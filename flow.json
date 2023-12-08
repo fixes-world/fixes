@@ -1,31 +1,80 @@
 {
-  "contracts": {},
-  "networks": {
-    "emulator": "127.0.0.1:3569",
-    "mainnet": "access.mainnet.nodes.onflow.org:9000",
-    "sandboxnet": "access.sandboxnet.nodes.onflow.org:9000",
-    "testnet": "access.devnet.nodes.onflow.org:9000"
-  },
-  "accounts": {
-    "emulator-account": {
-      "address": "service",
-      "key": "625fa26301b5d54d3be6aec70213c8c9a0dcb4bd22a78041cb0d8c6e7d19627e"
-    },
-    "emulator-flow": {
-      "address": "0ae53cb6e3f42a79",
-      "key": "625fa26301b5d54d3be6aec70213c8c9a0dcb4bd22a78041cb0d8c6e7d19627e"
-    },
-    "default": {
-      "address": "01cf0e2f2f715450",
-      "key": "625fa26301b5d54d3be6aec70213c8c9a0dcb4bd22a78041cb0d8c6e7d19627e"
-    }
-  },
-  "deployments": {
-    "emulator": {
-      "default": [],
-      "emulator-account": [],
-      "emulator-flow": []
-    },
-    "testnet": {}
-  }
+	"contracts": {
+		"FlowToken": {
+			"source": "cadence/contracts/deps/FlowToken.cdc",
+			"aliases": {
+				"emulator": "0ae53cb6e3f42a79",
+				"mainnet": "1654653399040a61",
+				"testnet": "7e60df042a9c0868"
+			}
+		},
+		"FungibleToken": {
+			"source": "cadence/contracts/deps/FungibleToken.cdc",
+			"aliases": {
+				"emulator": "ee82856bf20e2aa6",
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"FungibleTokenMetadataViews": {
+			"source": "cadence/contracts/deps/FungibleTokenMetadataViews.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"MetadataViews": {
+			"source": "cadence/contracts/deps/MetadataViews.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"NonFungibleToken": {
+			"source": "cadence/contracts/deps/NonFungibleToken.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"ViewResolver": {
+			"source": "cadence/contracts/deps/ViewResolver.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		}
+	},
+	"networks": {
+		"emulator": "127.0.0.1:3569",
+		"mainnet": "access.mainnet.nodes.onflow.org:9000",
+		"testnet": "access.devnet.nodes.onflow.org:9000"
+	},
+	"accounts": {
+		"default": {
+			"address": "f3fcd2c1a78f5eee",
+			"key": "625fa26301b5d54d3be6aec70213c8c9a0dcb4bd22a78041cb0d8c6e7d19627e"
+		},
+		"deps": {
+			"address": "e03daebed8ca0615",
+			"key": "625fa26301b5d54d3be6aec70213c8c9a0dcb4bd22a78041cb0d8c6e7d19627e"
+		},
+		"emulator-account": {
+			"address": "f8d6e0586b0a20c7",
+			"key": "625fa26301b5d54d3be6aec70213c8c9a0dcb4bd22a78041cb0d8c6e7d19627e"
+		}
+	},
+	"deployments": {
+		"emulator": {
+			"default": [],
+			"deps": [],
+			"emulator-account": [
+				"FungibleTokenMetadataViews"
+			]
+		}
+	}
 }
