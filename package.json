@@ -1,0 +1,17 @@
+{
+  "name": "fixes-contracts",
+  "version": "0.1.0",
+  "exports": {
+    "./contracts/*": "./contracts/*",
+    "./transactions/*": "./transactions/*",
+    "./scripts/*": "./scripts/*",
+    "./flow.json": "./flow.json"
+  },
+  "scripts": {
+    "deploy:emulator": "flow project deploy --update",
+    "deploy:testnet": "flow project deploy --update --network testnet",
+    "deploy:mainnet": "flow project deploy --update --network mainnet",
+    "fund:emulator": "flow transactions send ./transactions/for-dev/transfer-token.cdc 0x01cf0e2f2f715450 1000.0 --signer=emulator-account",
+    "dev": "pnpm deploy:emulator && pnpm init:emulator && pnpm fund:emulator"
+  }
+}
