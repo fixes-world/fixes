@@ -1,3 +1,5 @@
+import "MetadataViews"
+
 /// FIXES contract to store inscriptions
 ///
 pub contract Fixes {
@@ -9,12 +11,23 @@ pub contract Fixes {
 
     /* --- Interfaces & Resources --- */
 
+    /// The public interface to the inscriptions
     pub resource interface InscriptionPublic {
-
+        fun getId(): UInt64
+        fun getParentId(): UInt64
+        fun getMetadata(): [UInt8]
     }
 
-    pub resource Inscription: InscriptionPublic {
+    /// The resource that stores the inscriptions
+    pub resource Inscription: InscriptionPublic, MetadataViews.Resolver {
 
+        pub fun getViews(): [Type] {
+            return []
+        }
+
+        pub fun resolveView(_ view: Type): AnyStruct? {
+            return nil
+        }
     }
 
     /* --- Methods --- */
