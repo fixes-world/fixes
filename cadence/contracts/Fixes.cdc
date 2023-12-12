@@ -7,7 +7,7 @@ pub contract Fixes {
     /// Event emitted when the contract is initialized
     pub event ContractInitialized()
     /// Event emitted when a new inscription is created
-    pub event NewInscriptionCreated(
+    pub event InscriptionCreated(
         id: UInt64,
         mimeType: String,
         metadata: [UInt8],
@@ -186,7 +186,7 @@ pub contract Fixes {
             parentId: parentId
         )
         // emit event
-        emit NewInscriptionCreated(
+        emit InscriptionCreated(
             id: ins.getId(),
             mimeType: ins.getMimeType(),
             metadata: ins.getMetadata(),
