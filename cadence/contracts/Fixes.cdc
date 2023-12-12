@@ -147,12 +147,17 @@ pub contract Fixes {
         fun updateInscriptionOwner(ref: &Inscription) {
             let owner = ref.owner?.address ?? panic("Inscription must have an owner to be registered")
             let id = ref.getId()
-            self.mapping[id] = owner
 
-            emit InscriptionOwnerUpdated(
-                id: id,
-                owner: owner
-            )
+            if let oldOwner = self.mapping[id] {
+                if oldOwner != owner {
+                    self.mapping[id] = owner
+
+                    emit InscriptionOwnerUpdated(
+                        id: id,
+                        owner: owner
+                    )
+                }
+            }
         }
 
         access(all)
