@@ -1,7 +1,15 @@
 {
 	"contracts": {
-		"Fixes": "cadence/contracts/Fixes.cdc",
+		"ArrayUtils": {
+			"source": "cadence/contracts/deps/ArrayUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
 		"FRC20Indexer": "cadence/contracts/FRC20Indexer.cdc",
+		"Fixes": "cadence/contracts/Fixes.cdc",
 		"FlowToken": {
 			"source": "cadence/contracts/deps/FlowToken.cdc",
 			"aliases": {
@@ -42,6 +50,14 @@
 				"testnet": "631e88ae7f1d7c20"
 			}
 		},
+		"StringUtils": {
+			"source": "cadence/contracts/deps/StringUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
 		"ViewResolver": {
 			"source": "cadence/contracts/deps/ViewResolver.cdc",
 			"aliases": {
@@ -73,11 +89,14 @@
 	"deployments": {
 		"emulator": {
 			"default": [
+				"FRC20Indexer",
 				"Fixes"
 			],
 			"deps": [],
 			"emulator-account": [
-				"FungibleTokenMetadataViews"
+				"FungibleTokenMetadataViews",
+				"StringUtils",
+				"ArrayUtils"
 			]
 		}
 	}

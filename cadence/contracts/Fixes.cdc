@@ -30,12 +30,12 @@ pub contract Fixes {
     /// The rarity of a Inscription value
     ///
     pub enum ValueRarity: UInt8 {
-        case Common
-        case Uncommon
-        case Rare
-        case SuperRare
-        case Epic
-        case Legendary
+        pub case Common
+        pub case Uncommon
+        pub case Rare
+        pub case SuperRare
+        pub case Epic
+        pub case Legendary
     }
 
     /// The data of an inscription
