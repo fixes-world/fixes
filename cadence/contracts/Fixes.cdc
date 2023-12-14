@@ -87,6 +87,8 @@ pub contract Fixes {
         fun getInscriptionMinValue(): UFix64
         access(all) view
         fun getInscriptionRarity(): ValueRarity
+        access(all) view
+        fun isExacted(): Bool
     }
 
     /// The resource that stores the inscriptions
@@ -127,12 +129,19 @@ pub contract Fixes {
 
         /** ------ Functionality ------  */
 
+        /// Check if the inscription is exacted
+        ///
+        access(all) view
+        fun isExacted(): Bool {
+            return self.value == nil
+        }
+
         /// Fuse the inscription with another inscription
         ///
         access(all)
         fun fuse(_ other: @Inscription) {
             pre {
-                self.value != nil: "Inscription already exacted"
+                !self.isExacted(): "Inscription already exacted"
             }
             let otherValue <- other.exact()
             let from = other.getId()
@@ -153,10 +162,10 @@ pub contract Fixes {
         access(all)
         fun exact(): @FlowToken.Vault {
             pre {
-                self.value != nil: "Inscription already exacted"
+                !self.isExacted(): "Inscription already exacted"
             }
             post {
-                self.value == nil: "Inscription exacted"
+                self.isExacted(): "Inscription exacted"
             }
             let balance = self.value?.balance ?? panic("No value")
             let res <- self.value <- nil
