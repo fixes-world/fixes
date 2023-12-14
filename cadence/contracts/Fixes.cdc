@@ -18,7 +18,7 @@ pub contract Fixes {
         parentId: UInt64?,
     )
     pub event InscriptionBurned(id: UInt64)
-    pub event InscriptionExacted(id: UInt64, value: UFix64)
+    pub event InscriptionExtracted(id: UInt64, value: UFix64)
     pub event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
 
     /* --- Variable, Enums and Structs --- */
@@ -88,7 +88,9 @@ pub contract Fixes {
         access(all) view
         fun getInscriptionRarity(): ValueRarity
         access(all) view
-        fun isExacted(): Bool
+        fun isExtracted(): Bool
+        access(all) view
+        fun isExtractable(): Bool
     }
 
     /// The resource that stores the inscriptions
@@ -129,11 +131,18 @@ pub contract Fixes {
 
         /** ------ Functionality ------  */
 
-        /// Check if the inscription is exacted
+        /// Check if the inscription is extracted
         ///
         access(all) view
-        fun isExacted(): Bool {
+        fun isExtracted(): Bool {
             return self.value == nil
+        }
+
+        /// Check if the inscription is not extracted and has an owner
+        ///
+        access(all) view
+        fun isExtractable(): Bool {
+            return !self.isExtracted() && self.owner != nil
         }
 
         /// Fuse the inscription with another inscription
@@ -141,7 +150,7 @@ pub contract Fixes {
         access(all)
         fun fuse(_ other: @Inscription) {
             pre {
-                !self.isExacted(): "Inscription already exacted"
+                !self.isExtracted(): "Inscription already extracted"
             }
             let otherValue <- other.exact()
             let from = other.getId()
@@ -162,14 +171,14 @@ pub contract Fixes {
         access(all)
         fun exact(): @FlowToken.Vault {
             pre {
-                !self.isExacted(): "Inscription already exacted"
+                !self.isExtracted(): "Inscription already extracted"
             }
             post {
-                self.isExacted(): "Inscription exacted"
+                self.isExtracted(): "Inscription extracted"
             }
             let balance = self.value?.balance ?? panic("No value")
             let res <- self.value <- nil
-            emit InscriptionExacted(id: self.id, value: balance)
+            emit InscriptionExtracted(id: self.id, value: balance)
             return <- res!
         }
 
