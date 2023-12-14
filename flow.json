@@ -1,6 +1,7 @@
 {
 	"contracts": {
 		"Fixes": "cadence/contracts/Fixes.cdc",
+		"FRC20Indexer": "cadence/contracts/FRC20Indexer.cdc",
 		"FlowToken": {
 			"source": "cadence/contracts/deps/FlowToken.cdc",
 			"aliases": {

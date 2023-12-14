@@ -1,4 +1,5 @@
 import "MetadataViews"
+import "FlowToken"
 
 /// FIXES contract to store inscriptions
 ///
@@ -11,36 +12,81 @@ pub contract Fixes {
         id: UInt64,
         mimeType: String,
         metadata: [UInt8],
+        value: UFix64,
         metaProtocol: String?,
         encoding: String?,
-        parentId: UInt64?
+        parentId: UInt64?,
     )
-    /// Event emitted when the owner of an inscription is updated
-    pub event InscriptionOwnerUpdated(
-        id: UInt64,
-        owner: Address
-    )
+    pub event InscriptionBurned(id: UInt64)
+    pub event InscriptionExacted(id: UInt64, value: UFix64)
+    pub event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
 
     /* --- Variable, Enums and Structs --- */
-    access(all)
-    let IndexerStoragePath: StoragePath
-    access(all)
-    let IndexerPublicPath: PublicPath
-
     access(contract)
     var totalInscriptions: UInt64
 
     /* --- Interfaces & Resources --- */
 
+    /// The rarity of a Inscription value
+    ///
+    pub enum ValueRarity: UInt8 {
+        case Common
+        case Uncommon
+        case Rare
+        case SuperRare
+        case Epic
+        case Legendary
+    }
+
+    /// The data of an inscription
+    ///
+    pub struct InscriptionData {
+        /// whose value is the MIME type of the inscription
+        access(all) let mimeType: String
+        /// The metadata content of the inscription
+        access(all) let metadata: [UInt8]
+        /// The protocol used to encode the metadata
+        access(all) let metaProtocol: String?
+        /// The encoding used to encode the metadata
+        access(all) let encoding: String?
+
+        init(
+            _ mimeType: String,
+            _ metadata: [UInt8],
+            _ metaProtocol: String?,
+            _ encoding: String?
+        ) {
+            self.mimeType = mimeType
+            self.metadata = metadata
+            self.metaProtocol = metaProtocol
+            self.encoding = encoding
+        }
+    }
+
     /// The public interface to the inscriptions
     ///
     pub resource interface InscriptionPublic {
-        access(all) fun getId(): UInt64
-        access(all) fun getParentId(): UInt64?
-        access(all) fun getMimeType(): String
-        access(all) fun getMetadata(): [UInt8]
-        access(all) fun getMetaProtocol(): String?
-        access(all) fun getContentEncoding(): String?
+        // identifiers
+        access(all) view
+        fun getId(): UInt64
+        access(all) view
+        fun getParentId(): UInt64?
+        // data
+        access(all) view
+        fun getData(): InscriptionData
+        access(all) view
+        fun getMimeType(): String
+        access(all) view
+        fun getMetadata(): [UInt8]
+        access(all) view
+        fun getMetaProtocol(): String?
+        access(all) view
+        fun getContentEncoding(): String?
+        // attributes
+        access(all) view
+        fun getInscriptionMinValue(): UFix64
+        access(all) view
+        fun getInscriptionRarity(): ValueRarity
     }
 
     /// The resource that stores the inscriptions
@@ -50,119 +96,163 @@ pub contract Fixes {
         access(self) let id: UInt64
         /// the id of the parent inscription
         access(self) let parentId: UInt64?
-        /// whose value is the MIME type of the inscription
-        access(self) let mimeType: String
-        /// The metadata content of the inscription
-        access(self) let metadata: [UInt8]
-        /// The protocol used to encode the metadata
-        access(self) let metaProtocol: String?
-        /// The encoding used to encode the metadata
-        access(self) let encoding: String?
+        /// the data of the inscription
+        access(self) let data: InscriptionData
+        /// the inscription value
+        access(self) var value: @FlowToken.Vault?
 
         init(
+            value: @FlowToken.Vault,
             mimeType: String,
             metadata: [UInt8],
             metaProtocol: String?,
             encoding: String?,
             parentId: UInt64?
         ) {
+            post {
+                self.value?.balance ?? panic("No value") >= self.getInscriptionMinValue(): "Inscription value should be bigger than minimium $FLOW at least."
+            }
             self.id = Fixes.totalInscriptions
             Fixes.totalInscriptions = Fixes.totalInscriptions + 1
-
-            self.mimeType = mimeType
-            self.metadata = metadata
-            self.metaProtocol = metaProtocol
-            self.encoding = encoding
             self.parentId = parentId
+
+            self.data = InscriptionData(mimeType, metadata, metaProtocol, encoding)
+            self.value <- value
+        }
+
+        destroy() {
+            destroy self.value
+            emit InscriptionBurned(id: self.id)
+        }
+
+        /** ------ Functionality ------  */
+
+        access(all)
+        fun fuse(_ other: @Inscription) {
+            pre {
+                self.value != nil: "Inscription already exacted"
+            }
+            let otherValue <- other.exact()
+            let from = other.getId()
+            let fusedValue = otherValue.balance
+            destroy other
+            let selfValue = (&self.value as &FlowToken.Vault?)!
+            selfValue.deposit(from: <- otherValue)
+
+            emit InscriptionFused(
+                from: from,
+                to: self.getId(),
+                value: fusedValue
+            )
+        }
+
+        access(contract)
+        fun exact(): @FlowToken.Vault {
+            pre {
+                self.value != nil: "Inscription already exacted"
+            }
+            post {
+                self.value == nil: "Inscription exacted"
+            }
+            let balance = self.value?.balance ?? panic("No value")
+            let res <- self.value <- nil
+            emit InscriptionExacted(id: self.id, value: balance)
+            return <- res!
+        }
+
+        access(all) view
+        fun getInscriptionMinValue(): UFix64 {
+            return UFix64(self.data.metadata.length) * 0.001
+        }
+
+        access(all) view
+        fun getInscriptionRarity(): ValueRarity {
+            let value = self.value?.balance ?? panic("No value")
+            if value <= 0.1 { // 0.001 ~ 0.1
+                return ValueRarity.Common
+            } else if value <= 10.0 { // 0.1 ~ 10
+                return ValueRarity.Uncommon
+            } else if value <= 1000.0 { // 10 ~ 1000
+                return ValueRarity.Rare
+            } else if value <= 10000.0 { // 1000 ~ 10000
+                return ValueRarity.SuperRare
+            } else if value <= 100000.0 { // 10000 ~ 100000
+                return ValueRarity.Epic
+            } else { // 100000 ~
+                return ValueRarity.Legendary
+            }
         }
 
         /** ---- Implementation of InscriptionPublic ---- */
 
-        access(all)
+        access(all) view
         fun getId(): UInt64 {
             return self.id
         }
 
-        access(all)
+        access(all) view
         fun getParentId(): UInt64? {
             return self.parentId
         }
 
-        access(all)
+        access(all) view
+        fun getData(): InscriptionData {
+            return self.data
+        }
+
+        access(all) view
         fun getMimeType(): String {
-            return self.mimeType
+            return self.data.mimeType
         }
 
-        access(all)
+        access(all) view
         fun getMetadata(): [UInt8] {
-            return self.metadata
+            return self.data.metadata
         }
 
-        access(all)
+        access(all) view
         fun getMetaProtocol(): String? {
-            return self.metaProtocol
+            return self.data.metaProtocol
         }
 
-        access(all)
+        access(all) view
         fun getContentEncoding(): String? {
-            return self.encoding
+            return self.data.encoding
         }
 
         /** ---- Implementation of MetadataViews.Resolver ---- */
 
         pub fun getViews(): [Type] {
             return [
+                Type<MetadataViews.Rarity>(),
                 Type<MetadataViews.Traits>()
             ]
         }
 
         pub fun resolveView(_ view: Type): AnyStruct? {
+            let rarity = self.getInscriptionRarity()
+            let ratityView = MetadataViews.Rarity(
+                UFix64(rarity.rawValue),
+                UFix64(ValueRarity.Legendary.rawValue),
+                nil
+            )
             switch view {
+            case Type<MetadataViews.Rarity>():
+                return ratityView
             case Type<MetadataViews.Traits>():
                 return MetadataViews.Traits([
-                    MetadataViews.Trait(name: "id", value: self.getId(), nil, nil),
-                    MetadataViews.Trait(name: "parentId", value: self.getParentId(), nil, nil),
                     MetadataViews.Trait(name: "mimeType", value: self.getMimeType(), nil, nil),
                     MetadataViews.Trait(name: "metaProtocol", value: self.getMetaProtocol(), nil, nil),
-                    MetadataViews.Trait(name: "encoding", value: self.getContentEncoding(), nil, nil)
+                    MetadataViews.Trait(name: "encoding", value: self.getContentEncoding(), nil, nil),
+                    MetadataViews.Trait(
+                        name: "rarity",
+                        value: rarity.rawValue,
+                        nil,
+                        ratityView
+                    )
                 ])
             }
             return nil
-        }
-    }
-
-    /// The resource that stores the inscriptions mapping
-    ///
-    pub resource InscriptionIndexer {
-        /// The mapping between the inscription id and the owner
-        ///
-        access(self)
-        let mapping: {UInt64: Address}
-
-        init() {
-            self.mapping = {}
-        }
-
-        access(all)
-        fun updateInscriptionOwner(ref: &Inscription) {
-            let owner = ref.owner?.address ?? panic("Inscription must have an owner to be registered")
-            let id = ref.getId()
-
-            if let oldOwner = self.mapping[id] {
-                if oldOwner != owner {
-                    self.mapping[id] = owner
-
-                    emit InscriptionOwnerUpdated(
-                        id: id,
-                        owner: owner
-                    )
-                }
-            }
-        }
-
-        access(all)
-        fun getOwner(id: UInt64): Address? {
-            return self.mapping[id]
         }
     }
 
@@ -172,13 +262,16 @@ pub contract Fixes {
     ///
     access(all)
     fun createInscription(
+        value: @FlowToken.Vault,
         mimeType: String,
         metadata: [UInt8],
         metaProtocol: String?,
         encoding: String?,
         parentId: UInt64?
     ): @Inscription {
+        let bal = value.balance
         let ins <- create Inscription(
+            value: <- value,
             mimeType: mimeType,
             metadata: metadata,
             metaProtocol: metaProtocol,
@@ -190,22 +283,12 @@ pub contract Fixes {
             id: ins.getId(),
             mimeType: ins.getMimeType(),
             metadata: ins.getMetadata(),
+            value: bal,
             metaProtocol: ins.getMetaProtocol(),
             encoding: ins.getContentEncoding(),
-            parentId: ins.getParentId()
+            parentId: ins.getParentId(),
         )
         return <- ins
-    }
-
-    /// Get the inscription indexer
-    ///
-    access(all)
-    fun getIndexer(): &InscriptionIndexer {
-        let addr = self.account.address
-        let cap = getAccount(addr)
-            .capabilities
-            .borrow<&InscriptionIndexer>(self.IndexerPublicPath)
-        return cap ?? panic("Could not borrow InscriptionIndexer")
     }
 
     /// Get the storage path of a inscription
@@ -220,14 +303,6 @@ pub contract Fixes {
 
     init() {
         self.totalInscriptions = 0
-
-        let identifier = "FixesIndexer_".concat(self.account.address.toString())
-        self.IndexerStoragePath = StoragePath(identifier: identifier)!
-        self.IndexerPublicPath = PublicPath(identifier: identifier)!
-        // create the indexer
-        self.account.save<@InscriptionIndexer>(<- create InscriptionIndexer(), to: self.IndexerStoragePath)
-        let cap = self.account.capabilities.storage.issue<&InscriptionIndexer>(self.IndexerStoragePath)
-        self.account.capabilities.publish(cap, at: self.IndexerPublicPath)
 
         emit ContractInitialized()
     }
