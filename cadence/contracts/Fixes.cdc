@@ -127,6 +127,8 @@ pub contract Fixes {
 
         /** ------ Functionality ------  */
 
+        /// Fuse the inscription with another inscription
+        ///
         access(all)
         fun fuse(_ other: @Inscription) {
             pre {
@@ -146,7 +148,9 @@ pub contract Fixes {
             )
         }
 
-        access(contract)
+        /// Exact the inscription value
+        ///
+        access(all)
         fun exact(): @FlowToken.Vault {
             pre {
                 self.value != nil: "Inscription already exacted"
@@ -160,11 +164,15 @@ pub contract Fixes {
             return <- res!
         }
 
+        /// Get the minimum value of the inscription
+        ///
         access(all) view
         fun getInscriptionMinValue(): UFix64 {
             return UFix64(self.data.metadata.length) * 0.001
         }
 
+        /// Get the rarity of the inscription
+        ///
         access(all) view
         fun getInscriptionRarity(): ValueRarity {
             let value = self.value?.balance ?? panic("No value")
