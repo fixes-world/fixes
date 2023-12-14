@@ -152,7 +152,7 @@ pub contract Fixes {
             pre {
                 !self.isExtracted(): "Inscription already extracted"
             }
-            let otherValue <- other.exact()
+            let otherValue <- other.extract()
             let from = other.getId()
             let fusedValue = otherValue.balance
             destroy other
@@ -166,10 +166,10 @@ pub contract Fixes {
             )
         }
 
-        /// Exact the inscription value
+        /// Extract the inscription value
         ///
         access(all)
-        fun exact(): @FlowToken.Vault {
+        fun extract(): @FlowToken.Vault {
             pre {
                 !self.isExtracted(): "Inscription already extracted"
             }
