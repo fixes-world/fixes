@@ -12,7 +12,7 @@ pub contract FRC20Indexer {
     /// Event emitted when a FRC20 token is minted
     pub event FRC20Minted(tick: String, amount: UFix64, to: Address)
     /// Event emitted when the owner of an inscription is updated
-    pub event FRC20Transfer(from: Address, to: Address, amount: UFix64)
+    pub event FRC20Transfer(tick: String, from: Address, to: Address, amount: UFix64)
     /// Event emitted when a FRC20 token is burned
     pub event FRC20Burned(tick: String, amount: UFix64, from: Address, flowExtracted: UFix64)
 
@@ -334,6 +334,7 @@ pub contract FRC20Indexer {
 
             // emit event
             emit FRC20Transfer(
+                tick: tick,
                 from: fromAddr,
                 to: to,
                 amount: amt
