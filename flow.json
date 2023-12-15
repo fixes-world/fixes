@@ -1,7 +1,7 @@
 {
 	"contracts": {
 		"ArrayUtils": {
-			"source": "cadence/contracts/deps/ArrayUtils.cdc",
+			"source": "cadence/deps/ArrayUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
@@ -11,7 +11,7 @@
 		"FRC20Indexer": "cadence/contracts/FRC20Indexer.cdc",
 		"Fixes": "cadence/contracts/Fixes.cdc",
 		"FlowToken": {
-			"source": "cadence/contracts/deps/FlowToken.cdc",
+			"source": "cadence/deps/FlowToken.cdc",
 			"aliases": {
 				"emulator": "0ae53cb6e3f42a79",
 				"mainnet": "1654653399040a61",
@@ -19,7 +19,7 @@
 			}
 		},
 		"FungibleToken": {
-			"source": "cadence/contracts/deps/FungibleToken.cdc",
+			"source": "cadence/deps/FungibleToken.cdc",
 			"aliases": {
 				"emulator": "ee82856bf20e2aa6",
 				"mainnet": "f233dcee88fe0abe",
@@ -27,7 +27,7 @@
 			}
 		},
 		"FungibleTokenMetadataViews": {
-			"source": "cadence/contracts/deps/FungibleTokenMetadataViews.cdc",
+			"source": "cadence/deps/FungibleTokenMetadataViews.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "f233dcee88fe0abe",
@@ -35,7 +35,7 @@
 			}
 		},
 		"MetadataViews": {
-			"source": "cadence/contracts/deps/MetadataViews.cdc",
+			"source": "cadence/deps/MetadataViews.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
@@ -43,7 +43,7 @@
 			}
 		},
 		"NonFungibleToken": {
-			"source": "cadence/contracts/deps/NonFungibleToken.cdc",
+			"source": "cadence/deps/NonFungibleToken.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
@@ -51,7 +51,7 @@
 			}
 		},
 		"StringUtils": {
-			"source": "cadence/contracts/deps/StringUtils.cdc",
+			"source": "cadence/deps/StringUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
@@ -59,7 +59,7 @@
 			}
 		},
 		"ViewResolver": {
-			"source": "cadence/contracts/deps/ViewResolver.cdc",
+			"source": "cadence/deps/ViewResolver.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
@@ -74,7 +74,7 @@
 	},
 	"accounts": {
 		"default": {
-			"address": "e03daebed8ca0615",
+			"address": "06909bc5ba14c266",
 			"key": "625fa26301b5d54d3be6aec70213c8c9a0dcb4bd22a78041cb0d8c6e7d19627e"
 		},
 		"deps": {
@@ -92,7 +92,6 @@
 				"FRC20Indexer",
 				"Fixes"
 			],
-			"deps": [],
 			"emulator-account": [
 				"FungibleTokenMetadataViews",
 				"StringUtils",
