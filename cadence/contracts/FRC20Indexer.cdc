@@ -381,7 +381,7 @@ pub contract FRC20Indexer {
             let restAmt = tokenMeta.supplied.saturatingSubtract(oldBurned)
             if restAmt > 0.0 {
                 let flowTokenToExtract = flowPool.balance * amt / restAmt
-                let flowExtracted <- flowPool.withdraw(amount: flowTokenToExtract) as! @FlowToken.Vault
+                let flowExtracted <- flowPool.withdraw(amount: flowTokenToExtract)
                 // emit event
                 emit FRC20Burned(
                     tick: tick,
@@ -389,7 +389,7 @@ pub contract FRC20Indexer {
                     from: fromAddr,
                     flowExtracted: flowExtracted.balance
                 )
-                return <- flowExtracted
+                return <- (flowExtracted as! @FlowToken.Vault)
             } else {
                 return <- (FlowToken.createEmptyVault() as! @FlowToken.Vault)
             }
