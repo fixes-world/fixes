@@ -71,6 +71,9 @@ pub contract FRC20Indexer {
         /// Get the balance of a FRC20 token
         access(all) view
         fun getBalance(tick: String, addr: Address): UFix64
+        /// Get all balances of some address
+        access(all) view
+        fun getBalances(addr: Address): {String: UFix64}
         /* --- write --- */
         /// Deploy a new FRC20 token
         access(all)
@@ -136,6 +139,21 @@ pub contract FRC20Indexer {
         fun getBalance(tick: String, addr: Address): UFix64 {
             let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
             return balancesRef[addr] ?? 0.0
+        }
+
+        /// Get all balances of some address
+        ///
+        access(all) view
+        fun getBalances(addr: Address): {String: UFix64} {
+            let ret: {String: UFix64} = {}
+            for tick in self.tokens.keys {
+                let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+                let balance = balancesRef[addr] ?? 0.0
+                if balance > 0.0 {
+                    ret[tick] = balance
+                }
+            }
+            return ret
         }
 
         /// Check if an inscription is a valid FRC20 inscription
