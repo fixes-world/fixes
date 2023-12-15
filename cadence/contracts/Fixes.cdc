@@ -186,7 +186,14 @@ pub contract Fixes {
         ///
         access(all) view
         fun getInscriptionMinValue(): UFix64 {
-            return UFix64(self.data.metadata.length) * 0.001
+            let data = self.data
+            return Fixes.estimateValue(
+                index: self.getId(),
+                mimeType: data.mimeType,
+                data: data.metadata,
+                protocol: data.metaProtocol,
+                encoding: data.encoding
+            )
         }
 
         /// Get the rarity of the inscription
@@ -317,9 +324,24 @@ pub contract Fixes {
         return <- ins
     }
 
+    access(all) view
+    fun estimateValue(
+        index: UInt64,
+        mimeType: String,
+        data: [UInt8],
+        protocol: String?,
+        encoding: String?
+    ): UFix64 {
+        let bytes = UFix64(
+            (mimeType.length + (protocol != nil ? protocol!.length : 0) + (encoding != nil ? encoding!.length : 0)) * 3
+        ) + UFix64(data.length)
+        + UFix64(index / UInt64(UInt8.max) + 1)
+        return bytes * 0.001
+    }
+
     /// Get the storage path of a inscription
     ///
-    access(all)
+    access(all) view
     fun getFixesStoragePath(index: UInt64): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
