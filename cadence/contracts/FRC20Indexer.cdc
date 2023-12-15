@@ -59,6 +59,9 @@ pub contract FRC20Indexer {
 
     pub resource interface IndexerPublic {
         /* --- read-only --- */
+        /// Get all the tokens
+        access(all) view
+        fun getTokens(): [String]
         /// Get the meta-info of a token
         access(all) view
         fun getTokenMeta(tick: String): FRC20Meta?
@@ -112,6 +115,13 @@ pub contract FRC20Indexer {
         }
 
         /* ---- Public methds ---- */
+
+        /// Get all the tokens
+        ///
+        access(all) view
+        fun getTokens(): [String] {
+            return self.tokens.keys
+        }
 
         /// Get the meta-info of a token
         ///
