@@ -74,6 +74,12 @@ pub contract FRC20Indexer {
         /// Get all balances of some address
         access(all) view
         fun getBalances(addr: Address): {String: UFix64}
+        /// Get the holders of a FRC20 token
+        access(all) view
+        fun getHolders(tick: String): [Address]
+        /// Get the amount of holders of a FRC20 token
+        access(all) view
+        fun getHoldersAmount(tick: String): UInt64
         /* --- write --- */
         /// Deploy a new FRC20 token
         access(all)
@@ -154,6 +160,19 @@ pub contract FRC20Indexer {
                 }
             }
             return ret
+        }
+
+        /// Get the holders of a FRC20 token
+        access(all) view
+        fun getHolders(tick: String): [Address] {
+            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+            return balancesRef.keys
+        }
+
+        /// Get the amount of holders of a FRC20 token
+        access(all) view
+        fun getHoldersAmount(tick: String): UInt64 {
+            return UInt64(self.getHolders(tick: tick).length)
         }
 
         /// Check if an inscription is a valid FRC20 inscription
