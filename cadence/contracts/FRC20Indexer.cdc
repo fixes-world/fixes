@@ -249,6 +249,10 @@ pub contract FRC20Indexer {
                 message: "The token has not been deployed"
             )
             let tokenMeta = self.borrowTokenMeta(tick: tick)
+            assert(
+                tokenMeta.supplied < tokenMeta.max,
+                message: "The token has reached the max supply"
+            )
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let fromAddr = ins.owner!.address
 
@@ -356,6 +360,10 @@ pub contract FRC20Indexer {
                 message: "The token has not been deployed"
             )
             let tokenMeta = self.borrowTokenMeta(tick: tick)
+            assert(
+                tokenMeta.supplied > tokenMeta.burned,
+                message: "The token has been burned out"
+            )
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let fromAddr = ins.owner!.address
 
