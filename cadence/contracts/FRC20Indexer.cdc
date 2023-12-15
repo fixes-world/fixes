@@ -58,18 +58,27 @@ pub contract FRC20Indexer {
     }
 
     pub resource interface IndexerPublic {
-        // read-only
+        /* --- read-only --- */
+        /// Get the meta-info of a token
         access(all) view
         fun getTokenMeta(tick: String): FRC20Meta?
+        /// Check if an inscription is a valid FRC20 inscription
         access(all) view
         fun isValidFRC20Inscription(ins: &Fixes.Inscription): Bool
-        // write
+        /// Get the balance of a FRC20 token
+        access(all) view
+        fun getBalance(tick: String, addr: Address): UFix64
+        /* --- write --- */
+        /// Deploy a new FRC20 token
         access(all)
         fun deploy(ins: &Fixes.Inscription)
+        /// Mint a FRC20 token
         access(all)
         fun mint(ins: &Fixes.Inscription)
+        /// Transfer a FRC20 token
         access(all)
         fun transfer(ins: &Fixes.Inscription)
+        /// Burn a FRC20 token
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
     }
@@ -111,6 +120,16 @@ pub contract FRC20Indexer {
             return self.tokens[tick]
         }
 
+        /// Get the balance of a FRC20 token
+        ///
+        access(all) view
+        fun getBalance(tick: String, addr: Address): UFix64 {
+            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+            return balancesRef[addr] ?? 0.0
+        }
+
+        /// Check if an inscription is a valid FRC20 inscription
+        ///
         access(all) view
         fun isValidFRC20Inscription(ins: &Fixes.Inscription): Bool {
             let p = ins.getMetaProtocol()
@@ -217,6 +236,8 @@ pub contract FRC20Indexer {
             )
         }
 
+        /// Transfer a FRC20 token
+        ///
         access(all)
         fun transfer(ins: &Fixes.Inscription) {
             pre {
