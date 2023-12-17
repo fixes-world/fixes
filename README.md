@@ -1,3 +1,3 @@
-# FIXeS - Flow Inscription Xero Slot
+# FIXES - Flow Inscriptions Xerox Exchange System
 
-The Inscription Protocol on Flow blockchain.
+The Inscriptions Protocol on Flow blockchain.
