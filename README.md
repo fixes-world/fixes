@@ -1,3 +1,3 @@
-# FIXES - Flow Inscriptions Xerox Exchange System
+# FIXeS: Flow Inscriptions Xerox System
 
 The Inscriptions Protocol on Flow blockchain.
