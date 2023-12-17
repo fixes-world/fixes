@@ -29,6 +29,7 @@ pub contract FRC20Indexer {
         access(all) let tick: String
         access(all) let max: UFix64
         access(all) let limit: UFix64
+        access(all) let deployAt: UFix64
         access(all) var supplied: UFix64
         access(all) var burned: UFix64
 
@@ -36,12 +37,14 @@ pub contract FRC20Indexer {
             tick: String,
             max: UFix64,
             limit: UFix64,
+            deployAt: UFix64,
             supplied: UFix64,
             burned: UFix64
         ) {
             self.tick = tick
             self.max = max
             self.limit = limit
+            self.deployAt = deployAt
             self.supplied = supplied
             self.burned = burned
         }
@@ -211,6 +214,7 @@ pub contract FRC20Indexer {
                 tick: tick,
                 max: max,
                 limit: limit,
+                deployAt: getCurrentBlock().timestamp,
                 supplied: 0.0,
                 burned: 0.0
             )
