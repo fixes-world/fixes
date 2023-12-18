@@ -275,6 +275,10 @@ pub contract FRC20Indexer {
                 message: "The token has reached the max supply"
             )
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            assert(
+                amt > 0.0 && amt <= tokenMeta.limit,
+                message: "The amount should be greater than 0.0 and less than the limit"
+            )
             let fromAddr = ins.owner!.address
 
             // get the balance mapping
