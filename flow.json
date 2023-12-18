@@ -89,8 +89,8 @@
 	"deployments": {
 		"emulator": {
 			"default": [
-				"FRC20Indexer",
-				"Fixes"
+				"Fixes",
+				"FRC20Indexer"
 			],
 			"emulator-account": [
 				"FungibleTokenMetadataViews",

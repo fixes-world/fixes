@@ -15,6 +15,8 @@ pub contract FRC20Indexer {
     pub event FRC20Transfer(tick: String, from: Address, to: Address, amount: UFix64)
     /// Event emitted when a FRC20 token is burned
     pub event FRC20Burned(tick: String, amount: UFix64, from: Address, flowExtracted: UFix64)
+    /// Event emitted when a FRC20 token is set to be burnable
+    pub event FRC20BurnableSet(tick: String, burnable: Bool)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -30,6 +32,8 @@ pub contract FRC20Indexer {
         access(all) let max: UFix64
         access(all) let limit: UFix64
         access(all) let deployAt: UFix64
+        access(all) let deployer: Address
+        access(all) var burnable: Bool
         access(all) var supplied: UFix64
         access(all) var burned: UFix64
 
@@ -38,6 +42,7 @@ pub contract FRC20Indexer {
             max: UFix64,
             limit: UFix64,
             deployAt: UFix64,
+            deployer: Address,
             supplied: UFix64,
             burned: UFix64
         ) {
@@ -45,8 +50,10 @@ pub contract FRC20Indexer {
             self.max = max
             self.limit = limit
             self.deployAt = deployAt
+            self.deployer = deployer
             self.supplied = supplied
             self.burned = burned
+            self.burnable = false
         }
 
         access(all)
@@ -57,6 +64,11 @@ pub contract FRC20Indexer {
         access(all)
         fun updateBurned(_ amt: UFix64) {
             self.burned = amt
+        }
+
+        access(all)
+        fun setBurnable(_ burnable: Bool) {
+            self.burnable = burnable
         }
     }
 
@@ -93,6 +105,9 @@ pub contract FRC20Indexer {
         /// Transfer a FRC20 token
         access(all)
         fun transfer(ins: &Fixes.Inscription)
+        /// Set a FRC20 token to be burnable
+        access(all)
+        fun setBurnable(ins: &Fixes.Inscription)
         /// Burn a FRC20 token
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
@@ -210,11 +225,13 @@ pub contract FRC20Indexer {
             )
             let max = UFix64.fromString(meta["max"]!) ?? panic("The max supply is not a valid UFix64")
             let limit = UFix64.fromString(meta["lim"]!) ?? panic("The limit is not a valid UFix64")
+            let deployer = ins.owner!.address
             self.tokens[tick] = FRC20Meta(
                 tick: tick,
                 max: max,
                 limit: limit,
                 deployAt: getCurrentBlock().timestamp,
+                deployer: deployer,
                 supplied: 0.0,
                 burned: 0.0
             )
@@ -229,7 +246,7 @@ pub contract FRC20Indexer {
                 tick: tick,
                 max: max,
                 limit: limit,
-                deployer: ins.owner!.address
+                deployer: deployer
             )
         }
 
@@ -345,6 +362,43 @@ pub contract FRC20Indexer {
             )
         }
 
+        /// Set a FRC20 token to be burnable
+        ///
+        access(all)
+        fun setBurnable(ins: &Fixes.Inscription) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+            }
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for setting burnable"
+            )
+
+            let tick = meta["tick"]!
+            assert(
+                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
+                message: "The token has not been deployed"
+            )
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            assert(
+                tokenMeta.deployer == ins.owner!.address,
+                message: "The deployer is not the owner of the inscription."
+            )
+            let isTrue = meta["v"]! == "true" || meta["v"]! == "1"
+            tokenMeta.setBurnable(isTrue)
+
+            // extract inscription
+            self.extractInscription(tick: tick, ins: ins)
+
+            // emit event
+            emit FRC20BurnableSet(
+                tick: tick,
+                burnable: isTrue
+            )
+        }
+
         /// Burn a FRC20 token
         ///
         access(all)
@@ -365,6 +419,10 @@ pub contract FRC20Indexer {
                 message: "The token has not been deployed"
             )
             let tokenMeta = self.borrowTokenMeta(tick: tick)
+            assert(
+                tokenMeta.burnable,
+                message: "The token is not burnable"
+            )
             assert(
                 tokenMeta.supplied > tokenMeta.burned,
                 message: "The token has been burned out"
