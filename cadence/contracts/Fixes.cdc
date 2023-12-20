@@ -336,7 +336,7 @@ pub contract Fixes {
             (mimeType.length + (protocol != nil ? protocol!.length : 0) + (encoding != nil ? encoding!.length : 0)) * 3
         ) + UFix64(data.length)
         + UFix64(index / UInt64(UInt8.max) + 1)
-        return bytes * 0.001
+        return bytes * 0.0001
     }
 
     /// Get the storage path of a inscription
