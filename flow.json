@@ -8,8 +8,18 @@
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
-		"FRC20Indexer": "cadence/contracts/FRC20Indexer.cdc",
-		"Fixes": "cadence/contracts/Fixes.cdc",
+		"FRC20Indexer": {
+			"source": "cadence/contracts/FRC20Indexer.cdc",
+			"aliases": {
+				"emulator": "01cf0e2f2f715450"
+			}
+		},
+		"Fixes": {
+			"source": "cadence/contracts/Fixes.cdc",
+			"aliases": {
+				"emulator": "01cf0e2f2f715450"
+			}
+		},
 		"FlowToken": {
 			"source": "cadence/deps/FlowToken.cdc",
 			"aliases": {
