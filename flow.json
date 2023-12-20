@@ -11,13 +11,13 @@
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
-				"emulator": "01cf0e2f2f715450"
+				"emulator": "f8d6e0586b0a20c7"
 			}
 		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
 			"aliases": {
-				"emulator": "01cf0e2f2f715450"
+				"emulator": "f8d6e0586b0a20c7"
 			}
 		},
 		"FlowToken": {
@@ -100,14 +100,13 @@
 	},
 	"deployments": {
 		"emulator": {
-			"default": [
-				"FRC20Indexer",
-				"Fixes"
-			],
+			"default": [],
 			"emulator-account": [
 				"FungibleTokenMetadataViews",
 				"StringUtils",
-				"ArrayUtils"
+				"ArrayUtils",
+				"FRC20Indexer",
+				"Fixes"
 			]
 		}
 	}
