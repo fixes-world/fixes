@@ -22,7 +22,7 @@ pub contract Fixes {
     pub event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
 
     /* --- Variable, Enums and Structs --- */
-    access(contract)
+    access(all)
     var totalInscriptions: UInt64
 
     /* --- Interfaces & Resources --- */
