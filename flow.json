@@ -74,7 +74,7 @@
 	},
 	"accounts": {
 		"default": {
-			"address": "f3fcd2c1a78f5eee",
+			"address": "01cf0e2f2f715450",
 			"key": {
 				"type": "file",
 				"location": "./emulator.key"
