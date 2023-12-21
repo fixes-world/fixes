@@ -49,6 +49,8 @@ pub contract Fixes {
         access(all) let metaProtocol: String?
         /// The encoding used to encode the metadata
         access(all) let encoding: String?
+        /// The timestamp of the inscription
+        access(all) let createdAt: UFix64
 
         init(
             _ mimeType: String,
@@ -60,6 +62,7 @@ pub contract Fixes {
             self.metadata = metadata
             self.metaProtocol = metaProtocol
             self.encoding = encoding
+            self.createdAt = getCurrentBlock().timestamp
         }
     }
 
