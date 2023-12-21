@@ -44,7 +44,8 @@ pub contract FRC20Indexer {
             deployAt: UFix64,
             deployer: Address,
             supplied: UFix64,
-            burned: UFix64
+            burned: UFix64,
+            burnable: Bool
         ) {
             self.tick = tick
             self.max = max
@@ -53,7 +54,7 @@ pub contract FRC20Indexer {
             self.deployer = deployer
             self.supplied = supplied
             self.burned = burned
-            self.burnable = false
+            self.burnable = burnable
         }
 
         access(all)
@@ -226,6 +227,7 @@ pub contract FRC20Indexer {
             let max = UFix64.fromString(meta["max"]!) ?? panic("The max supply is not a valid UFix64")
             let limit = UFix64.fromString(meta["lim"]!) ?? panic("The limit is not a valid UFix64")
             let deployer = ins.owner!.address
+            let burnable = meta["burnable"] == "true" || meta["burnable"] == "1" // default to false
             self.tokens[tick] = FRC20Meta(
                 tick: tick,
                 max: max,
@@ -233,7 +235,8 @@ pub contract FRC20Indexer {
                 deployAt: getCurrentBlock().timestamp,
                 deployer: deployer,
                 supplied: 0.0,
-                burned: 0.0
+                burned: 0.0,
+                burnable: burnable
             )
             self.balances[tick] = {} // init the balance mapping
             self.pool[tick] <-! FlowToken.createEmptyVault() as! @FlowToken.Vault // init the pool

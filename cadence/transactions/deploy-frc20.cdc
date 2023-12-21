@@ -6,6 +6,7 @@ transaction(
     tick: String,
     max: UFix64,
     limit: UFix64,
+    burnable: Bool,
 ) {
     let ins: &Fixes.Inscription
 
@@ -13,7 +14,10 @@ transaction(
         // basic attributes
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
-        let dataStr = "op=deploy,tick=".concat(tick).concat(",max=").concat(max.toString()).concat(",lim=").concat(limit.toString())
+        let dataStr = "op=deploy,tick=".concat(tick)
+            .concat(",max=").concat(max.toString())
+            .concat(",lim=").concat(limit.toString())
+            .concat(",burnable=").concat(burnable ? "1" : "0")
         let metadata = dataStr.utf8
 
         // estimate the required storage
