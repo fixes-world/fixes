@@ -36,7 +36,6 @@ pub struct Inscription {
     pub let protocol: String?;
     pub let encoding: String?;
     pub let metadata: [UInt8];
-    pub let dataStr: String?;
 
     init(
         owner: Address,
@@ -57,6 +56,5 @@ pub struct Inscription {
         self.protocol = data.metaProtocol
         self.encoding = data.encoding
         self.metadata = data.metadata
-        self.dataStr = data.encoding == nil || data.encoding == "utf8" ? String.fromUTF8(data.metadata) : ""
     }
 }
