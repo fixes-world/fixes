@@ -87,7 +87,9 @@ pub contract Fixes {
         fun getContentEncoding(): String?
         // attributes
         access(all) view
-        fun getInscriptionMinValue(): UFix64
+        fun getMinCost(): UFix64
+        access(all) view
+        fun getInscriptionValue(): UFix64
         access(all) view
         fun getInscriptionRarity(): ValueRarity
         access(all) view
@@ -117,7 +119,7 @@ pub contract Fixes {
             parentId: UInt64?
         ) {
             post {
-                self.value?.balance ?? panic("No value") >= self.getInscriptionMinValue(): "Inscription value should be bigger than minimium $FLOW at least."
+                self.value?.balance ?? panic("No value") >= self.getMinCost(): "Inscription value should be bigger than minimium $FLOW at least."
             }
             self.id = Fixes.totalInscriptions
             Fixes.totalInscriptions = Fixes.totalInscriptions + 1
@@ -188,7 +190,7 @@ pub contract Fixes {
         /// Get the minimum value of the inscription
         ///
         access(all) view
-        fun getInscriptionMinValue(): UFix64 {
+        fun getMinCost(): UFix64 {
             let data = self.data
             return Fixes.estimateValue(
                 index: self.getId(),
@@ -199,11 +201,18 @@ pub contract Fixes {
             )
         }
 
+        /// Get the value of the inscription
+        ///
+        access(all) view
+        fun getInscriptionValue(): UFix64 {
+            return self.value?.balance ?? 0.0
+        }
+
         /// Get the rarity of the inscription
         ///
         access(all) view
         fun getInscriptionRarity(): ValueRarity {
-            let value = self.value?.balance ?? panic("No value")
+            let value = self.value?.balance ??  0.0
             if value <= 0.1 { // 0.001 ~ 0.1
                 return ValueRarity.Common
             } else if value <= 10.0 { // 0.1 ~ 10
