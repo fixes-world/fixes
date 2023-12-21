@@ -14,7 +14,7 @@ pub fun main(
         data: data.utf8,
         protocol: protocol,
         encoding: nil
-    ) + 0.0001
+    ) + 0.0005
 
     let vaultRef = getAccount(payer)
         .getCapability(/public/flowTokenBalance)
