@@ -25,12 +25,18 @@ pub fun main(
 }
 
 pub struct Inscription {
-    pub let owner: Address
     pub let id: UInt64
-    pub let data: Fixes.InscriptionData
+    pub let parentId: UInt64?
+    pub let owner: Address
     pub let value: UFix64
     pub let rarity: UInt8
-    pub let parentId: UInt64?
+    // content
+    pub let createdAt: UFix64;
+    pub let mimeType: String
+    pub let protocol: String?;
+    pub let encoding: String?;
+    pub let metadata: [UInt8];
+    pub let dataStr: String?;
 
     init(
         owner: Address,
@@ -40,11 +46,17 @@ pub struct Inscription {
         rarity: UInt8,
         parentId: UInt64?
     ) {
-        self.owner = owner
         self.id = id
-        self.data = data
+        self.parentId = parentId
+        self.owner = owner
         self.value = value
         self.rarity = rarity
-        self.parentId = parentId
+
+        self.createdAt = data.createdAt
+        self.mimeType = data.mimeType
+        self.protocol = data.metaProtocol
+        self.encoding = data.encoding
+        self.metadata = data.metadata
+        self.dataStr = data.encoding == nil || data.encoding == "utf8" ? String.fromUTF8(data.metadata) : ""
     }
 }
