@@ -158,14 +158,14 @@ pub contract FRC20Indexer {
         ///
         access(all) view
         fun getTokenMeta(tick: String): FRC20Meta? {
-            return self.tokens[tick]
+            return self.tokens[tick.toLower()]
         }
 
         /// Get the balance of a FRC20 token
         ///
         access(all) view
         fun getBalance(tick: String, addr: Address): UFix64 {
-            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+            let balancesRef = (&self.balances[tick.toLower()] as &{Address: UFix64}?)!
             return balancesRef[addr] ?? 0.0
         }
 
@@ -187,21 +187,21 @@ pub contract FRC20Indexer {
         /// Get the holders of a FRC20 token
         access(all) view
         fun getHolders(tick: String): [Address] {
-            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+            let balancesRef = (&self.balances[tick.toLower()] as &{Address: UFix64}?)!
             return balancesRef.keys
         }
 
         /// Get the amount of holders of a FRC20 token
         access(all) view
         fun getHoldersAmount(tick: String): UInt64 {
-            return UInt64(self.getHolders(tick: tick).length)
+            return UInt64(self.getHolders(tick: tick.toLower()).length)
         }
 
         /// Get the pool balance of a FRC20 token
         ///
         access(all) view
         fun getPoolBalance(tick: String): UFix64 {
-            let pool = (&self.pool[tick] as &FlowToken.Vault?)!
+            let pool = (&self.pool[tick.toLower()] as &FlowToken.Vault?)!
             return pool.balance
         }
 
@@ -230,7 +230,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for deployment"
             )
 
-            let tick = meta["tick"]!
+            let tick = meta["tick"]!.toLower()
             assert(
                 self.tokens[tick] == nil && self.balances[tick] == nil && self.pool[tick] == nil,
                 message: "The token has already been deployed"
@@ -278,7 +278,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for minting"
             )
 
-            let tick = meta["tick"]!
+            let tick = meta["tick"]!.toLower()
             assert(
                 self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
                 message: "The token has not been deployed"
@@ -340,7 +340,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for transfer"
             )
 
-            let tick = meta["tick"]!
+            let tick = meta["tick"]!.toLower()
             assert(
                 self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
                 message: "The token has not been deployed"
@@ -394,7 +394,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for setting burnable"
             )
 
-            let tick = meta["tick"]!
+            let tick = meta["tick"]!.toLower()
             assert(
                 self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
                 message: "The token has not been deployed"
@@ -431,7 +431,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for burning"
             )
 
-            let tick = meta["tick"]!
+            let tick = meta["tick"]!.toLower()
             assert(
                 self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
                 message: "The token has not been deployed"
@@ -535,7 +535,7 @@ pub contract FRC20Indexer {
 
         access(self)
         fun borrowTokenMeta(tick: String): &FRC20Meta {
-            let meta = &self.tokens[tick] as &FRC20Meta?
+            let meta = &self.tokens[tick.toLower()] as &FRC20Meta?
             return meta ?? panic("The token meta is not found")
         }
     }
