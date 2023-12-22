@@ -96,6 +96,9 @@ pub contract FRC20Indexer {
         /// Get the amount of holders of a FRC20 token
         access(all) view
         fun getHoldersAmount(tick: String): UInt64
+        /// Get the pool balance of a FRC20 token
+        access(all) view
+        fun getPoolBalance(tick: String): UFix64
         /* --- write --- */
         /// Deploy a new FRC20 token
         access(all)
@@ -192,6 +195,14 @@ pub contract FRC20Indexer {
         access(all) view
         fun getHoldersAmount(tick: String): UInt64 {
             return UInt64(self.getHolders(tick: tick).length)
+        }
+
+        /// Get the pool balance of a FRC20 token
+        ///
+        access(all) view
+        fun getPoolBalance(tick: String): UFix64 {
+            let pool = (&self.pool[tick] as &FlowToken.Vault?)!
+            return pool.balance
         }
 
         /// Check if an inscription is a valid FRC20 inscription
