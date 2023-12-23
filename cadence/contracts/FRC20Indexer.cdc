@@ -546,8 +546,8 @@ pub contract FRC20Indexer {
     fun getIndexer(): &InscriptionIndexer{IndexerPublic} {
         let addr = self.account.address
         let cap = getAccount(addr)
-            .capabilities
-            .borrow<&InscriptionIndexer{IndexerPublic}>(self.IndexerPublicPath)
+            .getCapability<&InscriptionIndexer{IndexerPublic}>(self.IndexerPublicPath)
+            .borrow()
         return cap ?? panic("Could not borrow InscriptionIndexer")
     }
 
@@ -557,9 +557,6 @@ pub contract FRC20Indexer {
         self.IndexerPublicPath = PublicPath(identifier: identifier)!
         // create the indexer
         self.account.save(<- create InscriptionIndexer(), to: self.IndexerStoragePath)
-        let cap = self.account
-            .capabilities.storage
-            .issue<&InscriptionIndexer{IndexerPublic}>(self.IndexerStoragePath)
-        self.account.capabilities.publish(cap, at: self.IndexerPublicPath)
+        self.account.link<&InscriptionIndexer{IndexerPublic}>(self.IndexerPublicPath, target: self.IndexerStoragePath)
     }
 }
