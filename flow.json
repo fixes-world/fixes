@@ -11,13 +11,17 @@
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7"
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "43f16acb483bbee0"
 			}
 		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7"
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "43f16acb483bbee0"
 			}
 		},
 		"FlowToken": {
@@ -96,6 +100,20 @@
 				"type": "file",
 				"location": "./emulator.key"
 			}
+		},
+		"mainnet-admin": {
+			"address": "d2abb5dbf5e08666",
+			"key": {
+				"type": "file",
+				"location": "mainnet-admin.pkey"
+			}
+		},
+		"testnet-admin": {
+			"address": "43f16acb483bbee0",
+			"key": {
+				"type": "file",
+				"location": "testnet-admin.pkey"
+			}
 		}
 	},
 	"deployments": {
@@ -105,6 +123,18 @@
 				"FungibleTokenMetadataViews",
 				"StringUtils",
 				"ArrayUtils",
+				"FRC20Indexer",
+				"Fixes"
+			]
+		},
+		"testnet": {
+			"testnet-admin": [
+				"FRC20Indexer",
+				"Fixes"
+			]
+		},
+		"mainnet": {
+			"mainnet-admin": [
 				"FRC20Indexer",
 				"Fixes"
 			]
