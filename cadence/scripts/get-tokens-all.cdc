@@ -19,8 +19,8 @@ pub fun main(
                 }
             }
             ret.append(FRC20Info(
-                holders: indexer.getHoldersAmount(tick: tick),
                 meta: meta,
+                holders: indexer.getHoldersAmount(tick: tick),
                 pool: indexer.getPoolBalance(tick: tick),
             ))
         }
@@ -34,8 +34,8 @@ pub struct FRC20Info {
     pub let pool: UFix64
 
     init(
-        holders: UInt64,
         meta: FRC20Indexer.FRC20Meta,
+        holders: UInt64,
         pool: UFix64,
     ) {
         self.holders = holders

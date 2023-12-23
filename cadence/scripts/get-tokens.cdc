@@ -16,8 +16,8 @@ pub fun main(
     for tick in slicedTokens {
         if let meta = indexer.getTokenMeta(tick: tick) {
             ret.append(FRC20Info(
-                holders: indexer.getHoldersAmount(tick: tick),
                 meta: meta,
+                holders: indexer.getHoldersAmount(tick: tick),
                 pool: indexer.getPoolBalance(tick: tick),
             ))
         }
@@ -26,13 +26,13 @@ pub fun main(
 }
 
 pub struct FRC20Info {
-    pub let holders: UInt64
     pub let meta: FRC20Indexer.FRC20Meta
+    pub let holders: UInt64
     pub let pool: UFix64
 
     init(
-        holders: UInt64,
         meta: FRC20Indexer.FRC20Meta,
+        holders: UInt64,
         pool: UFix64,
     ) {
         self.holders = holders
