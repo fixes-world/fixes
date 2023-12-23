@@ -344,9 +344,9 @@ pub contract Fixes {
         protocol: String?,
         encoding: String?
     ): UFix64 {
-        let currIndexValue = UFix64(index / UInt64(UInt8.max) + 1)
-        let maxIndexValue = UFix64(UInt64(UInt8.max) * 1000)
-        let estimatedIndexValue = currIndexValue < maxIndexValue ? currIndexValue : maxIndexValue
+        let currIdxValue = UFix64(index / UInt64(UInt8.max) + 1)
+        let maxIdxValue = 1000.0
+        let estimatedIndexValue = currIdxValue < maxIdxValue ? currIdxValue : maxIdxValue
         let bytes = UFix64(
             (mimeType.length + (protocol != nil ? protocol!.length : 0) + (encoding != nil ? encoding!.length : 0)) * 3
         ) + UFix64(data.length)
