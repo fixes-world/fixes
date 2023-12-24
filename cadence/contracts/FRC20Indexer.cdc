@@ -232,6 +232,10 @@ pub contract FRC20Indexer {
 
             let tick = meta["tick"]!.toLower()
             assert(
+                tick.length >= 3 && tick.length <= 10,
+                message: "The token tick should be between 3 and 10 characters"
+            )
+            assert(
                 self.tokens[tick] == nil && self.balances[tick] == nil && self.pool[tick] == nil,
                 message: "The token has already been deployed"
             )
