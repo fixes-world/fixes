@@ -114,6 +114,13 @@
 				"type": "file",
 				"location": "testnet-admin.pkey"
 			}
+		},
+		"testnet-user": {
+			"address": "79c7233c8c2050d5",
+			"key": {
+				"type": "file",
+				"location": "testnet-user.pkey"
+			}
 		}
 	},
 	"deployments": {
@@ -127,14 +134,14 @@
 				"Fixes"
 			]
 		},
-		"testnet": {
-			"testnet-admin": [
+		"mainnet": {
+			"mainnet-admin": [
 				"FRC20Indexer",
 				"Fixes"
 			]
 		},
-		"mainnet": {
-			"mainnet-admin": [
+		"testnet": {
+			"testnet-admin": [
 				"FRC20Indexer",
 				"Fixes"
 			]
