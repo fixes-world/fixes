@@ -108,6 +108,13 @@
 				"location": "mainnet-admin.pkey"
 			}
 		},
+		"mainnet-user": {
+			"address": "d59667dc1a7cfecf",
+			"key": {
+				"type": "file",
+				"location": "mainnet-user.pkey"
+			}
+		},
 		"testnet-admin": {
 			"address": "43f16acb483bbee0",
 			"key": {
