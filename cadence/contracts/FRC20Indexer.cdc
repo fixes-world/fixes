@@ -17,6 +17,8 @@ pub contract FRC20Indexer {
     pub event FRC20Burned(tick: String, amount: UFix64, from: Address, flowExtracted: UFix64)
     /// Event emitted when a FRC20 token is set to be burnable
     pub event FRC20BurnableSet(tick: String, burnable: Bool)
+    /// Event emitted when a FRC20 token is burned unsupplied tokens
+    pub event FRC20UnsuppliedBurned(tick: String, amount: UFix64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -109,12 +111,17 @@ pub contract FRC20Indexer {
         /// Transfer a FRC20 token
         access(all)
         fun transfer(ins: &Fixes.Inscription)
-        /// Set a FRC20 token to be burnable
-        access(all)
-        fun setBurnable(ins: &Fixes.Inscription)
         /// Burn a FRC20 token
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
+        /** ---- Account Methods for command inscriptions ---- */
+        /// Set a FRC20 token to be burnable
+        access(account)
+        fun setBurnable(ins: &Fixes.Inscription)
+        // Burn unsupplied frc20 tokens
+        access(account)
+        fun burnUnsupplied(ins: &Fixes.Inscription)
+
     }
 
     /// The resource that stores the inscriptions mapping
@@ -384,43 +391,6 @@ pub contract FRC20Indexer {
             )
         }
 
-        /// Set a FRC20 token to be burnable
-        ///
-        access(all)
-        fun setBurnable(ins: &Fixes.Inscription) {
-            pre {
-                ins.isExtractable(): "The inscription is not extractable"
-                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
-            }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-            assert(
-                meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil,
-                message: "The inscription is not a valid FRC20 inscription for setting burnable"
-            )
-
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
-            let tokenMeta = self.borrowTokenMeta(tick: tick)
-            assert(
-                tokenMeta.deployer == ins.owner!.address,
-                message: "The deployer is not the owner of the inscription."
-            )
-            let isTrue = meta["v"]! == "true" || meta["v"]! == "1"
-            tokenMeta.setBurnable(isTrue)
-
-            // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
-
-            // emit event
-            emit FRC20BurnableSet(
-                tick: tick,
-                burnable: isTrue
-            )
-        }
-
         /// Burn a FRC20 token
         ///
         access(all)
@@ -488,9 +458,104 @@ pub contract FRC20Indexer {
             }
         }
 
+        // ---- Command Inscriptions Methods ----
+
+        /// Set a FRC20 token to be burnable
+        ///
+        access(account)
+        fun setBurnable(ins: &Fixes.Inscription) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+                // The command inscriptions should be only executed by the indexer
+                self.isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
+            }
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for setting burnable"
+            )
+
+            let tick = meta["tick"]!.toLower()
+            assert(
+                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
+                message: "The token has not been deployed"
+            )
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            let isTrue = meta["v"]! == "true" || meta["v"]! == "1"
+            tokenMeta.setBurnable(isTrue)
+
+            // extract inscription
+            self.extractInscription(tick: tick, ins: ins)
+
+            // emit event
+            emit FRC20BurnableSet(
+                tick: tick,
+                burnable: isTrue
+            )
+        }
+
+        /// Burn unsupplied frc20 tokens
+        ///
+        access(account)
+        fun burnUnsupplied(ins: &Fixes.Inscription) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+                // The command inscriptions should be only executed by the indexer
+                self.isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
+            }
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for burning unsupplied tokens"
+            )
+
+            let tick = meta["tick"]!.toLower()
+            // check the token, the token should be deployed
+            assert(
+                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
+                message: "The token has not been deployed"
+            )
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            // check the burnable
+            assert(
+                tokenMeta.burnable,
+                message: "The token is not burnable"
+            )
+            // check the supplied, should be less than the max
+            assert(
+                tokenMeta.supplied < tokenMeta.max,
+                message: "The token has reached the max supply"
+            )
+
+            let perc = UFix64.fromString(meta["perc"]!) ?? panic("The percentage is not a valid UFix64")
+            // check the percentage
+            assert(
+                perc > 0.0 && perc <= 1.0,
+                message: "The percentage should be greater than 0.0 and less than or equal to 1.0"
+            )
+
+            // update the burned amount
+            let totalUnsupplied = tokenMeta.max.saturatingSubtract(tokenMeta.supplied)
+            let amtToBurn = totalUnsupplied * perc
+            // update the meta-info: supplied and burned
+            tokenMeta.updateSupplied(tokenMeta.supplied.saturatingAdd(amtToBurn))
+            tokenMeta.updateBurned(tokenMeta.burned.saturatingAdd(amtToBurn))
+
+            // extract inscription
+            self.extractInscription(tick: tick, ins: ins)
+
+            // emit event
+            emit FRC20UnsuppliedBurned(
+                tick: tick,
+                amount: amtToBurn
+            )
+        }
+
         /** ----- Private methods ----- */
 
-        access(self)
+        access(account)
         fun extractInscription(tick: String, ins: &Fixes.Inscription) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
@@ -514,7 +579,7 @@ pub contract FRC20Indexer {
 
         /// Parse the metadata of a FRC20 inscription
         ///
-        access(self)
+        access(account)
         fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
             let ret: {String: String} = {}
             if data.encoding != nil && data.encoding != "utf8" {
@@ -537,11 +602,29 @@ pub contract FRC20Indexer {
             return ret
         }
 
+        /// Check if an inscription is owned by the indexer
+        ///
+        access(self) view
+        fun isOwnedByIndexer(_ ins: &Fixes.Inscription): Bool {
+            return ins.owner?.address == FRC20Indexer.getAddress()
+        }
+
+        /// Borrow the meta-info of a token
+        ///
         access(self)
         fun borrowTokenMeta(tick: String): &FRC20Meta {
             let meta = &self.tokens[tick.toLower()] as &FRC20Meta?
             return meta ?? panic("The token meta is not found")
         }
+    }
+
+    /* --- Public Methods --- */
+
+    /// Get the address of the indexer
+    ///
+    access(all)
+    fun getAddress(): Address {
+        return self.account.address
     }
 
     /// Get the inscription indexer
