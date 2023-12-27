@@ -306,7 +306,7 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             // info to emit
             let srcType = nftToWrap.getType()
             let srcId = nftToWrap.id
-            let insId = inscription?.id
+            let insId = inscription?.getId()
 
             // create a new NFT
             var newNFT <- create NFT(

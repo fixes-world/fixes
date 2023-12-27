@@ -154,7 +154,9 @@
 				"StringUtils",
 				"ArrayUtils",
 				"FRC20Indexer",
-				"Fixes"
+				"Fixes",
+				"FixesWrappedNFT",
+				"FRC20NFTWrapper"
 			]
 		},
 		"mainnet": {
