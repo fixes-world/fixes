@@ -379,10 +379,10 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             FixesWrappedNFT.totalSupply = FixesWrappedNFT.totalSupply - UInt64(1)
 
             // emit the event
-            emit Wrapped(
+            emit Unwrapped(
                 id: nftId,
-                srcType: srcType, srcId: srcId,
-                inscriptionId: insId
+                srcType: srcType,
+                srcId: srcId,
             )
             // return the inscription
             return <- out
