@@ -89,7 +89,7 @@ pub contract FRC20NFTWrapper {
         /// Register a new FRC20 strategy
         access(all)
         fun registerFRC20Strategy(
-            nft: &NonFungibleToken.NFT,
+            nftType: Type,
             alloc: UFix64,
             copies: UInt64,
             ins: &Fixes.Inscription,
@@ -174,7 +174,7 @@ pub contract FRC20NFTWrapper {
         /// Register a new FRC20 strategy
         access(all)
         fun registerFRC20Strategy(
-            nft: &NonFungibleToken.NFT,
+            nftType: Type,
             alloc: UFix64,
             copies: UInt64,
             ins: &Fixes.Inscription,
@@ -202,7 +202,6 @@ pub contract FRC20NFTWrapper {
                 message: "The frc20 deployer is not the owner of the inscription"
             )
 
-            let nftType = nft.getType()
             // check if the strategy already exists
             assert(
                 self.strategies[nftType] == nil,
@@ -377,13 +376,11 @@ pub contract FRC20NFTWrapper {
         addr: Address,
         _ value: @FlowToken.Vault
     ): Void {
-        let ref = getAccount(addr)
-            .getCapability<&FRC20NFTWrapper.Wrapper{WrapperPublic}>(self.FRC20NFTWrapperPublicPath)
-            .borrow() ?? panic("Could not borrow Xerox public reference")
+        let ref = self.borrowWrapperPublic(addr: addr)
         ref.donate(value: <- value)
     }
 
-    /// Xerox an NFT and wrap it to the FixesWrappedNFT collection
+    /// Create a new Wrapper resourceTON
     ///
     access(all)
     fun createNewWrapper(
@@ -392,6 +389,18 @@ pub contract FRC20NFTWrapper {
         return <- create Wrapper(minterCap)
     }
 
+    /// Borrow the public reference to the Wrapper resource
+    ///
+    access(all)
+    fun borrowWrapperPublic(
+        addr: Address,
+    ): &FRC20NFTWrapper.Wrapper{WrapperPublic} {
+        return getAccount(addr)
+            .getCapability<&FRC20NFTWrapper.Wrapper{WrapperPublic}>(self.FRC20NFTWrapperPublicPath)
+            .borrow() ?? panic("Could not borrow Xerox public reference")
+    }
+
+    /// init
     init() {
         let identifier = "FixesFRC20NFTWrapper_".concat(self.account.address.toString())
         self.FRC20NFTWrapperStoragePath = StoragePath(identifier: identifier)!
