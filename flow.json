@@ -16,6 +16,14 @@
 				"testnet": "43f16acb483bbee0"
 			}
 		},
+		"FRC20NFTWrapper": {
+			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "43f16acb483bbee0"
+			}
+		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
 			"aliases": {
@@ -153,14 +161,16 @@
 			"mainnet-admin": [
 				"FRC20Indexer",
 				"Fixes",
-				"FixesWrappedNFT"
+				"FixesWrappedNFT",
+				"FRC20NFTWrapper"
 			]
 		},
 		"testnet": {
 			"testnet-admin": [
 				"FRC20Indexer",
 				"Fixes",
-				"FixesWrappedNFT"
+				"FixesWrappedNFT",
+				"FRC20NFTWrapper"
 			]
 		}
 	}
