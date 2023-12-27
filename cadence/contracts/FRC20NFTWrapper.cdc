@@ -122,12 +122,9 @@ pub contract FRC20NFTWrapper {
         let internalFlowVault: @FlowToken.Vault
         access(self)
         let minterCap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>
-        access(self)
-        let collection: Capability<&FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Provider,MetadataViews.ResolverCollection}>
 
         init(
             _ cap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>,
-            _ col: Capability<&FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Provider,MetadataViews.ResolverCollection}>
         ) {
             pre {
                 cap.check() && cap.borrow() != nil: "Capability not authorized"
@@ -135,7 +132,6 @@ pub contract FRC20NFTWrapper {
             self.histories = {}
             self.strategies = {}
             self.minterCap = cap
-            self.collection = col
             self.internalFlowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
         }
 
@@ -392,9 +388,8 @@ pub contract FRC20NFTWrapper {
     access(all)
     fun createNewWrapper(
         _ minterCap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>,
-        _ col: Capability<&FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Provider,MetadataViews.ResolverCollection}>
     ): @Wrapper {
-        return <- create Wrapper(minterCap, col)
+        return <- create Wrapper(minterCap)
     }
 
     init() {
