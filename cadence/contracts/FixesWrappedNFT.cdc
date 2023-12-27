@@ -66,7 +66,17 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         ///
         pub fun getViews(): [Type] {
             if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
-                return nftRef.getViews()
+                let nftViews = nftRef.getViews()
+                if !nftViews.contains(Type<MetadataViews.ExternalURL>()) {
+                    nftViews.append(Type<MetadataViews.ExternalURL>())
+                }
+                if !nftViews.contains(Type<MetadataViews.NFTCollectionData>()) {
+                    nftViews.append(Type<MetadataViews.NFTCollectionData>())
+                }
+                if !nftViews.contains(Type<MetadataViews.NFTCollectionDisplay>()) {
+                    nftViews.append(Type<MetadataViews.NFTCollectionDisplay>())
+                }
+                return nftViews
             }
             return []
         }
@@ -77,10 +87,19 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @return A structure representing the requested view.
         ///
         pub fun resolveView(_ view: Type): AnyStruct? {
-            if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
-                return nftRef.resolveView(view)
+            let colViews = [
+                Type<MetadataViews.ExternalURL>(),
+                Type<MetadataViews.NFTCollectionData>(),
+                Type<MetadataViews.NFTCollectionDisplay>()
+            ]
+            if colViews.contains(view) {
+                return FixesWrappedNFT.resolveView(view)
+            } else {
+                if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
+                    return nftRef.resolveView(view)
+                }
+                return nil
             }
-            return nil
         }
 
         /// Borrow the NFT's type
@@ -377,6 +396,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     ///
     pub fun resolveView(_ view: Type): AnyStruct? {
         switch view {
+            case Type<MetadataViews.ExternalURL>():
+                return MetadataViews.ExternalURL("https://fixes.world/")
             case Type<MetadataViews.NFTCollectionData>():
                 return MetadataViews.NFTCollectionData(
                     storagePath: FixesWrappedNFT.CollectionStoragePath,
@@ -417,6 +438,7 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     ///
     pub fun getViews(): [Type] {
         return [
+            Type<MetadataViews.ExternalURL>(),
             Type<MetadataViews.NFTCollectionData>(),
             Type<MetadataViews.NFTCollectionDisplay>()
         ]
