@@ -24,6 +24,14 @@
 				"testnet": "43f16acb483bbee0"
 			}
 		},
+		"FixesWrappedNFT": {
+			"source": "cadence/contracts/FixesWrappedNFT.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "43f16acb483bbee0"
+			}
+		},
 		"FlowToken": {
 			"source": "cadence/deps/FlowToken.cdc",
 			"aliases": {
@@ -144,13 +152,15 @@
 		"mainnet": {
 			"mainnet-admin": [
 				"FRC20Indexer",
-				"Fixes"
+				"Fixes",
+				"FixesWrappedNFT"
 			]
 		},
 		"testnet": {
 			"testnet-admin": [
 				"FRC20Indexer",
-				"Fixes"
+				"Fixes",
+				"FixesWrappedNFT"
 			]
 		}
 	}
