@@ -7,7 +7,6 @@ import "FRC20Indexer"
 import "FlowToken"
 
 transaction(
-    nftCollectionIdentifier: String,
     wrappedNftId: UInt64,
 ) {
     let wrapper: &FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}
@@ -23,6 +22,9 @@ transaction(
             ?? panic("Could not borrow FixesWrappedNFT collection")
 
         self.nftToUnwrap <- wrappedNFTCol.withdraw(withdrawID: wrappedNftId) as! @FixesWrappedNFT.NFT
+
+        let srcNftType = self.nftToUnwrap.getWrappedType() ?? panic("Could not get wrapped type")
+        let nftCollectionIdentifier = srcNftType.identifier.slice(from: 0, upTo: srcNftType.identifier.length - 3).concat("Collection")
 
         // Find the nft to wrap
         let nftColType = CompositeType(nftCollectionIdentifier)!
