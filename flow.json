@@ -13,7 +13,7 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "43f16acb483bbee0"
+				"testnet": "c006c191e039b11d"
 			}
 		},
 		"FRC20NFTWrapper": {
@@ -21,7 +21,7 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "43f16acb483bbee0"
+				"testnet": "c006c191e039b11d"
 			}
 		},
 		"Fixes": {
@@ -29,7 +29,7 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "43f16acb483bbee0"
+				"testnet": "c006c191e039b11d"
 			}
 		},
 		"FixesWrappedNFT": {
@@ -37,7 +37,7 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "43f16acb483bbee0"
+				"testnet": "c006c191e039b11d"
 			}
 		},
 		"FlowToken": {
@@ -132,7 +132,7 @@
 			}
 		},
 		"testnet-admin": {
-			"address": "43f16acb483bbee0",
+			"address": "c006c191e039b11d",
 			"key": {
 				"type": "file",
 				"location": "testnet-admin.pkey"

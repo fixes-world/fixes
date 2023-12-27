@@ -13,6 +13,12 @@ pub contract FRC20NFTWrapper {
     /// The event that is emitted when the internal flow vault is donated to
     pub event InternalFlowVaultDonated(amount: UFix64)
 
+    /// The event that is emitted when the whitelist is updated
+    pub event AuthorizedWhitelistUpdated(
+        addr: Address,
+        isAuthorized: Bool,
+    )
+
     /// The event that is emitted when an NFT is unwrapped
     pub event FRC20StrategyRegistered(
         deployer: Address,
@@ -80,6 +86,9 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun getFRC20Strategy(nft: &NonFungibleToken.NFT): FRC20Strategy?
 
+        access(all) view
+        fun isAuthorizedToRegister(addr: Address): Bool
+
         // write methods ----
 
         /// Donate to the internal flow vault
@@ -122,6 +131,8 @@ pub contract FRC20NFTWrapper {
         let internalFlowVault: @FlowToken.Vault
         access(self)
         let minterCap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>
+        access(self)
+        let whitelist: {Address: Bool}
 
         init(
             _ cap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>,
@@ -131,6 +142,7 @@ pub contract FRC20NFTWrapper {
             }
             self.histories = {}
             self.strategies = {}
+            self.whitelist = {}
             self.minterCap = cap
             self.internalFlowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
         }
@@ -157,6 +169,11 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun getFRC20Strategy(nft: &NonFungibleToken.NFT): FRC20Strategy? {
             return self.strategies[nft.getType()]
+        }
+
+        access(all) view
+        fun isAuthorizedToRegister(addr: Address): Bool {
+            return self.whitelist[addr] ?? false
         }
 
         // write methods
@@ -197,9 +214,16 @@ pub contract FRC20NFTWrapper {
             let meta = indexer.getTokenMeta(tick: tick)
                 ?? panic("Could not get token meta for ".concat(tick))
 
+            /// check if the deployer is the owner of the inscription
             assert(
                 meta.deployer == fromAddr,
                 message: "The frc20 deployer is not the owner of the inscription"
+            )
+
+            // check if the deployer is authorized to register a new strategy
+            assert(
+                self.isAuthorizedToRegister(addr: fromAddr),
+                message: "The deployer is not authorized to register a new strategy"
             )
 
             // check if the strategy already exists
@@ -341,6 +365,20 @@ pub contract FRC20NFTWrapper {
         ): @Fixes.Inscription? {
             let minter = self.borrowMinter()
             return <- minter.unwrap(recipient: recipient, nftToUnwrap: <- nftToUnwrap)
+        }
+
+        // private methods
+
+        /// Update the whitelist
+        ///
+        access(all)
+        fun updateWhitelist(addr: Address, isAuthorized: Bool): Void {
+            self.whitelist[addr] = isAuthorized
+
+            emit AuthorizedWhitelistUpdated(
+                addr: addr,
+                isAuthorized: isAuthorized,
+            )
         }
 
         // internal methods
