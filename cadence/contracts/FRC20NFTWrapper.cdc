@@ -4,6 +4,7 @@ import "FlowToken"
 import "Fixes"
 import "FixesWrappedNFT"
 import "FRC20Indexer"
+import "StringUtils"
 
 pub contract FRC20NFTWrapper {
 
@@ -15,6 +16,8 @@ pub contract FRC20NFTWrapper {
 
     /// The event that is emitted when a new Wrapper is created
     pub event WrapperCreated()
+    /// The event that is emitted when the wrapper options is updated
+    pub event WrapperOptionsUpdated(wrapper: Address, key: String)
 
     /// The event that is emitted when the whitelist is updated
     pub event AuthorizedWhitelistUpdated(
@@ -46,8 +49,6 @@ pub contract FRC20NFTWrapper {
     // Indexer
     /// The event that is emitted when a new wrapper is added to the indexer
     pub event WrapperAddedToIndexer(wrapper: Address)
-    /// The event that is emitted when the wrapper options is updated
-    pub event WrapperOptionsUpdated(wrapper: Address, key: String)
     /// The event that is emitted when the extra NFT collection display is updated
     pub event WrapperIndexerUpdatedNFTCollectionDisplay(nftType: Type, name: String, description: String)
 
@@ -70,6 +71,7 @@ pub contract FRC20NFTWrapper {
         pub let alloc: UFix64
         pub let copies: UInt64
         pub let cond: String?
+        pub let createdAt: UFix64
         pub var usedAmt: UInt64
 
         init(
@@ -85,6 +87,7 @@ pub contract FRC20NFTWrapper {
             self.copies = copies
             self.cond = cond
             self.usedAmt = 0
+            self.createdAt = getCurrentBlock().timestamp
         }
 
         access(all)
@@ -125,6 +128,12 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun isAuthorizedToRegister(addr: Address): Bool
 
+        access(all) view
+        fun getOption(key: String): AnyStruct?
+
+        access(all) view
+        fun getOptions(): {String: AnyStruct}
+
         // write methods ----
 
         /// Donate to the internal flow vault
@@ -161,11 +170,14 @@ pub contract FRC20NFTWrapper {
         let internalFlowVault: @FlowToken.Vault
         access(self)
         let whitelist: {Address: Bool}
+        access(self)
+        let options: {String: AnyStruct}
 
         init() {
             self.histories = {}
             self.strategies = {}
             self.whitelist = {}
+            self.options = {}
             self.internalFlowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
 
             emit WrapperCreated()
@@ -218,6 +230,16 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun isAuthorizedToRegister(addr: Address): Bool {
             return addr == self.owner?.address || (self.whitelist[addr] ?? false)
+        }
+
+        access(all) view
+        fun getOption(key: String): AnyStruct? {
+            return self.options[key]
+        }
+
+        access(all) view
+        fun getOptions(): {String: AnyStruct} {
+            return self.options
         }
 
         // write methods
@@ -276,6 +298,21 @@ pub contract FRC20NFTWrapper {
                 self.strategies[nftType] == nil,
                 message: "The strategy already exists"
             )
+
+            // ensure condition is valid
+            if let condStr = cond {
+                let conds = StringUtils.split(condStr, ",")
+                for one in conds {
+                    let subConds = StringUtils.split(one, "~")
+                    if subConds.length == 1 && UInt64.fromString(subConds[0]) != nil {
+                        continue
+                    } else if subConds.length == 2 && UInt64.fromString(subConds[0]) != nil && UInt64.fromString(subConds[1]) != nil {
+                        continue
+                    } else {
+                        panic("Invalid condition")
+                    }
+                }
+            }
 
             // indexer address
             let indexerAddr = FRC20Indexer.getAddress()
@@ -345,6 +382,37 @@ pub contract FRC20NFTWrapper {
                 strategy.usedAmt < strategy.copies,
                 message: "The strategy is used up"
             )
+
+            // check strategy condition
+            if let condStr = strategy.cond {
+                var valid: Bool = false
+                let conds = StringUtils.split(condStr, ",")
+                for one in conds {
+                    let subConds = StringUtils.split(one, "~")
+                    if subConds.length == 1 {
+                        // check if the NFT id is the same
+                        valid = valid || UInt64.fromString(subConds[0]) == srcNftId
+                    } else if subConds.length == 2 {
+                        // check if the NFT id is in the range
+                        let start = UInt64.fromString(subConds[0]) ?? panic("Invalid condition")
+                        let end = UInt64.fromString(subConds[1]) ?? panic("Invalid condition")
+                        // check if the range is valid, and the NFT id is in the range
+                        // NOTE: the range is [start, end)
+                        valid = valid || (start <= srcNftId && srcNftId < end)
+                    } else {
+                      panic("Invalid condition")
+                    }
+                    // break if valid
+                    if valid {
+                        break
+                    }
+                }
+
+                assert(
+                    valid,
+                    message: "The NFT ID does not meet the condition:".concat(condStr)
+                )
+            }
 
             // borrow the history
             let history = self.borrowHistory(nftType: nftType)
@@ -420,6 +488,17 @@ pub contract FRC20NFTWrapper {
 
         // private methods
 
+        /// Update the wrapper options
+        access(all)
+        fun updateOptions(key: String, value: AnyStruct) {
+            self.options[key] = value
+
+            emit WrapperOptionsUpdated(
+                wrapper: self.owner?.address ?? panic("Wrapper owner is nil"),
+                key: key
+            )
+        }
+
         /// Update the whitelist
         ///
         access(all)
@@ -484,10 +563,6 @@ pub contract FRC20NFTWrapper {
         /// Register a new Wrapper
         access(all)
         fun registerWrapper(wrapper: &Wrapper)
-
-        /// Update the wrapper options
-        access(all)
-        fun updateWrapperOptions(wrapper: &Wrapper, key: String, value: AnyStruct)
     }
 
     /// The resource for the Wrapper indexer contract
@@ -497,13 +572,10 @@ pub contract FRC20NFTWrapper {
         access(self)
         let wrappers: {Address: Bool}
         access(self)
-        let wrapperOptions: {Address: {String: AnyStruct}}
-        access(self)
         let displayHelper: {Type: MetadataViews.NFTCollectionDisplay}
 
         init() {
             self.wrappers = {}
-            self.wrapperOptions = {}
             self.displayHelper = {}
         }
 
@@ -548,26 +620,8 @@ pub contract FRC20NFTWrapper {
             }
             let ownerAddr = wrapper.owner!.address
             self.wrappers[ownerAddr] = true
-            self.wrapperOptions[ownerAddr] = {}
 
             emit WrapperAddedToIndexer(wrapper: ownerAddr)
-        }
-
-        /// Update the wrapper options
-        access(all)
-        fun updateWrapperOptions(wrapper: &Wrapper, key: String, value: AnyStruct) {
-            pre {
-                wrapper.owner != nil: "Wrapper owner is nil"
-            }
-            let ownerAddr = wrapper.owner!.address
-            if self.wrappers[ownerAddr] == nil {
-                self.registerWrapper(wrapper: wrapper)
-            }
-
-            let optionsRef = self.borrowWrapperOptions(addr: ownerAddr)
-            optionsRef[key] = value
-
-            emit WrapperOptionsUpdated(wrapper: wrapper.owner?.address ?? panic("Wrapper owner is nil"), key: key)
         }
 
         // private write methods ----
@@ -584,14 +638,6 @@ pub contract FRC20NFTWrapper {
                 name: display.name,
                 description: display.description,
             )
-        }
-
-        /// Borrow the wrapper options
-        ///
-        access(self)
-        fun borrowWrapperOptions(addr: Address): &{String: AnyStruct} {
-            return &self.wrapperOptions[addr] as &{String: AnyStruct}?
-                ?? panic("Could not borrow wrapper options")
         }
     }
 
