@@ -5,25 +5,24 @@ import "FRC20Indexer"
 import "FlowToken"
 
 transaction(
+    wrapperAddress: Address,
     nftTypeIdentifer: String,
     tick: String,
     alloc: UFix64,
     copies: UInt64,
-    transferAmt: UFix64?,
+    transferAmt: UFix64,
 ) {
     let wrapper: &FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}
     let ins: &Fixes.Inscription
 
     prepare(acct: AuthAccount) {
         let indexerAddr = FRC20Indexer.getAddress()
-        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: indexerAddr)
+        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddress)
 
         // basic attributes
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
-        let dataStr = transferAmt != nil
-            ? "op=transfer,tick=".concat(tick).concat(",amt=").concat(transferAmt!.toString()).concat(",to=").concat(indexerAddr.toString())
-            : "tick=".concat(tick)
+        let dataStr = "op=transfer,tick=".concat(tick).concat(",amt=").concat(transferAmt.toString()).concat(",to=").concat(indexerAddr.toString())
         let metadata = dataStr.utf8
 
         // estimate the required storage

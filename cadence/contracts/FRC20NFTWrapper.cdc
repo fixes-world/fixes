@@ -21,6 +21,7 @@ pub contract FRC20NFTWrapper {
 
     /// The event that is emitted when an NFT is unwrapped
     pub event FRC20StrategyRegistered(
+        wrapper: Address,
         deployer: Address,
         nftType: Type,
         tick: String,
@@ -29,6 +30,7 @@ pub contract FRC20NFTWrapper {
     )
     /// The event that is emitted when an NFT is wrapped
     pub event NFTWrappedWithFRC20Allocated(
+        wrapper: Address,
         nftType: Type,
         srcNftId: UInt64,
         wrappedNftId: UInt64,
@@ -65,8 +67,16 @@ pub contract FRC20NFTWrapper {
             self.usedAmt = 0
         }
 
+        access(all)
+        fun isUsedUp(): Bool {
+            return self.usedAmt >= self.copies
+        }
+
         access(contract)
         fun use() {
+            pre {
+                self.usedAmt < self.copies: "The strategy is used up"
+            }
             self.usedAmt = self.usedAmt + 1
         }
     }
@@ -85,6 +95,9 @@ pub contract FRC20NFTWrapper {
 
         access(all) view
         fun getFRC20Strategy(nft: &NonFungibleToken.NFT): FRC20Strategy?
+
+        access(all) view
+        fun getStrategies(all: Bool): [FRC20Strategy]
 
         access(all) view
         fun isAuthorizedToRegister(addr: Address): Bool
@@ -172,8 +185,18 @@ pub contract FRC20NFTWrapper {
         }
 
         access(all) view
+        fun getStrategies(all: Bool): [FRC20Strategy] {
+            if all {
+                return self.strategies.values
+            }
+            return self.strategies.values.filter(fun (s: FRC20Strategy): Bool {
+                return s.isUsedUp() == false
+            })
+        }
+
+        access(all) view
         fun isAuthorizedToRegister(addr: Address): Bool {
-            return self.whitelist[addr] ?? false
+            return addr == self.owner?.address || (self.whitelist[addr] ?? false)
         }
 
         // write methods
@@ -207,8 +230,8 @@ pub contract FRC20NFTWrapper {
             let fromAddr = ins.owner?.address ?? panic("Inscription owner is nil")
             let data = indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
-                data["tick"] != nil,
-                message: "The inscription does not have a tick"
+                data["op"] == "transfer" && data["tick"] != nil && data["amt"] != nil && data["to"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for transfer"
             )
             let tick: String = data["tick"]!.toLower()
             let meta = indexer.getTokenMeta(tick: tick)
@@ -232,17 +255,29 @@ pub contract FRC20NFTWrapper {
                 message: "The strategy already exists"
             )
 
-            // apply inscription
-            if data["op"] == "transfer" {
-                indexer.transfer(ins: ins)
-            } else if data["op"] == "mint" {
-                indexer.mint(ins: ins)
-            }
-            // ensure frc20 is enough
+            // indexer address
             let indexerAddr = FRC20Indexer.getAddress()
+
+            // check if the allocation is enough
+            let amt = UFix64.fromString(data["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let to = Address.fromString(data["to"]!) ?? panic("The receiver is not a valid address")
+            let toAllocateAmt = alloc * UFix64(copies)
+            assert(
+                amt >= toAllocateAmt,
+                message: "The amount is not enough to allocate"
+            )
+            assert(
+                to == indexerAddr,
+                message: "The receiver is not the indexer"
+            )
+
+            // apply inscription for transfer
+            indexer.transfer(ins: ins)
+
+            // ensure frc20 is enough
             let frc20BalanceForContract = indexer.getBalance(tick: tick, addr: indexerAddr)
             assert(
-                frc20BalanceForContract >= alloc * UFix64(copies),
+                frc20BalanceForContract >= toAllocateAmt,
                 message: "The FRC20 balance for the contract is not enough"
             )
 
@@ -258,6 +293,7 @@ pub contract FRC20NFTWrapper {
 
             // emit event
             emit FRC20StrategyRegistered(
+                wrapper: self.owner?.address ?? panic("Wrapper owner is nil"),
                 deployer: fromAddr,
                 nftType: nftType,
                 tick: tick,
@@ -347,6 +383,7 @@ pub contract FRC20NFTWrapper {
 
             // emit event
             emit NFTWrappedWithFRC20Allocated(
+                wrapper: self.owner?.address ?? panic("Wrapper owner is nil"),
                 nftType: nftType,
                 srcNftId: srcNftId,
                 wrappedNftId: newId,
