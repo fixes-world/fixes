@@ -129,6 +129,9 @@ pub contract FRC20NFTWrapper {
         fun isAuthorizedToRegister(addr: Address): Bool
 
         access(all) view
+        fun getWhitelistedAddresses(): [Address]
+
+        access(all) view
         fun getOption(key: String): AnyStruct?
 
         access(all) view
@@ -230,6 +233,17 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun isAuthorizedToRegister(addr: Address): Bool {
             return addr == self.owner?.address || (self.whitelist[addr] ?? false)
+        }
+
+        access(all) view
+        fun getWhitelistedAddresses(): [Address] {
+            let ret: [Address] = []
+            for addr in self.whitelist.keys {
+                if self.whitelist[addr]! {
+                    ret.append(addr)
+                }
+            }
+            return ret
         }
 
         access(all) view
