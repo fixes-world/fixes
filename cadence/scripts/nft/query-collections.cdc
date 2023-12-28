@@ -1,6 +1,7 @@
 import "NonFungibleToken"
 import "MetadataViews"
 import "StringUtils"
+import "FixesWrappedNFT"
 
 pub fun main(
     addr: Address
@@ -23,7 +24,7 @@ pub fun main(
 
     let ret: {String: MetadataViews.NFTCollectionDisplay} = {}
     acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
-        if type.isSubtype(of: Type<@NonFungibleToken.Collection>()) {
+        if type.isSubtype(of: Type<@NonFungibleToken.Collection>()) && type != Type<@FixesWrappedNFT.Collection>() {
             let valid = acct.check<@AnyResource{MetadataViews.ResolverCollection}>(from: path)
             if !valid {
                 return true
