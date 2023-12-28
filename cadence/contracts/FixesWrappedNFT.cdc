@@ -291,102 +291,79 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         return <- create Collection()
     }
 
-
-    /// Private interface that allows the NFTMinter resource to create new NFTs
+    /// Mints a new NFT with a new ID and deposit it in the
+    /// recipients collection using their collection reference
+    /// -- recipient, the collection of FixesWrappedNFTs
     ///
-    pub resource interface Minter {
-        /// method to wrap an NFT
-        pub fun wrap(
-            recipient: &{NonFungibleToken.CollectionPublic},
-            nftToWrap: @NonFungibleToken.NFT,
-            inscription: @Fixes.Inscription?,
-        ): UInt64
-        /// method to unwrap an NFT
-        pub fun unwrap(
-            recipient: &{NonFungibleToken.CollectionPublic},
-            nftToUnwrap: @FixesWrappedNFT.NFT,
-        ): @Fixes.Inscription?
+    pub fun wrap(
+        recipient: &FixesWrappedNFT.Collection{NonFungibleToken.CollectionPublic},
+        nftToWrap: @NonFungibleToken.NFT,
+        inscription: @Fixes.Inscription?,
+    ): UInt64 {
+        // info to emit
+        let srcType = nftToWrap.getType()
+        let srcId = nftToWrap.id
+        let insId = inscription?.getId()
+
+        // create a new NFT
+        var newNFT <- create NFT(
+            nft: <-nftToWrap,
+            inscription: <-inscription,
+        )
+        let nftId = newNFT.id
+        // deposit it in the recipient's account using their reference
+        recipient.deposit(token: <-newNFT)
+
+        FixesWrappedNFT.totalSupply = FixesWrappedNFT.totalSupply + UInt64(1)
+
+        // emit the event
+        emit Wrapped(
+            id: nftId,
+            srcType: srcType, srcId: srcId,
+            inscriptionId: insId
+        )
+        return nftId
     }
 
-    /// Resource that an admin or something similar would own to be
-    /// able to mint new NFTs
+    /// Unwraps an NFT and deposits it in the recipients collection
+    /// using their collection reference
+    /// -- recipient, the collection of wrapped NFTs
     ///
-    pub resource NFTMinter: Minter {
+    pub fun unwrap(
+        recipient: &{NonFungibleToken.CollectionPublic},
+        nftToUnwrap: @FixesWrappedNFT.NFT,
+    ): @Fixes.Inscription? {
+        let nftId = nftToUnwrap.id
+        // unwrap the NFT
+        let unwrappedNFT <- nftToUnwrap.unwrapNFT()
+        // info to emit
+        let srcType = unwrappedNFT.getType()
+        let srcId = unwrappedNFT.id
+        // deposit it in the recipient's account using their reference
+        recipient.deposit(token: <-unwrappedNFT)
 
-        /// Mints a new NFT with a new ID and deposit it in the
-        /// recipients collection using their collection reference
-        /// -- recipient, the collection of FixesWrappedNFTs
-        ///
-        pub fun wrap(
-            recipient: &{NonFungibleToken.CollectionPublic},
-            nftToWrap: @NonFungibleToken.NFT,
-            inscription: @Fixes.Inscription?,
-        ): UInt64 {
-            // info to emit
-            let srcType = nftToWrap.getType()
-            let srcId = nftToWrap.id
-            let insId = inscription?.getId()
-
-            // create a new NFT
-            var newNFT <- create NFT(
-                nft: <-nftToWrap,
-                inscription: <-inscription,
-            )
-            let nftId = newNFT.id
-            // deposit it in the recipient's account using their reference
-            recipient.deposit(token: <-newNFT)
-
-            FixesWrappedNFT.totalSupply = FixesWrappedNFT.totalSupply + UInt64(1)
-
-            // emit the event
-            emit Wrapped(
-                id: nftId,
-                srcType: srcType, srcId: srcId,
-                inscriptionId: insId
-            )
-            return nftId
+        var out: @Fixes.Inscription? <- nil
+        var insId: UInt64? = nil
+        if nftToUnwrap.hasWrappedInscription() {
+            // unwrap the inscription
+            var ins: @Fixes.Inscription? <- nftToUnwrap.unwrapInscription()
+            insId = ins?.getId()
+            out <-> ins
+            destroy ins
         }
+        // destroy the FixesWrappedNFT
+        destroy nftToUnwrap
+        // decrease the total supply
+        FixesWrappedNFT.totalSupply = FixesWrappedNFT.totalSupply - UInt64(1)
 
-        /// Unwraps an NFT and deposits it in the recipients collection
-        /// using their collection reference
-        /// -- recipient, the collection of wrapped NFTs
-        ///
-        pub fun unwrap(
-            recipient: &{NonFungibleToken.CollectionPublic},
-            nftToUnwrap: @FixesWrappedNFT.NFT,
-        ): @Fixes.Inscription? {
-            let nftId = nftToUnwrap.id
-            // unwrap the NFT
-            let unwrappedNFT <- nftToUnwrap.unwrapNFT()
-            // info to emit
-            let srcType = unwrappedNFT.getType()
-            let srcId = unwrappedNFT.id
-            // deposit it in the recipient's account using their reference
-            recipient.deposit(token: <-unwrappedNFT)
-
-            var out: @Fixes.Inscription? <- nil
-            var insId: UInt64? = nil
-            if nftToUnwrap.hasWrappedInscription() {
-                // unwrap the inscription
-                var ins: @Fixes.Inscription? <- nftToUnwrap.unwrapInscription()
-                insId = ins?.getId()
-                out <-> ins
-                destroy ins
-            }
-            // destroy the FixesWrappedNFT
-            destroy nftToUnwrap
-            // decrease the total supply
-            FixesWrappedNFT.totalSupply = FixesWrappedNFT.totalSupply - UInt64(1)
-
-            // emit the event
-            emit Unwrapped(
-                id: nftId,
-                srcType: srcType,
-                srcId: srcId,
-            )
-            // return the inscription
-            return <- out
-        }
+        // emit the event
+        emit Unwrapped(
+            id: nftId,
+            srcType: srcType,
+            srcId: srcId,
+        )
+        // return the inscription
+        return <- out
     }
 
     /// Function that resolves a metadata view for this contract.
@@ -464,14 +441,6 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         self.account.link<&FixesWrappedNFT.Collection{NonFungibleToken.CollectionPublic, FixesWrappedNFT.FixesWrappedNFTCollectionPublic, MetadataViews.ResolverCollection}>(
             self.CollectionPublicPath,
             target: self.CollectionStoragePath
-        )
-
-        // Create a Minter resource and save it to storage
-        let minter <- create NFTMinter()
-        self.account.save(<-minter, to: self.MinterStoragePath)
-        self.account.link<&NFTMinter{Minter}>(
-            self.MinterPrivatePath,
-            target: self.MinterStoragePath
         )
 
         emit ContractInitialized()
