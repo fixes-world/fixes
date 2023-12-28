@@ -117,7 +117,7 @@ pub contract FRC20NFTWrapper {
         fun isFRC20NFTWrappered(nft: &NonFungibleToken.NFT): Bool
 
         access(all) view
-        fun getFRC20Strategy(nft: &NonFungibleToken.NFT): FRC20Strategy?
+        fun hasFRC20Strategy(nftType: Type): Bool
 
         access(all) view
         fun getStrategiesAmount(all: Bool): UInt64
@@ -206,8 +206,8 @@ pub contract FRC20NFTWrapper {
         }
 
         access(all) view
-        fun getFRC20Strategy(nft: &NonFungibleToken.NFT): FRC20Strategy? {
-            return self.strategies[nft.getType()]
+        fun hasFRC20Strategy(nftType: Type): Bool {
+            return self.strategies[nftType] != nil
         }
 
         access(all) view
