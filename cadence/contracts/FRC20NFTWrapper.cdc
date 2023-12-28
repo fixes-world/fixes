@@ -388,7 +388,10 @@ pub contract FRC20NFTWrapper {
             // check if the NFT is owned by the signer
             let recipientAddr = recipient.owner?.address ?? panic("Recipient owner is nil")
             // get the NFT type
-            let nftType = nftToWrap.getType()
+            let nftTypeIdentifier = nftToWrap.getType().identifier
+            // generate the collection type
+            let nftType = FRC20NFTWrapper.asCollectionType(identifier: nftTypeIdentifier)
+            // get the NFT id
             let srcNftId = nftToWrap.id
             // check if the strategy exists, and borrow it
             let strategy = self.borrowStrategy(nftType: nftType)
@@ -673,6 +676,26 @@ pub contract FRC20NFTWrapper {
     access(all)
     fun createNewWrapper(): @Wrapper {
         return <- create Wrapper()
+    }
+
+    /// Make a new NFT type
+    ///
+    access(all)
+    fun asNFTType(identifier: String): Type {
+        let ids = StringUtils.split(identifier, ".")
+        assert(ids.length == 4, message: "Invalid NFT type identifier!")
+        ids[3] = "NFT" // replace the last part with NFT
+        return CompositeType(StringUtils.join(ids, "."))!
+    }
+
+    /// Make a new NFT Collection type
+    ///
+    access(all)
+    fun asCollectionType(identifier: String): Type {
+        let ids = StringUtils.split(identifier, ".")
+        assert(ids.length == 4, message: "Invalid NFT Collection type identifier!")
+        ids[3] = "Collection" // replace the last part with Collection
+        return CompositeType(StringUtils.join(ids, "."))!
     }
 
     /// Borrow the public reference to the Wrapper resource

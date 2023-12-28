@@ -2,6 +2,7 @@ import "NonFungibleToken"
 import "MetadataViews"
 import "Fixes"
 import "FixesWrappedNFT"
+import "FRC20NFTWrapper"
 
 transaction(
     wrappedNftId: UInt64,
@@ -17,10 +18,9 @@ transaction(
         self.nftToUnwrap <- wrappedNFTCol.withdraw(withdrawID: wrappedNftId) as! @FixesWrappedNFT.NFT
 
         let srcNftType = self.nftToUnwrap.getWrappedType() ?? panic("Could not get wrapped type")
-        let nftCollectionIdentifier = srcNftType.identifier.slice(from: 0, upTo: srcNftType.identifier.length - 3).concat("Collection")
 
         // Find the nft to wrap
-        let nftColType = CompositeType(nftCollectionIdentifier)!
+        let nftColType = FRC20NFTWrapper.asCollectionType(identifier: srcNftType.identifier)
         var nftProviderRef: &{NonFungibleToken.CollectionPublic}? = nil
         acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
             if type == nftColType {
@@ -33,7 +33,7 @@ transaction(
         })
         assert(
             nftProviderRef != nil,
-            message: "Could not find NFT collection with identifier: ".concat(nftCollectionIdentifier)
+            message: "Could not find NFT collection with identifier: ".concat(nftColType.identifier)
         )
         self.targetNFTCol = nftProviderRef!
     }

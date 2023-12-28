@@ -7,12 +7,11 @@ import "FRC20NFTWrapper"
 transaction(
     wrapperAddr: Address,
     nftCollectionIdentifier: String,
-    nftId: UInt64,
+    nftIds: [UInt64],
     keepWrapped: Bool,
 ) {
     let wrapper: &FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}
     let wrappedNFTCol: &FixesWrappedNFT.Collection
-    let nftToWrap: @NonFungibleToken.NFT
     let nftProvider: &{NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}
 
     prepare(acct: AuthAccount) {
@@ -36,7 +35,7 @@ transaction(
         self.wrappedNFTCol = acct.borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath)!
 
         // Find the nft to wrap
-        let nftColType = CompositeType(nftCollectionIdentifier)!
+        let nftColType = FRC20NFTWrapper.asCollectionType(identifier: nftCollectionIdentifier)
         var nftProviderRef: &{NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}? = nil
         acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
             if type == nftColType {
@@ -52,24 +51,31 @@ transaction(
             message: "Could not find NFT collection with identifier: ".concat(nftCollectionIdentifier)
         )
         self.nftProvider = nftProviderRef!
-        self.nftToWrap <- nftProviderRef!.withdraw(withdrawID: nftId)
+    }
+
+    pre {
+        nftIds.length > 0: "Must provide at least one NFT ID"
     }
 
     execute {
-        let newWrappedNFTId = self.wrapper.wrap(
-            recipient: self.wrappedNFTCol,
-            nftToWrap: <- self.nftToWrap
-        )
+        for uid in nftIds {
+            let nftToWrap <- self.nftProvider.withdraw(withdrawID: uid)
 
-        // If we don't want to keep the wrapped NFT, unwrap it
-        // and destroy the inscription
-        if !keepWrapped {
-            let wrappedNft <- self.wrappedNFTCol.withdraw(withdrawID: newWrappedNFTId) as! @FixesWrappedNFT.NFT
-            let ins <- FixesWrappedNFT.unwrap(
-                recipient: self.nftProvider,
-                nftToUnwrap: <- wrappedNft
+            let newWrappedNFTId = self.wrapper.wrap(
+                recipient: self.wrappedNFTCol,
+                nftToWrap: <- nftToWrap
             )
-            destroy ins
+
+            // If we don't want to keep the wrapped NFT, unwrap it
+            // and destroy the inscription
+            if !keepWrapped {
+                let wrappedNft <- self.wrappedNFTCol.withdraw(withdrawID: newWrappedNFTId) as! @FixesWrappedNFT.NFT
+                let ins <- FixesWrappedNFT.unwrap(
+                    recipient: self.nftProvider,
+                    nftToUnwrap: <- wrappedNft
+                )
+                destroy ins
+            }
         }
     }
 }
