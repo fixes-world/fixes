@@ -265,6 +265,7 @@ pub contract FRC20NFTWrapper {
         ) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
+                nftType.identifier != Type<@FixesWrappedNFT.NFT>().identifier: "You cannot wrap a FixesWrappedNFT"
             }
             let indexer = FRC20Indexer.getIndexer()
             assert(

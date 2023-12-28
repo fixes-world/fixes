@@ -302,6 +302,10 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     ): UInt64 {
         // info to emit
         let srcType = nftToWrap.getType()
+        assert(
+            srcType.identifier != Type<@FixesWrappedNFT.NFT>().identifier,
+            message: "You cannot wrap a FixesWrappedNFT"
+        )
         let srcId = nftToWrap.id
         let insId = inscription?.getId()
 
