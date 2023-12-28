@@ -388,18 +388,24 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                     })
                 )
             case Type<MetadataViews.NFTCollectionDisplay>():
-                let media = MetadataViews.Media(
+                let bannerMedia = MetadataViews.Media(
                     file: MetadataViews.HTTPFile(
                         url: "https://i.imgur.com/Wdy3GG7.jpg"
                     ),
                     mediaType: "image/jpeg"
                 )
+                let squareMedia = MetadataViews.Media(
+                    file: MetadataViews.HTTPFile(
+                        url: "https://i.imgur.com/hs3U5CY.png"
+                    ),
+                    mediaType: "image/png"
+                )
                 return MetadataViews.NFTCollectionDisplay(
                     name: "The Fixes Wrapped NFT Collection",
                     description: "This collection is used to wrap any Flow NFT.",
                     externalURL: MetadataViews.ExternalURL("https://fixes.world/"),
-                    squareImage: media,
-                    bannerImage: media,
+                    squareImage: squareMedia,
+                    bannerImage: bannerMedia,
                     socials: {
                         "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesOnFlow")
                     }
