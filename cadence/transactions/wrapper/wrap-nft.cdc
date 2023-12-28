@@ -14,7 +14,7 @@ transaction(
     let nftToWrap: @NonFungibleToken.NFT
 
     prepare(acct: AuthAccount) {
-        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddr)
+        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddr) ?? panic("Could not borrow public reference")
 
         // Create a new empty collection
         if acct.borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath) == nil {

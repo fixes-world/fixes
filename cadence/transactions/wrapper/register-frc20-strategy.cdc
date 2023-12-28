@@ -36,7 +36,7 @@ transaction(
             }
         }
 
-        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddress)
+        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddress) ?? panic("Could not borrow public reference")
         assert(
             self.wrapper.isAuthorizedToRegister(addr: acct.address),
             message: "Signer is not authorized to register!"

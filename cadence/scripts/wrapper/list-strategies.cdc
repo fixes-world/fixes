@@ -9,6 +9,7 @@ pub fun main(
     let indexerAddr = FRC20Indexer.getAddress()
     let indexer = FRC20Indexer.getIndexer()
     let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: indexerAddr)
+        ?? panic("Could not borrow public reference")
     let list = wrapper.getStrategies(all: all)
     let ret: [Strategy] = []
     for info in list {

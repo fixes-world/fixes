@@ -13,6 +13,9 @@ pub contract FRC20NFTWrapper {
     /// The event that is emitted when the internal flow vault is donated to
     pub event InternalFlowVaultDonated(amount: UFix64)
 
+    /// The event that is emitted when a new Wrapper is created
+    pub event WrapperCreated()
+
     /// The event that is emitted when the whitelist is updated
     pub event AuthorizedWhitelistUpdated(
         addr: Address,
@@ -40,11 +43,24 @@ pub contract FRC20NFTWrapper {
         address: Address,
     )
 
+    // Indexer
+    /// The event that is emitted when a new wrapper is added to the indexer
+    pub event WrapperAddedToIndexer(wrapper: Address)
+    /// The event that is emitted when the wrapper options is updated
+    pub event WrapperOptionsUpdated(wrapper: Address, key: String)
+    /// The event that is emitted when the extra NFT collection display is updated
+    pub event WrapperIndexerUpdatedNFTCollectionDisplay(nftType: Type, name: String, description: String)
+
     /* --- Variable, Enums and Structs --- */
     access(all)
     let FRC20NFTWrapperStoragePath: StoragePath
     access(all)
     let FRC20NFTWrapperPublicPath: PublicPath
+    access(all)
+    let FRC20NFTWrapperIndexerStoragePath: StoragePath
+    access(all)
+    let FRC20NFTWrapperIndexerPublicPath: PublicPath
+
 
     /* --- Interfaces & Resources --- */
 
@@ -101,6 +117,9 @@ pub contract FRC20NFTWrapper {
         fun getFRC20Strategy(nft: &NonFungibleToken.NFT): FRC20Strategy?
 
         access(all) view
+        fun getStrategiesAmount(all: Bool): UInt64
+
+        access(all) view
         fun getStrategies(all: Bool): [FRC20Strategy]
 
         access(all) view
@@ -148,6 +167,8 @@ pub contract FRC20NFTWrapper {
             self.strategies = {}
             self.whitelist = {}
             self.internalFlowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
+
+            emit WrapperCreated()
         }
 
         destroy() {
@@ -172,6 +193,16 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun getFRC20Strategy(nft: &NonFungibleToken.NFT): FRC20Strategy? {
             return self.strategies[nft.getType()]
+        }
+
+        access(all) view
+        fun getStrategiesAmount(all: Bool): UInt64 {
+            if all {
+                return UInt64(self.strategies.keys.length)
+            }
+            return UInt64(self.strategies.values.filter(fun (s: FRC20Strategy): Bool {
+                return s.isUsedUp() == false
+            }).length)
         }
 
         access(all) view
@@ -418,6 +449,150 @@ pub contract FRC20NFTWrapper {
         }
     }
 
+    /// The public resource interface for the Wrapper Indexer
+    ///
+    pub resource interface WrapperIndexerPublic {
+        // public methods ----
+
+        /// Check if the wrapper is registered
+        ///
+        access(all) view
+        fun hasRegisteredWrapper(addr: Address): Bool
+
+        /// Get all the wrappers
+        access(all) view
+        fun getAllWrappers(includeNoStrategy: Bool): [Address]
+
+        /// Get the public reference to the Wrapper resource
+        ///
+        access(all)
+        fun borrowWrapperPublic(addr: Address): &Wrapper{WrapperPublic}? {
+            return FRC20NFTWrapper.borrowWrapperPublic(addr: addr)
+        }
+
+        /// Get the extra NFT collection display
+        ///
+        access(all) view
+        fun getExtraNFTCollectionDisplay(
+            nftType: Type,
+        ): MetadataViews.NFTCollectionDisplay?
+
+        // write methods ----
+
+        /// Register a new Wrapper
+        access(all)
+        fun registerWrapper(wrapper: &Wrapper)
+
+        /// Update the wrapper options
+        access(all)
+        fun updateWrapperOptions(wrapper: &Wrapper, key: String, value: AnyStruct)
+    }
+
+    /// The resource for the Wrapper indexer contract
+    ///
+    pub resource WrapperIndexer: WrapperIndexerPublic {
+        /// The event that is emitted when the contract is created
+        access(self)
+        let wrappers: {Address: Bool}
+        access(self)
+        let wrapperOptions: {Address: {String: AnyStruct}}
+        access(self)
+        let displayHelper: {Type: MetadataViews.NFTCollectionDisplay}
+
+        init() {
+            self.wrappers = {}
+            self.wrapperOptions = {}
+            self.displayHelper = {}
+        }
+
+        // public methods ----
+
+        /// Check if the wrapper is registered
+        ///
+        access(all) view
+        fun hasRegisteredWrapper(addr: Address): Bool {
+            return self.wrappers[addr] != nil
+        }
+
+        /// Get all the wrappers
+        ///
+        access(all) view
+        fun getAllWrappers(includeNoStrategy: Bool): [Address] {
+            return self.wrappers.keys.filter(fun (addr: Address): Bool {
+                if let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: addr) {
+                    return includeNoStrategy ? true : wrapper.getStrategiesAmount(all: false) > 0
+                } else {
+                    return false
+                }
+            })
+        }
+
+        /// Get the extra NFT collection display
+        ///
+        access(all) view
+        fun getExtraNFTCollectionDisplay(
+            nftType: Type,
+        ): MetadataViews.NFTCollectionDisplay? {
+            return self.displayHelper[nftType]
+        }
+
+        // write methods ----
+
+        /// Register a new Wrapper
+        access(all)
+        fun registerWrapper(wrapper: &Wrapper) {
+            pre {
+                wrapper.owner != nil: "Wrapper owner is nil"
+            }
+            let ownerAddr = wrapper.owner!.address
+            self.wrappers[ownerAddr] = true
+            self.wrapperOptions[ownerAddr] = {}
+
+            emit WrapperAddedToIndexer(wrapper: ownerAddr)
+        }
+
+        /// Update the wrapper options
+        access(all)
+        fun updateWrapperOptions(wrapper: &Wrapper, key: String, value: AnyStruct) {
+            pre {
+                wrapper.owner != nil: "Wrapper owner is nil"
+            }
+            let ownerAddr = wrapper.owner!.address
+            if self.wrappers[ownerAddr] == nil {
+                self.registerWrapper(wrapper: wrapper)
+            }
+
+            let optionsRef = self.borrowWrapperOptions(addr: ownerAddr)
+            optionsRef[key] = value
+
+            emit WrapperOptionsUpdated(wrapper: wrapper.owner?.address ?? panic("Wrapper owner is nil"), key: key)
+        }
+
+        // private write methods ----
+
+        access(all)
+        fun updateExtraNFTCollectionDisplay(
+            nftType: Type,
+            display: MetadataViews.NFTCollectionDisplay,
+        ): Void {
+            self.displayHelper[nftType] = display
+
+            emit WrapperIndexerUpdatedNFTCollectionDisplay(
+                nftType: nftType,
+                name: display.name,
+                description: display.description,
+            )
+        }
+
+        /// Borrow the wrapper options
+        ///
+        access(self)
+        fun borrowWrapperOptions(addr: Address): &{String: AnyStruct} {
+            return &self.wrapperOptions[addr] as &{String: AnyStruct}?
+                ?? panic("Could not borrow wrapper options")
+        }
+    }
+
     /// Donate to the internal flow vault
     ///
     access(all)
@@ -426,6 +601,7 @@ pub contract FRC20NFTWrapper {
         _ value: @FlowToken.Vault
     ): Void {
         let ref = self.borrowWrapperPublic(addr: addr)
+             ?? panic("Could not borrow Xerox public reference")
         ref.donate(value: <- value)
     }
 
@@ -441,10 +617,10 @@ pub contract FRC20NFTWrapper {
     access(all)
     fun borrowWrapperPublic(
         addr: Address,
-    ): &FRC20NFTWrapper.Wrapper{WrapperPublic} {
+    ): &FRC20NFTWrapper.Wrapper{WrapperPublic}? {
         return getAccount(addr)
             .getCapability<&FRC20NFTWrapper.Wrapper{WrapperPublic}>(self.FRC20NFTWrapperPublicPath)
-            .borrow() ?? panic("Could not borrow Xerox public reference")
+            .borrow()
     }
 
     /// init
@@ -453,10 +629,28 @@ pub contract FRC20NFTWrapper {
         self.FRC20NFTWrapperStoragePath = StoragePath(identifier: identifier)!
         self.FRC20NFTWrapperPublicPath = PublicPath(identifier: identifier)!
 
+        self.FRC20NFTWrapperIndexerStoragePath = StoragePath(identifier: identifier.concat("_indexer"))!
+        self.FRC20NFTWrapperIndexerPublicPath = PublicPath(identifier: identifier.concat("_indexer"))!
+
         self.account.save(<- self.createNewWrapper(), to: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
         self.account.link<&FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}>(
             FRC20NFTWrapper.FRC20NFTWrapperPublicPath,
             target: FRC20NFTWrapper.FRC20NFTWrapperStoragePath
+        )
+
+        // create indexer
+        let indexer <- create WrapperIndexer()
+
+        // register the wrapper to the indexer
+        let wrapper = self.account.borrow<&Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
+            ?? panic("Could not borrow wrapper public reference")
+        indexer.registerWrapper(wrapper: wrapper)
+
+        // save the indexer
+        self.account.save(<- indexer, to: self.FRC20NFTWrapperIndexerStoragePath)
+        self.account.link<&FRC20NFTWrapper.WrapperIndexer{FRC20NFTWrapper.WrapperIndexerPublic}>(
+            self.FRC20NFTWrapperIndexerPublicPath,
+            target: self.FRC20NFTWrapperIndexerStoragePath
         )
 
         emit ContractInitialized()
