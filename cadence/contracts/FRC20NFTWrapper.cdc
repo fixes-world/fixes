@@ -623,6 +623,16 @@ pub contract FRC20NFTWrapper {
             .borrow()
     }
 
+    /// Borrow the public interface to the Wrapper Indexer resource
+    ///
+    access(all)
+    fun borrowWrapperIndexerPublic(): &FRC20NFTWrapper.WrapperIndexer{WrapperIndexerPublic} {
+        return getAccount(self.account.address)
+            .getCapability<&FRC20NFTWrapper.WrapperIndexer{WrapperIndexerPublic}>(self.FRC20NFTWrapperIndexerPublicPath)
+            .borrow()
+            ?? panic("Could not borrow WrapperIndexer public reference")
+    }
+
     /// init
     init() {
         let identifier = "FixesFRC20NFTWrapper_".concat(self.account.address.toString())

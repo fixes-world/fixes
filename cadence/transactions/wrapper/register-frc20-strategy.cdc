@@ -33,6 +33,13 @@ transaction(
                 let toDonate <- vaultRef.withdraw(amount: 1.0)
 
                 FRC20NFTWrapper.donate(addr: acct.address, <- (toDonate as! @FlowToken.Vault))
+
+                let wrapperIndexer = FRC20NFTWrapper.borrowWrapperIndexerPublic()
+                if !wrapperIndexer.hasRegisteredWrapper(addr: acct.address) {
+                    let ref = acct.borrow<&FRC20NFTWrapper.Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
+                        ?? panic("Could not borrow reference to the owner's Wrapper!")
+                    wrapperIndexer.registerWrapper(wrapper: ref)
+                }
             }
         }
 
