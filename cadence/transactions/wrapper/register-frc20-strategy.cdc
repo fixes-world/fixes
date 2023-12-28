@@ -11,7 +11,6 @@ transaction(
     alloc: UFix64,
     copies: UInt64,
     cond: String?,
-    transferAmt: UFix64,
 ) {
     let wrapper: &FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}
     let ins: &Fixes.Inscription
@@ -49,6 +48,7 @@ transaction(
             message: "Signer is not authorized to register!"
         )
 
+        let transferAmt = alloc * UFix64(copies)
         // basic attributes
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
