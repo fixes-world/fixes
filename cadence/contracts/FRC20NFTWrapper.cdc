@@ -146,8 +146,8 @@ pub contract FRC20NFTWrapper {
         access(all)
         fun wrap(
             recipient: &FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic, NonFungibleToken.CollectionPublic},
-            nftToWrap: @NonFungibleToken.NFT,
-        )
+            nftToWrap: @NonFungibleToken.NFT
+        ): UInt64
     }
 
     /// The resource for the Wrapper contract
@@ -332,7 +332,7 @@ pub contract FRC20NFTWrapper {
         fun wrap(
             recipient: &FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic, NonFungibleToken.CollectionPublic},
             nftToWrap: @NonFungibleToken.NFT
-        ) {
+        ): UInt64 {
             // check if the NFT is owned by the signer
             let recipientAddr = recipient.owner?.address ?? panic("Recipient owner is nil")
             // get the NFT type
@@ -414,6 +414,8 @@ pub contract FRC20NFTWrapper {
                 alloc: strategy.alloc,
                 address: recipientAddr,
             )
+
+            return newId
         }
 
         // private methods
