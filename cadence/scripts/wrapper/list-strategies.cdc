@@ -18,7 +18,7 @@ pub fun main(
             for info in list {
                 let token = frc20Indexer.getTokenMeta(tick: info.tick) ?? panic("token not found")
                 ret.append(Strategy(
-                    hoster: wrapperAddr,
+                    host: wrapperAddr,
                     info: info,
                     meta: token,
                     holders: frc20Indexer.getHoldersAmount(tick: info.tick),
@@ -31,20 +31,20 @@ pub fun main(
 }
 
 pub struct Strategy {
-    pub let hoster: Address
+    pub let host: Address
     pub let info: FRC20NFTWrapper.FRC20Strategy
     pub let holders: UInt64
     pub let meta: FRC20Indexer.FRC20Meta
     pub let pool: UFix64
 
     init(
-        hoster: Address,
+        host: Address,
         info: FRC20NFTWrapper.FRC20Strategy,
         meta: FRC20Indexer.FRC20Meta,
         holders: UInt64,
         pool: UFix64,
     ) {
-        self.hoster = hoster
+        self.host = host
         self.info = info
         self.holders = holders
         self.meta = meta
