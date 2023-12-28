@@ -27,6 +27,7 @@ pub contract FRC20NFTWrapper {
         tick: String,
         alloc: UFix64,
         copies: UInt64,
+        cond: String?
     )
     /// The event that is emitted when an NFT is wrapped
     pub event NFTWrappedWithFRC20Allocated(
@@ -52,18 +53,21 @@ pub contract FRC20NFTWrapper {
         pub let nftType: Type
         pub let alloc: UFix64
         pub let copies: UInt64
+        pub let cond: String?
         pub var usedAmt: UInt64
 
         init(
             tick: String,
             nftType: Type,
             alloc: UFix64,
-            c: UInt64
+            copies: UInt64,
+            cond: String?
         ) {
             self.tick = tick
             self.nftType = nftType
             self.alloc = alloc
-            self.copies = c
+            self.copies = copies
+            self.cond = cond
             self.usedAmt = 0
         }
 
@@ -114,6 +118,7 @@ pub contract FRC20NFTWrapper {
             nftType: Type,
             alloc: UFix64,
             copies: UInt64,
+            cond: String?,
             ins: &Fixes.Inscription,
         )
 
@@ -217,6 +222,7 @@ pub contract FRC20NFTWrapper {
             nftType: Type,
             alloc: UFix64,
             copies: UInt64,
+            cond: String?,
             ins: &Fixes.Inscription,
         ) {
             pre {
@@ -286,7 +292,8 @@ pub contract FRC20NFTWrapper {
                 tick: tick,
                 nftType: nftType,
                 alloc: alloc,
-                c: copies
+                copies: copies,
+                cond: cond,
             )
             // setup history
             self.histories[nftType] = {}
@@ -299,6 +306,7 @@ pub contract FRC20NFTWrapper {
                 tick: tick,
                 alloc: alloc,
                 copies: copies,
+                cond: cond,
             )
         }
 
