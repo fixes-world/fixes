@@ -129,13 +129,6 @@ pub contract FRC20NFTWrapper {
             recipient: &FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic, NonFungibleToken.CollectionPublic},
             nftToWrap: @NonFungibleToken.NFT,
         )
-        /// Unwrap an NFT to its original collection
-        ///
-        access(all)
-        fun unwrap(
-            recipient: &{NonFungibleToken.CollectionPublic},
-            nftToUnwrap: @FixesWrappedNFT.NFT,
-        ): @Fixes.Inscription?
     }
 
     /// The resource for the Wrapper contract
@@ -148,20 +141,12 @@ pub contract FRC20NFTWrapper {
         access(self)
         let internalFlowVault: @FlowToken.Vault
         access(self)
-        let minterCap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>
-        access(self)
         let whitelist: {Address: Bool}
 
-        init(
-            _ cap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>,
-        ) {
-            pre {
-                cap.check() && cap.borrow() != nil: "Capability not authorized"
-            }
+        init() {
             self.histories = {}
             self.strategies = {}
             self.whitelist = {}
-            self.minterCap = cap
             self.internalFlowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
         }
 
@@ -369,8 +354,7 @@ pub contract FRC20NFTWrapper {
                 parentId: nil
             )
             // mint the wrapped NFT
-            let minter = self.borrowMinter()
-            let newId = minter.wrap(recipient: recipient, nftToWrap: <- nftToWrap, inscription: <- newIns)
+            let newId = FixesWrappedNFT.wrap(recipient: recipient, nftToWrap: <- nftToWrap, inscription: <- newIns)
 
             // borrow the inscription
             let nft = recipient.borrowFixesWrappedNFT(id: newId) ?? panic("Could not borrow FixesWrappedNFT")
@@ -401,17 +385,6 @@ pub contract FRC20NFTWrapper {
             )
         }
 
-        /// Unwrap an NFT to its original collection
-        ///
-        access(all)
-        fun unwrap(
-            recipient: &{NonFungibleToken.CollectionPublic},
-            nftToUnwrap: @FixesWrappedNFT.NFT,
-        ): @Fixes.Inscription? {
-            let minter = self.borrowMinter()
-            return <- minter.unwrap(recipient: recipient, nftToUnwrap: <- nftToUnwrap)
-        }
-
         // private methods
 
         /// Update the whitelist
@@ -427,13 +400,6 @@ pub contract FRC20NFTWrapper {
         }
 
         // internal methods
-
-        /// Borrow the minter for the FixesWrappedNFT collection
-        ///
-        access(self)
-        fun borrowMinter(): &FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter} {
-            return self.minterCap.borrow() ?? panic("Could not borrow minter")
-        }
 
         /// Borrow the strategy for an NFT type
         ///
@@ -466,10 +432,8 @@ pub contract FRC20NFTWrapper {
     /// Create a new Wrapper resourceTON
     ///
     access(all)
-    fun createNewWrapper(
-        _ minterCap: Capability<&FixesWrappedNFT.NFTMinter{FixesWrappedNFT.Minter}>,
-    ): @Wrapper {
-        return <- create Wrapper(minterCap)
+    fun createNewWrapper(): @Wrapper {
+        return <- create Wrapper()
     }
 
     /// Borrow the public reference to the Wrapper resource
@@ -488,6 +452,12 @@ pub contract FRC20NFTWrapper {
         let identifier = "FixesFRC20NFTWrapper_".concat(self.account.address.toString())
         self.FRC20NFTWrapperStoragePath = StoragePath(identifier: identifier)!
         self.FRC20NFTWrapperPublicPath = PublicPath(identifier: identifier)!
+
+        self.account.save(<- self.createNewWrapper(), to: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
+        self.account.link<&FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}>(
+            FRC20NFTWrapper.FRC20NFTWrapperPublicPath,
+            target: FRC20NFTWrapper.FRC20NFTWrapperStoragePath
+        )
 
         emit ContractInitialized()
     }

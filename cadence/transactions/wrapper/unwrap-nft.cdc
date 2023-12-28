@@ -2,21 +2,14 @@ import "NonFungibleToken"
 import "MetadataViews"
 import "Fixes"
 import "FixesWrappedNFT"
-import "FRC20NFTWrapper"
-import "FRC20Indexer"
-import "FlowToken"
 
 transaction(
     wrappedNftId: UInt64,
 ) {
-    let wrapper: &FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}
     let targetNFTCol: &{NonFungibleToken.CollectionPublic}
     let nftToUnwrap: @FixesWrappedNFT.NFT
 
     prepare(acct: AuthAccount) {
-        let indexerAddr = FRC20Indexer.getAddress()
-        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: indexerAddr)
-
         let wrappedNFTCol = acct
             .borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath)
             ?? panic("Could not borrow FixesWrappedNFT collection")
@@ -46,7 +39,7 @@ transaction(
     }
 
     execute {
-        let ins <- self.wrapper.unwrap(
+        let ins <- FixesWrappedNFT.unwrap(
             recipient: self.targetNFTCol,
             nftToUnwrap: <- self.nftToUnwrap
         )

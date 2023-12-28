@@ -3,10 +3,9 @@ import "MetadataViews"
 import "Fixes"
 import "FixesWrappedNFT"
 import "FRC20NFTWrapper"
-import "FRC20Indexer"
-import "FlowToken"
 
 transaction(
+    wrapperAddr: Address,
     nftCollectionIdentifier: String,
     nftId: UInt64,
 ) {
@@ -15,8 +14,7 @@ transaction(
     let nftToWrap: @NonFungibleToken.NFT
 
     prepare(acct: AuthAccount) {
-        let indexerAddr = FRC20Indexer.getAddress()
-        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: indexerAddr)
+        self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddr)
 
         // Create a new empty collection
         if acct.borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath) == nil {
