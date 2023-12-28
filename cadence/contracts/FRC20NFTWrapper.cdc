@@ -698,18 +698,20 @@ pub contract FRC20NFTWrapper {
 
         // create indexer
         let indexer <- create WrapperIndexer()
-
-        // register the wrapper to the indexer
-        let wrapper = self.account.borrow<&Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
-            ?? panic("Could not borrow wrapper public reference")
-        indexer.registerWrapper(wrapper: wrapper)
-
         // save the indexer
         self.account.save(<- indexer, to: self.FRC20NFTWrapperIndexerStoragePath)
         self.account.link<&FRC20NFTWrapper.WrapperIndexer{FRC20NFTWrapper.WrapperIndexerPublic}>(
             self.FRC20NFTWrapperIndexerPublicPath,
             target: self.FRC20NFTWrapperIndexerStoragePath
         )
+
+        let indexerRef = self.account.borrow<&FRC20NFTWrapper.WrapperIndexer>(from: self.FRC20NFTWrapperIndexerStoragePath)
+            ?? panic("Could not borrow indexer public reference")
+
+        // register the wrapper to the indexer
+        let wrapper = self.account.borrow<&Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
+            ?? panic("Could not borrow wrapper public reference")
+        indexerRef.registerWrapper(wrapper: wrapper)
 
         emit ContractInitialized()
     }
