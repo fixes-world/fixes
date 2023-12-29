@@ -9,7 +9,7 @@ pub fun main(
     let wrapperIndexer = FRC20NFTWrapper.borrowWrapperIndexerPublic()
     let ret: [WrapperHost] = []
 
-    let wrappers = wrapperIndexer.getAllWrappers(includeNoStrategy: includeNoStrategy)
+    let wrappers = wrapperIndexer.getAllWrappers(includeNoStrategy, true)
     for addr in wrappers {
         if let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: addr) {
             ret.append(WrapperHost(

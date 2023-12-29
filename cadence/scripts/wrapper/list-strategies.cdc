@@ -9,7 +9,7 @@ pub fun main(
 ): [Strategy] {
     let wrapperIndexer = FRC20NFTWrapper.borrowWrapperIndexerPublic()
     let frc20Indexer = FRC20Indexer.getIndexer()
-    let allWrapper = wrapperIndexer.getAllWrappers(includeNoStrategy: false)
+    let allWrapper = wrapperIndexer.getAllWrappers(false, true)
 
     let ret: [Strategy] = []
 

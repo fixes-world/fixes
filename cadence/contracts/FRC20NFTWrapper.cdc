@@ -568,7 +568,7 @@ pub contract FRC20NFTWrapper {
 
         /// Get all the wrappers
         access(all) view
-        fun getAllWrappers(includeNoStrategy: Bool): [Address]
+        fun getAllWrappers(_ includeNoStrategy: Bool, _ includeFinished: Bool): [Address]
 
         /// Get the public reference to the Wrapper resource
         ///
@@ -617,10 +617,13 @@ pub contract FRC20NFTWrapper {
         /// Get all the wrappers
         ///
         access(all) view
-        fun getAllWrappers(includeNoStrategy: Bool): [Address] {
+        fun getAllWrappers(
+            _ includeNoStrategy: Bool,
+            _ includeFinished: Bool,
+        ): [Address] {
             return self.wrappers.keys.filter(fun (addr: Address): Bool {
                 if let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: addr) {
-                    return includeNoStrategy ? true : wrapper.getStrategiesAmount(all: false) > 0
+                    return includeNoStrategy ? true : wrapper.getStrategiesAmount(all: includeFinished) > 0
                 } else {
                     return false
                 }
