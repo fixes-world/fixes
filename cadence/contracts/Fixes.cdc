@@ -269,6 +269,10 @@ pub contract Fixes {
 
         pub fun getViews(): [Type] {
             return [
+                Type<MetadataViews.Serial>(),
+                Type<MetadataViews.Display>(),
+                Type<MetadataViews.Medias>(),
+                Type<MetadataViews.ExternalURL>(),
                 Type<MetadataViews.Rarity>(),
                 Type<MetadataViews.Traits>()
             ]
@@ -281,11 +285,38 @@ pub contract Fixes {
                 UFix64(ValueRarity.Legendary.rawValue),
                 nil
             )
+            let mimeType = self.getMimeType()
+            let metadata = self.getMetadata()
+            let encoding = self.getContentEncoding()
+            let isUTF8 = encoding == "utf8" || encoding == "utf-8" || encoding == nil
+            let fileView = MetadataViews.HTTPFile(
+                url: "data:".concat(mimeType).concat(";")
+                    .concat(isUTF8 ? "utf8,charset=UTF-8" : encoding!)
+                    .concat(",").concat(
+                        isUTF8 ? String.fromUTF8(metadata)! : encoding == "hex" ? String.encodeHex(metadata) : ""
+                    ),
+            )
             switch view {
+            case Type<MetadataViews.Serial>():
+                return MetadataViews.Serial(self.getId())
+            case Type<MetadataViews.Display>():
+                return MetadataViews.Display(
+                    name: "FIXeS Inscription #".concat(self.getId().toString()),
+                    description: "Fixes is a decentralized protocol to store and exchange inscriptions.",
+                    thumbnail: fileView,
+                )
+            case Type<MetadataViews.Medias>():
+                return MetadataViews.Medias([MetadataViews.Media(
+                    file: fileView,
+                    mediaType: mimeType
+                )])
+            case Type<MetadataViews.ExternalURL>():
+                return MetadataViews.ExternalURL("https://fixes.world/")
             case Type<MetadataViews.Rarity>():
                 return ratityView
             case Type<MetadataViews.Traits>():
                 return MetadataViews.Traits([
+                    MetadataViews.Trait(name: "id", value: self.getId(), nil, nil),
                     MetadataViews.Trait(name: "mimeType", value: self.getMimeType(), nil, nil),
                     MetadataViews.Trait(name: "metaProtocol", value: self.getMetaProtocol(), nil, nil),
                     MetadataViews.Trait(name: "encoding", value: self.getContentEncoding(), nil, nil),

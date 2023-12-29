@@ -76,6 +76,9 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 if !nftViews.contains(Type<MetadataViews.NFTCollectionDisplay>()) {
                     nftViews.append(Type<MetadataViews.NFTCollectionDisplay>())
                 }
+                if !nftViews.contains(Type<MetadataViews.Traits>()) {
+                    nftViews.append(Type<MetadataViews.Traits>())
+                }
                 return nftViews
             }
             return []
@@ -96,7 +99,18 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 return FixesWrappedNFT.resolveView(view)
             } else {
                 if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
-                    return nftRef.resolveView(view)
+                    if let originView = nftRef.resolveView(view) {
+                        if view == Type<MetadataViews.Traits>() {
+                            let traits = originView as! MetadataViews.Traits
+                            traits.addTrait(MetadataViews.Trait(name: "srcNFTType", value: nftRef.getType().identifier, nil, nil))
+                            traits.addTrait(MetadataViews.Trait(name: "srcNFTId", value: nftRef.id, nil, nil))
+                            if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
+                                traits.addTrait(MetadataViews.Trait(name: "inscriptionId", value: insRef.getId(), nil, nil))
+                            }
+                            return traits
+                        }
+                        return originView
+                    }
                 }
                 return nil
             }
@@ -128,7 +142,7 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// Borrow the NFT's injected inscription
         ///
         access(all)
-        fun borrowInscriptionPublic(): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+        fun borrowInscriptionPublic(): &Fixes.Inscription{Fixes.InscriptionPublic, MetadataViews.Resolver}? {
             return self.borrowInscription()
         }
 
