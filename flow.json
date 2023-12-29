@@ -111,6 +111,20 @@
 				"mainnet": "49a7cda3a1eecc29",
 				"testnet": "324c34e1c517e4db"
 			}
+		},
+		"FIND": {
+			"source": "",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"Domains": {
+			"source": "",
+			"aliases": {
+				"mainnet": "233eb012d34b0070",
+				"testnet": "b05b2abb42335e88"
+			}
 		}
 	},
 	"networks": {
