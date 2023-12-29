@@ -633,9 +633,14 @@ pub contract FRC20NFTWrapper {
             nftType: Type,
         ): MetadataViews.NFTCollectionDisplay {
             let collectionType = FRC20NFTWrapper.asCollectionType(nftType.identifier)
+            let nftType = FRC20NFTWrapper.asNFTType(nftType.identifier)
             // get from NFTCatalog first
-            if let catalogEntry = NFTCatalog.getCatalogEntry(collectionIdentifier : collectionType.identifier) {
-                return catalogEntry.collectionDisplay
+            if let entries: {String: Bool} = NFTCatalog.getCollectionsForType(nftTypeIdentifier: nftType.identifier) {
+                for colId in entries.keys {
+                    if let catalogEntry = NFTCatalog.getCatalogEntry(collectionIdentifier: colId) {
+                        return catalogEntry.collectionDisplay
+                    }
+                }
             }
             // if no exists, then get from display helper
             if let display = self.displayHelper[collectionType] {
