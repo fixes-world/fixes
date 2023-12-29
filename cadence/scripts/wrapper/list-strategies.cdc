@@ -1,3 +1,4 @@
+import "MetadataViews"
 import "Fixes"
 import "FixesWrappedNFT"
 import "FRC20NFTWrapper"
@@ -23,6 +24,8 @@ pub fun main(
                     meta: token,
                     holders: frc20Indexer.getHoldersAmount(tick: info.tick),
                     pool: frc20Indexer.getPoolBalance(tick: info.tick),
+                    collectionDisplay: wrapperIndexer.getNFTCollectionDisplay(nftType: info.nftType)
+                        ?? FixesWrappedNFT.resolveView(Type<MetadataViews.NFTCollectionDisplay>()) as! MetadataViews.NFTCollectionDisplay
                 ))
             }
         }
@@ -36,6 +39,7 @@ pub struct Strategy {
     pub let holders: UInt64
     pub let meta: FRC20Indexer.FRC20Meta
     pub let pool: UFix64
+    pub let collectionDisplay: MetadataViews.NFTCollectionDisplay
 
     init(
         host: Address,
@@ -43,11 +47,13 @@ pub struct Strategy {
         meta: FRC20Indexer.FRC20Meta,
         holders: UInt64,
         pool: UFix64,
+        collectionDisplay: MetadataViews.NFTCollectionDisplay
     ) {
         self.host = host
         self.info = info
         self.holders = holders
         self.meta = meta
         self.pool = pool
+        self.collectionDisplay = collectionDisplay
     }
 }
