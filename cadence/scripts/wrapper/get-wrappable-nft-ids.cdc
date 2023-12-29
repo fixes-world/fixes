@@ -13,6 +13,8 @@ pub fun main(
     wrapper: Address,
     nftIdentifier: String,
     userAddr: Address,
+    page: Int,
+    size: Int
 ): [UInt64] {
     let collectionType = FRC20NFTWrapper.asCollectionType(nftIdentifier)
     if let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapper) {
@@ -67,11 +69,16 @@ pub fun main(
 
         // scan all NFTs in the collection to search all NFTs that can be wrapped
         let allIds = collectionRef!.getIDs()
+        var endIdx = page * size + size
+        if endIdx > allIds.length {
+            endIdx = allIds.length
+        }
+        let sliced = allIds.slice(from: page * size, upTo: endIdx)
         // Soul bound view
         let soulBoundView = Type<FindViews.SoulBound>()
 
         let ret: [UInt64] = []
-        for id in allIds {
+        for id in sliced {
             let nft = collectionRef!.borrowNFT(id: id)
             // check if it is wrapped or soul bound
             let isWrapped = wrapper.isFRC20NFTWrappered(nft: nft)
