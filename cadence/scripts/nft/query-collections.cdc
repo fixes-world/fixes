@@ -1,5 +1,6 @@
 import "NonFungibleToken"
 import "MetadataViews"
+import "InscriptionMetadata"
 import "StringUtils"
 import "FixesWrappedNFT"
 
@@ -27,43 +28,59 @@ pub fun main(
         if type.isSubtype(of: Type<@NonFungibleToken.Collection>()) && type != Type<@FixesWrappedNFT.Collection>() {
             let valid = acct.check<@AnyResource{MetadataViews.ResolverCollection}>(from: path)
             if !valid {
+                // hack for FreeFlow Inscription
+                if acct.check<@AnyResource{InscriptionMetadata.ResolverCollection}>(from: path) {
+                    let ref = acct.borrow<&AnyResource{InscriptionMetadata.ResolverCollection}>(from: path)!
+                    let nftIds = ref.getIDs()
+                    if nftIds.length == 0 {
+                        return true
+                    }
+                    ret[type.identifier] = MetadataViews.NFTCollectionDisplay(
+                        name: "FreeFlow",
+                        description: "Free Flow Inscription NFT Collection.",
+                        externalURL: defaultUrl,
+                        squareImage: defaultSquareMedia,
+                        bannerImage: defaultSquareMedia,
+                        socials: defaultSocial
+                    )
+                }
                 return true
             }
-            if let ref = acct.borrow<&AnyResource{MetadataViews.ResolverCollection}>(from: path) {
-                let nftIds = ref.getIDs()
-                if nftIds.length > 0 {
-                    // use the first NFT to get the collection display
-                    let viewResolver = ref.borrowViewResolver(id: nftIds[0])
-                    // if the collection has a display, use it
-                    if let display = MetadataViews.getNFTCollectionDisplay(viewResolver) {
-                        ret[type.identifier] = display
-                    }
-                    // if the collection has an NFT display, use it
-                    else if let nftDisplay = MetadataViews.getDisplay(viewResolver) {
-                        let media = MetadataViews.Media(
-                            file: nftDisplay.thumbnail,
-                            mediaType: "image/*"
-                        )
-                        ret[type.identifier] = MetadataViews.NFTCollectionDisplay(
-                            name: nftDisplay.name,
-                            description: nftDisplay.description,
-                            externalURL: defaultUrl,
-                            squareImage: media,
-                            bannerImage: defaultBannerMedia,
-                            socials: defaultSocial
-                        )
-                    } else {
-                        let ids = StringUtils.split(type.identifier, ".")
-                        ret[type.identifier] = MetadataViews.NFTCollectionDisplay(
-                            name: ids[2],
-                            description: "NFT Collection built by address ".concat(ids[1]),
-                            externalURL: defaultUrl,
-                            squareImage: defaultSquareMedia,
-                            bannerImage: defaultSquareMedia,
-                            socials: defaultSocial
-                        )
-                    }
-                }
+            let ref = acct.borrow<&AnyResource{MetadataViews.ResolverCollection}>(from: path)!
+            let nftIds = ref.getIDs()
+            if nftIds.length == 0 {
+                return true
+            }
+            // use the first NFT to get the collection display
+            let viewResolver = ref.borrowViewResolver(id: nftIds[0])
+            // if the collection has a display, use it
+            if let display = MetadataViews.getNFTCollectionDisplay(viewResolver) {
+                ret[type.identifier] = display
+            }
+            // if the collection has an NFT display, use it
+            else if let nftDisplay = MetadataViews.getDisplay(viewResolver) {
+                let media = MetadataViews.Media(
+                    file: nftDisplay.thumbnail,
+                    mediaType: "image/*"
+                )
+                ret[type.identifier] = MetadataViews.NFTCollectionDisplay(
+                    name: nftDisplay.name,
+                    description: nftDisplay.description,
+                    externalURL: defaultUrl,
+                    squareImage: media,
+                    bannerImage: defaultBannerMedia,
+                    socials: defaultSocial
+                )
+            } else {
+                let ids = StringUtils.split(type.identifier, ".")
+                ret[type.identifier] = MetadataViews.NFTCollectionDisplay(
+                    name: ids[2],
+                    description: "NFT Collection built by address ".concat(ids[1]),
+                    externalURL: defaultUrl,
+                    squareImage: defaultSquareMedia,
+                    bannerImage: defaultSquareMedia,
+                    socials: defaultSocial
+                )
             }
         }
         return true

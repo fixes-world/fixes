@@ -112,6 +112,13 @@
 				"testnet": "324c34e1c517e4db"
 			}
 		},
+		"InscriptionMetadata": {
+			"source": "cadence/deps/InscriptionMetadata.cdc",
+			"aliases": {
+				"mainnet": "88dd257fcf26d3cc",
+				"testnet": "564b229bd8380848"
+			}
+		},
 		"FIND": {
 			"source": "",
 			"aliases": {

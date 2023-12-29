@@ -1,6 +1,6 @@
 {
   "name": "fixes-contracts",
-	"version": "0.3.1",
+	"version": "0.3.2",
   "exports": {
     "./contracts/*": "./cadence/contracts/*",
     "./transactions/*": "./cadence/transactions/*",
