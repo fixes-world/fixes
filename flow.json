@@ -199,7 +199,9 @@
 		"mainnet": {
 			"mainnet-admin": [
 				"FRC20Indexer",
-				"Fixes"
+				"Fixes",
+				"FixesWrappedNFT",
+				"FRC20NFTWrapper"
 			]
 		},
 		"testnet": {
