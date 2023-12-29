@@ -119,6 +119,13 @@
 				"testnet": "35717efbbce11c74"
 			}
 		},
+		"FindViews": {
+			"source": "cadence/deps/FindViews.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
 		"Domains": {
 			"source": "",
 			"aliases": {

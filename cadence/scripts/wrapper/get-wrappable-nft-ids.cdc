@@ -1,6 +1,9 @@
+// Third party imports
 import "NonFungibleToken"
-import "NFTCatalog"
 import "MetadataViews"
+import "NFTCatalog"
+import "FindViews"
+// Fixes imports
 import "Fixes"
 import "FixesWrappedNFT"
 import "FRC20NFTWrapper"
@@ -18,7 +21,7 @@ pub fun main(
         }
 
         let acct = getAuthAccount(userAddr)
-        var collectionRef: &NonFungibleToken.Collection? = nil
+        var collectionRef: &{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}? = nil
 
         let nftType = FRC20NFTWrapper.asNFTType(nftIdentifier)
         // get from NFTCatalog first
@@ -26,7 +29,7 @@ pub fun main(
             for colId in entries.keys {
                 if let catalogEntry = NFTCatalog.getCatalogEntry(collectionIdentifier: colId) {
                     let path = catalogEntry.collectionData.storagePath
-                    collectionRef = acct.borrow<&NonFungibleToken.Collection>(from: path)
+                    collectionRef = acct.borrow<&{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path)
                     if collectionRef != nil {
                         break
                     }
@@ -39,7 +42,7 @@ pub fun main(
             var found = false
             acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
                 if type.identifier == collectionType.identifier {
-                    collectionRef = acct.borrow<&NonFungibleToken.Collection>(from: path)
+                    collectionRef = acct.borrow<&{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path)
                     if collectionRef != nil {
                         found = true  // stop
                     }
@@ -55,11 +58,18 @@ pub fun main(
 
         // scan all NFTs in the collection to search all NFTs that can be wrapped
         let allIds = collectionRef!.getIDs()
+        // Soul bound view
+        let soulBoundView = Type<FindViews.SoulBound>()
 
         let ret: [UInt64] = []
         for id in allIds {
             let nft = collectionRef!.borrowNFT(id: id)
-            if !wrapper.isFRC20NFTWrappered(nft: nft) {
+            let viewResolver = collectionRef!.borrowViewResolver(id: id)
+            // check if it is wrapped or soul bound
+            let isWrapped = wrapper.isFRC20NFTWrappered(nft: nft)
+            let isSoulBound = viewResolver.resolveView(soulBoundView) != nil
+            // if not wrapped and not soul bound, add to return list
+            if !isWrapped && !isSoulBound {
                 ret.append(id)
             }
         }
