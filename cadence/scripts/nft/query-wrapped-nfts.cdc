@@ -56,7 +56,7 @@ pub struct WrappedNFTView {
     pub let uuid: UInt64
     pub let display: MetadataViews.Display?
     pub let externalURL: MetadataViews.ExternalURL?
-    pub let traits: MetadataViews.Traits?
+    pub let traits: [MetadataViews.Trait]
     pub let extras: [AnyStruct]
     init(
         basic: MetadataViews.NFTView,
@@ -66,7 +66,7 @@ pub struct WrappedNFTView {
         self.uuid = basic.uuid
         self.display = basic.display
         self.externalURL = basic.externalURL
-        self.traits = basic.traits
+        self.traits = basic.traits?.traits ?? []
         self.extras = extras
     }
 }
