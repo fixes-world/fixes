@@ -95,7 +95,7 @@ transaction(
 
     execute {
         self.wrapper.registerFRC20Strategy(
-            nftType: FRC20NFTWrapper.asCollectionType(identifier: nftTypeIdentifer),
+            type: FRC20NFTWrapper.asCollectionType(nftTypeIdentifer),
             alloc: alloc,
             copies: copies,
             cond: cond,

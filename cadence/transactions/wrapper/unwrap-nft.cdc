@@ -20,7 +20,7 @@ transaction(
         let srcNftType = self.nftToUnwrap.getWrappedType() ?? panic("Could not get wrapped type")
 
         // Find the nft to wrap
-        let nftColType = FRC20NFTWrapper.asCollectionType(identifier: srcNftType.identifier)
+        let nftColType = FRC20NFTWrapper.asCollectionType(srcNftType.identifier)
         var nftProviderRef: &{NonFungibleToken.CollectionPublic}? = nil
         acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
             if type == nftColType {

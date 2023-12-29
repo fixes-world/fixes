@@ -5,6 +5,7 @@ import "Fixes"
 import "FixesWrappedNFT"
 import "FRC20Indexer"
 import "StringUtils"
+import "NFTCatalog"
 
 pub contract FRC20NFTWrapper {
 
@@ -146,7 +147,7 @@ pub contract FRC20NFTWrapper {
         /// Register a new FRC20 strategy
         access(all)
         fun registerFRC20Strategy(
-            nftType: Type,
+            type: Type,
             alloc: UFix64,
             copies: UInt64,
             cond: String?,
@@ -271,7 +272,7 @@ pub contract FRC20NFTWrapper {
         /// Register a new FRC20 strategy
         access(all)
         fun registerFRC20Strategy(
-            nftType: Type,
+            type: Type,
             alloc: UFix64,
             copies: UInt64,
             cond: String?,
@@ -279,7 +280,6 @@ pub contract FRC20NFTWrapper {
         ) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
-                nftType.identifier != Type<@FixesWrappedNFT.NFT>().identifier: "You cannot wrap a FixesWrappedNFT"
             }
             let indexer = FRC20Indexer.getIndexer()
             assert(
@@ -308,9 +308,16 @@ pub contract FRC20NFTWrapper {
                 message: "The deployer is not authorized to register a new strategy"
             )
 
+            // ensure store as collection type
+            let collectionType = FRC20NFTWrapper.asCollectionType(type.identifier)
+            assert(
+                collectionType.identifier != Type<@FixesWrappedNFT.Collection>().identifier,
+                message: "You cannot wrap a FixesWrappedNFT"
+            )
+
             // check if the strategy already exists
             assert(
-                self.strategies[nftType] == nil,
+                self.strategies[collectionType] == nil,
                 message: "The strategy already exists"
             )
 
@@ -356,21 +363,21 @@ pub contract FRC20NFTWrapper {
             )
 
             // setup strategy
-            self.strategies[nftType] = FRC20Strategy(
+            self.strategies[collectionType] = FRC20Strategy(
                 tick: tick,
-                nftType: nftType,
+                nftType: collectionType,
                 alloc: alloc,
                 copies: copies,
                 cond: cond,
             )
             // setup history
-            self.histories[nftType] = {}
+            self.histories[collectionType] = {}
 
             // emit event
             emit FRC20StrategyRegistered(
                 wrapper: self.owner?.address ?? panic("Wrapper owner is nil"),
                 deployer: fromAddr,
-                nftType: nftType,
+                nftType: collectionType,
                 tick: tick,
                 alloc: alloc,
                 copies: copies,
@@ -390,7 +397,7 @@ pub contract FRC20NFTWrapper {
             // get the NFT type
             let nftTypeIdentifier = nftToWrap.getType().identifier
             // generate the collection type
-            let nftType = FRC20NFTWrapper.asCollectionType(identifier: nftTypeIdentifier)
+            let nftType = FRC20NFTWrapper.asCollectionType(nftTypeIdentifier)
             // get the NFT id
             let srcNftId = nftToWrap.id
             // check if the strategy exists, and borrow it
@@ -569,10 +576,10 @@ pub contract FRC20NFTWrapper {
             return FRC20NFTWrapper.borrowWrapperPublic(addr: addr)
         }
 
-        /// Get the extra NFT collection display
+        /// Get the NFT collection display
         ///
         access(all) view
-        fun getExtraNFTCollectionDisplay(
+        fun getNFTCollectionDisplay(
             nftType: Type,
         ): MetadataViews.NFTCollectionDisplay?
 
@@ -622,10 +629,16 @@ pub contract FRC20NFTWrapper {
         /// Get the extra NFT collection display
         ///
         access(all) view
-        fun getExtraNFTCollectionDisplay(
+        fun getNFTCollectionDisplay(
             nftType: Type,
         ): MetadataViews.NFTCollectionDisplay? {
-            return self.displayHelper[nftType]
+            let collectionType = FRC20NFTWrapper.asCollectionType(nftType.identifier)
+            // get from NFTCatalog first
+            if let catalogEntry = NFTCatalog.getCatalogEntry(collectionIdentifier : collectionType.identifier) {
+                return catalogEntry.collectionDisplay
+            }
+            // if no exists, then get from display helper
+            return self.displayHelper[collectionType]
         }
 
         // write methods ----
@@ -649,10 +662,11 @@ pub contract FRC20NFTWrapper {
             nftType: Type,
             display: MetadataViews.NFTCollectionDisplay,
         ): Void {
-            self.displayHelper[nftType] = display
+            let collectionType = FRC20NFTWrapper.asCollectionType(nftType.identifier)
+            self.displayHelper[collectionType] = display
 
             emit WrapperIndexerUpdatedNFTCollectionDisplay(
-                nftType: nftType,
+                nftType: collectionType,
                 name: display.name,
                 description: display.description,
             )
@@ -681,7 +695,7 @@ pub contract FRC20NFTWrapper {
     /// Make a new NFT type
     ///
     access(all)
-    fun asNFTType(identifier: String): Type {
+    fun asNFTType(_ identifier: String): Type {
         let ids = StringUtils.split(identifier, ".")
         assert(ids.length == 4, message: "Invalid NFT type identifier!")
         ids[3] = "NFT" // replace the last part with NFT
@@ -691,7 +705,7 @@ pub contract FRC20NFTWrapper {
     /// Make a new NFT Collection type
     ///
     access(all)
-    fun asCollectionType(identifier: String): Type {
+    fun asCollectionType(_ identifier: String): Type {
         let ids = StringUtils.split(identifier, ".")
         assert(ids.length == 4, message: "Invalid NFT Collection type identifier!")
         ids[3] = "Collection" // replace the last part with Collection
@@ -717,6 +731,15 @@ pub contract FRC20NFTWrapper {
             .getCapability<&FRC20NFTWrapper.WrapperIndexer{WrapperIndexerPublic}>(self.FRC20NFTWrapperIndexerPublicPath)
             .borrow()
             ?? panic("Could not borrow WrapperIndexer public reference")
+    }
+
+    /// Get the NFT collection display
+    ///
+    access(all) view
+    fun getNFTCollectionDisplay(
+        nftType: Type,
+    ): MetadataViews.NFTCollectionDisplay? {
+        return self.borrowWrapperIndexerPublic().getNFTCollectionDisplay(nftType: nftType)
     }
 
     /// init
