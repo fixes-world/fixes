@@ -9,7 +9,7 @@ pub fun main(
 ): Bool {
     if let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddr) {
         if let type = CompositeType(nftType) {
-            return wrapper.hasFRC20Strategy(nftType: FRC20NFTWrapper.asCollectionType(type.identifier))
+            return wrapper.hasFRC20Strategy(FRC20NFTWrapper.asCollectionType(type.identifier))
         }
     }
     return false

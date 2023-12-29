@@ -16,7 +16,7 @@ pub fun main(
 ): [UInt64] {
     let collectionType = FRC20NFTWrapper.asCollectionType(nftIdentifier)
     if let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapper) {
-        if !wrapper.hasFRC20Strategy(nftType: collectionType) {
+        if !wrapper.hasFRC20Strategy(collectionType) {
             return []
         }
 
