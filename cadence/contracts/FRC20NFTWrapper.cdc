@@ -581,7 +581,7 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun getNFTCollectionDisplay(
             nftType: Type,
-        ): MetadataViews.NFTCollectionDisplay?
+        ): MetadataViews.NFTCollectionDisplay
 
         // write methods ----
 
@@ -631,14 +631,26 @@ pub contract FRC20NFTWrapper {
         access(all) view
         fun getNFTCollectionDisplay(
             nftType: Type,
-        ): MetadataViews.NFTCollectionDisplay? {
+        ): MetadataViews.NFTCollectionDisplay {
             let collectionType = FRC20NFTWrapper.asCollectionType(nftType.identifier)
             // get from NFTCatalog first
             if let catalogEntry = NFTCatalog.getCatalogEntry(collectionIdentifier : collectionType.identifier) {
                 return catalogEntry.collectionDisplay
             }
             // if no exists, then get from display helper
-            return self.displayHelper[collectionType]
+            if let display = self.displayHelper[collectionType] {
+                return display
+            }
+            let defaultDisplay = (FixesWrappedNFT.resolveView(Type<MetadataViews.NFTCollectionDisplay>()) as! MetadataViews.NFTCollectionDisplay?)!
+            let ids = StringUtils.split(nftType.identifier, ".")
+            return MetadataViews.NFTCollectionDisplay(
+                name: ids[2],
+                description: "NFT Collection built by address ".concat(ids[1]),
+                externalURL: defaultDisplay.externalURL,
+                squareImage: defaultDisplay.squareImage,
+                bannerImage: defaultDisplay.bannerImage,
+                socials: defaultDisplay.socials
+            )
         }
 
         // write methods ----
@@ -738,7 +750,7 @@ pub contract FRC20NFTWrapper {
     access(all) view
     fun getNFTCollectionDisplay(
         nftType: Type,
-    ): MetadataViews.NFTCollectionDisplay? {
+    ): MetadataViews.NFTCollectionDisplay {
         return self.borrowWrapperIndexerPublic().getNFTCollectionDisplay(nftType: nftType)
     }
 

@@ -25,7 +25,6 @@ pub fun main(
                     holders: frc20Indexer.getHoldersAmount(tick: info.tick),
                     pool: frc20Indexer.getPoolBalance(tick: info.tick),
                     collectionDisplay: wrapperIndexer.getNFTCollectionDisplay(nftType: info.nftType)
-                        ?? FixesWrappedNFT.resolveView(Type<MetadataViews.NFTCollectionDisplay>()) as! MetadataViews.NFTCollectionDisplay
                 ))
             }
         }
