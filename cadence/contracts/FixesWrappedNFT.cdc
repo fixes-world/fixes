@@ -99,16 +99,22 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 return FixesWrappedNFT.resolveView(view)
             } else {
                 if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
-                    if let originView = nftRef.resolveView(view) {
-                        if view == Type<MetadataViews.Traits>() {
-                            let traits = originView as! MetadataViews.Traits
-                            traits.addTrait(MetadataViews.Trait(name: "srcNFTType", value: nftRef.getType().identifier, nil, nil))
-                            traits.addTrait(MetadataViews.Trait(name: "srcNFTId", value: nftRef.id, nil, nil))
-                            if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
-                                traits.addTrait(MetadataViews.Trait(name: "inscriptionId", value: insRef.getId(), nil, nil))
+                    let originView = nftRef.resolveView(view)
+                    // For Traits view, we need to add the srcNFTType and srcNFTId trait
+                    if view == Type<MetadataViews.Traits>() {
+                        let traits = MetadataViews.Traits([])
+                        if  let originTraits = originView as! MetadataViews.Traits? {
+                            for t in originTraits.traits {
+                                traits.addTrait(t)
                             }
-                            return traits
                         }
+                        traits.addTrait(MetadataViews.Trait(name: "srcNFTType", value: nftRef.getType().identifier, nil, nil))
+                        traits.addTrait(MetadataViews.Trait(name: "srcNFTId", value: nftRef.id, nil, nil))
+                        if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
+                            traits.addTrait(MetadataViews.Trait(name: "inscriptionId", value: insRef.getId(), nil, nil))
+                        }
+                        return traits
+                    } else if originView != nil {
                         return originView
                     }
                 }
