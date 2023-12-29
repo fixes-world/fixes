@@ -99,7 +99,11 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 return FixesWrappedNFT.resolveView(view)
             } else {
                 if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
-                    let originView = nftRef.resolveView(view)
+                    let originSupportedViews = nftRef.getViews()
+                    var originView: AnyStruct? = nil
+                    if originSupportedViews.contains(view) {
+                        originView = nftRef.resolveView(view)
+                    }
                     // For Traits view, we need to add the srcNFTType and srcNFTId trait
                     if view == Type<MetadataViews.Traits>() {
                         let traits = MetadataViews.Traits([])
