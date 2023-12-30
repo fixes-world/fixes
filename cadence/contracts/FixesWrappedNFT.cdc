@@ -32,28 +32,10 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     pub let CollectionPrivatePath: PrivatePath
     pub let MinterPrivatePath: PrivatePath
 
-    /// The metadata view for Fixes Inscription
+    /// Deprecated, use `Fixes.InscriptionView` instead
     ///
     pub struct FixesInscriptionView {
-        pub let id: UInt64
-        pub let parentId: UInt64?
-        pub let data: Fixes.InscriptionData
-        pub let value: UFix64
-        pub let extractable: Bool
-
-        init(
-            id: UInt64,
-            parentId: UInt64?,
-            data: Fixes.InscriptionData,
-            value: UFix64,
-            extractable: Bool,
-        ) {
-            self.id = id
-            self.parentId = parentId
-            self.data = data
-            self.value = value
-            self.extractable = extractable
-        }
+        init() {}
     }
 
     /// The core resource that represents a Non Fungible Token.
@@ -109,7 +91,7 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 }
             }
             if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
-                nftViews.append(Type<FixesInscriptionView>())
+                nftViews.append(Type<Fixes.InscriptionView>())
             }
             return nftViews
         }
@@ -127,9 +109,12 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             ]
             if colViews.contains(view) {
                 return FixesWrappedNFT.resolveView(view)
-            } else if view == Type<FixesInscriptionView>() {
+            } else if view == Type<Fixes.InscriptionView>() {
                 if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
-                    return FixesInscriptionView(
+                    if let view = insRef.resolveView(view) {
+                        return view
+                    }
+                    return Fixes.InscriptionView(
                         id: insRef.getId(),
                         parentId: insRef.getParentId(),
                         data: insRef.getData(),
