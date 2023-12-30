@@ -79,6 +79,9 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 if !nftViews.contains(Type<MetadataViews.Traits>()) {
                     nftViews.append(Type<MetadataViews.Traits>())
                 }
+                if !nftViews.contains(Type<MetadataViews.Royalties>()) {
+                    nftViews.append(Type<MetadataViews.Royalties>())
+                }
                 return nftViews
             }
             return []
@@ -118,6 +121,9 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                             traits.addTrait(MetadataViews.Trait(name: "inscriptionId", value: insRef.getId(), nil, nil))
                         }
                         return traits
+                    } else if view == Type<MetadataViews.Royalties>() {
+                        // No royalties for FixesWrappedNFT
+                        return MetadataViews.Royalties([])
                     } else if originView != nil {
                         return originView
                     }
