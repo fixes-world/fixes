@@ -115,13 +115,18 @@ pub contract FRC20Indexer {
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
         /** ---- Account Methods for command inscriptions ---- */
+        /// Parse the metadata of a FRC20 inscription
+        access(account) view
+        fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
         /// Set a FRC20 token to be burnable
         access(account)
         fun setBurnable(ins: &Fixes.Inscription)
         // Burn unsupplied frc20 tokens
         access(account)
         fun burnUnsupplied(ins: &Fixes.Inscription)
-
+        /// Allocate the tokens to some address
+        access(account)
+        fun allocate(ins: &Fixes.Inscription): @FlowToken.Vault
     }
 
     /// The resource that stores the inscriptions mapping
@@ -263,9 +268,6 @@ pub contract FRC20Indexer {
             self.balances[tick] = {} // init the balance mapping
             self.pool[tick] <-! FlowToken.createEmptyVault() as! @FlowToken.Vault // init the pool
 
-            // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
-
             // emit event
             emit FRC20Deployed(
                 tick: tick,
@@ -273,6 +275,9 @@ pub contract FRC20Indexer {
                 limit: limit,
                 deployer: deployer
             )
+
+            // extract inscription
+            self.extractInscription(tick: tick, ins: ins)
         }
 
         /// Mint a FRC20 token
@@ -326,15 +331,15 @@ pub contract FRC20Indexer {
             }
             tokenMeta.updateSupplied(tokenMeta.supplied + amtToAdd)
 
-            // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
-
             // emit event
             emit FRC20Minted(
                 tick: tick,
                 amount: amtToAdd,
                 to: fromAddr
             )
+
+            // extract inscription
+            self.extractInscription(tick: tick, ins: ins)
         }
 
         /// Transfer a FRC20 token
@@ -361,34 +366,11 @@ pub contract FRC20Indexer {
             let to = Address.fromString(meta["to"]!) ?? panic("The receiver is not a valid address")
             let fromAddr = ins.owner!.address
 
-            // get the balance mapping
-            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
-
-            // check the amount for from address
-            let fromBalance = balancesRef[fromAddr] ?? panic("The from address does not have a balance")
-            assert(
-                fromBalance >= amt && amt > 0.0,
-                message: "The from address does not have enough balance"
-            )
-
-            balancesRef[fromAddr] = fromBalance.saturatingSubtract(amt)
-            // update the balance
-            if let oldBalance = balancesRef[to] {
-                balancesRef[to] = oldBalance.saturatingAdd(amt)
-            } else {
-                balancesRef[to] = amt
-            }
+            // call the internal transfer method
+            self._transferToken(tick: tick, fromAddr: fromAddr, to: to, amt: amt)
 
             // extract inscription
             self.extractInscription(tick: tick, ins: ins)
-
-            // emit event
-            emit FRC20Transfer(
-                tick: tick,
-                from: fromAddr,
-                to: to,
-                amount: amt
-            )
         }
 
         /// Burn a FRC20 token
@@ -458,7 +440,34 @@ pub contract FRC20Indexer {
             }
         }
 
-        // ---- Command Inscriptions Methods ----
+        // ---- Account Methods ----
+
+        /// Parse the metadata of a FRC20 inscription
+        ///
+        access(account) view
+        fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
+            let ret: {String: String} = {}
+            if data.encoding != nil && data.encoding != "utf8" {
+                panic("The inscription is not encoded in utf8")
+            }
+            // parse the body
+            if let body = String.fromUTF8(data.metadata) {
+                // split the pairs
+                let pairs = StringUtils.split(body, ",")
+                for pair in pairs {
+                    // split the key and value
+                    let kv = StringUtils.split(pair, "=")
+                    if kv.length == 2 {
+                        ret[kv[0]] = kv[1]
+                    }
+                }
+            } else {
+                panic("The inscription is not encoded in utf8")
+            }
+            return ret
+        }
+
+        // ---- Account Methods for command inscriptions ----
 
         /// Set a FRC20 token to be burnable
         ///
@@ -485,14 +494,14 @@ pub contract FRC20Indexer {
             let isTrue = meta["v"]! == "true" || meta["v"]! == "1"
             tokenMeta.setBurnable(isTrue)
 
-            // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
-
             // emit event
             emit FRC20BurnableSet(
                 tick: tick,
                 burnable: isTrue
             )
+
+            // extract inscription
+            self.extractInscription(tick: tick, ins: ins)
         }
 
         /// Burn unsupplied frc20 tokens
@@ -543,19 +552,50 @@ pub contract FRC20Indexer {
             tokenMeta.updateSupplied(tokenMeta.supplied.saturatingAdd(amtToBurn))
             tokenMeta.updateBurned(tokenMeta.burned.saturatingAdd(amtToBurn))
 
-            // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
-
             // emit event
             emit FRC20UnsuppliedBurned(
                 tick: tick,
                 amount: amtToBurn
             )
+
+            // extract inscription
+            self.extractInscription(tick: tick, ins: ins)
+        }
+
+        /// Allocate the tokens to some address
+        ///
+        access(account)
+        fun allocate(ins: &Fixes.Inscription): @FlowToken.Vault {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "alloc" && meta["tick"] != nil && meta["amt"] != nil && meta["to"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for allocating"
+            )
+
+            let tick = meta["tick"]!.toLower()
+            assert(
+                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
+                message: "The token has not been deployed"
+            )
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let to = Address.fromString(meta["to"]!) ?? panic("The receiver is not a valid address")
+            let fromAddr = FRC20Indexer.getAddress()
+
+            // call the internal transfer method
+            self._transferToken(tick: tick, fromAddr: fromAddr, to: to, amt: amt)
+
+            return <- ins.extract()
         }
 
         /** ----- Private methods ----- */
 
-        access(account)
+        access(self)
         fun extractInscription(tick: String, ins: &Fixes.Inscription) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
@@ -577,29 +617,40 @@ pub contract FRC20Indexer {
             treasury.deposit(from: <- tokenToTreasuryVault)
         }
 
-        /// Parse the metadata of a FRC20 inscription
+        /// Internal Transfer a FRC20 token
         ///
-        access(account)
-        fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
-            let ret: {String: String} = {}
-            if data.encoding != nil && data.encoding != "utf8" {
-                panic("The inscription is not encoded in utf8")
-            }
-            // parse the body
-            if let body = String.fromUTF8(data.metadata) {
-                // split the pairs
-                let pairs = StringUtils.split(body, ",")
-                for pair in pairs {
-                    // split the key and value
-                    let kv = StringUtils.split(pair, "=")
-                    if kv.length == 2 {
-                        ret[kv[0]] = kv[1]
-                    }
-                }
+        access(self)
+        fun _transferToken(
+            tick: String,
+            fromAddr: Address,
+            to: Address,
+            amt: UFix64
+        ) {
+            // get the balance mapping
+            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?) ?? panic("The token has not been deployed")
+
+            // check the amount for from address
+            let fromBalance = balancesRef[fromAddr] ?? panic("The from address does not have a balance")
+            assert(
+                fromBalance >= amt && amt > 0.0,
+                message: "The from address does not have enough balance"
+            )
+
+            balancesRef[fromAddr] = fromBalance.saturatingSubtract(amt)
+            // update the balance
+            if let oldBalance = balancesRef[to] {
+                balancesRef[to] = oldBalance.saturatingAdd(amt)
             } else {
-                panic("The inscription is not encoded in utf8")
+                balancesRef[to] = amt
             }
-            return ret
+
+            // emit event
+            emit FRC20Transfer(
+                tick: tick,
+                from: fromAddr,
+                to: to,
+                amount: amt
+            )
         }
 
         /// Check if an inscription is owned by the indexer
