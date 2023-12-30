@@ -32,6 +32,30 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     pub let CollectionPrivatePath: PrivatePath
     pub let MinterPrivatePath: PrivatePath
 
+    /// The metadata view for Fixes Inscription
+    ///
+    pub struct FixesInscriptionView {
+        pub let id: UInt64
+        pub let parentId: UInt64?
+        pub let data: Fixes.InscriptionData
+        pub let value: UFix64
+        pub let extractable: Bool
+
+        init(
+            id: UInt64,
+            parentId: UInt64?,
+            data: Fixes.InscriptionData,
+            value: UFix64,
+            extractable: Bool,
+        ) {
+            self.id = id
+            self.parentId = parentId
+            self.data = data
+            self.value = value
+            self.extractable = extractable
+        }
+    }
+
     /// The core resource that represents a Non Fungible Token.
     /// New instances will be created using the NFTMinter resource
     /// and stored in the Collection resource
@@ -65,8 +89,9 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         ///         developers to know which parameter to pass to the resolveView() method.
         ///
         pub fun getViews(): [Type] {
+            var nftViews: [Type] = []
             if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
-                let nftViews = nftRef.getViews()
+                nftViews = nftRef.getViews()
                 if !nftViews.contains(Type<MetadataViews.ExternalURL>()) {
                     nftViews.append(Type<MetadataViews.ExternalURL>())
                 }
@@ -82,9 +107,11 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 if !nftViews.contains(Type<MetadataViews.Royalties>()) {
                     nftViews.append(Type<MetadataViews.Royalties>())
                 }
-                return nftViews
             }
-            return []
+            if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
+                nftViews.append(Type<FixesInscriptionView>())
+            }
+            return nftViews
         }
 
         /// Function that resolves a metadata view for this token.
@@ -100,6 +127,17 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             ]
             if colViews.contains(view) {
                 return FixesWrappedNFT.resolveView(view)
+            } else if view == Type<FixesInscriptionView>() {
+                if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
+                    return FixesInscriptionView(
+                        id: insRef.getId(),
+                        parentId: insRef.getParentId(),
+                        data: insRef.getData(),
+                        value: insRef.getInscriptionValue(),
+                        extractable: insRef.isExtractable()
+                    )
+                }
+                return nil
             } else {
                 if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
                     let originSupportedViews = nftRef.getViews()
