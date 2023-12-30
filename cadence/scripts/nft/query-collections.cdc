@@ -40,7 +40,7 @@ pub fun main(
                         description: "Free Flow Inscription NFT Collection.",
                         externalURL: defaultUrl,
                         squareImage: defaultSquareMedia,
-                        bannerImage: defaultSquareMedia,
+                        bannerImage: defaultBannerMedia,
                         socials: defaultSocial
                     )
                 }
