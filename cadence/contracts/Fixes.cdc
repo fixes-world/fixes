@@ -66,6 +66,30 @@ pub contract Fixes {
         }
     }
 
+    /// The metadata view for Fixes Inscription
+    ///
+    pub struct InscriptionView {
+        pub let id: UInt64
+        pub let parentId: UInt64?
+        pub let data: Fixes.InscriptionData
+        pub let value: UFix64
+        pub let extractable: Bool
+
+        init(
+            id: UInt64,
+            parentId: UInt64?,
+            data: Fixes.InscriptionData,
+            value: UFix64,
+            extractable: Bool,
+        ) {
+            self.id = id
+            self.parentId = parentId
+            self.data = data
+            self.value = value
+            self.extractable = extractable
+        }
+    }
+
     /// The public interface to the inscriptions
     ///
     pub resource interface InscriptionPublic {
@@ -269,6 +293,7 @@ pub contract Fixes {
 
         pub fun getViews(): [Type] {
             return [
+                Type<Fixes.InscriptionView>(),
                 Type<MetadataViews.Serial>(),
                 Type<MetadataViews.Display>(),
                 Type<MetadataViews.Medias>(),
@@ -297,6 +322,14 @@ pub contract Fixes {
                     ),
             )
             switch view {
+            case Type<Fixes.InscriptionView>():
+                return Fixes.InscriptionView(
+                    id: self.getId(),
+                    parentId: self.getParentId(),
+                    data: self.getData(),
+                    value: self.getInscriptionValue(),
+                    extractable: self.isExtractable()
+                )
             case Type<MetadataViews.Serial>():
                 return MetadataViews.Serial(self.getId())
             case Type<MetadataViews.Display>():
