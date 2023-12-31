@@ -1,6 +1,8 @@
 import "Fixes"
 import "FlowToken"
 import "StringUtils"
+import "MetadataViews"
+import "FungibleTokenMetadataViews"
 
 pub contract FRC20Indexer {
     /* --- Events --- */
@@ -83,6 +85,9 @@ pub contract FRC20Indexer {
         /// Get the meta-info of a token
         access(all) view
         fun getTokenMeta(tick: String): FRC20Meta?
+        /// Get the token display info
+        access(all) view
+        fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay?
         /// Check if an inscription is a valid FRC20 inscription
         access(all) view
         fun isValidFRC20Inscription(ins: &Fixes.Inscription): Bool
@@ -101,6 +106,9 @@ pub contract FRC20Indexer {
         /// Get the pool balance of a FRC20 token
         access(all) view
         fun getPoolBalance(tick: String): UFix64
+        /// Get the pool balance of global
+        access(all) view
+        fun getGlobalTreasuryBalance(): UFix64
         /* --- write --- */
         /// Deploy a new FRC20 token
         access(all)
@@ -173,6 +181,38 @@ pub contract FRC20Indexer {
             return self.tokens[tick.toLower()]
         }
 
+        /// Get the token display info
+        ///
+        access(all) view
+        fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay? {
+            let ticker = tick.toLower()
+            if self.tokens[ticker] == nil {
+                return nil
+            }
+            let tickNameSize = 80 + (10 - ticker.length > 0 ? 10 - ticker.length : 0) * 12
+            let svgStr = "data:image/svg+xml;utf8,"
+                .concat("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-256 -256 512 512\" width=\"512\" height=\"512\">")
+                .concat("<defs><linearGradient gradientUnits=\"userSpaceOnUse\" x1=\"0\" y1=\"-240\" x2=\"0\" y2=\"240\" id=\"gradient-0\" gradientTransform=\"matrix(0.908427, -0.41805, 0.320369, 0.696163, -69.267567, -90.441103)\"><stop offset=\"0\" style=\"stop-color: rgb(244, 246, 246);\"></stop><stop offset=\"1\" style=\"stop-color: rgb(35, 133, 91);\"></stop></linearGradient></defs>")
+                .concat("<ellipse style=\"fill: rgb(149, 225, 192); stroke-width: 1rem; paint-order: fill; stroke: url(#gradient-0);\" ry=\"240\" rx=\"240\"></ellipse>")
+                .concat("<text style=\"dominant-baseline: middle; fill: rgb(80, 213, 155); font-family: system-ui, sans-serif; text-anchor: middle;\" fill-opacity=\"0.2\" y=\"-12\" font-size=\"420\">𝔉</text>")
+                .concat("<text style=\"dominant-baseline: middle; fill: rgb(244, 246, 246); font-family: system-ui, sans-serif; text-anchor: middle; font-style: italic; font-weight: 700;\" y=\"12\" font-size=\"").concat(tickNameSize.toString()).concat("\">")
+                .concat(ticker).concat("</text></svg>")
+            let medias = MetadataViews.Medias([MetadataViews.Media(
+                file: MetadataViews.HTTPFile(url: svgStr),
+                mediaType: "image/svg+xml"
+            )])
+            return FungibleTokenMetadataViews.FTDisplay(
+                name: "FIXeS FRC20 - ".concat(ticker),
+                symbol: ticker,
+                description: "This is a FRC20 Fungible Token created by [FIXeS](https://fixes.world/).",
+                externalURL: MetadataViews.ExternalURL("https://fixes.world/"),
+                logos: medias,
+                socials: {
+                    "twitter": MetadataViews.ExternalURL("https://twitter.com/flowOnFlow")
+                }
+            )
+        }
+
         /// Get the balance of a FRC20 token
         ///
         access(all) view
@@ -215,6 +255,13 @@ pub contract FRC20Indexer {
         fun getPoolBalance(tick: String): UFix64 {
             let pool = (&self.pool[tick.toLower()] as &FlowToken.Vault?)!
             return pool.balance
+        }
+
+        /// Get the pool balance of global
+        ///
+        access(all) view
+        fun getGlobalTreasuryBalance(): UFix64 {
+            return self.treasury.balance
         }
 
         /// Check if an inscription is a valid FRC20 inscription

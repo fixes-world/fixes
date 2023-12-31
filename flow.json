@@ -16,6 +16,22 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20FTShared": {
+			"source": "cadence/contracts/FRC20FTShared.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20FungibleToken": {
+			"source": "cadence/contracts/FRC20FungibleToken.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20NFTWrapper": {
 			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
 			"aliases": {
@@ -205,10 +221,12 @@
 				"FungibleTokenMetadataViews",
 				"StringUtils",
 				"ArrayUtils",
-				"FRC20Indexer",
 				"Fixes",
 				"FixesWrappedNFT",
-				"FRC20NFTWrapper"
+				"FRC20Indexer",
+				"FRC20NFTWrapper",
+				"FRC20FTShared",
+				"FRC20FungibleToken"
 			]
 		},
 		"mainnet": {
