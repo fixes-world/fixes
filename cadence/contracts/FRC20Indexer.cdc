@@ -1,8 +1,11 @@
-import "Fixes"
-import "FlowToken"
+// Third-party imports
 import "StringUtils"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
+import "FlowToken"
+// Fixes imports
+import "Fixes"
+import "FRC20FTShared"
 
 pub contract FRC20Indexer {
     /* --- Events --- */

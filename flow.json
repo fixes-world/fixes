@@ -40,6 +40,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20Storefront": {
+			"source": "cadence/contracts/FRC20Storefront.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
@@ -219,6 +227,7 @@
 			"default": [],
 			"emulator-account": [
 				"FungibleTokenMetadataViews",
+				"NFTCatalog",
 				"StringUtils",
 				"ArrayUtils",
 				"Fixes",
@@ -226,7 +235,8 @@
 				"FRC20Indexer",
 				"FRC20NFTWrapper",
 				"FRC20FTShared",
-				"FRC20FungibleToken"
+				"FRC20FungibleToken",
+				"FRC20Storefront"
 			]
 		},
 		"mainnet": {
