@@ -316,7 +316,7 @@ pub contract Fixes {
             let isUTF8 = encoding == "utf8" || encoding == "utf-8" || encoding == nil
             let fileView = MetadataViews.HTTPFile(
                 url: "data:".concat(mimeType).concat(";")
-                    .concat(isUTF8 ? "utf8,charset=UTF-8" : encoding!)
+                    .concat(isUTF8 ? "utf8;charset=UTF-8" : encoding!)
                     .concat(",").concat(
                         isUTF8 ? String.fromUTF8(metadata)! : encoding == "hex" ? String.encodeHex(metadata) : ""
                     ),
