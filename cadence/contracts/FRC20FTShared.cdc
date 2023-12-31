@@ -117,10 +117,6 @@ pub contract FRC20FTShared {
             from: Address?,
             ftVault: @FungibleToken.Vault?
         ) {
-            pre {
-                ftVault == nil || ftVault?.owner?.address ?? from != nil:
-                    "The owner of the FT Vault or the owner of the Change must not be nil"
-            }
             post {
                 self.tick == tick: "Tick must be equal to the provided tick"
                 balance == nil || self.from == from:
