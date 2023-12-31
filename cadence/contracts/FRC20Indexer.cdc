@@ -1,6 +1,7 @@
 // Third-party imports
 import "StringUtils"
 import "MetadataViews"
+import "FungibleToken"
 import "FungibleTokenMetadataViews"
 import "FlowToken"
 // Fixes imports
@@ -109,9 +110,16 @@ pub contract FRC20Indexer {
         /// Get the pool balance of a FRC20 token
         access(all) view
         fun getPoolBalance(tick: String): UFix64
-        /// Get the pool balance of global
+        /// Get the pool balance of platform treasury
         access(all) view
-        fun getGlobalTreasuryBalance(): UFix64
+        fun getPlatformTreasuryBalance(): UFix64
+        /** ---- borrow public interface ---- */
+        /// Borrow the token's treasury $FLOW receiver
+        access(all)
+        fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}
+        /// Borrow the platform treasury $FLOW receiver
+        access(all)
+        fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver}
         /* --- write --- */
         /// Deploy a new FRC20 token
         access(all)
@@ -256,14 +264,14 @@ pub contract FRC20Indexer {
         ///
         access(all) view
         fun getPoolBalance(tick: String): UFix64 {
-            let pool = (&self.pool[tick.toLower()] as &FlowToken.Vault?)!
+            let pool = self._borrowTokenTreasury(tick: tick)
             return pool.balance
         }
 
         /// Get the pool balance of global
         ///
         access(all) view
-        fun getGlobalTreasuryBalance(): UFix64 {
+        fun getPlatformTreasuryBalance(): UFix64 {
             return self.treasury.balance
         }
 
@@ -274,6 +282,24 @@ pub contract FRC20Indexer {
             let p = ins.getMetaProtocol()
             return ins.getMimeType() == "text/plain" &&
                 (p == "FRC20" || p == "frc20" || p == "frc-20" || p == "FRC-20")
+        }
+
+        /** ---- borrow public interface ---- */
+
+        /// Borrow the token's treasury $FLOW receiver
+        ///
+        access(all)
+        fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver} {
+            let pool = self._borrowTokenTreasury(tick: tick)
+            return pool as &FlowToken.Vault{FungibleToken.Receiver}
+        }
+
+        /// Borrow the platform treasury $FLOW receiver
+        ///
+        access(all)
+        fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver} {
+            let pool = self._borrowPlatformTreasury()
+            return pool as &FlowToken.Vault{FungibleToken.Receiver}
         }
 
         /** ------ Functionality ------  */
@@ -472,7 +498,7 @@ pub contract FRC20Indexer {
             self.extractInscription(tick: tick, ins: ins)
 
             // extract flow from pool
-            let flowPool = (&self.pool[tick] as &FlowToken.Vault?)!
+            let flowPool = self._borrowTokenTreasury(tick: tick)
             let restAmt = tokenMeta.supplied.saturatingSubtract(oldBurned)
             if restAmt > 0.0 {
                 let flowTokenToExtract = flowPool.balance * amt / restAmt
@@ -660,8 +686,8 @@ pub contract FRC20Indexer {
             let tokenToTreasuryVault <- token.withdraw(amount: amtToTreasury)
 
             // deposit the tokens to pool and treasury
-            let pool = (&self.pool[tick] as &FlowToken.Vault?)!
-            let treasury = &self.treasury as &FlowToken.Vault
+            let pool = self._borrowTokenTreasury(tick: tick)
+            let treasury = self._borrowPlatformTreasury()
 
             pool.deposit(from: <- token)
             treasury.deposit(from: <- tokenToTreasuryVault)
@@ -725,6 +751,21 @@ pub contract FRC20Indexer {
         fun borrowTokenMeta(tick: String): &FRC20Meta {
             let meta = &self.tokens[tick.toLower()] as &FRC20Meta?
             return meta ?? panic("The token meta is not found")
+        }
+
+        /// Borrow the token's treasury $FLOW receiver
+        ///
+        access(self)
+        fun _borrowTokenTreasury(tick: String): &FlowToken.Vault {
+            let pool = &self.pool[tick.toLower()] as &FlowToken.Vault?
+            return pool ?? panic("The token pool is not found")
+        }
+
+        /// Borrow the platform treasury $FLOW receiver
+        ///
+        access(self)
+        fun _borrowPlatformTreasury(): &FlowToken.Vault {
+            return &self.treasury as &FlowToken.Vault
         }
     }
 
