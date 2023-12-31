@@ -463,7 +463,7 @@ pub contract FRC20Indexer {
 
             let oldBurned = tokenMeta.burned
             balancesRef[fromAddr] = fromBalance.saturatingSubtract(amt)
-            tokenMeta.updateBurned(oldBurned + amt)
+            self._burnTokenInternal(tick: tick, amountToBurn: amt)
 
             // extract inscription
             self.extractInscription(tick: tick, ins: ins)
@@ -597,7 +597,7 @@ pub contract FRC20Indexer {
             let amtToBurn = totalUnsupplied * perc
             // update the meta-info: supplied and burned
             tokenMeta.updateSupplied(tokenMeta.supplied.saturatingAdd(amtToBurn))
-            tokenMeta.updateBurned(tokenMeta.burned.saturatingAdd(amtToBurn))
+            self._burnTokenInternal(tick: tick, amountToBurn: amtToBurn)
 
             // emit event
             emit FRC20UnsuppliedBurned(
@@ -698,6 +698,15 @@ pub contract FRC20Indexer {
                 to: to,
                 amount: amt
             )
+        }
+
+        /// Internal Burn a FRC20 token
+        ///
+        access(self)
+        fun _burnTokenInternal(tick: String, amountToBurn: UFix64) {
+            let meta = self.borrowTokenMeta(tick: tick)
+            let oldBurned = meta.burned
+            meta.updateBurned(oldBurned.saturatingAdd(amountToBurn))
         }
 
         /// Check if an inscription is owned by the indexer

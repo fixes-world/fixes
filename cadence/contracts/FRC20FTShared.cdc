@@ -84,7 +84,7 @@ pub contract FRC20FTShared {
 
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(all)
+        access(account)
         fun withdrawAsChange(amount: UFix64): @Change {
             post {
                 // `result` refers to the return value
@@ -139,6 +139,11 @@ pub contract FRC20FTShared {
         }
 
         destroy () {
+            // You can not destroy a Change with a non-zero balance
+            pre {
+                self.getBalance() == UFix64(0): "Balance must be zero for destroy"
+            }
+            // Destroy the FT Vault if it is not nil
             destroy self.ftVault
         }
 
@@ -169,7 +174,7 @@ pub contract FRC20FTShared {
 
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(all)
+        access(account)
         fun withdrawAsChange(amount: UFix64): @Change {
             pre {
                 self.ftVault == nil: "FT Vault must be nil for withdrawAsChange"

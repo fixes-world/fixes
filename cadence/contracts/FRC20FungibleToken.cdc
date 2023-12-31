@@ -58,6 +58,13 @@ pub contract FRC20FungibleToken: FungibleToken {
             self.balance = balance
         }
 
+        destroy() {
+            // You can not destroy a Change with a non-zero balance
+            pre {
+                self.balance == UFix64(0): "Balance must be zero for destroy"
+            }
+        }
+
         /// Function that takes an amount as an argument
         /// and withdraws that amount from the Vault.
         /// It creates a new temporary Vault that is used to hold
@@ -90,10 +97,14 @@ pub contract FRC20FungibleToken: FungibleToken {
             destroy vault
         }
 
-        destroy() {
-            if self.balance > 0.0 {
-                FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply - self.balance
-            }
+        /// This function only can be called by in the context of the contract before
+        /// destruction.
+        ///
+        access(contract)
+        fun extract(): UFix64 {
+            let amount = self.balance
+            self.balance = 0.0
+            return amount
         }
 
         /// The way of getting all the Metadata Views implemented by FRC20FungibleToken
@@ -228,13 +239,14 @@ pub contract FRC20FungibleToken: FungibleToken {
             vault.getType() == Type<@FRC20FungibleToken.Vault>(): "The vault must be of the same type as the token"
         }
         let fromVault <- vault as! @FRC20FungibleToken.Vault
-        let amount = fromVault.balance
+        let amount = fromVault.extract()
         // the total supply is updated in the vault's destroy method
         destroy fromVault
-
+        // update the total supply
+        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply - amount
         // emit the event
         emit TokensConvertedToFRC20(amount: amount)
-
+        // create the change
         return <- FRC20FTShared.createChange(
             tick: self.getTickerName(),
             balance: amount,
