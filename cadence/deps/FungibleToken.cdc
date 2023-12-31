@@ -84,7 +84,7 @@ pub contract interface FungibleToken {
         ///
         /// @param amount: The amount of tokens to be withdrawn from the vault
         /// @return The Vault resource containing the withdrawn funds
-        /// 
+        ///
         pub fun withdraw(amount: UFix64): @Vault {
             post {
                 // `result` refers to the return value
@@ -111,7 +111,7 @@ pub contract interface FungibleToken {
         pub fun deposit(from: @Vault)
 
         /// Below is referenced from the FLIP #69 https://github.com/onflow/flips/blob/main/flips/20230206-fungible-token-vault-type-discovery.md
-        /// 
+        ///
         /// Returns the dictionary of Vault types that the the receiver is able to accept in its `deposit` method
         /// this then it would return `{Type<@FlowToken.Vault>(): true}` and if any custom receiver
         /// uses the default implementation then it would return empty dictionary as its parent
@@ -121,10 +121,10 @@ pub contract interface FungibleToken {
         /// that supports this method because it is very valuable for various applications to have.
         ///
         /// @return dictionary of supported deposit vault types by the implementing resource.
-        /// 
+        ///
         pub fun getSupportedVaultTypes(): {Type: Bool} {
             // Below check is implemented to make sure that run-time type would
-            // only get returned when the parent resource conforms with `FungibleToken.Vault`. 
+            // only get returned when the parent resource conforms with `FungibleToken.Vault`.
             if self.getType().isSubtype(of: Type<@FungibleToken.Vault>()) {
                 return {self.getType(): true}
             } else {
@@ -215,7 +215,7 @@ pub contract interface FungibleToken {
             // Assert that the concrete type of the deposited vault is the same
             // as the vault that is accepting the deposit
             pre {
-                from.isInstance(self.getType()): 
+                from.isInstance(self.getType()):
                     "Cannot deposit an incompatible token type"
             }
             post {

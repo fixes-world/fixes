@@ -3,21 +3,21 @@ import MetadataViews from "MetadataViews"
 
 /// This contract implements the metadata standard proposed
 /// in FLIP-1087.
-/// 
+///
 /// Ref: https://github.com/onflow/flips/blob/main/application/20220811-fungible-tokens-metadata.md
-/// 
+///
 /// Structs and resources can implement one or more
 /// metadata types, called views. Each view type represents
 /// a different kind of metadata.
 ///
 pub contract FungibleTokenMetadataViews {
 
-    /// FTView wraps FTDisplay and FTVaultData, and is used to give a complete 
-    /// picture of a Fungible Token. Most Fungible Token contracts should 
+    /// FTView wraps FTDisplay and FTVaultData, and is used to give a complete
+    /// picture of a Fungible Token. Most Fungible Token contracts should
     /// implement this view.
     ///
     pub struct FTView {
-        pub let ftDisplay: FTDisplay?     
+        pub let ftDisplay: FTDisplay?
         pub let ftVaultData: FTVaultData?
         init(
             ftDisplay: FTDisplay?,
@@ -44,8 +44,8 @@ pub contract FungibleTokenMetadataViews {
         )
     }
 
-    /// View to expose the information needed to showcase this FT. 
-    /// This can be used by applications to give an overview and 
+    /// View to expose the information needed to showcase this FT.
+    /// This can be used by applications to give an overview and
     /// graphics of the FT.
     ///
     pub struct FTDisplay {
@@ -93,7 +93,7 @@ pub contract FungibleTokenMetadataViews {
     }
 
     /// Helper to get FTDisplay in a way that will return a typed optional.
-    /// 
+    ///
     /// @param viewResolver: A reference to the resolver resource
     /// @return An optional FTDisplay struct
     ///
@@ -107,7 +107,7 @@ pub contract FungibleTokenMetadataViews {
     }
 
     /// View to expose the information needed store and interact with a FT vault.
-    /// This can be used by applications to setup a FT vault with proper 
+    /// This can be used by applications to setup a FT vault with proper
     /// storage and public capabilities.
     ///
     pub struct FTVaultData {
@@ -120,19 +120,19 @@ pub contract FungibleTokenMetadataViews {
         /// Public path which must be linked to expose the balance and resolver public capabilities.
         pub let metadataPath: PublicPath
 
-        /// Private path which should be linked to expose the provider capability to withdraw funds 
+        /// Private path which should be linked to expose the provider capability to withdraw funds
         /// from the vault.
         pub let providerPath: PrivatePath
 
-        /// Type that should be linked at the `receiverPath`. This is a restricted type requiring 
+        /// Type that should be linked at the `receiverPath`. This is a restricted type requiring
         /// the `FungibleToken.Receiver` interface.
         pub let receiverLinkedType: Type
 
-        /// Type that should be linked at the `receiverPath`. This is a restricted type requiring 
+        /// Type that should be linked at the `receiverPath`. This is a restricted type requiring
         /// the `FungibleToken.Balance` and `MetadataViews.Resolver` interfaces.
         pub let metadataLinkedType: Type
 
-        /// Type that should be linked at the aforementioned private path. This 
+        /// Type that should be linked at the aforementioned private path. This
         /// is normally a restricted type with at a minimum the `FungibleToken.Provider` interface.
         pub let providerLinkedType: Type
 
@@ -189,4 +189,3 @@ pub contract FungibleTokenMetadataViews {
         }
     }
 }
- 
