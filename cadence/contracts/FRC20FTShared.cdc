@@ -25,7 +25,8 @@ pub contract FRC20FTShared {
     /// Cut type for the sale
     ///
     pub enum SaleCutType: UInt8 {
-        pub case Consumer
+        pub case SellMaker
+        pub case BuyTaker
         pub case TokenTreasury
         pub case PlatformTreasury
         pub case MarketplaceStakers
@@ -38,12 +39,16 @@ pub contract FRC20FTShared {
         access(all)
         let type: SaleCutType
         access(all)
-        let receiver: Capability<&{FungibleToken.Receiver}>?
-        access(all)
         let amount: UFix64
+        access(all)
+        let receiver: Capability<&{FungibleToken.Receiver}>?
 
-        init(type: SaleCutType, amount: UFix64, receiver: Capability<&{FungibleToken.Receiver}>?) {
-            if type == FRC20FTShared.SaleCutType.Consumer {
+        init(
+            type: SaleCutType,
+            amount: UFix64,
+            receiver: Capability<&{FungibleToken.Receiver}>?
+        ) {
+            if type == FRC20FTShared.SaleCutType.SellMaker {
                 assert(receiver != nil, message: "Receiver should not be nil for consumer cut")
             } else {
                 assert(receiver == nil, message: "Receiver should be nil for non-consumer cut")
@@ -419,7 +424,7 @@ pub contract FRC20FTShared {
     pub resource interface SharedStorePublic {
         // getter for the shared store
         access(all)
-        fun get(key: String): AnyStruct?
+        fun get(_ key: String): AnyStruct?
     }
 
     pub resource SharedStore: SharedStorePublic {
@@ -432,13 +437,13 @@ pub contract FRC20FTShared {
 
         // getter for the shared store
         access(all)
-        fun get(key: String): AnyStruct? {
+        fun get(_ key: String): AnyStruct? {
             return self.data[key]
         }
 
         // setter for the shared store
         access(account)
-        fun set(key: String, value: AnyStruct) {
+        fun set(_ key: String, value: AnyStruct) {
             self.data[key] = value
 
             emit SharedStoreKeyUpdated(key: key, valueType: value.getType())
@@ -463,19 +468,11 @@ pub contract FRC20FTShared {
     ///
     access(account)
     fun createValidFrozenOrder(
+        change: @Change,
         cuts: [SaleCut],
-        tick: String,
-        amount: UFix64?,
-        from: Address?,
-        ftVault: @FungibleToken.Vault?,
     ): @ValidFrozenOrder {
         return <- create ValidFrozenOrder(
-            <- self.createChange(
-                tick: tick,
-                balance: amount,
-                from: from,
-                ftVault: <- ftVault
-            ),
+            <- change,
             cuts: cuts
         )
     }

@@ -235,8 +235,7 @@
 				"FRC20Indexer",
 				"FRC20NFTWrapper",
 				"FRC20FTShared",
-				"FRC20FungibleToken",
-				"FRC20Storefront"
+				"FRC20FungibleToken"
 			]
 		},
 		"mainnet": {

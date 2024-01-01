@@ -21,6 +21,10 @@ pub contract FRC20Indexer {
     pub event FRC20Transfer(tick: String, from: Address, to: Address, amount: UFix64)
     /// Event emitted when a FRC20 token is burned
     pub event FRC20Burned(tick: String, amount: UFix64, from: Address, flowExtracted: UFix64)
+    /// Event emitted when a FRC20 token is withdrawn as change
+    pub event FRC20WithdrawnAsChange(tick: String, amount: UFix64, from: Address)
+    /// Event emitted when a FRC20 token is deposited from change
+    pub event FRC20DepositedFromChange(tick: String, amount: UFix64, to: Address, from: Address)
     /// Event emitted when a FRC20 token is set to be burnable
     pub event FRC20BurnableSet(tick: String, burnable: Bool)
     /// Event emitted when a FRC20 token is burned unsupplied tokens
@@ -133,10 +137,15 @@ pub contract FRC20Indexer {
         /// Burn a FRC20 token
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
-        /** ---- Account Methods for command inscriptions ---- */
+        /** ---- Account Methods for readonly ---- */
         /// Parse the metadata of a FRC20 inscription
         access(account) view
         fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
+        /** ---- Account Methods without Inscription extrasction ---- */
+        /// Parse the sale cut of a FRC20 inscription
+        access(account)
+        fun buildSellingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
+        /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
         fun setBurnable(ins: &Fixes.Inscription)
@@ -228,7 +237,7 @@ pub contract FRC20Indexer {
         ///
         access(all) view
         fun getBalance(tick: String, addr: Address): UFix64 {
-            let balancesRef = (&self.balances[tick.toLower()] as &{Address: UFix64}?)!
+            let balancesRef = self._borrowBalancesRef(tick: tick)
             return balancesRef[addr] ?? 0.0
         }
 
@@ -238,7 +247,7 @@ pub contract FRC20Indexer {
         fun getBalances(addr: Address): {String: UFix64} {
             let ret: {String: UFix64} = {}
             for tick in self.tokens.keys {
-                let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+                let balancesRef = self._borrowBalancesRef(tick: tick)
                 let balance = balancesRef[addr] ?? 0.0
                 if balance > 0.0 {
                     ret[tick] = balance
@@ -250,7 +259,7 @@ pub contract FRC20Indexer {
         /// Get the holders of a FRC20 token
         access(all) view
         fun getHolders(tick: String): [Address] {
-            let balancesRef = (&self.balances[tick.toLower()] as &{Address: UFix64}?)!
+            let balancesRef = self._borrowBalancesRef(tick: tick)
             return balancesRef.keys
         }
 
@@ -291,6 +300,7 @@ pub contract FRC20Indexer {
         access(all)
         fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver} {
             let pool = self._borrowTokenTreasury(tick: tick)
+            // Force cast to FungibleToken.Receiver, don't care about the warning, just for avoiding some mistakes
             return pool as &FlowToken.Vault{FungibleToken.Receiver}
         }
 
@@ -299,6 +309,7 @@ pub contract FRC20Indexer {
         access(all)
         fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver} {
             let pool = self._borrowPlatformTreasury()
+            // Force cast to FungibleToken.Receiver, don't care about the warning, just for avoiding some mistakes
             return pool as &FlowToken.Vault{FungibleToken.Receiver}
         }
 
@@ -388,7 +399,7 @@ pub contract FRC20Indexer {
             let fromAddr = ins.owner!.address
 
             // get the balance mapping
-            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+            let balancesRef = self._borrowBalancesRef(tick: tick)
 
             // check the limit
             var amtToAdd = amt
@@ -481,7 +492,7 @@ pub contract FRC20Indexer {
             let fromAddr = ins.owner!.address
 
             // get the balance mapping
-            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?)!
+            let balancesRef = self._borrowBalancesRef(tick: tick)
 
             // check the amount for from address
             let fromBalance = balancesRef[fromAddr] ?? panic("The from address does not have a balance")
@@ -669,8 +680,253 @@ pub contract FRC20Indexer {
             return <- ins.extract()
         }
 
+        /** ---- Account Methods without Inscription extrasction ---- */
+
+        /// Parse the sale cut of a FRC20 inscription
+        ///
+        access(account)
+        fun buildSellingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "list-sell" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for listing"
+            )
+
+            let tick = meta["tick"]!.toLower()
+            assert(
+                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
+                message: "The token has not been deployed"
+            )
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
+            let fromAddr = ins.owner!.address
+
+            // withdraw the token to change
+            let change <- self._withdrawToTokenChange(tick: tick, fromAddr: fromAddr, amt: amt)
+
+            assert(
+                change.getBalance() == amt,
+                message: "The change amount should be same as the amount"
+            )
+
+            // calculate the total price and sale cuts
+            let totalPrice = amt * price
+
+            // return the valid frozen order
+            return <- FRC20FTShared.createValidFrozenOrder(
+                change: <- change,
+                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr)
+            )
+        }
+
         /** ----- Private methods ----- */
 
+        /// Build the sale cuts for a FRC20 order
+        /// - Parameters:
+        ///   - amount: The amount of the FRC20 token
+        ///   - sellerAddress: The seller address, if it is nil, then it is a buy order
+        ///
+        access(self)
+        fun _buildFRC20SaleCuts(amount: UFix64, sellerAddress: Address?): [FRC20FTShared.SaleCut] {
+            let ret: [FRC20FTShared.SaleCut] = []
+
+            // use the shared store to get the sale fee
+            let sharedStore = FRC20FTShared.borrowStoreRef()
+            // Default sales fee, 2% of the total price
+            let salesFee = (sharedStore.get("salesFee") as! UFix64?) ?? 0.02
+            assert(
+                salesFee > 0.0 && salesFee <= 1.0,
+                message: "The sales fee should be greater than 0.0 and less than or equal to 1.0"
+            )
+
+            // Default 40% of sales free to the token treasury pool
+            let treasuryPoolCut = (sharedStore.get("treasuryPoolCut") as! UFix64?) ?? 0.4
+            // Default 30% of sales free to the platform pool
+            let platformPoolCut = (sharedStore.get("platformPoolCut") as! UFix64?) ?? 0.3
+            // 20% of sales free to the dapp stakers pool
+            let marketplaceStakersPoolCut = (sharedStore.get("marketplaceStakersPoolCut") as! UFix64?) ?? 0.2
+            // 10% of sales free to the dapp campaign pool
+            let marketplaceCampaignPoolCut = (sharedStore.get("marketplaceCampaignPoolCut") as! UFix64?) ?? 0.1
+
+            // sum of all the cuts should be 1.0
+            let totalCutsRatio = treasuryPoolCut + platformPoolCut + marketplaceStakersPoolCut + marketplaceCampaignPoolCut
+            assert(
+                totalCutsRatio == 1.0,
+                message: "The sum of all the cuts should be 1.0"
+            )
+
+            // add to the sale cuts
+            ret.append(FRC20FTShared.SaleCut(
+                type: FRC20FTShared.SaleCutType.TokenTreasury,
+                amount: amount * salesFee * treasuryPoolCut,
+                receiver: nil
+            ))
+            ret.append(FRC20FTShared.SaleCut(
+                type: FRC20FTShared.SaleCutType.PlatformTreasury,
+                amount: amount * salesFee * platformPoolCut,
+                receiver: nil
+            ))
+            ret.append(FRC20FTShared.SaleCut(
+                type: FRC20FTShared.SaleCutType.MarketplaceStakers,
+                amount: amount * salesFee * marketplaceStakersPoolCut,
+                receiver: nil
+            ))
+            ret.append(FRC20FTShared.SaleCut(
+                type: FRC20FTShared.SaleCutType.MarketplaceCampaign,
+                amount: amount * salesFee * marketplaceCampaignPoolCut,
+                receiver: nil
+            ))
+
+            // add the seller or buyer cut
+            if sellerAddress != nil {
+                // borrow the receiver reference
+                let flowTokenVault = getAccount(sellerAddress!)
+                    .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                assert(
+                    flowTokenVault.check(),
+                    message: "Could not borrow receiver reference to the seller's Vault"
+                )
+                ret.append(FRC20FTShared.SaleCut(
+                    type: FRC20FTShared.SaleCutType.SellMaker,
+                    amount: amount * (1.0 - salesFee),
+                    // recevier is the FlowToken Vault of the seller
+                    receiver: flowTokenVault
+                ))
+            } else {
+                ret.append(FRC20FTShared.SaleCut(
+                    type: FRC20FTShared.SaleCutType.BuyTaker,
+                    amount: amount * (1.0 - salesFee),
+                    receiver: nil
+                ))
+            }
+
+            // check cuts amount, should be same as the total price
+            var totalCuts: UFix64 = 0.0
+            for cut in ret {
+                totalCuts = totalCuts.saturatingAdd(cut.amount)
+            }
+            assert(
+                totalCuts == amount,
+                message: "The total cuts amount should be same as the total price"
+            )
+            // return the sale cuts
+            return ret
+        }
+
+        /// Internal Transfer a FRC20 token
+        ///
+        access(self)
+        fun _transferToken(
+            tick: String,
+            fromAddr: Address,
+            to: Address,
+            amt: UFix64
+        ) {
+            let change <- self._withdrawToTokenChange(tick: tick, fromAddr: fromAddr, amt: amt)
+            self._depositFromTokenChange(change: <- change, to: to)
+
+            // emit event
+            emit FRC20Transfer(
+                tick: tick,
+                from: fromAddr,
+                to: to,
+                amount: amt
+            )
+        }
+
+        /// Internal Build a FRC20 token change
+        ///
+        access(self)
+        fun _withdrawToTokenChange(
+            tick: String,
+            fromAddr: Address,
+            amt: UFix64
+        ): @FRC20FTShared.Change {
+            post {
+                result.isBackedByVault() == false: "The change should not be backed by a vault"
+                result.getBalance() == amt: "The change balance should be same as the amount"
+                self.getBalance(tick: tick, addr: fromAddr) == before(self.getBalance(tick: tick, addr: fromAddr)) - amt
+                    : "The from address balance should be decreased by the amount"
+            }
+            // borrow the balance mapping
+            let balancesRef = self._borrowBalancesRef(tick: tick)
+
+            // check the amount for from address
+            let fromBalance = balancesRef[fromAddr] ?? panic("The from address does not have a balance")
+            assert(
+                fromBalance >= amt && amt > 0.0,
+                message: "The from address does not have enough balance"
+            )
+
+            balancesRef[fromAddr] = fromBalance.saturatingSubtract(amt)
+
+            // emit event
+            emit FRC20WithdrawnAsChange(
+                tick: tick,
+                amount: amt,
+                from: fromAddr
+            )
+
+            // create the frc20 token change
+            return <- FRC20FTShared.createChange(
+                tick: tick,
+                balance: amt,
+                from: fromAddr,
+                ftVault: nil
+            )
+        }
+
+        /// Internal Deposit a FRC20 token change
+        ///
+        access(self)
+        fun _depositFromTokenChange(
+            change: @FRC20FTShared.Change,
+            to: Address
+        ) {
+            pre {
+                change.isBackedByVault() == false: "The change should not be backed by a vault"
+            }
+            let tick = change.tick
+            let amt = change.extract()
+            // borrow the balance mapping
+            let balancesRef = self._borrowBalancesRef(tick: tick)
+
+            // update the balance
+            if let oldBalance = balancesRef[to] {
+                balancesRef[to] = oldBalance.saturatingAdd(amt)
+            } else {
+                balancesRef[to] = amt
+            }
+
+            // emit event
+            emit FRC20DepositedFromChange(
+                tick: tick,
+                amount: amt,
+                to: to,
+                from: change.from
+            )
+
+            // destroy the empty change
+            destroy change
+        }
+
+        /// Internal Burn a FRC20 token
+        ///
+        access(self)
+        fun _burnTokenInternal(tick: String, amountToBurn: UFix64) {
+            let meta = self.borrowTokenMeta(tick: tick)
+            let oldBurned = meta.burned
+            meta.updateBurned(oldBurned.saturatingAdd(amountToBurn))
+        }
+
+        /// Extract the $FLOW from inscription
+        ///
         access(self)
         fun extractInscription(tick: String, ins: &Fixes.Inscription) {
             pre {
@@ -693,51 +949,6 @@ pub contract FRC20Indexer {
             treasury.deposit(from: <- tokenToTreasuryVault)
         }
 
-        /// Internal Transfer a FRC20 token
-        ///
-        access(self)
-        fun _transferToken(
-            tick: String,
-            fromAddr: Address,
-            to: Address,
-            amt: UFix64
-        ) {
-            // get the balance mapping
-            let balancesRef = (&self.balances[tick] as &{Address: UFix64}?) ?? panic("The token has not been deployed")
-
-            // check the amount for from address
-            let fromBalance = balancesRef[fromAddr] ?? panic("The from address does not have a balance")
-            assert(
-                fromBalance >= amt && amt > 0.0,
-                message: "The from address does not have enough balance"
-            )
-
-            balancesRef[fromAddr] = fromBalance.saturatingSubtract(amt)
-            // update the balance
-            if let oldBalance = balancesRef[to] {
-                balancesRef[to] = oldBalance.saturatingAdd(amt)
-            } else {
-                balancesRef[to] = amt
-            }
-
-            // emit event
-            emit FRC20Transfer(
-                tick: tick,
-                from: fromAddr,
-                to: to,
-                amount: amt
-            )
-        }
-
-        /// Internal Burn a FRC20 token
-        ///
-        access(self)
-        fun _burnTokenInternal(tick: String, amountToBurn: UFix64) {
-            let meta = self.borrowTokenMeta(tick: tick)
-            let oldBurned = meta.burned
-            meta.updateBurned(oldBurned.saturatingAdd(amountToBurn))
-        }
-
         /// Check if an inscription is owned by the indexer
         ///
         access(self) view
@@ -751,6 +962,14 @@ pub contract FRC20Indexer {
         fun borrowTokenMeta(tick: String): &FRC20Meta {
             let meta = &self.tokens[tick.toLower()] as &FRC20Meta?
             return meta ?? panic("The token meta is not found")
+        }
+
+        /// Borrow the balance mapping of a token
+        ///
+        access(self)
+        fun _borrowBalancesRef(tick: String): &{Address: UFix64} {
+            let balancesRef = &self.balances[tick.toLower()] as &{Address: UFix64}?
+            return balancesRef ?? panic("The token balance is not found")
         }
 
         /// Borrow the token's treasury $FLOW receiver
