@@ -144,10 +144,10 @@ pub contract FRC20Indexer {
         /** ---- Account Methods without Inscription extrasction ---- */
         /// Building a selling FRC20 Token order with the sale cut from a FRC20 inscription
         access(account)
-        fun buildSellingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
+        fun buildBuyNowListing(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
         /// Building a buying FRC20 Token order with the sale cut from a FRC20 inscription
         access(account)
-        fun buildBuyingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
+        fun buildSellNowListing(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -688,7 +688,7 @@ pub contract FRC20Indexer {
         /// Building a selling FRC20 Token order with the sale cut from a FRC20 inscription
         ///
         access(account)
-        fun buildSellingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder {
+        fun buildBuyNowListing(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
@@ -696,7 +696,7 @@ pub contract FRC20Indexer {
 
             let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
-                meta["op"] == "list-sell" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
+                meta["op"] == "list-buynow" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
             )
 
@@ -731,7 +731,7 @@ pub contract FRC20Indexer {
         /// Building a buying FRC20 Token order with the sale cut from a FRC20 inscription
         ///
         access(account)
-        fun buildBuyingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder {
+        fun buildSellNowListing(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
@@ -739,7 +739,7 @@ pub contract FRC20Indexer {
 
             let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
-                meta["op"] == "list-buy" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
+                meta["op"] == "list-sellnow" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
             )
 
