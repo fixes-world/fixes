@@ -2,6 +2,8 @@ import "FungibleToken"
 
 pub contract FRC20FTShared {
     /* --- Events --- */
+    /// The event that is emitted when the shared store is updated
+    pub event SharedStoreKeyUpdated(key: String, valueType: Type)
 
     /// The event that is emitted when tokens are created
     pub event TokenChangeCreated(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
@@ -11,6 +13,12 @@ pub contract FRC20FTShared {
     pub event TokenChangeMerged(tick:String, amount: UFix64, from: Address, changeUuid: UInt64, fromChangeUuid: UInt64)
     /// The event that is emitted when tokens are extracted
     pub event TokenChangeExtracted(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
+
+    /* --- Variable, Enums and Structs --- */
+    access(all)
+    let SharedStoreStoragePath: StoragePath
+    access(all)
+    let SharedStorePublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
 
@@ -116,6 +124,16 @@ pub contract FRC20FTShared {
             }
         }
 
+        /// Extract all balance of this Change
+        ///
+        access(all)
+        fun extractAsVault(): @FungibleToken.Vault
+
+        /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
+        ///
+        access(account)
+        fun merge(from: @Change)
+
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
         access(account)
@@ -126,11 +144,6 @@ pub contract FRC20FTShared {
                     "Withdrawal amount must be the same as the balance of the withdrawn Change"
             }
         }
-
-        /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
-        ///
-        access(account)
-        fun merge(from: @Change)
 
         /// Extract all balance of this Change
         ///
@@ -218,6 +231,81 @@ pub contract FRC20FTShared {
             return <- ret
         }
 
+        /// Extract all balance of this Change
+        ///
+        access(all)
+        fun extractAsVault(): @FungibleToken.Vault {
+            pre {
+                self.isBackedByVault() == true: "The Change must be backed by a Vault"
+                self.getBalance() > UFix64(0): "Balance must be greater than zero"
+            }
+            post {
+                self.getBalance() == UFix64(0):
+                    "Balance must be zero after extraction"
+                result.balance == before(self.getBalance()):
+                    "Extracted amount must be the same as the balance of the Change"
+            }
+            let vaultRef = self.borrowVault()
+            let balanceToExtract = self.getBalance()
+            let ret <- vaultRef.withdraw(amount: balanceToExtract)
+
+            emit TokenChangeExtracted(
+                tick: self.tick,
+                amount: balanceToExtract,
+                from: self.from,
+                changeUuid: self.uuid
+            )
+
+            return <- ret
+        }
+
+        /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
+        ///
+        access(account)
+        fun merge(from: @Change) {
+            pre {
+                self.isBackedByVault() == from.isBackedByVault():
+                    "The Change must be backed by a Vault if and only if the input Change is backed by a Vault"
+                from.tick == self.tick: "Tick must be equal to the provided tick"
+                from.from == self.from: "The owner of the Change must be the same as the owner of the Change"
+            }
+            post {
+                self.getBalance() == before(self.getBalance()) + before(from.getBalance()):
+                    "New Vault balance must be the sum of the previous balance and the deposited Vault"
+            }
+
+            var extractAmount: UFix64 = 0.0
+            if self.isBackedByVault() {
+                assert(
+                    self.ftVault != nil && from.ftVault != nil,
+                    message: "FT Vault must not be nil for merge"
+                )
+                let extracted <- from.extractAsVault()
+                extractAmount = extracted.balance
+                // Deposit the extracted Vault to self
+                let vaultRef = self.borrowVault()
+                vaultRef.deposit(from: <- extracted)
+            } else {
+                assert(
+                    self.balance != nil && from.balance != nil,
+                    message: "Balance must not be nil for merge"
+                )
+                extractAmount = from.extract()
+                self.balance = self.balance! + extractAmount
+            }
+
+            // emit TokenChangeMerged event
+            emit TokenChangeMerged(
+                tick: self.tick,
+                amount: extractAmount,
+                from: self.from,
+                changeUuid: self.uuid,
+                fromChangeUuid: from.uuid
+            )
+            // Destroy the Change that we extracted from
+            destroy from
+        }
+
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
         access(account)
@@ -248,35 +336,6 @@ pub contract FRC20FTShared {
                 from: self.from,
                 ftVault: nil
             )
-        }
-
-        /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
-        ///
-        access(account)
-        fun merge(from: @Change) {
-            pre {
-                !self.isBackedByVault() && !from.isBackedByVault(): "The Change must not be backed by a Vault"
-                self.balance != nil && from.balance != nil: "Balance must not be nil for merge"
-                from.tick == self.tick: "Tick must be equal to the provided tick"
-                from.from == self.from: "The owner of the Change must be the same as the owner of the Change"
-            }
-            post {
-                self.getBalance() == before(self.getBalance()) + before(from.getBalance()):
-                    "New Vault balance must be the sum of the previous balance and the deposited Vault"
-            }
-
-            let extractAmount = from.extract()
-            self.balance = self.balance! + extractAmount
-
-            emit TokenChangeMerged(
-                tick: self.tick,
-                amount: extractAmount,
-                from: self.from,
-                changeUuid: self.uuid,
-                fromChangeUuid: from.uuid
-            )
-            // Destroy the Change that we extracted from
-            destroy from
         }
 
         /// Extract all balance of this Change, this method is only available for the contracts in the same account
@@ -314,11 +373,11 @@ pub contract FRC20FTShared {
         }
     }
 
-    /** --- Temporary resources --- */
+    /** --- Temporary order resources --- */
 
     /// It a temporary resource combining change and cuts
     ///
-    pub resource ValidSellingChange {
+    pub resource ValidFrozenOrder {
         pub let cuts: [SaleCut]
         pub var change: @Change?
 
@@ -343,7 +402,6 @@ pub contract FRC20FTShared {
         fun extract(): @Change {
             pre {
                 self.change != nil: "Change must not be nil for extract"
-                self.change?.getBalance()! > UFix64(0): "Balance must be greater than zero"
             }
             post {
                 self.change == nil: "Change must be nil after extraction"
@@ -356,7 +414,71 @@ pub contract FRC20FTShared {
         }
     }
 
+    /** Shared store resource */
+
+    pub resource interface SharedStorePublic {
+        // getter for the shared store
+        access(all)
+        fun get(key: String): AnyStruct?
+    }
+
+    pub resource SharedStore: SharedStorePublic {
+        access(self)
+        var data: {String: AnyStruct}
+
+        init() {
+            self.data = {}
+        }
+
+        // getter for the shared store
+        access(all)
+        fun get(key: String): AnyStruct? {
+            return self.data[key]
+        }
+
+        // setter for the shared store
+        access(account)
+        fun set(key: String, value: AnyStruct) {
+            self.data[key] = value
+
+            emit SharedStoreKeyUpdated(key: key, valueType: value.getType())
+        }
+    }
+
+    /* --- Public Methods --- */
+
+    /// Get the shared store
+    ///
+    access(all)
+    fun borrowStoreRef(): &SharedStore{SharedStorePublic} {
+        let addr = self.account.address
+        return getAccount(addr)
+            .getCapability<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath)
+            .borrow() ?? panic("Could not borrow capability from public store")
+    }
+
     /* --- Account Methods --- */
+
+    /// Only the contracts in this account can call this method
+    ///
+    access(account)
+    fun createValidFrozenOrder(
+        cuts: [SaleCut],
+        tick: String,
+        amount: UFix64?,
+        from: Address?,
+        ftVault: @FungibleToken.Vault?,
+    ): @ValidFrozenOrder {
+        return <- create ValidFrozenOrder(
+            <- self.createChange(
+                tick: tick,
+                balance: amount,
+                from: from,
+                ftVault: <- ftVault
+            ),
+            cuts: cuts
+        )
+    }
 
     /// Only the owner of the account can call this method
     ///
@@ -373,5 +495,14 @@ pub contract FRC20FTShared {
             from: from,
             ftVault: <-ftVault
         )
+    }
+
+    init() {
+        let identifier = "FRC20SharedStore_".concat(self.account.address.toString())
+        self.SharedStoreStoragePath = StoragePath(identifier: identifier)!
+        self.SharedStorePublicPath = PublicPath(identifier: identifier)!
+        // create the indexer
+        self.account.save(<- create SharedStore(), to: self.SharedStoreStoragePath)
+        self.account.link<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath, target: self.SharedStoreStoragePath)
     }
 }
