@@ -1,3 +1,4 @@
+import "FlowToken"
 import "FungibleToken"
 
 pub contract FRC20FTShared {
@@ -63,6 +64,7 @@ pub contract FRC20FTShared {
     ///
     pub resource interface Balance {
         /// The ticker symbol of this change
+        /// If the tick is "", it means the change is backed by FlowToken.Vault
         ///
         pub let tick: String
         /// The type of the FT Vault, Optional
@@ -77,21 +79,10 @@ pub contract FRC20FTShared {
         //
         init(
             tick: String,
+            from: Address,
             balance: UFix64?,
-            from: Address?,
             ftVault: @FungibleToken.Vault?
-        ) {
-            pre {
-                balance != nil || ftVault != nil:
-                    "The balance of the FT Vault or the initial balance must not be nil"
-            }
-            post {
-                self.tick == tick: "Tick must be equal to the provided tick"
-                self.balance == balance: "Balance must be equal to the initial balance"
-                self.ftVault == nil || self.balance == nil:
-                    "Either FT Vault or balance must be not nil"
-            }
-        }
+        )
 
         /// Get the balance of this Change
         ///
@@ -170,22 +161,37 @@ pub contract FRC20FTShared {
 
         init(
             tick: String,
+            from: Address,
             balance: UFix64?,
-            from: Address?,
             ftVault: @FungibleToken.Vault?
         ) {
+            pre {
+                balance != nil || ftVault != nil:
+                    "The balance of the FT Vault or the initial balance must not be nil"
+            }
             post {
                 self.tick == tick: "Tick must be equal to the provided tick"
-                balance == nil || self.from == from:
-                    "Balance must be nil or the owner of the Change must be the same as the owner of the Change"
+                self.from == from: "The owner of the Change must be the same as the owner of the Change"
                 self.balance == balance: "Balance must be equal to the initial balance"
                 self.ftVault == nil || self.balance == nil:
                     "Either FT Vault or balance must be not nil"
             }
+
+            // If the tick is "", it means the change is backed by FlowToken.Vault
+            if tick == "" {
+                assert(
+                    ftVault != nil && balance == nil,
+                    message: "FT Vault must not be nil for tick = \"\""
+                )
+                assert(
+                    ftVault.isInstance(Type<@FlowToken.Vault>()),
+                    message: "FT Vault must be an instance of FlowToken.Vault"
+                )
+            }
+
             self.tick = tick
+            self.from = from
             self.balance = balance
-            // If the owner of the FT Vault is not nil, use it as the owner of the Change
-            self.from = ftVault?.owner?.address ?? from ?? panic("The owner of the Change must be specified")
             self.ftVault <- ftVault
 
             emit TokenChangeCreated(
@@ -337,8 +343,8 @@ pub contract FRC20FTShared {
             )
             return <- create Change(
                 tick: self.tick,
-                balance: amount,
                 from: self.from,
+                balance: amount,
                 ftVault: nil
             )
         }
@@ -482,14 +488,14 @@ pub contract FRC20FTShared {
     access(account)
     fun createChange(
         tick: String,
+        from: Address,
         balance: UFix64?,
-        from: Address?,
         ftVault: @FungibleToken.Vault?
     ): @Change {
         return <- create Change(
             tick: tick,
-            balance: balance,
             from: from,
+            balance: balance,
             ftVault: <-ftVault
         )
     }

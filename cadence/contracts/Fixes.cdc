@@ -143,7 +143,7 @@ pub contract Fixes {
             parentId: UInt64?
         ) {
             post {
-                self.value?.balance ?? panic("No value") >= self.getMinCost(): "Inscription value should be bigger than minimium $FLOW at least."
+                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
             }
             self.id = Fixes.totalInscriptions
             Fixes.totalInscriptions = Fixes.totalInscriptions + 1
@@ -172,6 +172,13 @@ pub contract Fixes {
         access(all) view
         fun isExtractable(): Bool {
             return !self.isExtracted() && self.owner != nil
+        }
+
+        /// Check if the inscription value is valid
+        ///
+        access(all) view
+        fun isValueValid(): Bool {
+            return self.value?.balance ?? panic("No value") >= self.getMinCost()
         }
 
         /// Fuse the inscription with another inscription
@@ -203,12 +210,32 @@ pub contract Fixes {
                 !self.isExtracted(): "Inscription already extracted"
             }
             post {
-                self.isExtracted(): "Inscription extracted"
+                self.isExtracted(): "Inscription not extracted"
             }
             let balance = self.value?.balance ?? panic("No value")
             let res <- self.value <- nil
             emit InscriptionExtracted(id: self.id, value: balance)
             return <- res!
+        }
+
+        /// Extract a part of the inscription value, but keep the inscription be not extracted
+        ///
+        access(all)
+        fun partialExtract(_ amount: UFix64): @FlowToken.Vault {
+            pre {
+                !self.isExtracted(): "Inscription already extracted"
+            }
+            post {
+                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
+                !self.isExtracted(): "Inscription should not be extracted"
+            }
+            let ret <- self.value?.withdraw(amount: amount) ?? panic("No value")
+            assert(
+                ret.balance == amount,
+                message: "Returned value should be equal to the amount"
+            )
+            emit InscriptionExtracted(id: self.id, value: amount)
+            return <- (ret as! @FlowToken.Vault)
         }
 
         /// Get the minimum value of the inscription

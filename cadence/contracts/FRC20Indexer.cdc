@@ -142,9 +142,12 @@ pub contract FRC20Indexer {
         access(account) view
         fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
         /** ---- Account Methods without Inscription extrasction ---- */
-        /// Parse the sale cut of a FRC20 inscription
+        /// Building a selling FRC20 Token order with the sale cut from a FRC20 inscription
         access(account)
         fun buildSellingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
+        /// Building a buying FRC20 Token order with the sale cut from a FRC20 inscription
+        access(account)
+        fun buildBuyingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -682,7 +685,7 @@ pub contract FRC20Indexer {
 
         /** ---- Account Methods without Inscription extrasction ---- */
 
-        /// Parse the sale cut of a FRC20 inscription
+        /// Building a selling FRC20 Token order with the sale cut from a FRC20 inscription
         ///
         access(account)
         fun buildSellingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder {
@@ -718,14 +721,77 @@ pub contract FRC20Indexer {
             // calculate the total price and sale cuts
             let totalPrice = amt * price
 
-            // return the valid frozen order
+            // create the valid frozen order
             return <- FRC20FTShared.createValidFrozenOrder(
                 change: <- change,
                 cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr)
             )
         }
 
+        /// Building a buying FRC20 Token order with the sale cut from a FRC20 inscription
+        ///
+        access(account)
+        fun buildBuyingOrder(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "list-buy" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for listing"
+            )
+
+            let tick = meta["tick"]!.toLower()
+            assert(
+                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
+                message: "The token has not been deployed"
+            )
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
+            let fromAddr = ins.owner!.address
+
+            // calculate the total price and sale cuts
+            let totalPrice = amt * price
+
+            // create the valid frozen order
+            return <- FRC20FTShared.createValidFrozenOrder(
+                change: <- self._extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
+                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr)
+            )
+        }
+
         /** ----- Private methods ----- */
+
+        /// Extract a part of the inscription's value to a FRC20 token change
+        ///
+        access(self)
+        fun _extractFlowVaultChangeFromInscription(_ ins: &Fixes.Inscription, amount: UFix64): @FRC20FTShared.Change {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+            }
+            post {
+                ins.isExtractable() && ins.isValueValid(): "The inscription should be extractable and the value should be valid after partial extraction"
+            }
+            // extract payment from the buyer's inscription, the payment should be a FLOW token
+            // the payment should be equal to the total price and the payer should be the buyer
+            // in the partialExtract method, the inscription will be extracted if the payment is enough
+            // and the inscription will be still extractable.
+            let vault <- ins.partialExtract(amount)
+            assert(
+                vault.balance == amount,
+                message: "The amount should be equal to the balance of the vault"
+            )
+            // return the change
+            return <- FRC20FTShared.createChange(
+                tick: "", // empty tick means this change is a FLOW token change
+                from: ins.owner!.address,
+                balance: nil,
+                ftVault: <- vault
+            )
+        }
 
         /// Build the sale cuts for a FRC20 order
         /// - Parameters:
@@ -876,8 +942,8 @@ pub contract FRC20Indexer {
             // create the frc20 token change
             return <- FRC20FTShared.createChange(
                 tick: tick,
-                balance: amt,
                 from: fromAddr,
+                balance: amt,
                 ftVault: nil
             )
         }
