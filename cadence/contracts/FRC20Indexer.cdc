@@ -811,17 +811,19 @@ pub contract FRC20Indexer {
                 message: "The sales fee should be greater than 0.0 and less than or equal to 1.0"
             )
 
-            // Default 40% of sales free to the token treasury pool
+            // Default 40% of sales fee to the token treasury pool
             let treasuryPoolCut = (sharedStore.get("treasuryPoolCut") as! UFix64?) ?? 0.4
-            // Default 30% of sales free to the platform pool
+            // Default 30% of sales fee to the platform pool
             let platformPoolCut = (sharedStore.get("platformPoolCut") as! UFix64?) ?? 0.3
-            // 20% of sales free to the dapp stakers pool
+            // 20% of sales fee to the dapp stakers pool
             let marketplaceStakersPoolCut = (sharedStore.get("marketplaceStakersPoolCut") as! UFix64?) ?? 0.2
-            // 10% of sales free to the dapp campaign pool
-            let marketplaceCampaignPoolCut = (sharedStore.get("marketplaceCampaignPoolCut") as! UFix64?) ?? 0.1
+            // 5~10% of sales fee to the dapp campaign pool
+            let marketplaceCampaignPoolCut = (sharedStore.get("marketplaceCampaignPoolCut") as! UFix64?) ?? 0.05
+            // 0~5% of sales fee to the commission cut
+            let commissionCut = (sharedStore.get("commissionCut") as! UFix64?) ?? 0.05
 
             // sum of all the cuts should be 1.0
-            let totalCutsRatio = treasuryPoolCut + platformPoolCut + marketplaceStakersPoolCut + marketplaceCampaignPoolCut
+            let totalCutsRatio = treasuryPoolCut + platformPoolCut + marketplaceStakersPoolCut + marketplaceCampaignPoolCut + commissionCut
             assert(
                 totalCutsRatio == 1.0,
                 message: "The sum of all the cuts should be 1.0"
@@ -848,21 +850,26 @@ pub contract FRC20Indexer {
                 amount: amount * salesFee * marketplaceCampaignPoolCut,
                 receiver: nil
             ))
+            ret.append(FRC20FTShared.SaleCut(
+                type: FRC20FTShared.SaleCutType.Commission,
+                amount: amount * salesFee * commissionCut,
+                receiver: nil
+            ))
 
             // add the seller or buyer cut
             if sellerAddress != nil {
                 // borrow the receiver reference
-                let flowTokenVault = getAccount(sellerAddress!)
+                let flowTokenReceiver = getAccount(sellerAddress!)
                     .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 assert(
-                    flowTokenVault.check(),
+                    flowTokenReceiver.check(),
                     message: "Could not borrow receiver reference to the seller's Vault"
                 )
                 ret.append(FRC20FTShared.SaleCut(
                     type: FRC20FTShared.SaleCutType.SellMaker,
                     amount: amount * (1.0 - salesFee),
                     // recevier is the FlowToken Vault of the seller
-                    receiver: flowTokenVault
+                    receiver: flowTokenReceiver
                 ))
             } else {
                 ret.append(FRC20FTShared.SaleCut(

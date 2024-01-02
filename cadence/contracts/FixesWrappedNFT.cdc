@@ -60,7 +60,7 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             self.wrappedInscription <- inscription
         }
 
-        destroy () {
+        destroy() {
             destroy self.wrappedNFT
             destroy self.wrappedInscription
         }

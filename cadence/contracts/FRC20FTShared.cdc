@@ -26,12 +26,13 @@ pub contract FRC20FTShared {
     /// Cut type for the sale
     ///
     pub enum SaleCutType: UInt8 {
-        pub case SellMaker
-        pub case BuyTaker
         pub case TokenTreasury
         pub case PlatformTreasury
         pub case MarketplaceStakers
         pub case MarketplaceCampaign
+        pub case Commission
+        pub case SellMaker
+        pub case BuyTaker
     }
 
     /// Sale cut struct for the sale
@@ -202,7 +203,7 @@ pub contract FRC20FTShared {
             )
         }
 
-        destroy () {
+        destroy() {
             // You can not destroy a Change with a non-zero balance
             pre {
                 self.getBalance() == UFix64(0): "Balance must be zero for destroy"
@@ -400,7 +401,7 @@ pub contract FRC20FTShared {
             self.change <- change
             self.cuts = cuts
         }
-        destroy () {
+        destroy() {
             pre {
                 self.change == nil: "Change must be nil for destroy"
             }
