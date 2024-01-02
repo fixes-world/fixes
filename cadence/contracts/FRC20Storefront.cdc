@@ -209,7 +209,7 @@ pub contract FRC20Storefront {
         access(all)
         fun takeBuyNow(
             ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
+            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
         )
 
         /// Purchase the listing, selling the token.
@@ -217,7 +217,8 @@ pub contract FRC20Storefront {
         access(all)
         fun takeSellNow(
             ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
+            paymentRecipient: Capability<&{FungibleToken.Receiver}>?,
+            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
         ): @FRC20FTShared.Change
 
         /** ---- Internal Methods ---- */
@@ -271,6 +272,10 @@ pub contract FRC20Storefront {
             switch op {
             case "list-buynow":
                 order <-! indexer.buildBuyNowListing(ins: listIns)
+                assert(
+                    order?.tick == order?.change?.tick && order?.amount == order?.change?.getBalance(),
+                    message: "Tick and amount in the inscription and the change should be the same"
+                )
                 listType = ListingType.FixedPriceBuyNow
                 break
             case "list-sellnow":
@@ -356,7 +361,7 @@ pub contract FRC20Storefront {
         access(all)
         fun takeBuyNow(
             ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
+            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
         ) {
             pre {
                 self.details.type == ListingType.FixedPriceBuyNow: "Listing must be a buy now listing"
@@ -371,40 +376,180 @@ pub contract FRC20Storefront {
             // The indexer for all the FRC20 tokens.
             let frc20Indexer = FRC20Indexer.getIndexer()
 
+            // just check if the inscription is valid, the further check will be done in applyListedOrder
+            assert(
+                frc20Indexer.isValidFRC20Inscription(ins: ins),
+                message: "Given inscription is not a valid FRC20 listing inscription"
+            )
+            // The payment vault for the sale.
+            let paymentChange <- frc20Indexer.extractFlowVaultChangeFromInscription(ins, amount: self.details.price)
+
+            // Pay the sale cuts to the recipients.
+            let commissionAmount = self._payToSaleCuts(
+                paymentChange: <- paymentChange,
+                commissionRecipient: commissionRecipient,
+                paymentRecipient: nil,
+            )
+
+            // give the change to the buyer
+            var frc20TokenChange: @FRC20FTShared.Change? <- nil
+            frc20TokenChange <-> self.frozenChange
+
+            assert(
+                frc20TokenChange != nil && frc20TokenChange?.isBackedByVault() == false,
+                message: "Frozen change should be backed by a non-vault change"
+            )
+
+            // apply the change and both inscriptions in frc20 indexer
+            frc20Indexer.applyListedOrder(
+                makerIns: self.borrowInspection(),
+                takerIns: ins,
+                change: <- (frc20TokenChange ?? panic("Unable to extract the change")),
+            )
+
+            // emit ListingCompleted event
+            emit ListingCompleted(
+                storefrontId: self.details.storefrontId,
+                listingResourceID: self.uuid,
+                type: self.details.type.rawValue,
+                tick: self.details.tick,
+                amount: self.details.amount,
+                price: self.details.price,
+                customID: self.details.customID,
+                commissionAmount: commissionAmount,
+                commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
+            )
+        }
+
+        /// Purchase the listing, selling the token.
+        /// This pays the beneficiaries and returns the token to the buyer.
+        access(all)
+        fun takeSellNow(
+            ins: &Fixes.Inscription,
+            paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+        ): @FRC20FTShared.Change {
+            pre {
+                self.details.type == ListingType.FixedPriceSellNow: "Listing must be a buy now listing"
+                self.details.status == ListingStatus.Available: "Listing must be available"
+                self.owner != nil : "Resource doesn't have the assigned owner"
+                ins.getInscriptionValue() >= self.details.price + ins.getMinCost(): "Insufficient payment value"
+            }
+
+            // Make sure the listing cannot be completed again.
+            self.details.setToCompleted()
+
+            // The indexer for all the FRC20 tokens.
+            let frc20Indexer = FRC20Indexer.getIndexer()
+
+            // just check if the inscription is valid, the further check will be done in applyListedOrder
             assert(
                 frc20Indexer.isValidFRC20Inscription(ins: ins),
                 message: "Given inscription is not a valid FRC20 listing inscription"
             )
 
+            // give the change to the buyer
+            var flowTokenChange: @FRC20FTShared.Change? <- nil
+            flowTokenChange <-> self.frozenChange
+
+            assert(
+                flowTokenChange != nil && flowTokenChange?.isBackedByVault() == true,
+                message: "Frozen change should be backed by a vault change"
+            )
+
+            // Pay the sale cuts to the recipients.
+            let commissionAmount = self._payToSaleCuts(
+                paymentChange: <- (flowTokenChange ?? panic("Change is nil")),
+                commissionRecipient: commissionRecipient,
+                paymentRecipient: paymentRecipient,
+            )
+
+            frc20Indexer.applyListedOrder(
+                makerIns: self.borrowInspection(),
+                takerIns: ins,
+                change: nil
+            )
+
+
+
+            return <- nil
+        }
+
+        /** ---- Account methods ---- */
+
+        access(account)
+        fun cancel(): @FRC20FTShared.Change {
+            pre {
+                self.details.status == ListingStatus.Available: "Listing must be available"
+                self.owner != nil : "Resource doesn't have the assigned owner"
+            }
+            // TODO
+
+            return <- nil
+        }
+
+        /// borrow the inscription reference
+        ///
+        access(contract)
+        fun borrowInspection(): &Fixes.Inscription {
+            return self._borrowStorefront().borrowInspection(self.inscriptionId)
+        }
+
+        /* ---- Internal methods ---- */
+
+        /// Pay the sale cuts to the recipients.
+        /// Returns the amount of commission paid.
+        ///
+        access(self)
+        fun _payToSaleCuts(
+            paymentChange: @FRC20FTShared.Change,
+            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+        ): UFix64 {
+            // The indexer for all the FRC20 tokens.
+            let frc20Indexer = FRC20Indexer.getIndexer()
+
+            // The function to pay to marketplace staking pool
+            let payToMarketplaceStakingPool = fun (_ payment: @FungibleToken.Vault) {
+                // TODO: Add to marketplace staking pool
+                destroy payment
+            }
+
+            // The function to pay to marketplace campaign pool
+            let payToMarketplaceCampaignPool = fun (_ payment: @FungibleToken.Vault) {
+                // TODO: Add to marketplace campaign pool
+                destroy payment
+            }
+
             // All the commission receivers that are eligible to receive the commission.
             let eligibleCommissionReceivers = self.commissionRecipientCaps
             // The function to pay the commission
-            let payCommissionFunc = fun (commissionPayment: @FungibleToken.Vault) {
+            let payCommissionFunc = fun (payment: @FungibleToken.Vault) {
                 // If commission recipient is nil, Throw panic.
-                let commissionReceiver = commissionRecipient ?? panic("Commission recipient can't be nil")
-                if eligibleCommissionReceivers != nil {
-                    var isCommissionRecipientHasValidType = false
-                    var isCommissionRecipientAuthorised = false
-                    for cap in eligibleCommissionReceivers! {
-                        // Check 1: Should have the same type
-                        if cap.getType() == commissionReceiver.getType() {
-                            isCommissionRecipientHasValidType = true
-                            // Check 2: Should have the valid market address that holds approved capability.
-                            if cap.address == commissionReceiver.address && cap.check() {
-                                isCommissionRecipientAuthorised = true
-                                break
+                if let commissionReceiver = commissionRecipient {
+                    if eligibleCommissionReceivers != nil {
+                        var isCommissionRecipientHasValidType = false
+                        var isCommissionRecipientAuthorised = false
+                        for cap in eligibleCommissionReceivers! {
+                            // Check 1: Should have the same type
+                            if cap.getType() == commissionReceiver.getType() {
+                                isCommissionRecipientHasValidType = true
+                                // Check 2: Should have the valid market address that holds approved capability.
+                                if cap.address == commissionReceiver.address && cap.check() {
+                                    isCommissionRecipientAuthorised = true
+                                    break
+                                }
                             }
                         }
+                        assert(isCommissionRecipientHasValidType, message: "Given recipient does not has valid type")
+                        assert(isCommissionRecipientAuthorised,   message: "Given recipient is not authorised to receive the commission")
                     }
-                    assert(isCommissionRecipientHasValidType, message: "Given recipient does not has valid type")
-                    assert(isCommissionRecipientAuthorised,   message: "Given recipient is not authorised to receive the commission")
+                    let recipient = commissionReceiver.borrow() ?? panic("Unable to borrow the recipient capability")
+                    recipient.deposit(from: <- payment)
+                } else {
+                    payToMarketplaceCampaignPool(<- payment)
                 }
-                let recipient = commissionReceiver.borrow() ?? panic("Unable to borrow the recipient capability")
-                recipient.deposit(from: <- commissionPayment)
             }
-
-            // The payment vault for the sale.
-            let paymentChange <- frc20Indexer.extractFlowVaultChangeFromInscription(ins, amount: self.details.price)
 
             // Rather than aborting the transaction if any receiver is absent when we try to pay it,
             // we send the cut to the token or platform treasury, and emit an event to let the
@@ -434,25 +579,30 @@ pub contract FRC20Storefront {
                     }
                     break
                 case FRC20FTShared.SaleCutType.MarketplaceStakers:
-                    // TODO: Add to marketplace stakers pool
+                    payToMarketplaceStakingPool(<- paymentChange.withdrawAsVault(amount: cut.amount))
                     break
                 case FRC20FTShared.SaleCutType.MarketplaceCampaign:
-                    // TODO: Add to marketplace campaign pool
+                    payToMarketplaceCampaignPool(<- paymentChange.withdrawAsVault(amount: cut.amount))
                     break
                 case FRC20FTShared.SaleCutType.Commission:
                     commissionAmount = cut.amount
                     payCommissionFunc(<- paymentChange.withdrawAsVault(amount: cut.amount))
                     break
                 case FRC20FTShared.SaleCutType.SellMaker:
-                    let reciverCap = cut.receiver ?? panic("Receiver capability should not be nil")
-                    if let receiver = reciverCap.borrow() {
+                    let receiverCap = cut.receiver ?? panic("Receiver capability should not be nil")
+                    if let receiver = receiverCap.borrow() {
                         receiver.deposit(from: <- paymentChange.withdrawAsVault(amount: cut.amount))
                     } else {
-                        emit UnpaidReceiver(receiver: reciverCap.address, entitledSaleCut: cut.amount)
+                        emit UnpaidReceiver(receiver: receiverCap.address, entitledSaleCut: cut.amount)
                     }
                     break
                 case FRC20FTShared.SaleCutType.BuyTaker:
-                    panic("Unsupported cut type: BuyTaker in buy now listing")
+                    let receiver = paymentRecipient?.borrow() ?? panic("Payment recipient should not be nil")
+                    assert(
+                        receiver != nil,
+                        message: "Payment recipient capability is not valid"
+                    )
+                    receiver!.deposit(from: <- paymentChange.withdrawAsVault(amount: cut.amount))
                 default:
                     panic("Unsupported cut type")
                 }
@@ -466,70 +616,14 @@ pub contract FRC20Storefront {
             // destory the payment change
             destroy paymentChange
 
-            // give the change to the buyer
-            var boughtTokenChange: @FRC20FTShared.Change? <- nil
-            boughtTokenChange <-> self.frozenChange
-            // apply the change and both inscriptions in frc20 indexer
-            frc20Indexer.applyListedOrder(
-                makerIns: self.borrowInspection(),
-                takerIns: ins,
-                change: <- (boughtTokenChange ?? panic("Unable to extract the change")),
-            )
-
-            // emit ListingCompleted event
-            emit ListingCompleted(
-                storefrontId: self.details.storefrontId,
-                listingResourceID: self.uuid,
-                type: self.details.type.rawValue,
-                tick: self.details.tick,
-                amount: self.details.amount,
-                price: self.details.price,
-                customID: self.details.customID,
-                commissionAmount: commissionAmount,
-                commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
-            )
+            // Return the commission amount
+            return commissionAmount
         }
 
-        /// Purchase the listing, selling the token.
-        /// This pays the beneficiaries and returns the token to the buyer.
-        access(all)
-        fun takeSellNow(
-            ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
-        ): @FRC20FTShared.Change {
-            pre {
-                self.details.status == ListingStatus.Available: "Listing must be available"
-                self.owner != nil : "Resource doesn't have the assigned owner"
-            }
-            // TODO
-
-            return <- nil
-        }
-
-        /** ---- Account methods ---- */
-
-        access(account)
-        fun cancel(): @FRC20FTShared.Change {
-            pre {
-                self.details.status == ListingStatus.Available: "Listing must be available"
-                self.owner != nil : "Resource doesn't have the assigned owner"
-            }
-            // TODO
-
-            return <- nil
-        }
-
-        /// borrow the inscription reference
+        /// Borrow the storefront resource.
         ///
-        access(contract)
-        fun borrowInspection(): &Fixes.Inscription {
-            return self.borrowStorefront().borrowInspection(self.inscriptionId)
-        }
-
-        /* ---- Internal methods ---- */
-
         access(self)
-        fun borrowStorefront(): &Storefront{StorefrontPublic} {
+        fun _borrowStorefront(): &Storefront{StorefrontPublic} {
             return FRC20Storefront.borrowStorefront(address: self.owner!.address)
                 ?? panic("Storefront not found")
         }

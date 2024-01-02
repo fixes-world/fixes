@@ -114,6 +114,9 @@ pub contract FRC20Indexer {
         /// Get the pool balance of a FRC20 token
         access(all) view
         fun getPoolBalance(tick: String): UFix64
+        /// Get the benchmark value of a FRC20 token
+        access(all) view
+        fun getBenchmarkValue(tick: String): UFix64
         /// Get the pool balance of platform treasury
         access(all) view
         fun getPlatformTreasuryBalance(): UFix64
@@ -155,7 +158,10 @@ pub contract FRC20Indexer {
         fun extractFlowVaultChangeFromInscription(_ ins: &Fixes.Inscription, amount: UFix64): @FRC20FTShared.Change
         /// Apply a listed order, maker and taker should be the same token and the same amount
         access(account)
-        fun applyListedOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
+        fun applyBuyNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
+        /// Apply a listed order, maker and taker should be the same token and the same amount
+        access(account)
+        fun applySellNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription)
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -288,6 +294,19 @@ pub contract FRC20Indexer {
             return pool.balance
         }
 
+        /// Get the benchmark value of a FRC20 token
+        access(all) view
+        fun getBenchmarkValue(tick: String): UFix64 {
+            let pool = self._borrowTokenTreasury(tick: tick)
+            let meta = self.borrowTokenMeta(tick: tick)
+            let totalExisting = meta.supplied.saturatingSubtract(meta.burned)
+            if totalExisting > 0.0 {
+                return pool.balance / totalExisting
+            } else {
+                return 0.0
+            }
+        }
+
         /// Get the pool balance of global
         ///
         access(all) view
@@ -375,7 +394,7 @@ pub contract FRC20Indexer {
             )
 
             // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
+            self._extractInscription(tick: tick, ins: ins)
         }
 
         /// Mint a FRC20 token
@@ -437,7 +456,7 @@ pub contract FRC20Indexer {
             )
 
             // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
+            self._extractInscription(tick: tick, ins: ins)
         }
 
         /// Transfer a FRC20 token
@@ -468,7 +487,7 @@ pub contract FRC20Indexer {
             self._transferToken(tick: tick, fromAddr: fromAddr, to: to, amt: amt)
 
             // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
+            self._extractInscription(tick: tick, ins: ins)
         }
 
         /// Burn a FRC20 token
@@ -517,7 +536,7 @@ pub contract FRC20Indexer {
             self._burnTokenInternal(tick: tick, amountToBurn: amt)
 
             // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
+            self._extractInscription(tick: tick, ins: ins)
 
             // extract flow from pool
             let flowPool = self._borrowTokenTreasury(tick: tick)
@@ -599,7 +618,7 @@ pub contract FRC20Indexer {
             )
 
             // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
+            self._extractInscription(tick: tick, ins: ins)
         }
 
         /// Burn unsupplied frc20 tokens
@@ -657,7 +676,7 @@ pub contract FRC20Indexer {
             )
 
             // extract inscription
-            self.extractInscription(tick: tick, ins: ins)
+            self._extractInscription(tick: tick, ins: ins)
         }
 
         /// Allocate the tokens to some address
@@ -716,8 +735,14 @@ pub contract FRC20Indexer {
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
-            let fromAddr = ins.owner!.address
 
+            let benchmarkValue = self.getBenchmarkValue(tick: tick)
+            assert(
+                price >= benchmarkValue,
+                message: "The price should be greater than or equal to the benchmark value: ".concat(benchmarkValue.toString())
+            )
+
+            let fromAddr = ins.owner!.address
             // withdraw the token to change
             let change <- self._withdrawToTokenChange(tick: tick, fromAddr: fromAddr, amt: amt)
 
@@ -762,6 +787,12 @@ pub contract FRC20Indexer {
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
 
+            let benchmarkValue = self.getBenchmarkValue(tick: tick)
+            assert(
+                price >= benchmarkValue,
+                message: "The price should be greater than or equal to the benchmark value: ".concat(benchmarkValue.toString())
+            )
+
             // calculate the total price and sale cuts
             let totalPrice = amt * price
 
@@ -772,6 +803,19 @@ pub contract FRC20Indexer {
                 cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: nil),
                 change: <- self.extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
             )
+        }
+
+        /// Apply a listed order, maker and taker should be the same token and the same amount
+        access(account)
+        fun applyBuyNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change) {
+            // TODO
+            destroy change
+        }
+
+        /// Apply a listed order, maker and taker should be the same token and the same amount
+        access(account)
+        fun applySellNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription) {
+            // TODO
         }
 
         /// Extract a part of the inscription's value to a FRC20 token change
@@ -801,13 +845,6 @@ pub contract FRC20Indexer {
                 balance: nil,
                 ftVault: <- vault
             )
-        }
-
-        /// Apply a listed order, maker and taker should be the same token and the same amount
-        access(account)
-        fun applyListedOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change) {
-            // TODO
-            destroy change
         }
 
         /** ----- Private methods ----- */
@@ -1021,7 +1058,7 @@ pub contract FRC20Indexer {
         /// Extract the $FLOW from inscription
         ///
         access(self)
-        fun extractInscription(tick: String, ins: &Fixes.Inscription) {
+        fun _extractInscription(tick: String, ins: &Fixes.Inscription) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.pool[tick] != nil: "The token has not been deployed"
