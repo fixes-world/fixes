@@ -20,6 +20,7 @@ pub contract Fixes {
     pub event InscriptionBurned(id: UInt64)
     pub event InscriptionExtracted(id: UInt64, value: UFix64)
     pub event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
+    pub event InscriptionArchived(id: UInt64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -392,6 +393,61 @@ pub contract Fixes {
         }
     }
 
+    pub resource interface ArchivedInscriptionsPublic {
+        access(all) view
+        fun getIDs(): [UInt64]
+        access(all) view
+        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
+    }
+
+    /// The resource that stores the archived inscriptions
+    ///
+    pub resource ArchivedInscriptions {
+        access(self)
+        let inscriptions: @{UInt64: Fixes.Inscription}
+
+        init() {
+            self.inscriptions <- {}
+        }
+
+        destroy() {
+            destroy self.inscriptions
+        }
+
+        // --- Public Methods ---
+
+        access(all) view
+        fun getIDs(): [UInt64] {
+            return self.inscriptions.keys
+        }
+
+        access(all) view
+        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+            return self.borrowInscriptionWritableRef(id)
+        }
+
+        // --- Private Methods ---
+
+        access(all)
+        fun archive(_ ins: @Fixes.Inscription) {
+            pre {
+                ins.isExtracted(): "Inscription should be extracted"
+            }
+            // inscription id should be unique
+            let id = ins.getId()
+            let old <- self.inscriptions.insert(key: id, <- ins)
+
+            emit InscriptionArchived(id: id)
+
+            destroy old
+        }
+
+        access(all)
+        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription? {
+            return &self.inscriptions[id] as &Fixes.Inscription?
+        }
+    }
+
     /* --- Methods --- */
 
     /// Create a new inscription
@@ -453,6 +509,12 @@ pub contract Fixes {
         return StoragePath(
             identifier: prefix.concat("_").concat(index.toString())
         )!
+    }
+
+    access(all) view
+    fun getArchivedFixesStoragePath(): StoragePath {
+        let prefix = "Fixes_".concat(self.account.address.toString())
+        return StoragePath(identifier: prefix.concat("_archived"))!
     }
 
     init() {
