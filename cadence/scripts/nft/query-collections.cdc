@@ -27,7 +27,8 @@ pub fun main(
         // official collections
         Type<@FixesWrappedNFT.Collection>(),
         // broken collections
-        CompositeType("A.afb8473247d9354c.FlowNia.Collection")
+        CompositeType("A.afb8473247d9354c.FlowNia.Collection"),
+        CompositeType("A.01ab36aaf654a13e.RaribleNFT.Collection")
     ]
 
     let ret: {String: MetadataViews.NFTCollectionDisplay} = {}
