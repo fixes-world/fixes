@@ -398,18 +398,37 @@ pub contract FRC20Storefront {
             // Pay each beneficiary their amount of the payment.
             for cut in self.details.saleCuts {
                 switch cut.type {
-                case FRC20FTShared.SaleCutType.Consumer:
-                    let reciverCap = cut.receiver ?? panic("Receiver capability should not be nil")
-                    if let receiver = reciverCap.borrow() {
-                        let paymentCut <- payment.withdraw(amount: cut.amount)
-                        receiver.deposit(from: <-paymentCut)
-                        if residualReceiver == nil {
-                            residualReceiver = receiver
-                        }
-                    } else {
-                        emit UnpaidReceiver(receiver: reciverCap.address, entitledSaleCut: cut.amount)
-                    }
-                // TODO
+                case FRC20FTShared.SaleCutType.TokenTreasury:
+                    // let reciverCap = cut.receiver ?? panic("Receiver capability should not be nil")
+                    // if let receiver = reciverCap.borrow() {
+                    //     let paymentCut <- payment.withdraw(amount: cut.amount)
+                    //     receiver.deposit(from: <-paymentCut)
+                    //     if residualReceiver == nil {
+                    //         residualReceiver = receiver
+                    //     }
+                    // } else {
+                    //     emit UnpaidReceiver(receiver: reciverCap.address, entitledSaleCut: cut.amount)
+                    // }
+                    // TODO
+                    break
+                case FRC20FTShared.SaleCutType.PlatformTreasury:
+                    // TODO
+                    break
+                case FRC20FTShared.SaleCutType.MarketplaceStakers:
+                    // TODO
+                    break
+                case FRC20FTShared.SaleCutType.MarketplaceCampaign:
+                    // TODO
+                    break
+                case FRC20FTShared.SaleCutType.Commission:
+                    // TODO
+                    break
+                case FRC20FTShared.SaleCutType.SellMaker:
+                    // TODO
+                    break
+                case FRC20FTShared.SaleCutType.BuyTaker:
+                    // TODO
+                    break
                 default:
                     panic("Unsupported cut type")
                 }
@@ -424,7 +443,7 @@ pub contract FRC20Storefront {
             // TODO - add more details
             emit ListingCompleted()
 
-            return <-nft
+            return <- nil
         }
 
         /// Purchase the listing, selling the token.
@@ -434,7 +453,13 @@ pub contract FRC20Storefront {
             change: @FRC20FTShared.Change,
             commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
         ): @FRC20FTShared.Change {
+            pre {
+                self.details.status == ListingStatus.Available: "Listing must be available"
+                self.owner != nil : "Resource doesn't have the assigned owner"
+            }
+            // TODO
 
+            return <- nil
         }
 
         /** ---- Account methods ---- */
@@ -446,13 +471,15 @@ pub contract FRC20Storefront {
                 self.owner != nil : "Resource doesn't have the assigned owner"
             }
             // TODO
+
+            return <- nil
         }
 
         /// borrow the inscription reference
         ///
         access(contract)
         fun borrowInspection(): &Fixes.Inscription {
-
+            return self.borrowStorefront().borrowInspection(self.inscriptionId)
         }
 
         /* ---- Internal methods ---- */

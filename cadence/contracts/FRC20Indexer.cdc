@@ -833,6 +833,7 @@ pub contract FRC20Indexer {
             )
 
             // add to the sale cuts
+            // The first cut is the token treasury cut to ensure residualReceiver will be this
             ret.append(FRC20FTShared.SaleCut(
                 type: FRC20FTShared.SaleCutType.TokenTreasury,
                 amount: amount * salesFee * treasuryPoolCut,
