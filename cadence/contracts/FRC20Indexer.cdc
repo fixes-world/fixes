@@ -141,13 +141,21 @@ pub contract FRC20Indexer {
         /// Parse the metadata of a FRC20 inscription
         access(account) view
         fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
-        /** ---- Account Methods without Inscription extrasction ---- */
+        /** ---- Account Methods for listing ---- */
         /// Building a selling FRC20 Token order with the sale cut from a FRC20 inscription
+        /// This method will not extract all value of the inscription
         access(account)
         fun buildBuyNowListing(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
         /// Building a buying FRC20 Token order with the sale cut from a FRC20 inscription
+        /// This method will not extract all value of the inscription
         access(account)
         fun buildSellNowListing(ins: &Fixes.Inscription): @FRC20FTShared.ValidFrozenOrder
+        /// Extract a part of the inscription's value to a FRC20 token change
+        access(account)
+        fun extractFlowVaultChangeFromInscription(_ ins: &Fixes.Inscription, amount: UFix64): @FRC20FTShared.Change
+        /// Apply a listed order, maker and taker should be the same token and the same amount
+        access(account)
+        fun applyListedOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -762,18 +770,17 @@ pub contract FRC20Indexer {
                 tick: tick,
                 amount: amt,
                 cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: nil),
-                change: <- self._extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
+                change: <- self.extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
             )
         }
 
-        /** ----- Private methods ----- */
-
         /// Extract a part of the inscription's value to a FRC20 token change
         ///
-        access(self)
-        fun _extractFlowVaultChangeFromInscription(_ ins: &Fixes.Inscription, amount: UFix64): @FRC20FTShared.Change {
+        access(account)
+        fun extractFlowVaultChangeFromInscription(_ ins: &Fixes.Inscription, amount: UFix64): @FRC20FTShared.Change {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
             post {
                 ins.isExtractable() && ins.isValueValid(): "The inscription should be extractable and the value should be valid after partial extraction"
@@ -795,6 +802,15 @@ pub contract FRC20Indexer {
                 ftVault: <- vault
             )
         }
+
+        /// Apply a listed order, maker and taker should be the same token and the same amount
+        access(account)
+        fun applyListedOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change) {
+            // TODO
+            destroy change
+        }
+
+        /** ----- Private methods ----- */
 
         /// Build the sale cuts for a FRC20 order
         /// - Parameters:
