@@ -23,9 +23,16 @@ pub fun main(
         "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesOnFlow")
     }
 
+    let ignoreCollections = [
+        // official collections
+        Type<@FixesWrappedNFT.Collection>(),
+        // broken collections
+        CompositeType("A.afb8473247d9354c.FlowNia.Collection")
+    ]
+
     let ret: {String: MetadataViews.NFTCollectionDisplay} = {}
     acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
-        if type.isSubtype(of: Type<@NonFungibleToken.Collection>()) && type != Type<@FixesWrappedNFT.Collection>() {
+        if type.isSubtype(of: Type<@NonFungibleToken.Collection>()) && !ignoreCollections.contains(type) {
             let valid = acct.check<@AnyResource{MetadataViews.ResolverCollection}>(from: path)
             if !valid {
                 // hack for FreeFlow Inscription
