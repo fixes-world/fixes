@@ -128,11 +128,15 @@ pub contract FRC20Storefront {
             self.salePrice = salePrice
         }
 
+        /// Return if the listing is purchased.
+        ///
         access(all)
         fun isPurchased(): Bool {
             return self.status == ListingStatus.Purchased
         }
 
+        /// Return if the listing is cancelled.
+        ///
         access(all)
         fun isCancelled(): Bool {
             return self.status == ListingStatus.Cancelled
@@ -140,7 +144,8 @@ pub contract FRC20Storefront {
 
         /// Irreversibly set this listing as purchased.
         ///
-        access(contract) fun setToPurchased() {
+        access(contract)
+        fun setToPurchased() {
             pre {
                 self.status == ListingStatus.Available: "Listing must be available"
             }
@@ -149,14 +154,18 @@ pub contract FRC20Storefront {
 
         /// Irreversibly set this listing as cancelled.
         ///
-        access(contract) fun setToCancelled() {
+        access(contract)
+        fun setToCancelled() {
             pre {
                 self.status == ListingStatus.Available: "Listing must be available"
             }
             self.status = ListingStatus.Cancelled
         }
 
-        access(contract) fun setCustomID(customID: String?){
+        /// Set the customID
+        ///
+        access(contract)
+        fun setCustomID(customID: String?){
             self.customID = customID
         }
     }
@@ -165,42 +174,51 @@ pub contract FRC20Storefront {
     /// An interface providing a useful public interface to a Listing.
     ///
     pub resource interface ListingPublic {
+        /** ---- Public Methods ---- */
+
+        /// Get the address of the owner of the NFT that is being sold.
+        access(all) view
+        fun getOwnerAddress(): Address
+
         /// The listing frc20 token name
-        ///
-        access(all)
+        access(all) view
         fun getTickName(): String
 
-        /// borrow the listing token Meta for the selling FRC20 token
-        ///
-        access(all)
+        /// Borrow the listing token Meta for the selling FRC20 token
+        access(all) view
         fun getTickMeta(): FRC20Indexer.FRC20Meta
 
-        /// getDetails
         /// Fetches the details of the listing.
-        access(all)
+        access(all) view
         fun getDetails(): ListingDetails
 
-        /// purchase
+        /// Fetches the allowed marketplaces capabilities or commission receivers.
+        /// If it returns `nil` then commission is up to grab by anyone.
+        access(all) view
+        fun getAllowedCommissionReceivers(): [Capability<&{FungibleToken.Receiver}>]?
+
         /// Purchase the listing, buying the token.
         /// This pays the beneficiaries and returns the token to the buyer.
         ///
         access(all)
-        fun purchase(
+        fun takeBuyNow(
             payment: @FungibleToken.Vault,
             commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
         ): @FRC20FTShared.Change
 
-        /// getAllowedCommissionReceivers
-        /// Fetches the allowed marketplaces capabilities or commission receivers.
-        /// If it returns `nil` then commission is up to grab by anyone.
-        ///
+        /// Purchase the listing, selling the token.
+        /// This pays the beneficiaries and returns the token to the buyer.
         access(all)
-        fun getAllowedCommissionReceivers(): [Capability<&{FungibleToken.Receiver}>]?
+        fun takeSellNow(
+            change: @FRC20FTShared.Change,
+            commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
+        ): @FRC20FTShared.Change
+
+        /** ---- Internal Methods ---- */
 
         /// borrow the inscription reference
-        ///
-        access(account)
-        fun borrowInspectionRef(): &Fixes.Inscription
+        access(contract)
+        fun borrowInspection(): &Fixes.Inscription
     }
 
 
@@ -210,14 +228,18 @@ pub contract FRC20Storefront {
     ///
     pub resource Listing: ListingPublic {
         /// The simple (non-Capability, non-complex) details of the sale
-        access(self) let details: ListingDetails
-        /// The frozen change for this listing.
-        access(contract) let frozenChange: @FRC20FTShared.Change
+        access(self)
+        let details: ListingDetails
         /// The inscriptions reference
-        access(contract) let inscriptions: @Fixes.Inscription
+        access(contract)
+        let inscriptionId: UInt64
+        /// The frozen change for this listing.
+        access(contract)
+        let frozenChange: @FRC20FTShared.Change
         /// An optional list of marketplaces capabilities that are approved
         /// to receive the marketplace commission.
-        access(contract) let marketplacesCapability: [Capability<&{FungibleToken.Receiver}>]?
+        access(contract)
+        let commissionRecipientCaps: [Capability<&{FungibleToken.Receiver}>]?
 
         /// initializer
         ///
@@ -227,37 +249,46 @@ pub contract FRC20Storefront {
             commissionRecipientCaps: [Capability<&{FungibleToken.Receiver}>]?,
             customID: String?
         ) {
+            // set the inscription id
+            self.inscriptionId = listIns.getId()
+            // Store the commission recipients capability
+            self.commissionRecipientCaps = commissionRecipientCaps
+
             // Analyze the listing inscription and build the details
             let indexer = FRC20Indexer.getIndexer()
             // find the op first
             let meta = indexer.parseMetadata(&listIns.getData() as &Fixes.InscriptionData)
             let op = meta["op"] as! String
 
+            var order: @FRC20FTShared.ValidFrozenOrder? <- nil
+            var listType: ListingType = ListingType.FixedPriceBuyNow
             switch op {
             case "list-buynow":
-                let order <- indexer.buildBuyNowListing(ins: insRef)
+                order <-! indexer.buildBuyNowListing(ins: listIns)
+                listType = ListingType.FixedPriceBuyNow
                 break
             case "list-sellnow":
+                order <-! indexer.buildSellNowListing(ins: listIns)
+                listType = ListingType.FixedPriceSellNow
                 break
             default:
                 panic("Unsupported listing operation")
             }
-            // Store the change first
-            // self.frozenChange <- frc20Change
-            // self.inscriptions <- listIns
-            // // Store the marketplaces capability
-            // self.marketplacesCapability = marketplacesCapability
 
-            // // Store the sale information
-            // self.details = ListingDetails(
-            //     storefrontId: storefrontId,
-            //     saleTick: self.frozenChange.tick,
-            //     saleAmount: self.frozenChange.getBalance(),
-            //     salePaymentVaultType: Type<@FlowToken.Vault>(), // Currently, we only support $FLOW as a payment vault.
-            //     saleCuts: saleCuts,
-            //     customID: customID,
-            //     commissionAmount: commissionAmount,
-            // )
+            // Store the change
+            self.frozenChange <- order?.extract() ?? panic("Unable to extract the change")
+            // Store the list information
+            self.details = ListingDetails(
+                storefrontId: storefrontId,
+                type: listType,
+                tick: order?.tick ?? panic("Unable to fetch the tick"),
+                amount: order?.amount ?? panic("Unable to fetch the amount"),
+                paymentVaultType: Type<@FungibleToken.Vault>(), // Currently, we only support $FLOW as a payment vault.
+                saleCuts: order?.cuts ?? panic("Unable to fetch the cuts"),
+                customID: customID
+            )
+            // Destroy stored order
+            destroy order
         }
 
         /// destructor
@@ -268,31 +299,38 @@ pub contract FRC20Storefront {
                     "Listing must be purchased or cancelled"
             }
             destroy self.frozenChange
-            destroy self.inscriptions
         }
 
         // ListingPublic interface implementation
 
+        /// getOwnerAddress
+        /// Fetches the address of the owner of the NFT that is being sold.
+        ///
+        access(all) view
+        fun getOwnerAddress(): Address {
+            return self.owner?.address ?? panic("Get owner address failed")
+        }
+
         /// The listing frc20 token name
         ///
-        access(all)
+        access(all) view
         fun getTickName(): String {
             return self.frozenChange.tick
         }
 
         /// borrow the Token Meta for the selling FRC20 token
         ///
-        access(all)
+        access(all) view
         fun getTickMeta(): FRC20Indexer.FRC20Meta {
             let indexer = FRC20Indexer.getIndexer()
-            return indexer.getTokenMeta(tick: self.details.saleTick)
+            return indexer.getTokenMeta(tick: self.details.tick)
                 ?? panic("Unable to fetch the token meta")
         }
 
         /// getDetails
         /// Get the details of listing.
         ///
-        access(all)
+        access(all) view
         fun getDetails(): ListingDetails {
             return self.details
         }
@@ -300,9 +338,9 @@ pub contract FRC20Storefront {
         /// getAllowedCommissionReceivers
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
-        access(all)
+        access(all) view
         fun getAllowedCommissionReceivers(): [Capability<&{FungibleToken.Receiver}>]? {
-            return self.marketplacesCapability
+            return self.commissionRecipientCaps
         }
 
         /// purchase
@@ -310,27 +348,30 @@ pub contract FRC20Storefront {
         /// This pays the beneficiaries and returns the token to the buyer.
         ///
         access(all)
-        fun purchase(
+        fun takeBuyNow(
             payment: @FungibleToken.Vault,
             commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
         ): @FRC20FTShared.Change {
             pre {
                 self.details.status == ListingStatus.Available: "Listing must be available"
-                payment.isInstance(self.details.salePaymentVaultType): "payment vault is not requested fungible token"
-                payment.balance == self.details.salePrice: "payment vault does not contain requested price"
                 self.owner != nil : "Resource doesn't have the assigned owner"
+                payment.isInstance(self.details.paymentVaultType): "payment vault is not requested fungible token"
+                payment.balance == self.details.salePrice: "payment vault does not contain requested price"
             }
+
             // Make sure the listing cannot be purchased again.
             self.details.setToPurchased()
 
-            // Pay the commission
-            if self.details.commissionAmount > 0.0 {
+            // All the commission receivers that are eligible to receive the commission.
+            let eligibleCommissionReceivers = self.commissionRecipientCaps
+            // The function to pay the commission
+            let payCommissionFunc = fun (commissionPayment: @FungibleToken.Vault) {
                 // If commission recipient is nil, Throw panic.
                 let commissionReceiver = commissionRecipient ?? panic("Commission recipient can't be nil")
-                if self.marketplacesCapability != nil {
+                if eligibleCommissionReceivers != nil {
                     var isCommissionRecipientHasValidType = false
                     var isCommissionRecipientAuthorised = false
-                    for cap in self.marketplacesCapability! {
+                    for cap in eligibleCommissionReceivers! {
                         // Check 1: Should have the same type
                         if cap.getType() == commissionReceiver.getType() {
                             isCommissionRecipientHasValidType = true
@@ -344,7 +385,6 @@ pub contract FRC20Storefront {
                     assert(isCommissionRecipientHasValidType, message: "Given recipient does not has valid type")
                     assert(isCommissionRecipientAuthorised,   message: "Given recipient is not authorised to receive the commission")
                 }
-                let commissionPayment <- payment.withdraw(amount: self.details.commissionAmount)
                 let recipient = commissionReceiver.borrow() ?? panic("Unable to borrow the recipient capability")
                 recipient.deposit(from: <- commissionPayment)
             }
@@ -387,6 +427,16 @@ pub contract FRC20Storefront {
             return <-nft
         }
 
+        /// Purchase the listing, selling the token.
+        /// This pays the beneficiaries and returns the token to the buyer.
+        access(all)
+        fun takeSellNow(
+            change: @FRC20FTShared.Change,
+            commissionRecipient: Capability<&{FungibleToken.Receiver}>?,
+        ): @FRC20FTShared.Change {
+
+        }
+
         /** ---- Account methods ---- */
 
         access(account)
@@ -400,12 +450,18 @@ pub contract FRC20Storefront {
 
         /// borrow the inscription reference
         ///
-        access(account)
-        fun borrowInspectionRef(): &Fixes.Inscription {
-            return &self.inscriptions as &Fixes.Inscription
+        access(contract)
+        fun borrowInspection(): &Fixes.Inscription {
+
         }
 
         /* ---- Internal methods ---- */
+
+        access(self)
+        fun borrowStorefront(): &Storefront{StorefrontPublic} {
+            return FRC20Storefront.borrowStorefront(address: self.owner!.address)
+                ?? panic("Storefront not found")
+        }
 
         /// Borrow the change for this listing.
         ///
@@ -442,11 +498,20 @@ pub contract FRC20Storefront {
     /// in a Storefront.
     ///
     pub resource interface StorefrontPublic {
-        pub fun getListingIDs(): [UInt64]
-        pub fun borrowListing(listingResourceID: UInt64): &Listing{ListingPublic}?
+        /** ---- Public Methods ---- */
+        access(all)
+        fun getListingIDs(): [UInt64]
+        access(all)
+        fun borrowListing(listingResourceID: UInt64): &Listing{ListingPublic}?
         // Cleanup methods
-        pub fun cleanupPurchasedListings(listingResourceID: UInt64)
-        pub fun cleanupGhostListings(listingResourceID: UInt64)
+        access(all)
+        fun cleanupPurchasedListings(listingResourceID: UInt64)
+        access(all)
+        fun cleanupGhostListings(listingResourceID: UInt64)
+        /** ---- Contract Methods ---- */
+        /// borrow the inscription reference
+        access(contract)
+        fun borrowInspection(_ id: UInt64): &Fixes.Inscription
    }
 
     /// Storefront
@@ -557,7 +622,7 @@ pub contract FRC20Storefront {
             }
 
             emit ListingAvailable(
-                storefrontAddress: self.owner?.address!,
+                storefrontAddress: self.owner?.address ?? panic("Storefront owner is not set"),
                 listingResourceID: listingResourceID,
                 tick: details.tick,
                 type: details.type.rawValue,
@@ -621,6 +686,15 @@ pub contract FRC20Storefront {
 
             destroy listing
         }
+
+        /** ---- Internal Method ---- */
+
+        /// borrow the inscription reference
+        ///
+        access(contract)
+        fun borrowInspection(_ id: UInt64): &Fixes.Inscription {
+            return &self.inscriptions[id] as &Fixes.Inscription? ?? panic("Inscription not found")
+        }
     }
 
     /* --- Public Resource Interfaces --- */
@@ -647,6 +721,15 @@ pub contract FRC20Storefront {
     access(all)
     fun createStorefront(): @Storefront {
         return <-create Storefront()
+    }
+
+    /// Borrow a Storefront from an account.
+    ///
+    access(all)
+    fun borrowStorefront(address: Address): &Storefront{StorefrontPublic}? {
+        return getAccount(address)
+            .getCapability<&Storefront{StorefrontPublic}>(self.StorefrontPublicPath)
+            .borrow()
     }
 
     init() {

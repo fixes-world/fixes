@@ -390,14 +390,24 @@ pub contract FRC20FTShared {
     /// It a temporary resource combining change and cuts
     ///
     pub resource ValidFrozenOrder {
+        pub let tick: String
+        pub let amount: UFix64
         pub let cuts: [SaleCut]
         pub var change: @Change?
 
-        init(_ change: @Change, cuts: [SaleCut]) {
+        init(
+            tick: String,
+            amount: UFix64,
+            cuts: [SaleCut],
+            _ change: @Change,
+        ) {
             pre {
+                amount > UFix64(0): "Amount must be greater than zero"
                 cuts.length > 0: "Cuts must not be empty"
                 change.getBalance() > UFix64(0): "Balance must be greater than zero"
             }
+            self.tick = tick
+            self.amount = amount
             self.change <- change
             self.cuts = cuts
         }
@@ -475,12 +485,16 @@ pub contract FRC20FTShared {
     ///
     access(account)
     fun createValidFrozenOrder(
-        change: @Change,
+        tick: String,
+        amount: UFix64,
         cuts: [SaleCut],
+        change: @Change,
     ): @ValidFrozenOrder {
         return <- create ValidFrozenOrder(
-            <- change,
-            cuts: cuts
+            tick: tick,
+            amount: amount,
+            cuts: cuts,
+            <- change
         )
     }
 

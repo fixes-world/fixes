@@ -723,8 +723,10 @@ pub contract FRC20Indexer {
 
             // create the valid frozen order
             return <- FRC20FTShared.createValidFrozenOrder(
+                tick: tick,
+                amount: amt,
+                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr),
                 change: <- change,
-                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr)
             )
         }
 
@@ -751,15 +753,16 @@ pub contract FRC20Indexer {
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
-            let fromAddr = ins.owner!.address
 
             // calculate the total price and sale cuts
             let totalPrice = amt * price
 
             // create the valid frozen order
             return <- FRC20FTShared.createValidFrozenOrder(
+                tick: tick,
+                amount: amt,
+                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: nil),
                 change: <- self._extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
-                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr)
             )
         }
 
@@ -787,7 +790,7 @@ pub contract FRC20Indexer {
             // return the change
             return <- FRC20FTShared.createChange(
                 tick: "", // empty tick means this change is a FLOW token change
-                from: ins.owner!.address,
+                from: ins.owner!.address, // Pay $FLOW to the buyer and get the FRC20 token
                 balance: nil,
                 ftVault: <- vault
             )
