@@ -217,9 +217,9 @@ pub contract FRC20Storefront {
         access(all)
         fun takeSellNow(
             ins: &Fixes.Inscription,
-            paymentRecipient: Capability<&{FungibleToken.Receiver}>?,
+            paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
             commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
-        ): @FRC20FTShared.Change
+        )
 
         /** ---- Internal Methods ---- */
 
@@ -428,7 +428,7 @@ pub contract FRC20Storefront {
             ins: &Fixes.Inscription,
             paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
             commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
-        ): @FRC20FTShared.Change {
+        ) {
             pre {
                 self.details.type == ListingType.FixedPriceSellNow: "Listing must be a buy now listing"
                 self.details.status == ListingStatus.Available: "Listing must be available"
@@ -471,8 +471,6 @@ pub contract FRC20Storefront {
             )
 
 
-
-            return <- nil
         }
 
         /** ---- Account methods ---- */
