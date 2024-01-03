@@ -440,6 +440,8 @@ pub contract FRC20Storefront {
                 change: <- (frc20TokenChange ?? panic("Unable to extract the change")),
             )
 
+            // TODO: Record the transction record
+
             // emit ListingCompleted event
             emit ListingCompleted(
                 storefrontId: self.details.storefrontId,
@@ -502,6 +504,8 @@ pub contract FRC20Storefront {
                 makerIns: self.borrowInspection(),
                 takerIns: ins
             )
+
+            // TODO: Record the transction record
 
             // emit ListingCompleted event
             emit ListingCompleted(

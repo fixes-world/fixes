@@ -414,11 +414,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for minting"
             )
 
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             assert(
                 tokenMeta.supplied < tokenMeta.max,
@@ -476,11 +472,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for transfer"
             )
 
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let to = Address.fromString(meta["to"]!) ?? panic("The receiver is not a valid address")
@@ -507,11 +499,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for burning"
             )
 
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             assert(
                 tokenMeta.burnable,
@@ -597,7 +585,7 @@ pub contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
                 // The command inscriptions should be only executed by the indexer
-                self.isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
+                self._isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
             }
             let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
@@ -605,11 +593,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for setting burnable"
             )
 
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let isTrue = meta["v"]! == "true" || meta["v"]! == "1"
             tokenMeta.setBurnable(isTrue)
@@ -632,7 +616,7 @@ pub contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
                 // The command inscriptions should be only executed by the indexer
-                self.isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
+                self._isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
             }
             let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
@@ -640,12 +624,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for burning unsupplied tokens"
             )
 
-            let tick = meta["tick"]!.toLower()
-            // check the token, the token should be deployed
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             // check the burnable
             assert(
@@ -697,11 +676,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for allocating"
             )
 
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let to = Address.fromString(meta["to"]!) ?? panic("The receiver is not a valid address")
@@ -730,11 +705,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for listing"
             )
 
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
@@ -744,26 +715,28 @@ pub contract FRC20Indexer {
                 price >= benchmarkValue,
                 message: "The price should be greater than or equal to the benchmark value: ".concat(benchmarkValue.toString())
             )
-
+            // from address
             let fromAddr = ins.owner!.address
-            // withdraw the token to change
-            let change <- self._withdrawToTokenChange(tick: tick, fromAddr: fromAddr, amt: amt)
-
-            assert(
-                change.getBalance() == amt,
-                message: "The change amount should be same as the amount"
-            )
-
             // calculate the total price and sale cuts
             let totalPrice = amt * price
 
             // create the valid frozen order
-            return <- FRC20FTShared.createValidFrozenOrder(
+            let order <- FRC20FTShared.createValidFrozenOrder(
                 tick: tick,
                 amount: amt,
                 cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr),
-                change: <- change,
+                // withdraw the token to change
+                change: <- self._withdrawToTokenChange(tick: tick, fromAddr: fromAddr, amt: amt),
             )
+            assert(
+                order.change != nil && order.change?.isBackedByVault() == false,
+                message: "The 'BuyNow' listing change should not be backed by a vault"
+            )
+            assert(
+                order.change?.getBalance() == amt,
+                message: "The change amount should be same as the amount"
+            )
+            return <- order
         }
 
         /// Building a buying FRC20 Token order with the sale cut from a FRC20 inscription
@@ -781,11 +754,7 @@ pub contract FRC20Indexer {
                 message: "The inscription is not a valid FRC20 inscription for listing"
             )
 
-            let tick = meta["tick"]!.toLower()
-            assert(
-                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
-                message: "The token has not been deployed"
-            )
+            let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
@@ -800,32 +769,149 @@ pub contract FRC20Indexer {
             let totalPrice = amt * price
 
             // create the valid frozen order
-            return <- FRC20FTShared.createValidFrozenOrder(
+            let order <- FRC20FTShared.createValidFrozenOrder(
                 tick: tick,
                 amount: amt,
                 cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: nil),
                 change: <- self.extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
             )
+            assert(
+                order.change != nil && order.change?.isBackedByVault() == true,
+                message: "The 'SellNow' listing change should be backed by a vault"
+            )
+            assert(
+                order.change?.getBalance() == totalPrice,
+                message: "The 'SellNow' listing change amount should be same as the amount"
+            )
+            return <- order
         }
 
         /// Apply a listed order, maker and taker should be the same token and the same amount
         access(account)
-        fun applyBuyNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change) {
-            // TODO
-            destroy change
+        fun applyBuyNowOrder(
+            makerIns: &Fixes.Inscription,
+            takerIns: &Fixes.Inscription,
+            change: @FRC20FTShared.Change
+        ) {
+            pre {
+                makerIns.isExtractable(): "The MAKER inscription is not extractable"
+                takerIns.isExtractable(): "The TAKER inscription is not extractable"
+                self.isValidFRC20Inscription(ins: makerIns): "The MAKER inscription is not a valid FRC20 inscription"
+                self.isValidFRC20Inscription(ins: takerIns): "The TAKER inscription is not a valid FRC20 inscription"
+                change.isBackedByVault() == false: "The change should not be backed by a vault"
+            }
+
+            let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
+            let takerMeta = self.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
+
+            assert(
+                makerMeta["op"] == "list-buynow" && makerMeta["tick"] != nil && makerMeta["amt"] != nil && makerMeta["price"] != nil,
+                message: "The MAKER inscription is not a valid FRC20 inscription for listing"
+            )
+            assert(
+                takerMeta["op"] == "list-take-buynow" && takerMeta["tick"] != nil && takerMeta["amt"] != nil,
+                message: "The TAKER inscription is not a valid FRC20 inscription for taking listing"
+            )
+
+            let tick = self._parseTickerName(takerMeta)
+            assert(
+                makerMeta["tick"]!.toLower() == tick && change.tick == tick,
+                message: "The MAKER and TAKER should be the same token"
+            )
+            let amt: UFix64 = UFix64.fromString(takerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let makerAmt = UFix64.fromString(makerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            assert(
+                amt == change.getBalance() && amt == makerAmt,
+                message: "The MAKER and TAKER should be the same amount"
+            )
+
+            let makerAddr = makerIns.owner!.address
+            let takerAddr = takerIns.owner!.address
+            assert(
+                makerAddr != takerAddr,
+                message: "The MAKER and TAKER should be different address"
+            )
+            assert(
+                makerAddr == change.from,
+                message: "The MAKER should be the same address as the change from address"
+            )
+
+            // deposit the token change to the taker
+            self._depositFromTokenChange(change: <- change, to: takerAddr)
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: makerIns)
+            self._extractInscription(tick: tick, ins: takerIns)
         }
 
         /// Apply a listed order, maker and taker should be the same token and the same amount
         access(account)
         fun applySellNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription) {
-            // TODO
+            pre {
+                makerIns.isExtractable(): "The MAKER inscription is not extractable"
+                takerIns.isExtractable(): "The TAKER inscription is not extractable"
+                self.isValidFRC20Inscription(ins: makerIns): "The MAKER inscription is not a valid FRC20 inscription"
+                self.isValidFRC20Inscription(ins: takerIns): "The TAKER inscription is not a valid FRC20 inscription"
+            }
+
+            let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
+            let takerMeta = self.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
+
+            assert(
+                makerMeta["op"] == "list-sellnow" && makerMeta["tick"] != nil && makerMeta["amt"] != nil && makerMeta["price"] != nil,
+                message: "The MAKER inscription is not a valid FRC20 inscription for listing"
+            )
+            assert(
+                takerMeta["op"] == "list-take-sellnow" && takerMeta["tick"] != nil && takerMeta["amt"] != nil,
+                message: "The TAKER inscription is not a valid FRC20 inscription for taking listing"
+            )
+
+            let tick = self._parseTickerName(takerMeta)
+            assert(
+                makerMeta["tick"]!.toLower() == tick,
+                message: "The MAKER and TAKER should be the same token"
+            )
+            let amt: UFix64 = UFix64.fromString(takerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let makerAmt = UFix64.fromString(makerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            assert(
+                amt == makerAmt,
+                message: "The MAKER and TAKER should be the same amount"
+            )
+
+            let makerAddr = makerIns.owner!.address
+            let takerAddr = takerIns.owner!.address
+            assert(
+                makerAddr != takerAddr,
+                message: "The MAKER and TAKER should be different address"
+            )
+
+            // transfer token from taker to maker
+            self._transferToken(tick: tick, fromAddr: takerAddr, to: makerAddr, amt: amt)
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: makerIns)
+            self._extractInscription(tick: tick, ins: takerIns)
         }
 
         /// Cancel a listed order
         access(account)
         fun cancelListing(listedIns: &Fixes.Inscription, change: @FRC20FTShared.Change) {
-            // TODO
-            destroy change
+            pre {
+                listedIns.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: listedIns): "The inscription is not a valid FRC20 inscription"
+            }
+
+            let meta = self.parseMetadata(&listedIns.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"]?.slice(from: 0, upTo: 5) == "list-" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for listing"
+            )
+            assert(
+                listedIns.owner!.address == change.from,
+                message: "The listed owner should be the same as the change from address"
+            )
+
+            let tick = self._parseTickerName(meta)
         }
 
         /// Extract a part of the inscription's value to a FRC20 token change
@@ -1092,8 +1178,20 @@ pub contract FRC20Indexer {
         /// Check if an inscription is owned by the indexer
         ///
         access(self) view
-        fun isOwnedByIndexer(_ ins: &Fixes.Inscription): Bool {
+        fun _isOwnedByIndexer(_ ins: &Fixes.Inscription): Bool {
             return ins.owner?.address == FRC20Indexer.getAddress()
+        }
+
+        /// Parse the ticker name from the meta-info of a FRC20 inscription
+        ///
+        access(self)
+        fun _parseTickerName(_ meta: {String: String}): String {
+            let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+            assert(
+                self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
+                message: "The token has not been deployed"
+            )
+            return tick
         }
 
         /// Borrow the meta-info of a token
@@ -1146,6 +1244,17 @@ pub contract FRC20Indexer {
             .getCapability<&InscriptionIndexer{IndexerPublic}>(self.IndexerPublicPath)
             .borrow()
         return cap ?? panic("Could not borrow InscriptionIndexer")
+    }
+
+    /// Helper method to get FlowToken receiver
+    ///
+    access(all)
+    fun borrowFlowTokenReceiver(
+        _ addr: Address
+    ): &FlowToken.Vault{FungibleToken.Receiver}? {
+        let cap = getAccount(addr)
+            .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+        return cap.borrow()
     }
 
     init() {
