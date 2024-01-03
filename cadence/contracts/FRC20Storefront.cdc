@@ -16,6 +16,7 @@ pub contract FRC20Storefront {
         storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
+        inscriptionId: UInt64,
         type: UInt8,
         tick: String,
         amount: UFix64,
@@ -26,6 +27,7 @@ pub contract FRC20Storefront {
     pub event ListingCompleted(
         storefrontId: UInt64,
         listingResourceID: UInt64,
+        inscriptionId: UInt64,
         type: UInt8,
         tick: String,
         amount: UFix64,
@@ -34,7 +36,23 @@ pub contract FRC20Storefront {
         commissionAmount: UFix64,
         commissionReceiver: Address?,
     )
-    pub event ListingCancelled()
+    pub event ListingCancelled(
+        storefrontId: UInt64,
+        listingResourceID: UInt64,
+        inscriptionId: UInt64,
+        type: UInt8,
+        tick: String,
+        amount: UFix64,
+        price: UFix64,
+        customID: String?,
+    )
+    pub event ListingRemoved(
+        storefrontId: UInt64,
+        listingResourceID: UInt64,
+        inscriptionId: UInt64,
+        customID: String?,
+        withStatus: UInt8,
+    )
 
     /// UnpaidReceiver
     /// A entitled receiver has not been paid during the sale of the NFT.
@@ -68,6 +86,8 @@ pub contract FRC20Storefront {
         access(all)
         let storefrontId: UInt64
         access(all)
+        let inscriptionId: UInt64
+        access(all)
         let type: ListingType
         access(all)
         let tick: String
@@ -94,6 +114,7 @@ pub contract FRC20Storefront {
         ///
         init (
             storefrontId: UInt64,
+            inscriptionId: UInt64,
             type: ListingType,
             tick: String,
             amount: UFix64,
@@ -106,6 +127,7 @@ pub contract FRC20Storefront {
             }
 
             self.storefrontId = storefrontId
+            self.inscriptionId = inscriptionId
             self.type = type
             self.tick = tick
             self.amount = amount
@@ -198,10 +220,14 @@ pub contract FRC20Storefront {
         access(all) view
         fun getDetails(): ListingDetails
 
+        /// Fetches the status
+        access(all) view
+        fun getStatus(): ListingStatus
+
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
         access(all) view
-        fun getAllowedCommissionReceivers(): [Capability<&{FungibleToken.Receiver}>]?
+        fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
 
         /// Purchase the listing, buying the token.
         /// This pays the beneficiaries and returns the token to the buyer.
@@ -243,7 +269,7 @@ pub contract FRC20Storefront {
         /// An optional list of marketplaces capabilities that are approved
         /// to receive the marketplace commission.
         access(contract)
-        let commissionRecipientCaps: [Capability<&{FungibleToken.Receiver}>]?
+        let commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
         /// The frozen change for this listing.
         access(contract)
         var frozenChange: @FRC20FTShared.Change?
@@ -253,7 +279,7 @@ pub contract FRC20Storefront {
         init (
             storefrontId: UInt64,
             listIns: &Fixes.Inscription,
-            commissionRecipientCaps: [Capability<&{FungibleToken.Receiver}>]?,
+            commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
             customID: String?
         ) {
             // set the inscription id
@@ -291,6 +317,7 @@ pub contract FRC20Storefront {
             // Store the list information
             self.details = ListingDetails(
                 storefrontId: storefrontId,
+                inscriptionId: self.inscriptionId,
                 type: listType,
                 tick: order?.tick ?? panic("Unable to fetch the tick"),
                 amount: order?.amount ?? panic("Unable to fetch the amount"),
@@ -338,7 +365,13 @@ pub contract FRC20Storefront {
                 ?? panic("Unable to fetch the token meta")
         }
 
-        /// getDetails
+        /// Fetches the status
+        ///
+        access(all) view
+        fun getStatus(): ListingStatus {
+            return self.details.status
+        }
+
         /// Get the details of listing.
         ///
         access(all) view
@@ -350,7 +383,7 @@ pub contract FRC20Storefront {
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
         access(all) view
-        fun getAllowedCommissionReceivers(): [Capability<&{FungibleToken.Receiver}>]? {
+        fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]? {
             return self.commissionRecipientCaps
         }
 
@@ -373,14 +406,14 @@ pub contract FRC20Storefront {
             // Make sure the listing cannot be completed again.
             self.details.setToCompleted()
 
-            // The indexer for all the FRC20 tokens.
-            let frc20Indexer = FRC20Indexer.getIndexer()
-
             // just check if the inscription is valid, the further check will be done in applyListedOrder
             assert(
-                frc20Indexer.isValidFRC20Inscription(ins: ins),
+                FRC20Storefront.isListFRC20Inscription(ins: ins),
                 message: "Given inscription is not a valid FRC20 listing inscription"
             )
+
+            // The indexer for all the FRC20 tokens.
+            let frc20Indexer = FRC20Indexer.getIndexer()
             // The payment vault for the sale.
             let paymentChange <- frc20Indexer.extractFlowVaultChangeFromInscription(ins, amount: self.details.price)
 
@@ -401,7 +434,7 @@ pub contract FRC20Storefront {
             )
 
             // apply the change and both inscriptions in frc20 indexer
-            frc20Indexer.applyListedOrder(
+            frc20Indexer.applyBuyNowOrder(
                 makerIns: self.borrowInspection(),
                 takerIns: ins,
                 change: <- (frc20TokenChange ?? panic("Unable to extract the change")),
@@ -411,6 +444,7 @@ pub contract FRC20Storefront {
             emit ListingCompleted(
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
+                inscriptionId: self.inscriptionId,
                 type: self.details.type.rawValue,
                 tick: self.details.tick,
                 amount: self.details.amount,
@@ -439,14 +473,14 @@ pub contract FRC20Storefront {
             // Make sure the listing cannot be completed again.
             self.details.setToCompleted()
 
-            // The indexer for all the FRC20 tokens.
-            let frc20Indexer = FRC20Indexer.getIndexer()
-
             // just check if the inscription is valid, the further check will be done in applyListedOrder
             assert(
-                frc20Indexer.isValidFRC20Inscription(ins: ins),
+                FRC20Storefront.isListFRC20Inscription(ins: ins),
                 message: "Given inscription is not a valid FRC20 listing inscription"
             )
+
+            // The indexer for all the FRC20 tokens.
+            let frc20Indexer = FRC20Indexer.getIndexer()
 
             // give the change to the buyer
             var flowTokenChange: @FRC20FTShared.Change? <- nil
@@ -464,26 +498,64 @@ pub contract FRC20Storefront {
                 paymentRecipient: paymentRecipient,
             )
 
-            frc20Indexer.applyListedOrder(
+            frc20Indexer.applySellNowOrder(
                 makerIns: self.borrowInspection(),
-                takerIns: ins,
-                change: nil
+                takerIns: ins
             )
 
-
+            // emit ListingCompleted event
+            emit ListingCompleted(
+                storefrontId: self.details.storefrontId,
+                listingResourceID: self.uuid,
+                inscriptionId: self.inscriptionId,
+                type: self.details.type.rawValue,
+                tick: self.details.tick,
+                amount: self.details.amount,
+                price: self.details.price,
+                customID: self.details.customID,
+                commissionAmount: commissionAmount,
+                commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
+            )
         }
 
-        /** ---- Account methods ---- */
+        /** ---- Account or contract methods ---- */
 
-        access(account)
-        fun cancel(): @FRC20FTShared.Change {
+        access(contract)
+        fun cancel() {
             pre {
                 self.details.status == ListingStatus.Available: "Listing must be available"
                 self.owner != nil : "Resource doesn't have the assigned owner"
             }
-            // TODO
 
-            return <- nil
+            self.details.setToCancelled()
+
+            // The indexer for all the FRC20 tokens.
+            let frc20Indexer = FRC20Indexer.getIndexer()
+
+            var changeToReturn: @FRC20FTShared.Change? <- nil
+            changeToReturn <-> self.frozenChange
+
+            assert(
+                changeToReturn != nil,
+                message: "Frozen change should not be nil"
+            )
+
+            // apply the change and rollback inscriptions in frc20 indexer
+            frc20Indexer.cancelListing(
+                listedIns: self.borrowInspection(),
+                change: <- (changeToReturn ?? panic("Unable to extract the change"))
+            )
+
+            emit ListingCancelled(
+                storefrontId: self.details.storefrontId,
+                listingResourceID: self.uuid,
+                inscriptionId: self.inscriptionId,
+                type: self.details.type.rawValue,
+                tick: self.details.tick,
+                amount: self.details.amount,
+                price: self.details.price,
+                customID: self.details.customID,
+            )
         }
 
         /// borrow the inscription reference
@@ -552,7 +624,7 @@ pub contract FRC20Storefront {
             // Rather than aborting the transaction if any receiver is absent when we try to pay it,
             // we send the cut to the token or platform treasury, and emit an event to let the
             // receiver know that they have unclaimed funds.
-            var residualReceiver: &{FungibleToken.Receiver}? = nil
+            var residualReceiver: &FlowToken.Vault{FungibleToken.Receiver}? = nil
 
             // The commission amount
             var commissionAmount = 0.0
@@ -637,16 +709,17 @@ pub contract FRC20Storefront {
         /// createListing
         /// Allows the Storefront owner to create and insert Listings.
         ///
-        pub fun createListing(
+        access(all)
+        fun createListing(
             ins: @Fixes.Inscription,
-            commissionRecipientCaps: [Capability<&{FungibleToken.Receiver}>]?,
+            commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
             customID: String?
         ): UInt64
 
-        /// removeListing
         /// Allows the Storefront owner to remove any sale listing, accepted or not.
         ///
-        pub fun removeListing(listingResourceID: UInt64)
+        access(all)
+        fun removeListing(listingResourceID: UInt64)
     }
 
     /// StorefrontPublic
@@ -661,9 +734,7 @@ pub contract FRC20Storefront {
         fun borrowListing(listingResourceID: UInt64): &Listing{ListingPublic}?
         // Cleanup methods
         access(all)
-        fun cleanupPurchasedListings(listingResourceID: UInt64)
-        access(all)
-        fun cleanupGhostListings(listingResourceID: UInt64)
+        fun cleanupFinishedListings(listingResourceID: UInt64)
         /** ---- Contract Methods ---- */
         /// borrow the inscription reference
         access(contract)
@@ -709,14 +780,16 @@ pub contract FRC20Storefront {
         /// getListingIDs
         /// Returns an array of the Listing resource IDs that are in the collection
         ///
-        pub fun getListingIDs(): [UInt64] {
+        access(all)
+        fun getListingIDs(): [UInt64] {
             return self.listings.keys
         }
 
         /// borrowSaleItem
         /// Returns a read-only view of the SaleItem for the given listingID if it is contained by this collection.
         ///
-        pub fun borrowListing(listingResourceID: UInt64): &Listing{ListingPublic}? {
+        access(all)
+        fun borrowListing(listingResourceID: UInt64): &Listing{ListingPublic}? {
              if self.listings[listingResourceID] != nil {
                 return &self.listings[listingResourceID] as &Listing{ListingPublic}?
             } else {
@@ -729,9 +802,10 @@ pub contract FRC20Storefront {
         /// insert
         /// Create and publish a Listing for an NFT.
         ///
-         pub fun createListing(
+        access(all)
+        fun createListing(
             ins: @Fixes.Inscription,
-            commissionRecipientCaps: [Capability<&{FungibleToken.Receiver}>]?,
+            commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
             customID: String?
          ): UInt64 {
             pre {
@@ -781,6 +855,7 @@ pub contract FRC20Storefront {
                 storefrontAddress: self.owner?.address ?? panic("Storefront owner is not set"),
                 storefrontId: self.uuid,
                 listingResourceID: listingResourceID,
+                inscriptionId: details.inscriptionId,
                 type: details.type.rawValue,
                 tick: details.tick,
                 amount: details.amount,
@@ -792,54 +867,66 @@ pub contract FRC20Storefront {
             return listingResourceID
         }
 
-        /// removeListing
         /// Remove a Listing that has not yet been purchased from the collection and destroy it.
         /// It can only be executed by the StorefrontManager resource owner.
         ///
-        pub fun removeListing(listingResourceID: UInt64) {
+        access(all)
+        fun removeListing(listingResourceID: UInt64) {
+            let listingRef = self.borrowListingPrivate(listingResourceID)
+
+            let currentStatus: FRC20Storefront.ListingStatus = listingRef.getStatus()
+            // If the listing is already completed, then we don't need to do anything.
+            if currentStatus == ListingStatus.Available {
+                listingRef.cancel()
+            } else if currentStatus == ListingStatus.Cancelled {
+                // If the listing is already cancelled, then we don't need to do anything.
+            } else if currentStatus == ListingStatus.Completed {
+                // If the listing is already completed, then we don't need to do anything.
+            }
+
+            // ensure the change in listing is nil
+            assert(
+                listingRef.frozenChange == nil,
+                message: "Listing change should be nil"
+            )
+
             let listing <- self.listings.remove(key: listingResourceID)
                 ?? panic("missing Listing")
-            let listingDetails = listing.getDetails()
-
-            // TODO: a lot of remove lising logic
-
-            // This will emit a ListingCompleted event.
-            destroy listing
-        }
-
-        /// cleanupPurchasedListings
-        /// Allows anyone to remove already purchased listings.
-        ///
-        pub fun cleanupPurchasedListings(listingResourceID: UInt64) {
-            pre {
-                self.listings[listingResourceID] != nil: "could not find listing with given id"
-                self.borrowListing(listingResourceID: listingResourceID)!.getDetails().isCompleted() == true: "listing not purchased yet"
-            }
-            let listing <- self.listings.remove(key: listingResourceID)!
             let details = listing.getDetails()
 
-            // TODO: a lot of remove lising logic
+            emit ListingRemoved(
+                storefrontId: self.uuid,
+                listingResourceID: listingResourceID,
+                inscriptionId: details.inscriptionId,
+                customID: details.customID,
+                withStatus: currentStatus.rawValue
+            )
 
             destroy listing
         }
 
-        /// cleanupGhostListings
-        /// Allow anyone to cleanup ghost listings
-        /// Listings will become ghost listings if stored provider capability doesn't hold
-        /// the NFT anymore.
+        /// Allows anyone to remove already completed listings.
         ///
-        /// @param listingResourceID ID of the listing resource which would get removed if it become ghost listing.
-        pub fun cleanupGhostListings(listingResourceID: UInt64) {
-            pre {
-                self.listings[listingResourceID] != nil: "Could not find listing with given id"
-            }
-            let listingRef = self.borrowListing(listingResourceID: listingResourceID)!
+        access(all)
+        fun cleanupFinishedListings(listingResourceID: UInt64) {
+            let listingRef = self.borrowListing(listingResourceID: listingResourceID)
+                ?? panic("Could not find listing with given id")
             let details = listingRef.getDetails()
-            assert(!details.isCompleted(), message: "Given listing is already purchased")
-            // assert(!listingRef.hasListingBecomeGhosted(), message: "Listing is not ghost listing")
+
+            assert(
+                details.isCompleted() || details.isCancelled(),
+                message: "Given listing is not completed or cancelled"
+            )
+
             let listing <- self.listings.remove(key: listingResourceID)!
 
-            // TODO: a lot of remove lising logic
+            emit ListingRemoved(
+                storefrontId: self.uuid,
+                listingResourceID: listingResourceID,
+                inscriptionId: details.inscriptionId,
+                customID: details.customID,
+                withStatus: details.status.rawValue
+            )
 
             destroy listing
         }
@@ -851,6 +938,13 @@ pub contract FRC20Storefront {
         access(contract)
         fun borrowInspection(_ id: UInt64): &Fixes.Inscription {
             return &self.inscriptions[id] as &Fixes.Inscription? ?? panic("Inscription not found")
+        }
+
+        /// borrow the listing reference
+        ///
+        access(contract)
+        fun borrowListingPrivate(_ id: UInt64): &Listing {
+            return &self.listings[id] as &Listing? ?? panic("Listing not found")
         }
     }
 

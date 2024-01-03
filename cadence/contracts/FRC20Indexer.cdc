@@ -162,6 +162,9 @@ pub contract FRC20Indexer {
         /// Apply a listed order, maker and taker should be the same token and the same amount
         access(account)
         fun applySellNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription)
+        /// Cancel a listed order
+        access(account)
+        fun cancelListing(listedIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -816,6 +819,13 @@ pub contract FRC20Indexer {
         access(account)
         fun applySellNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription) {
             // TODO
+        }
+
+        /// Cancel a listed order
+        access(account)
+        fun cancelListing(listedIns: &Fixes.Inscription, change: @FRC20FTShared.Change) {
+            // TODO
+            destroy change
         }
 
         /// Extract a part of the inscription's value to a FRC20 token change
