@@ -906,12 +906,27 @@ pub contract FRC20Indexer {
                 meta["op"]?.slice(from: 0, upTo: 5) == "list-" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
             )
+            let fromAddr = listedIns.owner!.address
             assert(
-                listedIns.owner!.address == change.from,
+                fromAddr == change.from,
                 message: "The listed owner should be the same as the change from address"
             )
 
             let tick = self._parseTickerName(meta)
+            if change.isBackedByVault() {
+                // deposit the token change return to change's from address
+                let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
+                    ?? panic("The flow receiver no found")
+                let flowVault <- change.extractAsVault()
+                assert(
+                    flowVault.getType() == Type<@FlowToken.Vault>(),
+                    message: "The change should be a flow token vault"
+                )
+                flowReceiver.deposit(from: <- (flowVault as! @FlowToken.Vault))
+                destroy change
+            } else {
+                self._depositFromTokenChange(change: <- change, to: fromAddr)
+            }
         }
 
         /// Extract a part of the inscription's value to a FRC20 token change
