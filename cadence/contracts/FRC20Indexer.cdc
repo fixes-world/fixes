@@ -912,11 +912,12 @@ pub contract FRC20Indexer {
                 message: "The listed owner should be the same as the change from address"
             )
 
+            // deposit the token change return to change's from address
+            let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
+                ?? panic("The flow receiver no found")
+
             let tick = self._parseTickerName(meta)
             if change.isBackedByVault() {
-                // deposit the token change return to change's from address
-                let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
-                    ?? panic("The flow receiver no found")
                 let flowVault <- change.extractAsVault()
                 assert(
                     flowVault.getType() == Type<@FlowToken.Vault>(),
@@ -927,6 +928,9 @@ pub contract FRC20Indexer {
             } else {
                 self._depositFromTokenChange(change: <- change, to: fromAddr)
             }
+
+            // extract inscription and return flow in the inscription to the owner
+            flowReceiver.deposit(from: <- listedIns.extract())
         }
 
         /// Extract a part of the inscription's value to a FRC20 token change

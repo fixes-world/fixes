@@ -286,6 +286,7 @@ pub contract FRC20Storefront {
             self.inscriptionId = listIns.getId()
             // Store the commission recipients capability
             self.commissionRecipientCaps = commissionRecipientCaps
+            // TODO: check the commission recipients address before storing them
 
             // Analyze the listing inscription and build the details
             let indexer = FRC20Indexer.getIndexer()
@@ -723,7 +724,7 @@ pub contract FRC20Storefront {
         /// Allows the Storefront owner to remove any sale listing, accepted or not.
         ///
         access(all)
-        fun removeListing(listingResourceID: UInt64)
+        fun removeListing(listingResourceID: UInt64): @Fixes.Inscription
     }
 
     /// StorefrontPublic
@@ -875,7 +876,7 @@ pub contract FRC20Storefront {
         /// It can only be executed by the StorefrontManager resource owner.
         ///
         access(all)
-        fun removeListing(listingResourceID: UInt64) {
+        fun removeListing(listingResourceID: UInt64): @Fixes.Inscription {
             let listingRef = self.borrowListingPrivate(listingResourceID)
 
             let currentStatus: FRC20Storefront.ListingStatus = listingRef.getStatus()
@@ -907,6 +908,9 @@ pub contract FRC20Storefront {
             )
 
             destroy listing
+
+            // return the inscription
+            return <- self.inscriptions.remove(key: details.inscriptionId)!
         }
 
         /// Allows anyone to remove already completed listings.
@@ -931,8 +935,11 @@ pub contract FRC20Storefront {
                 customID: details.customID,
                 withStatus: details.status.rawValue
             )
-
+            // destroy listing
             destroy listing
+            // destory the inscription
+            let ins <- self.inscriptions.remove(key: details.inscriptionId)
+            destroy ins
         }
 
         /** ---- Internal Method ---- */
