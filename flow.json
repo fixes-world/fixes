@@ -91,6 +91,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20Marketplace": {
+			"source": "cadence/contracts/FRC20Marketplace.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
@@ -295,7 +303,8 @@
 				"FRC20FTShared",
 				"FRC20FungibleToken",
 				"FRC20Storefront",
-				"FRC20AccountsPool"
+				"FRC20AccountsPool",
+				"FRC20Marketplace"
 			]
 		},
 		"mainnet": {

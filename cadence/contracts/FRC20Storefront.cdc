@@ -451,7 +451,7 @@ pub contract FRC20Storefront {
                 change: <- (frc20TokenChange ?? panic("Unable to extract the change")),
             )
 
-            // TODO: Record the transction record
+            // TODO: Record the transction record and trading Volume, using Hooks model
 
             // emit ListingCompleted event
             emit ListingCompleted(
@@ -516,7 +516,7 @@ pub contract FRC20Storefront {
                 takerIns: ins
             )
 
-            // TODO: Record the transction record
+            // TODO: Record the transction record and trading Volume, using Hooks model
 
             // emit ListingCompleted event
             emit ListingCompleted(
@@ -766,7 +766,7 @@ pub contract FRC20Storefront {
         fun borrowListing(_ listingResourceID: UInt64): &Listing{ListingPublic}?
         // Cleanup methods
         access(all)
-        fun cleanupFinishedListings(_ listingResourceID: UInt64)
+        fun cleanupFinishedListing(_ listingResourceID: UInt64)
         /** ---- Contract Methods ---- */
         /// borrow the inscription reference
         access(contract)
@@ -943,7 +943,7 @@ pub contract FRC20Storefront {
         /// Allows anyone to remove already completed listings.
         ///
         access(all)
-        fun cleanupFinishedListings(_ listingResourceID: UInt64) {
+        fun cleanupFinishedListing(_ listingResourceID: UInt64) {
             let listingRef = self.borrowListing(listingResourceID)
                 ?? panic("Could not find listing with given id")
             let details = listingRef.getDetails()
