@@ -4,7 +4,6 @@ import "FungibleToken"
 import "FungibleTokenMetadataViews"
 import "FlowToken"
 import "HybridCustody"
-
 // Fixes imports
 // import "Fixes"
 // import "FRC20FTShared"
@@ -31,7 +30,7 @@ pub contract FRC20AccountsPool {
 
     /// The public interface can be accessed by anyone
     ///
-    pub resource interface ManagerPublic {
+    pub resource interface PoolPublic {
         /// ---- Getters ----
         /// Returns the address of the FRC20 market for the given tick
         access(all) view
@@ -46,11 +45,13 @@ pub contract FRC20AccountsPool {
         access(all)
         fun borrowFRC20StakingFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
         /// ----- Access account methods -----
+        access(account)
+        fun borrowChildAccount(type: ChildAccountType, tick: String): &AuthAccount?
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
     ///
-    pub resource interface ManagerAdmin {
+    pub resource interface PoolAdmin {
         /// Sets up a new child account
         access(all)
         fun setupNewChild(
@@ -60,7 +61,7 @@ pub contract FRC20AccountsPool {
         )
     }
 
-    pub resource AccountManager: ManagerPublic, ManagerAdmin {
+    pub resource Pool: PoolPublic, PoolAdmin {
         access(self)
         let hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
         access(self)
@@ -103,6 +104,21 @@ pub contract FRC20AccountsPool {
         fun borrowFRC20StakingFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}? {
             if let addr = self.getFRC20StakingAddress(tick: tick) {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
+            }
+            return nil
+        }
+
+        /// ----- Access account methods -----
+        /// Borrow child's AuthAccount
+        ///
+        access(account)
+        fun borrowChildAccount(type: ChildAccountType, tick: String): &AuthAccount? {
+            let tickDict = self.borrowTickDict(type: type)
+            if let childAddr = tickDict[tick] {
+                let hcManagerRef = self.hcManagerCap.borrow() ?? panic("Failed to borrow hcManager")
+                if let ownedChild = hcManagerRef.borrowOwnedAccount(addr: childAddr) {
+                    return ownedChild.borrowAccount()
+                }
             }
             return nil
         }
@@ -201,10 +217,46 @@ pub contract FRC20AccountsPool {
         }
     }
 
+    /* --- Public Methods --- */
+
+    /// Returns the public account manager interface
+    ///
+    access(all)
+    fun borrowAccountsPool(): &Pool{PoolPublic} {
+        return self.account
+            .getCapability<&Pool{PoolPublic}>(self.AccountsPoolPublicPath)
+            .borrow()
+            ?? panic("Could not borrow accounts pool reference")
+    }
+
     init() {
         let identifier = "FRC20AccountsPool_".concat(self.account.address.toString())
         self.AccountsPoolStoragePath = StoragePath(identifier: identifier)!
         self.AccountsPoolPublicPath = PublicPath(identifier: identifier)!
+
+        // create account manager with hybrid custody manager capability
+        if self.account.borrow<&HybridCustody.Manager>(from: HybridCustody.ManagerStoragePath) == nil {
+            let m <- HybridCustody.createManager(filter: nil)
+            self.account.save(<- m, to: HybridCustody.ManagerStoragePath)
+        }
+
+        // reset account manager paths
+        self.account.unlink(HybridCustody.ManagerPublicPath)
+        self.account.link<&HybridCustody.Manager{HybridCustody.ManagerPublic}>(HybridCustody.ManagerPublicPath, target: HybridCustody.ManagerStoragePath)
+
+        self.account.unlink(HybridCustody.ManagerPrivatePath)
+        let cap = self.account
+            .link<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>(
+                HybridCustody.ManagerPrivatePath,
+                target: HybridCustody.ManagerStoragePath
+            )
+            ?? panic("failed to link account manager capability")
+
+        // init account manager
+        let acctPool <- create Pool(cap)
+        self.account.save(<- acctPool, to: self.AccountsPoolStoragePath)
+        // link public capability
+        self.account.link<&Pool{PoolPublic}>(self.AccountsPoolPublicPath, target: self.AccountsPoolStoragePath)
 
         emit ContractInitialized()
     }
