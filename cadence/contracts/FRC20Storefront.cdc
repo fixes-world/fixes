@@ -263,9 +263,6 @@ pub contract FRC20Storefront {
         /// The simple (non-Capability, non-complex) details of the sale
         access(self)
         let details: ListingDetails
-        /// The inscriptions reference
-        access(contract)
-        let inscriptionId: UInt64
         /// An optional list of marketplaces capabilities that are approved
         /// to receive the marketplace commission.
         access(contract)
@@ -282,8 +279,6 @@ pub contract FRC20Storefront {
             commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
             customID: String?
         ) {
-            // set the inscription id
-            self.inscriptionId = listIns.getId()
             // Store the commission recipients capability
             self.commissionRecipientCaps = commissionRecipientCaps
             // TODO: check the commission recipients address before storing them
@@ -318,7 +313,7 @@ pub contract FRC20Storefront {
             // Store the list information
             self.details = ListingDetails(
                 storefrontId: storefrontId,
-                inscriptionId: self.inscriptionId,
+                inscriptionId: listIns.getId(),
                 type: listType,
                 tick: order?.tick ?? panic("Unable to fetch the tick"),
                 amount: order?.amount ?? panic("Unable to fetch the amount"),
@@ -447,7 +442,7 @@ pub contract FRC20Storefront {
             emit ListingCompleted(
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
-                inscriptionId: self.inscriptionId,
+                inscriptionId: self.details.inscriptionId,
                 type: self.details.type.rawValue,
                 tick: self.details.tick,
                 amount: self.details.amount,
@@ -512,7 +507,7 @@ pub contract FRC20Storefront {
             emit ListingCompleted(
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
-                inscriptionId: self.inscriptionId,
+                inscriptionId: self.details.inscriptionId,
                 type: self.details.type.rawValue,
                 tick: self.details.tick,
                 amount: self.details.amount,
@@ -554,7 +549,7 @@ pub contract FRC20Storefront {
             emit ListingCancelled(
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
-                inscriptionId: self.inscriptionId,
+                inscriptionId: self.details.inscriptionId,
                 type: self.details.type.rawValue,
                 tick: self.details.tick,
                 amount: self.details.amount,
@@ -567,7 +562,7 @@ pub contract FRC20Storefront {
         ///
         access(contract)
         fun borrowInspection(): &Fixes.Inscription {
-            return self._borrowStorefront().borrowInspection(self.inscriptionId)
+            return self._borrowStorefront().borrowInspection(self.details.inscriptionId)
         }
 
         /* ---- Internal methods ---- */
