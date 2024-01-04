@@ -82,7 +82,7 @@ pub contract FRC20Storefront {
     /// A struct containing a Listing's data.
     ///
     pub struct ListingDetails {
-        // constants
+        // constants data values
         access(all)
         let storefrontId: UInt64
         access(all)
@@ -93,12 +93,15 @@ pub contract FRC20Storefront {
         let tick: String
         access(all)
         let amount: UFix64
-        access(all)
-        let price: UFix64
         /// Sale cuts
         access(all)
         let saleCuts: [FRC20FTShared.SaleCut]
-        /// Expiry of listing
+        // Calculated values
+        access(all)
+        let price: UFix64
+        access(all)
+        let priceValuePerMint: UFix64
+        /// Created time of the listing
         access(all)
         let createdAt: UInt64
         // variables
@@ -124,7 +127,10 @@ pub contract FRC20Storefront {
             pre {
                 // Validate the length of the sale cut
                 saleCuts.length > 0: "Listing must have at least one payment cut recipient"
+                amount > 0.0: "Listing must have non-zero amount"
             }
+            let tokenMeta = FRC20Indexer.getIndexer().getTokenMeta(tick: tick)
+                ?? panic("Unable to fetch the token meta")
 
             self.storefrontId = storefrontId
             self.inscriptionId = inscriptionId
@@ -154,6 +160,14 @@ pub contract FRC20Storefront {
 
             // Store the calculated sale price
             self.price = salePrice
+            // Store the calculated price value per mint
+            self.priceValuePerMint = salePrice / amount * tokenMeta.limit
+        }
+
+        /// Get the price rank
+        access(all)
+        fun priceRank(): UInt64 {
+            return UInt64(self.price * 100000.0)
         }
 
         /// Return if the listing is completed.
