@@ -758,13 +758,15 @@ pub contract FRC20Storefront {
     ///
     pub resource interface StorefrontPublic {
         /** ---- Public Methods ---- */
+        /// get all listingIDs
         access(all)
         fun getListingIDs(): [UInt64]
+        // Borrow the listing reference
         access(all)
-        fun borrowListing(listingResourceID: UInt64): &Listing{ListingPublic}?
+        fun borrowListing(_ listingResourceID: UInt64): &Listing{ListingPublic}?
         // Cleanup methods
         access(all)
-        fun cleanupFinishedListings(listingResourceID: UInt64)
+        fun cleanupFinishedListings(_ listingResourceID: UInt64)
         /** ---- Contract Methods ---- */
         /// borrow the inscription reference
         access(contract)
@@ -819,7 +821,7 @@ pub contract FRC20Storefront {
         /// Returns a read-only view of the SaleItem for the given listingID if it is contained by this collection.
         ///
         access(all)
-        fun borrowListing(listingResourceID: UInt64): &Listing{ListingPublic}? {
+        fun borrowListing(_ listingResourceID: UInt64): &Listing{ListingPublic}? {
              if self.listings[listingResourceID] != nil {
                 return &self.listings[listingResourceID] as &Listing{ListingPublic}?
             } else {
@@ -941,8 +943,8 @@ pub contract FRC20Storefront {
         /// Allows anyone to remove already completed listings.
         ///
         access(all)
-        fun cleanupFinishedListings(listingResourceID: UInt64) {
-            let listingRef = self.borrowListing(listingResourceID: listingResourceID)
+        fun cleanupFinishedListings(_ listingResourceID: UInt64) {
+            let listingRef = self.borrowListing(listingResourceID)
                 ?? panic("Could not find listing with given id")
             let details = listingRef.getDetails()
 
