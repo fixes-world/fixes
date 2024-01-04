@@ -42,6 +42,9 @@ pub contract FRC20AccountsPool {
         /// Returns the address of the FRC20 market for the given tick
         access(all) view
         fun getMarketSharedAddress(): Address?
+        /// Returns the addresses of the FRC20 with the given type
+        access(all) view
+        fun getFRC20Addresses(type: ChildAccountType): {String: Address}
         /// Returns the flow token receiver for the given tick
         access(all)
         fun borrowFRC20MarketFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
@@ -117,6 +120,15 @@ pub contract FRC20AccountsPool {
         access(all) view
         fun getMarketSharedAddress(): Address? {
             return self.sharedAddressMappping[ChildAccountType.Market]
+        }
+
+        /// Returns the addresses of the FRC20 with the given type
+        access(all) view
+        fun getFRC20Addresses(type: ChildAccountType): {String: Address} {
+            if let tickDict = self.tickAddressMapping[type] {
+                return tickDict
+            }
+            return {}
         }
 
         /// Returns the flow token receiver for the given tick
