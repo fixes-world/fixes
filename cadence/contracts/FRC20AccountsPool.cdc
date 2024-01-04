@@ -58,18 +58,14 @@ pub contract FRC20AccountsPool {
         /// Borrow child's AuthAccount
         access(account)
         fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount?
+        /// Sets up a new child account
+        access(account)
+        fun setupNewChildForTick(type: ChildAccountType, tick: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
     ///
     pub resource interface PoolAdmin {
-        /// Sets up a new child account
-        access(all)
-        fun setupNewChildForTick(
-            type: ChildAccountType,
-            tick: String,
-            _ acctCap: Capability<&AuthAccount>,
-        )
         /// Sets up a new child account
         access(all)
         fun setupNewChildForShared(
@@ -185,11 +181,9 @@ pub contract FRC20AccountsPool {
             return nil
         }
 
-        /** ---- Admin Methods ---- */
-
         /// Sets up a new child account
         ///
-        access(all)
+        access(account)
         fun setupNewChildForTick(
             type: ChildAccountType,
             tick: String,
@@ -228,6 +222,10 @@ pub contract FRC20AccountsPool {
             )
         }
 
+        /** ---- Admin Methods ---- */
+
+        /// Sets up a new shared child account
+        ///
         access(all)
         fun setupNewChildForShared(
             type: ChildAccountType,
