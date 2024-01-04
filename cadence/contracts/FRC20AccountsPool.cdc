@@ -14,10 +14,11 @@ pub contract FRC20AccountsPool {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     pub event ContractInitialized()
-    /// Event emitted when a new child account is added
-    pub event NewChildAccountAdded(type: UInt8, tick: String, address: Address)
+    /// Event emitted when a new child account is added, if tick is nil, it means the child account is not a shared account
+    pub event NewChildAccountAdded(type: UInt8, address: Address, tick: String?)
 
     /* --- Variable, Enums and Structs --- */
+
     pub let AccountsPoolStoragePath: StoragePath
     pub let AccountsPoolPublicPath: PublicPath
 
@@ -32,21 +33,28 @@ pub contract FRC20AccountsPool {
     ///
     pub resource interface PoolPublic {
         /// ---- Getters ----
-        /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getFRC20MarketAddress(tick: String): Address?
         /// Returns the address of the FRC20 staking for the given tick
         access(all) view
         fun getFRC20StakingAddress(tick: String): Address?
+        /// Returns the address of the FRC20 market for the given tick
+        access(all) view
+        fun getFRC20MarketAddress(tick: String): Address?
+        /// Returns the address of the FRC20 market for the given tick
+        access(all) view
+        fun getMarketSharedAddress(): Address?
         /// Returns the flow token receiver for the given tick
         access(all)
         fun borrowFRC20MarketFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
         /// Returns the flow token receiver for the given tick
         access(all)
         fun borrowFRC20StakingFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
+        /// Returns the address of the FRC20 market for the given tick
+        access(all)
+        fun borrowMarketSharedFlowTokenReceiver(): &FlowToken.Vault{FungibleToken.Receiver}?
         /// ----- Access account methods -----
+        /// Borrow child's AuthAccount
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, tick: String): &AuthAccount?
+        fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount?
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -54,9 +62,15 @@ pub contract FRC20AccountsPool {
     pub resource interface PoolAdmin {
         /// Sets up a new child account
         access(all)
-        fun setupNewChild(
+        fun setupNewChildForTick(
             type: ChildAccountType,
             tick: String,
+            _ acctCap: Capability<&AuthAccount>,
+        )
+        /// Sets up a new child account
+        access(all)
+        fun setupNewChildForShared(
+            type: ChildAccountType,
             _ acctCap: Capability<&AuthAccount>,
         )
     }
@@ -64,14 +78,19 @@ pub contract FRC20AccountsPool {
     pub resource Pool: PoolPublic, PoolAdmin {
         access(self)
         let hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
+        // AccountType -> Tick -> Address
         access(self)
-        let addressMapping: {ChildAccountType: {String: Address}}
+        let tickAddressMapping: {ChildAccountType: {String: Address}}
+        // AccountType -> Address
+        access(self)
+        let sharedAddressMappping: {ChildAccountType: Address}
 
         init(
             _ hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
         ) {
             self.hcManagerCap = hcManagerCap
-            self.addressMapping = {}
+            self.tickAddressMapping = {}
+            self.sharedAddressMappping = {}
         }
 
         /** ---- Public Methods ---- */
@@ -79,15 +98,25 @@ pub contract FRC20AccountsPool {
         /// Returns the address of the FRC20 market for the given tick
         access(all) view
         fun getFRC20MarketAddress(tick: String): Address? {
-            let tickDict = self.borrowTickDict(type: ChildAccountType.Market)
-            return tickDict[tick]
+            if let tickDict = self.borrowTickDict(type: ChildAccountType.Market) {
+                return tickDict[tick]
+            }
+            return nil
         }
 
         /// Returns the address of the FRC20 staking for the given tick
         access(all) view
         fun getFRC20StakingAddress(tick: String): Address? {
-            let tickDict = self.borrowTickDict(type: ChildAccountType.Staking)
-            return tickDict[tick]
+            if let tickDict = self.borrowTickDict(type: ChildAccountType.Staking) {
+                return tickDict[tick]
+            }
+            return nil
+        }
+
+        /// Returns the address of the FRC20 market for the given tick
+        access(all) view
+        fun getMarketSharedAddress(): Address? {
+            return self.sharedAddressMappping[ChildAccountType.Market]
         }
 
         /// Returns the flow token receiver for the given tick
@@ -108,16 +137,37 @@ pub contract FRC20AccountsPool {
             return nil
         }
 
+        /// Returns the address of the FRC20 market for the given tick
+        access(all)
+        fun borrowMarketSharedFlowTokenReceiver(): &FlowToken.Vault{FungibleToken.Receiver}? {
+            if let addr = self.getMarketSharedAddress() {
+                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+            }
+            return nil
+        }
+
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         ///
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, tick: String): &AuthAccount? {
-            let tickDict = self.borrowTickDict(type: type)
-            if let childAddr = tickDict[tick] {
-                let hcManagerRef = self.hcManagerCap.borrow() ?? panic("Failed to borrow hcManager")
-                if let ownedChild = hcManagerRef.borrowOwnedAccount(addr: childAddr) {
-                    return ownedChild.borrowAccount()
+        fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount? {
+            let hcManagerRef = self.hcManagerCap.borrow()
+                ?? panic("Failed to borrow hcManager")
+            if let tickSpecified = tick {
+                let tickDict = self.borrowTickDict(type: type)
+                if tickDict == nil {
+                    return nil
+                }
+                if let childAddr = tickDict![tickSpecified] {
+                    if let ownedChild = hcManagerRef.borrowOwnedAccount(addr: childAddr) {
+                        return ownedChild.borrowAccount()
+                    }
+                }
+            } else {
+                if let sharedAddr = self.sharedAddressMappping[type] {
+                    if let ownedChild = hcManagerRef.borrowOwnedAccount(addr: sharedAddr) {
+                        return ownedChild.borrowAccount()
+                    }
                 }
             }
             return nil
@@ -128,7 +178,7 @@ pub contract FRC20AccountsPool {
         /// Sets up a new child account
         ///
         access(all)
-        fun setupNewChild(
+        fun setupNewChildForTick(
             type: ChildAccountType,
             tick: String,
             _ childAcctCap: Capability<&AuthAccount>,
@@ -136,13 +186,9 @@ pub contract FRC20AccountsPool {
             pre {
                 childAcctCap.check(): "Child account capability is invalid"
             }
+            self._ensureTypeDictExists(type)
 
-            // ensure type dict was initialized
-            if self.addressMapping[type] == nil {
-                self.addressMapping[type] = {}
-            }
-
-            let tickDict = self.borrowTickDict(type: type)
+            let tickDict = self.borrowTickDict(type: type) ?? panic("Failed to borrow tick dict")
             assert(
                 tickDict[tick] == nil,
                 message: "Child account already exists"
@@ -160,6 +206,48 @@ pub contract FRC20AccountsPool {
             tickDict[tick] = childAcctCap.address
 
             // setup new child account
+            self._setupChildAccount(childAcctCap)
+
+            // emit event
+            emit NewChildAccountAdded(
+                type: type.rawValue,
+                address: childAcctCap.address,
+                tick: tick,
+            )
+        }
+
+        access(all)
+        fun setupNewChildForShared(
+            type: ChildAccountType,
+            _ childAcctCap: Capability<&AuthAccount>,
+        ) {
+            pre {
+                childAcctCap.check(): "Child account capability is invalid"
+                self.sharedAddressMappping[type] == nil: "Shared child account already exists"
+            }
+
+            self.sharedAddressMappping[type] = childAcctCap.address
+
+            // setup new child account
+            self._setupChildAccount(childAcctCap)
+
+            // emit event
+            emit NewChildAccountAdded(
+                type: type.rawValue,
+                address: childAcctCap.address,
+                tick: nil,
+            )
+        }
+
+        /** ---- Internal Methods ---- */
+
+        /// Sets up a new child account
+        ///
+        access(self)
+        fun _setupChildAccount(
+            _ childAcctCap: Capability<&AuthAccount>,
+        ) {
+
             let hcManager = self.hcManagerCap.borrow() ?? panic("Failed to borrow hcManager")
             let hcManagerAddr = self.hcManagerCap.address
 
@@ -168,7 +256,6 @@ pub contract FRC20AccountsPool {
                 ?? panic("Failed to borrow child account")
 
             // >>> [1] Child: createOwnedAccount
-
             if child.borrow<&HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath) == nil {
                 let ownedAccount <- HybridCustody.createOwnedAccount(acct: childAcctCap)
                 child.save(<-ownedAccount, to: HybridCustody.OwnedAccountStoragePath)
@@ -199,21 +286,22 @@ pub contract FRC20AccountsPool {
                 ) ?? panic("failed to link child account capability")
             // add owned account to manager
             hcManager.addOwnedAccount(cap: ownedPrivCap)
-
-            // emit event
-            emit NewChildAccountAdded(
-                type: type.rawValue,
-                tick: tick,
-                address: childAcctCap.address
-            )
         }
 
-        /** ---- Internal Methods ---- */
-
+        /// Borrow tick dict
+        ///
         access(self)
-        fun borrowTickDict(type: ChildAccountType): &{String: Address} {
-            return &self.addressMapping[type] as &{String: Address}?
-                ?? panic("Invalid child account type")
+        fun borrowTickDict(type: ChildAccountType): &{String: Address}? {
+            return &self.tickAddressMapping[type] as &{String: Address}?
+        }
+
+        /// ensure type dict exists
+        ///
+        access(self)
+        fun _ensureTypeDictExists(_ type: ChildAccountType) {
+            if self.tickAddressMapping[type] == nil {
+                self.tickAddressMapping[type] = {}
+            }
         }
     }
 

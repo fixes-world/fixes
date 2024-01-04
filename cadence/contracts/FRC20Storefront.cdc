@@ -5,6 +5,7 @@ import "FlowToken"
 import "Fixes"
 import "FRC20FTShared"
 import "FRC20Indexer"
+import "FRC20AccountsPool"
 
 pub contract FRC20Storefront {
 
@@ -590,19 +591,36 @@ pub contract FRC20Storefront {
             commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
             paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
         ): UFix64 {
-            // The indexer for all the FRC20 tokens.
+            // Some singleton resources
             let frc20Indexer = FRC20Indexer.getIndexer()
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let sharedStore = FRC20FTShared.borrowStoreRef()
+
+            // some constants
+            let stakingFRC20Tick = (sharedStore.get("marketplaceStakingFRC20Tick") as! String?) ?? "flows"
+
+            // Token treasuries
+            let tokenTreasury = frc20Indexer.borrowTokenTreasuryReceiver(tick: self.details.tick)
+            let platformTreasury = frc20Indexer.borowPlatformTreasuryReceiver()
 
             // The function to pay to marketplace staking pool
             let payToMarketplaceStakingPool = fun (_ payment: @FungibleToken.Vault) {
-                // TODO: Add to marketplace staking pool
-                destroy payment
+                if let flowVault = acctsPool.borrowFRC20StakingFlowTokenReceiver(tick: stakingFRC20Tick) {
+                    flowVault.deposit(from: <- payment)
+                } else {
+                    // if the staking pool doesn't exist, pay to token treasury
+                    tokenTreasury.deposit(from: <- payment)
+                }
             }
 
             // The function to pay to marketplace campaign pool
             let payToMarketplaceCampaignPool = fun (_ payment: @FungibleToken.Vault) {
-                // TODO: Add to marketplace campaign pool
-                destroy payment
+                if let flowVault = acctsPool.borrowMarketSharedFlowTokenReceiver() {
+                    flowVault.deposit(from: <- payment)
+                } else {
+                    // if the campaign pool doesn't exist, pay to token treasury
+                    tokenTreasury.deposit(from: <- payment)
+                }
             }
 
             // All the commission receivers that are eligible to receive the commission.
@@ -647,7 +665,6 @@ pub contract FRC20Storefront {
             for cut in self.details.saleCuts {
                 switch cut.type {
                 case FRC20FTShared.SaleCutType.TokenTreasury:
-                    let tokenTreasury = frc20Indexer.borrowTokenTreasuryReceiver(tick: self.details.tick)
                     tokenTreasury.deposit(from: <- paymentChange.withdrawAsVault(amount: cut.amount))
                     // If the residual receiver is not set, set it to the token treasury.
                     if residualReceiver == nil {
@@ -655,7 +672,6 @@ pub contract FRC20Storefront {
                     }
                     break
                 case FRC20FTShared.SaleCutType.PlatformTreasury:
-                    let platformTreasury = frc20Indexer.borowPlatformTreasuryReceiver()
                     platformTreasury.deposit(from: <- paymentChange.withdrawAsVault(amount: cut.amount))
                     // If the residual receiver is not set, set it to the token treasury.
                     if residualReceiver == nil {
