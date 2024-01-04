@@ -8,6 +8,14 @@
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
+		"AddressUtils": {
+			"source": "cadence/deps/AddressUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
 		"CapabilityDelegator": {
 			"source": "./cadence/deps/CapabilityDelegator.cdc",
 			"aliases": {
@@ -275,6 +283,7 @@
 				"NFTCatalog",
 				"StringUtils",
 				"ArrayUtils",
+				"AddressUtils",
 				"HybridCustody",
 				"CapabilityDelegator",
 				"CapabilityFilter",
