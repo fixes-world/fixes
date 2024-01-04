@@ -8,6 +8,33 @@
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
+		"CapabilityDelegator": {
+			"source": "./cadence/deps/CapabilityDelegator.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
+			}
+		},
+		"CapabilityFactory": {
+			"source": "./cadence/deps/CapabilityFactory.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
+			}
+		},
+		"CapabilityFilter": {
+			"source": "./cadence/deps/CapabilityFilter.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
+			}
+		},
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
@@ -104,6 +131,15 @@
 				"testnet": "9a0766d93b6608b7"
 			}
 		},
+		"HybridCustody": {
+			"source": "cadence/deps/HybridCustody.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
+			}
+		},
 		"MetadataViews": {
 			"source": "cadence/deps/MetadataViews.cdc",
 			"aliases": {
@@ -183,6 +219,7 @@
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
+		"testing": "127.0.0.1:3569",
 		"mainnet": "access.mainnet.nodes.onflow.org:9000",
 		"testnet": "access.devnet.nodes.onflow.org:9000"
 	},
@@ -238,6 +275,10 @@
 				"NFTCatalog",
 				"StringUtils",
 				"ArrayUtils",
+				"HybridCustody",
+				"CapabilityDelegator",
+				"CapabilityFilter",
+				"CapabilityFactory",
 				"Fixes",
 				"FixesWrappedNFT",
 				"FRC20Indexer",
