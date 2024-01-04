@@ -776,7 +776,7 @@ pub contract FRC20Indexer {
                 change: <- self.extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
             )
             assert(
-                order.change != nil && order.change?.isBackedByVault() == true,
+                order.change != nil && order.change?.isBackedByFlowTokenVault() == true,
                 message: "The 'SellNow' listing change should be backed by a vault"
             )
             assert(
@@ -917,7 +917,7 @@ pub contract FRC20Indexer {
                 ?? panic("The flow receiver no found")
 
             let tick = self._parseTickerName(meta)
-            if change.isBackedByVault() {
+            if change.isBackedByFlowTokenVault() {
                 let flowVault <- change.extractAsVault()
                 assert(
                     flowVault.getType() == Type<@FlowToken.Vault>(),
@@ -925,8 +925,10 @@ pub contract FRC20Indexer {
                 )
                 flowReceiver.deposit(from: <- (flowVault as! @FlowToken.Vault))
                 destroy change
-            } else {
+            } else if !change.isBackedByVault() {
                 self._depositFromTokenChange(change: <- change, to: fromAddr)
+            } else {
+                panic("The change should not be backed by a vault that not a flow token vault")
             }
 
             // extract inscription and return flow in the inscription to the owner

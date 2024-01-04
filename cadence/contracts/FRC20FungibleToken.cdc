@@ -249,8 +249,8 @@ pub contract FRC20FungibleToken: FungibleToken {
         // create the change
         return <- FRC20FTShared.createChange(
             tick: self.getTickerName(),
-            balance: amount,
             from: from,
+            balance: amount,
             ftVault: nil
         )
     }

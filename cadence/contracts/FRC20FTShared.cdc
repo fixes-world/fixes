@@ -99,6 +99,13 @@ pub contract FRC20FTShared {
             return self.ftVault != nil
         }
 
+        /// Check if this Change is backed by a FlowToken Vault
+        ///
+        access(all) view
+        fun isBackedByFlowTokenVault(): Bool {
+            return self.tick == "" && self.isBackedByVault()
+        }
+
         /// Get the type of the Vault
         ///
         access(all) view

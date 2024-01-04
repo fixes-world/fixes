@@ -499,7 +499,7 @@ pub contract FRC20Storefront {
             flowTokenChange <-> self.frozenChange
 
             assert(
-                flowTokenChange != nil && flowTokenChange?.isBackedByVault() == true,
+                flowTokenChange != nil && flowTokenChange?.isBackedByFlowTokenVault() == true,
                 message: "Frozen change should be backed by a vault change"
             )
 
