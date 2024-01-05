@@ -484,6 +484,15 @@ pub contract FRC20FTShared {
         }
     }
 
+    /** Transaction hooks */
+
+    /// It a general interface for the Transaction Hook
+    ///
+    pub resource interface TransactionHook {
+        access(account)
+        fun onDeal()
+    }
+
     /* --- Public Methods --- */
 
     /// Get the shared store
@@ -502,6 +511,16 @@ pub contract FRC20FTShared {
         return getAccount(address)
             .getCapability<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath)
             .borrow()
+    }
+
+    /// Get the path to the transaction hook
+    ///
+    access(all)
+    fun getTransactionHookPublicPath(): PublicPath {
+        let identifier = "FRC20FTShared_"
+            .concat(self.account.address.toString())
+            .concat("_transactionHook")
+        return PublicPath(identifier: identifier)!
     }
 
     /* --- Account Methods --- */
@@ -547,6 +566,16 @@ pub contract FRC20FTShared {
             balance: balance,
             ftVault: <-ftVault
         )
+    }
+
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun borrowTransactionHook(_ address: Address): &AnyResource{TransactionHook}? {
+        let path = self.getTransactionHookPublicPath()
+        return getAccount(address)
+            .getCapability<&AnyResource{TransactionHook}>(path)
+            .borrow()
     }
 
     init() {

@@ -26,7 +26,7 @@ pub contract FRC20Storefront {
         commissionReceivers: [Address]?,
     )
 
-    pub event ListingPartiallyTaken(
+    pub event ListingPartiallyDeal(
         storefrontId: UInt64,
         listingResourceID: UInt64,
         inscriptionId: UInt64,
@@ -530,8 +530,8 @@ pub contract FRC20Storefront {
                 paymentRecipient: nil,
             )
 
-            // emit ListingPartiallyTaken event
-            emit ListingPartiallyTaken(
+            // emit ListingPartiallyDeal event
+            emit ListingPartiallyDeal(
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
                 inscriptionId: self.details.inscriptionId,
@@ -649,8 +649,8 @@ pub contract FRC20Storefront {
                 paymentRecipient: paymentRecipient,
             )
 
-            // emit ListingPartiallyTaken event
-            emit ListingPartiallyTaken(
+            // emit ListingPartiallyDeal event
+            emit ListingPartiallyDeal(
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
                 inscriptionId: self.details.inscriptionId,
