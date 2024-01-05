@@ -28,11 +28,11 @@ pub contract FRC20FTShared {
     pub enum SaleCutType: UInt8 {
         pub case TokenTreasury
         pub case PlatformTreasury
-        pub case MarketplaceStakers
-        pub case MarketplaceCampaign
-        pub case Commission
+        pub case PlatformStakers
         pub case SellMaker
         pub case BuyTaker
+        pub case Commission
+        pub case MarketplacePortion
     }
 
     /// Sale cut struct for the sale
@@ -41,13 +41,13 @@ pub contract FRC20FTShared {
         access(all)
         let type: SaleCutType
         access(all)
-        let amount: UFix64
+        let ratio: UFix64
         access(all)
         let receiver: Capability<&{FungibleToken.Receiver}>?
 
         init(
             type: SaleCutType,
-            amount: UFix64,
+            ratio: UFix64,
             receiver: Capability<&{FungibleToken.Receiver}>?
         ) {
             if type == FRC20FTShared.SaleCutType.SellMaker {
@@ -56,7 +56,7 @@ pub contract FRC20FTShared {
                 assert(receiver == nil, message: "Receiver should be nil for non-consumer cut")
             }
             self.type = type
-            self.amount = amount
+            self.ratio = ratio
             self.receiver = receiver
         }
     }
@@ -90,6 +90,13 @@ pub contract FRC20FTShared {
         access(all) view
         fun getBalance(): UFix64 {
             return self.ftVault?.balance ?? self.balance!
+        }
+
+        /// Check if this Change is empty
+        ///
+        access(all) view
+        fun isEmpty(): Bool {
+            return self.getBalance() == 0.0
         }
 
         /// Check if this Change is backed by a Vault
@@ -399,12 +406,14 @@ pub contract FRC20FTShared {
     pub resource ValidFrozenOrder {
         pub let tick: String
         pub let amount: UFix64
+        pub let totalPrice: UFix64
         pub let cuts: [SaleCut]
         pub var change: @Change?
 
         init(
             tick: String,
             amount: UFix64,
+            totalPrice: UFix64,
             cuts: [SaleCut],
             _ change: @Change,
         ) {
@@ -415,6 +424,7 @@ pub contract FRC20FTShared {
             }
             self.tick = tick
             self.amount = amount
+            self.totalPrice = totalPrice
             self.change <- change
             self.cuts = cuts
         }
@@ -479,14 +489,29 @@ pub contract FRC20FTShared {
     /// Get the shared store
     ///
     access(all)
-    fun borrowStoreRef(): &SharedStore{SharedStorePublic} {
+    fun borrowGlobalStoreRef(): &SharedStore{SharedStorePublic} {
         let addr = self.account.address
-        return getAccount(addr)
+        return self.borrowStoreRef(addr)
+            ?? panic("Could not borrow capability from public store")
+    }
+
+    /// Borrow the shared store
+    ///
+    access(all)
+    fun borrowStoreRef(_ address: Address): &SharedStore{SharedStorePublic}? {
+        return getAccount(address)
             .getCapability<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath)
-            .borrow() ?? panic("Could not borrow capability from public store")
+            .borrow()
     }
 
     /* --- Account Methods --- */
+
+    /// Create the instance of the shared store
+    ///
+    access(account)
+    fun createSharedStore(): @SharedStore {
+        return <- create SharedStore()
+    }
 
     /// Only the contracts in this account can call this method
     ///
@@ -494,12 +519,14 @@ pub contract FRC20FTShared {
     fun createValidFrozenOrder(
         tick: String,
         amount: UFix64,
+        totalPrice: UFix64,
         cuts: [SaleCut],
         change: @Change,
     ): @ValidFrozenOrder {
         return <- create ValidFrozenOrder(
             tick: tick,
             amount: amount,
+            totalPrice: totalPrice,
             cuts: cuts,
             <- change
         )
@@ -527,7 +554,7 @@ pub contract FRC20FTShared {
         self.SharedStoreStoragePath = StoragePath(identifier: identifier)!
         self.SharedStorePublicPath = PublicPath(identifier: identifier)!
         // create the indexer
-        self.account.save(<- create SharedStore(), to: self.SharedStoreStoragePath)
+        self.account.save(<- self.createSharedStore(), to: self.SharedStoreStoragePath)
         self.account.link<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath, target: self.SharedStoreStoragePath)
     }
 }

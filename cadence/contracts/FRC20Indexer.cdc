@@ -158,13 +158,27 @@ pub contract FRC20Indexer {
         fun extractFlowVaultChangeFromInscription(_ ins: &Fixes.Inscription, amount: UFix64): @FRC20FTShared.Change
         /// Apply a listed order, maker and taker should be the same token and the same amount
         access(account)
-        fun applyBuyNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
+        fun applyBuyNowOrder(
+            makerIns: &Fixes.Inscription,
+            takerIns: &Fixes.Inscription,
+            maxAmount: UFix64,
+            change: @FRC20FTShared.Change
+        ): @FRC20FTShared.Change
         /// Apply a listed order, maker and taker should be the same token and the same amount
         access(account)
-        fun applySellNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription)
+        fun applySellNowOrder(
+            makerIns: &Fixes.Inscription,
+            takerIns: &Fixes.Inscription,
+            maxAmount: UFix64,
+            change: @FRC20FTShared.Change,
+            _ distributeFlowTokenFunc: ((UFix64, @FlowToken.Vault): Bool)
+        ): @FRC20FTShared.Change
         /// Cancel a listed order
         access(account)
         fun cancelListing(listedIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
+        /// Return the change of a FRC20 order back to the owner
+        access(account)
+        fun returnChange(change: @FRC20FTShared.Change)
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -708,23 +722,24 @@ pub contract FRC20Indexer {
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
-            let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
+            // the price here means the total price
+            let totalPrice = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
 
             let benchmarkValue = self.getBenchmarkValue(tick: tick)
+            let benchmarkPrice = benchmarkValue * amt
             assert(
-                price >= benchmarkValue,
+                totalPrice >= benchmarkPrice,
                 message: "The price should be greater than or equal to the benchmark value: ".concat(benchmarkValue.toString())
             )
             // from address
             let fromAddr = ins.owner!.address
-            // calculate the total price and sale cuts
-            let totalPrice = amt * price
 
             // create the valid frozen order
             let order <- FRC20FTShared.createValidFrozenOrder(
                 tick: tick,
                 amount: amt,
-                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: fromAddr),
+                totalPrice: totalPrice,
+                cuts: self._buildFRC20SaleCuts(sellerAddress: fromAddr),
                 // withdraw the token to change
                 change: <- self._withdrawToTokenChange(tick: tick, fromAddr: fromAddr, amt: amt),
             )
@@ -757,22 +772,22 @@ pub contract FRC20Indexer {
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
-            let price = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
+            // the price here means the total price
+            let totalPrice = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
 
             let benchmarkValue = self.getBenchmarkValue(tick: tick)
+            let benchmarkPrice = benchmarkValue * amt
             assert(
-                price >= benchmarkValue,
+                totalPrice >= benchmarkValue,
                 message: "The price should be greater than or equal to the benchmark value: ".concat(benchmarkValue.toString())
             )
-
-            // calculate the total price and sale cuts
-            let totalPrice = amt * price
 
             // create the valid frozen order
             let order <- FRC20FTShared.createValidFrozenOrder(
                 tick: tick,
                 amount: amt,
-                cuts: self._buildFRC20SaleCuts(amount: totalPrice, sellerAddress: nil),
+                totalPrice: totalPrice,
+                cuts: self._buildFRC20SaleCuts(sellerAddress: nil),
                 change: <- self.extractFlowVaultChangeFromInscription(ins, amount: totalPrice),
             )
             assert(
@@ -791,14 +806,16 @@ pub contract FRC20Indexer {
         fun applyBuyNowOrder(
             makerIns: &Fixes.Inscription,
             takerIns: &Fixes.Inscription,
+            maxAmount: UFix64,
             change: @FRC20FTShared.Change
-        ) {
+        ): @FRC20FTShared.Change {
             pre {
                 makerIns.isExtractable(): "The MAKER inscription is not extractable"
                 takerIns.isExtractable(): "The TAKER inscription is not extractable"
                 self.isValidFRC20Inscription(ins: makerIns): "The MAKER inscription is not a valid FRC20 inscription"
                 self.isValidFRC20Inscription(ins: takerIns): "The TAKER inscription is not a valid FRC20 inscription"
                 change.isBackedByVault() == false: "The change should not be backed by a vault"
+                maxAmount <= change.getBalance(): "The max amount should be less than or equal to the change balance"
             }
 
             let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
@@ -818,11 +835,19 @@ pub contract FRC20Indexer {
                 makerMeta["tick"]!.toLower() == tick && change.tick == tick,
                 message: "The MAKER and TAKER should be the same token"
             )
-            let amt: UFix64 = UFix64.fromString(takerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let takerAmt = UFix64.fromString(takerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let makerAmt = UFix64.fromString(makerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+
+            // the max amount should be less than or equal to the maker amount
             assert(
-                amt == change.getBalance() && amt == makerAmt,
+                maxAmount <= makerAmt,
                 message: "The MAKER and TAKER should be the same amount"
+            )
+            // set the transact amount, max
+            let transactAmount = takerAmt > maxAmount ? maxAmount : takerAmt
+            assert(
+                transactAmount <= change.getBalance(),
+                message: "The available amount should be less than or equal to the change balance"
             )
 
             let makerAddr = makerIns.owner!.address
@@ -836,22 +861,36 @@ pub contract FRC20Indexer {
                 message: "The MAKER should be the same address as the change from address"
             )
 
-            // deposit the token change to the taker
-            self._depositFromTokenChange(change: <- change, to: takerAddr)
+            // withdraw the token from the maker by given amount
+            let tokenToTransfer <- change.withdrawAsChange(amount: transactAmount)
 
-            // extract inscription
-            self._extractInscription(tick: tick, ins: makerIns)
+            // deposit the token change to the taker
+            self._depositFromTokenChange(change: <- tokenToTransfer, to: takerAddr)
+
+            // extract taker's inscription
             self._extractInscription(tick: tick, ins: takerIns)
+            // check rest balance in the change, if empty, extract the maker's inscription
+            if change.isEmpty() {
+                self._extractInscription(tick: tick, ins: makerIns)
+            }
+            return <- change
         }
 
         /// Apply a listed order, maker and taker should be the same token and the same amount
         access(account)
-        fun applySellNowOrder(makerIns: &Fixes.Inscription, takerIns: &Fixes.Inscription) {
+        fun applySellNowOrder(
+            makerIns: &Fixes.Inscription,
+            takerIns: &Fixes.Inscription,
+            maxAmount: UFix64,
+            change: @FRC20FTShared.Change,
+            _ distributeFlowTokenFunc: ((UFix64, @FlowToken.Vault): Bool)
+        ): @FRC20FTShared.Change {
             pre {
                 makerIns.isExtractable(): "The MAKER inscription is not extractable"
                 takerIns.isExtractable(): "The TAKER inscription is not extractable"
                 self.isValidFRC20Inscription(ins: makerIns): "The MAKER inscription is not a valid FRC20 inscription"
                 self.isValidFRC20Inscription(ins: takerIns): "The TAKER inscription is not a valid FRC20 inscription"
+                change.isBackedByFlowTokenVault() == true: "The change should be backed by a flow vault"
             }
 
             let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
@@ -871,12 +910,16 @@ pub contract FRC20Indexer {
                 makerMeta["tick"]!.toLower() == tick,
                 message: "The MAKER and TAKER should be the same token"
             )
-            let amt: UFix64 = UFix64.fromString(takerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let takerAmt = UFix64.fromString(takerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let makerAmt = UFix64.fromString(makerMeta["amt"]!) ?? panic("The amount is not a valid UFix64")
+
+            // the max amount should be less than or equal to the maker amount
             assert(
-                amt == makerAmt,
+                maxAmount <= makerAmt,
                 message: "The MAKER and TAKER should be the same amount"
             )
+            // set the transact amount, max
+            let transactAmount = takerAmt > maxAmount ? maxAmount : takerAmt
 
             let makerAddr = makerIns.owner!.address
             let takerAddr = takerIns.owner!.address
@@ -884,13 +927,29 @@ pub contract FRC20Indexer {
                 makerAddr != takerAddr,
                 message: "The MAKER and TAKER should be different address"
             )
+            assert(
+                makerAddr == change.from,
+                message: "The MAKER should be the same address as the change from address"
+            )
+
+            // the price here means the total price
+            let totalPrice = UFix64.fromString(makerMeta["price"]!) ?? panic("The price is not a valid UFix64")
+            let partialPrice = transactAmount / makerAmt * totalPrice
 
             // transfer token from taker to maker
-            self._transferToken(tick: tick, fromAddr: takerAddr, to: makerAddr, amt: amt)
+            self._transferToken(tick: tick, fromAddr: takerAddr, to: makerAddr, amt: transactAmount)
+
+            // withdraw the token from the maker by given amount
+            let tokenToTransfer <- change.withdrawAsVault(amount: partialPrice)
+            let isCompleted = distributeFlowTokenFunc(transactAmount, <- (tokenToTransfer as! @FlowToken.Vault))
 
             // extract inscription
-            self._extractInscription(tick: tick, ins: makerIns)
             self._extractInscription(tick: tick, ins: takerIns)
+            // check rest balance in the change, if empty, extract the maker's inscription
+            if change.isEmpty() || isCompleted {
+                self._extractInscription(tick: tick, ins: makerIns)
+            }
+            return <- change
         }
 
         /// Cancel a listed order
@@ -915,14 +974,33 @@ pub contract FRC20Indexer {
             // deposit the token change return to change's from address
             let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
                 ?? panic("The flow receiver no found")
+            // extract inscription and return flow in the inscription to the owner
+            flowReceiver.deposit(from: <- listedIns.extract())
 
-            let tick = self._parseTickerName(meta)
+            // call the return change method
+            self.returnChange(change: <- change)
+        }
+
+        /// Return the change of a FRC20 order back to the owner
+        ///
+        access(account)
+        fun returnChange(change: @FRC20FTShared.Change) {
+            // if the change is empty, destroy it and return
+            if change.getBalance() == 0.0 {
+                destroy change
+                return
+            }
+            let fromAddr = change.from
+
             if change.isBackedByFlowTokenVault() {
                 let flowVault <- change.extractAsVault()
                 assert(
                     flowVault.getType() == Type<@FlowToken.Vault>(),
                     message: "The change should be a flow token vault"
                 )
+                // deposit the token change return to change's from address
+                let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
+                    ?? panic("The flow receiver no found")
                 flowReceiver.deposit(from: <- (flowVault as! @FlowToken.Vault))
                 destroy change
             } else if !change.isBackedByVault() {
@@ -930,9 +1008,6 @@ pub contract FRC20Indexer {
             } else {
                 panic("The change should not be backed by a vault that not a flow token vault")
             }
-
-            // extract inscription and return flow in the inscription to the owner
-            flowReceiver.deposit(from: <- listedIns.extract())
         }
 
         /// Extract a part of the inscription's value to a FRC20 token change
@@ -968,15 +1043,14 @@ pub contract FRC20Indexer {
 
         /// Build the sale cuts for a FRC20 order
         /// - Parameters:
-        ///   - amount: The amount of the FRC20 token
         ///   - sellerAddress: The seller address, if it is nil, then it is a buy order
         ///
         access(self)
-        fun _buildFRC20SaleCuts(amount: UFix64, sellerAddress: Address?): [FRC20FTShared.SaleCut] {
+        fun _buildFRC20SaleCuts(sellerAddress: Address?): [FRC20FTShared.SaleCut] {
             let ret: [FRC20FTShared.SaleCut] = []
 
             // use the shared store to get the sale fee
-            let sharedStore = FRC20FTShared.borrowStoreRef()
+            let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
             // Default sales fee, 2% of the total price
             let salesFee = (sharedStore.get("salesFee") as! UFix64?) ?? 0.02
             assert(
@@ -986,17 +1060,15 @@ pub contract FRC20Indexer {
 
             // Default 40% of sales fee to the token treasury pool
             let treasuryPoolCut = (sharedStore.get("treasuryPoolCut") as! UFix64?) ?? 0.4
-            // Default 30% of sales fee to the platform pool
-            let platformPoolCut = (sharedStore.get("platformPoolCut") as! UFix64?) ?? 0.3
-            // 20% of sales fee to the dapp stakers pool
-            let marketplaceStakersPoolCut = (sharedStore.get("marketplaceStakersPoolCut") as! UFix64?) ?? 0.2
-            // 5~10% of sales fee to the dapp campaign pool
-            let marketplaceCampaignPoolCut = (sharedStore.get("marketplaceCampaignPoolCut") as! UFix64?) ?? 0.05
-            // 0~5% of sales fee to the commission cut
-            let commissionCut = (sharedStore.get("commissionCut") as! UFix64?) ?? 0.05
+            // Default 25% of sales fee to the platform pool
+            let platformTreasuryCut = (sharedStore.get("platformTreasuryCut") as! UFix64?) ?? 0.25
+            // Default 25% of sales fee to the stakers pool
+            let platformStakersCut = (sharedStore.get("platformStakersCut") as! UFix64?) ?? 0.25
+            // Default 10% of sales fee to the marketplace portion cut
+            let marketplacePortionCut = (sharedStore.get("marketplacePortionCut") as! UFix64?) ?? 0.1
 
             // sum of all the cuts should be 1.0
-            let totalCutsRatio = treasuryPoolCut + platformPoolCut + marketplaceStakersPoolCut + marketplaceCampaignPoolCut + commissionCut
+            let totalCutsRatio = treasuryPoolCut + platformTreasuryCut + platformStakersCut + marketplacePortionCut
             assert(
                 totalCutsRatio == 1.0,
                 message: "The sum of all the cuts should be 1.0"
@@ -1006,27 +1078,22 @@ pub contract FRC20Indexer {
             // The first cut is the token treasury cut to ensure residualReceiver will be this
             ret.append(FRC20FTShared.SaleCut(
                 type: FRC20FTShared.SaleCutType.TokenTreasury,
-                amount: amount * salesFee * treasuryPoolCut,
+                amount: salesFee * treasuryPoolCut,
                 receiver: nil
             ))
             ret.append(FRC20FTShared.SaleCut(
                 type: FRC20FTShared.SaleCutType.PlatformTreasury,
-                amount: amount * salesFee * platformPoolCut,
+                amount: salesFee * platformTreasuryCut,
                 receiver: nil
             ))
             ret.append(FRC20FTShared.SaleCut(
-                type: FRC20FTShared.SaleCutType.MarketplaceStakers,
-                amount: amount * salesFee * marketplaceStakersPoolCut,
+                type: FRC20FTShared.SaleCutType.PlatformStakers,
+                amount: salesFee * platformStakersCut,
                 receiver: nil
             ))
             ret.append(FRC20FTShared.SaleCut(
-                type: FRC20FTShared.SaleCutType.MarketplaceCampaign,
-                amount: amount * salesFee * marketplaceCampaignPoolCut,
-                receiver: nil
-            ))
-            ret.append(FRC20FTShared.SaleCut(
-                type: FRC20FTShared.SaleCutType.Commission,
-                amount: amount * salesFee * commissionCut,
+                type: FRC20FTShared.SaleCutType.MarketplacePortion,
+                amount: salesFee * marketplacePortionCut,
                 receiver: nil
             ))
 
@@ -1041,26 +1108,26 @@ pub contract FRC20Indexer {
                 )
                 ret.append(FRC20FTShared.SaleCut(
                     type: FRC20FTShared.SaleCutType.SellMaker,
-                    amount: amount * (1.0 - salesFee),
+                    amount: (1.0 - salesFee),
                     // recevier is the FlowToken Vault of the seller
                     receiver: flowTokenReceiver
                 ))
             } else {
                 ret.append(FRC20FTShared.SaleCut(
                     type: FRC20FTShared.SaleCutType.BuyTaker,
-                    amount: amount * (1.0 - salesFee),
+                    amount: (1.0 - salesFee),
                     receiver: nil
                 ))
             }
 
             // check cuts amount, should be same as the total price
-            var totalCuts: UFix64 = 0.0
+            var totalRatio: UFix64 = 0.0
             for cut in ret {
-                totalCuts = totalCuts.saturatingAdd(cut.amount)
+                totalRatio = totalRatio.saturatingAdd(cut.ratio)
             }
             assert(
-                totalCuts == amount,
-                message: "The total cuts amount should be same as the total price"
+                totalRatio == 1.0,
+                message: "The sum of all the cuts should be 1.0"
             )
             // return the sale cuts
             return ret
