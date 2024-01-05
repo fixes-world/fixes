@@ -722,6 +722,11 @@ pub contract FRC20Indexer {
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            assert(
+                amt >= tokenMeta.limit,
+                message: "The amount should be greater than or equal to the limit"
+            )
+
             // the price here means the total price
             let totalPrice = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
 
@@ -772,6 +777,11 @@ pub contract FRC20Indexer {
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            assert(
+                amt >= tokenMeta.limit,
+                message: "The amount should be greater than or equal to the limit"
+            )
+
             // the price here means the total price
             let totalPrice = UFix64.fromString(meta["price"]!) ?? panic("The price is not a valid UFix64")
 
