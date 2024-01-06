@@ -4,9 +4,10 @@ import "MetadataViews"
 import "FungibleTokenMetadataViews"
 import "FlowToken"
 // Fixes imports
-import "Fixes"
 import "FRC20FTShared"
+import "FRC20Indexer"
 import "FRC20Storefront"
+import "FRC20AccountsPool"
 
 pub contract FRC20Marketplace {
 
@@ -20,6 +21,9 @@ pub contract FRC20Marketplace {
     pub event ListingAdded(tick: String, storefront: Address, listingId: UInt64, type: UInt8)
     /// Event emitted when a listing is removed
     pub event ListingRemoved(tick: String, storefront: Address, listingId: UInt64, type: UInt8)
+
+    /// Event emitted when the market is accessable
+    pub event MarketWhitelistClaimed(tick: String, addr: Address)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -165,6 +169,8 @@ pub contract FRC20Marketplace {
         access(all) view
         fun getListedItemByRankdedId(rankedId: String): ListedItem?
 
+        // ---- Market operations ----
+
         /// Add a listing to the market
         access(all)
         fun addToList(storefront: Address, listingId: UInt64)
@@ -172,6 +178,27 @@ pub contract FRC20Marketplace {
         // Anyone can remove it if the listing item has been removed or purchased.
         access(all)
         fun removeCompletedListing(rankedId: String)
+
+        // ---- Accessable settings ----
+
+        /// Check if the market is accessable
+        access(all) view
+        fun isAccessable(): Bool
+
+        /// The accessable after timestamp
+        access(all) view
+        fun accessableAfter(): UInt64?
+
+        /// The accessable conditions: tick => amount, the conditions are OR relationship
+        access(all) view
+        fun whitelistClaimingConditions(): {String: UFix64}
+
+        access(all) view
+        fun isInWhitelist(addr: Address): Bool
+
+        // Claim the address to the whitelist before the accessable timestamp
+        access(all)
+        fun claimWhitelist(addr: Address)
     }
 
     /// The Market resource
@@ -183,6 +210,8 @@ pub contract FRC20Marketplace {
         let collections: @{FRC20Storefront.ListingType: {UInt64: ListingCollection}}
         access(self)
         let sortedPriceRanks: {FRC20Storefront.ListingType: [UInt64]}
+        access(self)
+        let accessWhitelist: {Address: Bool}
 
         init(
             tick: String
@@ -190,6 +219,7 @@ pub contract FRC20Marketplace {
             self.tick = tick
             self.collections <- {}
             self.sortedPriceRanks = {}
+            self.accessWhitelist = {}
         }
 
         destroy() {
@@ -311,8 +341,93 @@ pub contract FRC20Marketplace {
             }
         }
 
+        // ---- Accessable settings ----
+
+        /// Check if the market is accessable
+        ///
+        access(all) view
+        fun isAccessable(): Bool {
+            if let after = self.accessableAfter() {
+                return UInt64(getCurrentBlock().timestamp) >= after
+            }
+            return true
+        }
+
+        /// The accessable after timestamp
+        ///
+        access(all) view
+        fun accessableAfter(): UInt64? {
+            if let storeRef = self.borrowSharedStore() {
+                return storeRef.get("market:AccessableAfter") as! UInt64?
+            }
+            return nil
+        }
+
+        /// The accessable conditions: tick => amount, the conditions are OR relationship
+        ///
+        access(all) view
+        fun whitelistClaimingConditions(): {String: UFix64} {
+            let ret: {String: UFix64} = {}
+            if let storeRef = self.borrowSharedStore() {
+                let name = storeRef.get("market:whitelistClaimingTickName") as! String?
+                let amt = storeRef.get("market:whitelistClaimingTickAmount") as! UFix64?
+                if name != nil && amt != nil {
+                    ret[name!] = amt
+                }
+            }
+            return ret
+        }
+
+        /// Check if the address is in the whitelist
+        ///
+        access(all) view
+        fun isInWhitelist(addr: Address): Bool {
+            return self.accessWhitelist[addr] ?? false
+        }
+
+        /// Claim the address to the whitelist before the accessable timestamp
+        ///
+        access(all)
+        fun claimWhitelist(addr: Address) {
+            let isAccessableNow = self.isAccessable()
+            if isAccessableNow {
+                return
+            }
+
+            let conds = self.whitelistClaimingConditions()
+            if conds.keys.length == 0 {
+                return
+            }
+
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            var valid = false
+            for tick in conds.keys {
+                let balance = frc20Indexer.getBalance(tick: tick, addr: addr)
+                if balance >= conds[tick]! {
+                    valid = true
+                    break
+                }
+            }
+
+            // add to the whitelist if valid
+            if valid {
+                self.accessWhitelist[addr] = true
+
+                emit MarketWhitelistClaimed(tick: self.tick, addr: addr)
+            }
+        }
+
         /** ---- Internal Methods ---- */
 
+        /// Borrow the shared store
+        ///
+        access(self)
+        fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}? {
+            return FRC20FTShared.borrowStoreRef(self.owner!.address)
+        }
+
+        /// Parse the ranked id
+        ///
         access(self) view
         fun parseRankedId(rankedId: String): ItemIdentifier {
             let parts = StringUtils.split(rankedId, "-")
@@ -327,6 +442,8 @@ pub contract FRC20Marketplace {
             return ItemIdentifier(type: type, rank: rank, listingId: id)
         }
 
+        /// Borrow or create the collection
+        ///
         access(self)
         fun borrowOrCreateCollection(
             _ type: FRC20Storefront.ListingType,
@@ -368,6 +485,8 @@ pub contract FRC20Marketplace {
     }
 
     /** ---– Account Access methods ---- */
+
+    // NOTHING
 
     /** ---– Public methods ---- */
 

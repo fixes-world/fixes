@@ -971,9 +971,9 @@ pub contract FRC20Storefront {
                     // Load config from market shared store
                     if let store = marketSharedStore {
                         // load from the market shared store
-                        let sharedRatio = store.get("marketplaceSharedRatio") as! UFix64? ?? 1.0
-                        let specificRatio = store.get("marketplaceSpecificRatio") as! UFix64? ?? 0.0
-                        let deployerRatio = store.get("marketplaceDeployerRatio") as! UFix64? ?? 0.0
+                        let sharedRatio = store.get("market:feeSharedRatio") as! UFix64? ?? 1.0
+                        let specificRatio = store.get("market:feeSpecificRatio") as! UFix64? ?? 0.0
+                        let deployerRatio = store.get("market:feeDeployerRatio") as! UFix64? ?? 0.0
                         // calculate the total weight
                         let totalWeight = sharedRatio + specificRatio + deployerRatio
                         let mktPaymentBalance = partialPayment.balance
