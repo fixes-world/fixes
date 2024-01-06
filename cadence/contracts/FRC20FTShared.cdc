@@ -423,6 +423,23 @@ pub contract FRC20FTShared {
         }
     }
 
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun createChange(
+        tick: String,
+        from: Address,
+        balance: UFix64?,
+        ftVault: @FungibleToken.Vault?
+    ): @Change {
+        return <- create Change(
+            tick: tick,
+            from: from,
+            balance: balance,
+            ftVault: <-ftVault
+        )
+    }
+
     /** --- Temporary order resources --- */
 
     /// It a temporary resource combining change and cuts
@@ -477,12 +494,106 @@ pub contract FRC20FTShared {
         }
     }
 
+    /// Only the contracts in this account can call this method
+    ///
+    access(account)
+    fun createValidFrozenOrder(
+        tick: String,
+        amount: UFix64,
+        totalPrice: UFix64,
+        cuts: [SaleCut],
+        change: @Change,
+    ): @ValidFrozenOrder {
+        return <- create ValidFrozenOrder(
+            tick: tick,
+            amount: amount,
+            totalPrice: totalPrice,
+            cuts: cuts,
+            <- change
+        )
+    }
+
     /** Shared store resource */
 
+    /// The Market config type
+    ///
+    pub enum ConfigType: UInt8 {
+        pub case PlatformSalesFee
+        pub case PlatformSalesCutTreasuryPoolRatio
+        pub case PlatformSalesCutPlatformPoolRatio
+        pub case PlatformSalesCutPlatformStakersRatio
+        pub case PlatformSalesCutMarketRatio
+        pub case PlatofrmMarketplaceStakingToken
+        pub case MarketFeeSharedRatio
+        pub case MarketFeeTokenSpecificRatio
+        pub case MarketFeeDeployerRatio
+        pub case MarketAccessableAfter
+        pub case MarketWhitelistClaimingToken
+        pub case MarketWhitelistClaimingAmount
+    }
+
+    /* --- Public Methods --- */
+
     pub resource interface SharedStorePublic {
+        /// Get the key by type
+        ///
+        access(all) view
+        fun getKeyByEnum(_ type: ConfigType): String? {
+            var key: String? = nil
+            // get the key by type
+            switch type {
+            case ConfigType.PlatformSalesFee:
+                key = "platform:SalesFee"
+                break
+            case ConfigType.PlatformSalesCutTreasuryPoolRatio:
+                key = "platform:SalesCutTreasuryPoolRatio"
+                break
+            case ConfigType.PlatformSalesCutPlatformPoolRatio:
+                key = "platform:SalesCutPlatformPoolRatio"
+                break
+            case ConfigType.PlatformSalesCutPlatformStakersRatio:
+                key = "platform:SalesCutPlatformStakersRatio"
+                break
+            case ConfigType.PlatformSalesCutMarketRatio:
+                key = "platform:SalesCutMarketRatio"
+                break
+            case ConfigType.PlatofrmMarketplaceStakingToken:
+                key = "platform:MarketplaceStakingToken"
+                break
+            case ConfigType.MarketFeeSharedRatio:
+                key = "market:FeeSharedRatio"
+                break
+            case ConfigType.MarketFeeTokenSpecificRatio:
+                key = "market:FeeTokenSpecificRatio"
+                break
+            case ConfigType.MarketFeeDeployerRatio:
+                key = "market:FeeDeployerRatio"
+                break
+            case ConfigType.MarketAccessableAfter:
+                key = "market:AccessableAfter"
+                break
+            case ConfigType.MarketWhitelistClaimingToken:
+                key = "market:WhitelistClaimingToken"
+                break
+            case ConfigType.MarketWhitelistClaimingAmount:
+                key = "market:WhitelistClaimingAmount"
+                break
+            }
+            return key
+        }
+
         // getter for the shared store
         access(all)
         fun get(_ key: String): AnyStruct?
+
+        // getter for the shared store
+        access(all)
+        fun getByEnum(_ type: ConfigType): AnyStruct? {
+            if let key = self.getKeyByEnum(type)  {
+                return self.get(key)
+            }
+            return nil
+        }
     }
 
     pub resource SharedStore: SharedStorePublic {
@@ -493,19 +604,59 @@ pub contract FRC20FTShared {
             self.data = {}
         }
 
-        // getter for the shared store
+        /// getter for the shared store
+        ///
         access(all)
         fun get(_ key: String): AnyStruct? {
             return self.data[key]
         }
 
-        // setter for the shared store
+        /// Set the value
+        ///
         access(account)
         fun set(_ key: String, value: AnyStruct) {
             self.data[key] = value
 
             emit SharedStoreKeyUpdated(key: key, valueType: value.getType())
         }
+
+        /// Set the value by type
+        ///
+        access(account)
+        fun setByEnum(_ type: ConfigType, value: AnyStruct) {
+            if let key = self.getKeyByEnum(type)  {
+                self.set(key, value: value)
+            }
+        }
+    }
+
+    /* --- Public Methods --- */
+
+    /// Get the shared store
+    ///
+    access(all)
+    fun borrowGlobalStoreRef(): &SharedStore{SharedStorePublic} {
+        let addr = self.account.address
+        return self.borrowStoreRef(addr)
+            ?? panic("Could not borrow capability from public store")
+    }
+
+    /// Borrow the shared store
+    ///
+    access(all)
+    fun borrowStoreRef(_ address: Address): &SharedStore{SharedStorePublic}? {
+        return getAccount(address)
+            .getCapability<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath)
+            .borrow()
+    }
+
+    /* --- Account Methods --- */
+
+    /// Create the instance of the shared store
+    ///
+    access(account)
+    fun createSharedStore(): @SharedStore {
+        return <- create SharedStore()
     }
 
     /** Transaction hooks */
@@ -606,76 +757,11 @@ pub contract FRC20FTShared {
         }
     }
 
-    /* --- Public Methods --- */
-
-    /// Get the shared store
-    ///
-    access(all)
-    fun borrowGlobalStoreRef(): &SharedStore{SharedStorePublic} {
-        let addr = self.account.address
-        return self.borrowStoreRef(addr)
-            ?? panic("Could not borrow capability from public store")
-    }
-
-    /// Borrow the shared store
-    ///
-    access(all)
-    fun borrowStoreRef(_ address: Address): &SharedStore{SharedStorePublic}? {
-        return getAccount(address)
-            .getCapability<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath)
-            .borrow()
-    }
-
-    /* --- Account Methods --- */
-
-    /// Create the instance of the shared store
-    ///
-    access(account)
-    fun createSharedStore(): @SharedStore {
-        return <- create SharedStore()
-    }
-
     /// Create the instance of the hooks resource
     ///
     access(account)
     fun createHooks(): @Hooks {
         return <- create Hooks()
-    }
-
-    /// Only the contracts in this account can call this method
-    ///
-    access(account)
-    fun createValidFrozenOrder(
-        tick: String,
-        amount: UFix64,
-        totalPrice: UFix64,
-        cuts: [SaleCut],
-        change: @Change,
-    ): @ValidFrozenOrder {
-        return <- create ValidFrozenOrder(
-            tick: tick,
-            amount: amount,
-            totalPrice: totalPrice,
-            cuts: cuts,
-            <- change
-        )
-    }
-
-    /// Only the owner of the account can call this method
-    ///
-    access(account)
-    fun createChange(
-        tick: String,
-        from: Address,
-        balance: UFix64?,
-        ftVault: @FungibleToken.Vault?
-    ): @Change {
-        return <- create Change(
-            tick: tick,
-            from: from,
-            balance: balance,
-            ftVault: <-ftVault
-        )
     }
 
     /// Only the owner of the account can call this method
