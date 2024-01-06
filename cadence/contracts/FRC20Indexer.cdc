@@ -1062,20 +1062,20 @@ pub contract FRC20Indexer {
             // use the shared store to get the sale fee
             let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
             // Default sales fee, 2% of the total price
-            let salesFee = (sharedStore.get("salesFee") as! UFix64?) ?? 0.02
+            let salesFee = (sharedStore.getByEnum(FRC20FTShared.ConfigType.PlatformSalesFee) as! UFix64?) ?? 0.02
             assert(
                 salesFee > 0.0 && salesFee <= 1.0,
                 message: "The sales fee should be greater than 0.0 and less than or equal to 1.0"
             )
 
             // Default 40% of sales fee to the token treasury pool
-            let treasuryPoolCut = (sharedStore.get("treasuryPoolCut") as! UFix64?) ?? 0.4
+            let treasuryPoolCut = (sharedStore.getByEnum(FRC20FTShared.ConfigType.PlatformSalesCutTreasuryPoolRatio) as! UFix64?) ?? 0.4
             // Default 25% of sales fee to the platform pool
-            let platformTreasuryCut = (sharedStore.get("platformTreasuryCut") as! UFix64?) ?? 0.25
+            let platformTreasuryCut = (sharedStore.getByEnum(FRC20FTShared.ConfigType.PlatformSalesCutPlatformPoolRatio) as! UFix64?) ?? 0.25
             // Default 25% of sales fee to the stakers pool
-            let platformStakersCut = (sharedStore.get("platformStakersCut") as! UFix64?) ?? 0.25
+            let platformStakersCut = (sharedStore.getByEnum(FRC20FTShared.ConfigType.PlatformSalesCutPlatformStakersRatio) as! UFix64?) ?? 0.25
             // Default 10% of sales fee to the marketplace portion cut
-            let marketplacePortionCut = (sharedStore.get("marketplacePortionCut") as! UFix64?) ?? 0.1
+            let marketplacePortionCut = (sharedStore.getByEnum(FRC20FTShared.ConfigType.PlatformSalesCutMarketRatio) as! UFix64?) ?? 0.1
 
             // sum of all the cuts should be 1.0
             let totalCutsRatio = treasuryPoolCut + platformTreasuryCut + platformStakersCut + marketplacePortionCut

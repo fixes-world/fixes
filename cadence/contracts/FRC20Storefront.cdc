@@ -837,7 +837,7 @@ pub contract FRC20Storefront {
             let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
 
             // some constants
-            let stakingFRC20Tick = (globalSharedStore.get("platfromStakingFRC20Tick") as! String?) ?? "flows"
+            let stakingFRC20Tick = (globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?) ?? "flows"
             let listingTick = self.details.tick
             let listingTokenMeta = frc20Indexer.getTokenMeta(tick: listingTick)
                 ?? panic("Unable to fetch the token meta")
@@ -971,9 +971,9 @@ pub contract FRC20Storefront {
                     // Load config from market shared store
                     if let store = marketSharedStore {
                         // load from the market shared store
-                        let sharedRatio = store.get("market:feeSharedRatio") as! UFix64? ?? 1.0
-                        let specificRatio = store.get("market:feeSpecificRatio") as! UFix64? ?? 0.0
-                        let deployerRatio = store.get("market:feeDeployerRatio") as! UFix64? ?? 0.0
+                        let sharedRatio = store.getByEnum(FRC20FTShared.ConfigType.MarketFeeSharedRatio) as! UFix64? ?? 1.0
+                        let specificRatio = store.getByEnum(FRC20FTShared.ConfigType.MarketFeeTokenSpecificRatio) as! UFix64? ?? 0.0
+                        let deployerRatio = store.getByEnum(FRC20FTShared.ConfigType.MarketFeeDeployerRatio) as! UFix64? ?? 0.0
                         // calculate the total weight
                         let totalWeight = sharedRatio + specificRatio + deployerRatio
                         let mktPaymentBalance = partialPayment.balance

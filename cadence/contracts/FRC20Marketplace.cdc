@@ -31,6 +31,7 @@ pub contract FRC20Marketplace {
     pub let FRC20MarketPublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
+
     /// The Listing item information
     pub struct ListedItem {
         // The combined uid for querying in the market
@@ -181,6 +182,10 @@ pub contract FRC20Marketplace {
 
         // ---- Accessable settings ----
 
+        /// Check if the address is in the whitelist or admin whitelist or the market is accessable
+        access(all) view
+        fun canAccess(addr: Address): Bool
+
         /// Check if the market is accessable
         access(all) view
         fun isAccessable(): Bool
@@ -193,12 +198,16 @@ pub contract FRC20Marketplace {
         access(all) view
         fun whitelistClaimingConditions(): {String: UFix64}
 
-        access(all) view
-        fun isInWhitelist(addr: Address): Bool
-
-        // Claim the address to the whitelist before the accessable timestamp
+        /// Claim the address to the whitelist before the accessable timestamp
         access(all)
         fun claimWhitelist(addr: Address)
+
+        // --- Admin operations ---
+
+        /// Check if the address is in the admin whitelist
+        access(all) view
+        fun isInAdminWhitelist(addr: Address): Bool
+
     }
 
     /// The Market resource
@@ -211,6 +220,8 @@ pub contract FRC20Marketplace {
         access(self)
         let sortedPriceRanks: {FRC20Storefront.ListingType: [UInt64]}
         access(self)
+        let adminWhitelist: {Address: Bool}
+        access(self)
         let accessWhitelist: {Address: Bool}
 
         init(
@@ -220,6 +231,12 @@ pub contract FRC20Marketplace {
             self.collections <- {}
             self.sortedPriceRanks = {}
             self.accessWhitelist = {}
+            self.adminWhitelist = {}
+
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let meta = frc20Indexer.getTokenMeta(tick: tick) ?? panic("Invalid tick")
+            // add the deployer of the tick to the admin whitelist
+            self.adminWhitelist[meta.deployer] = true
         }
 
         destroy() {
@@ -341,7 +358,36 @@ pub contract FRC20Marketplace {
             }
         }
 
+        // ---- Admin operations ----
+
+        /// Check if the address is in the admin whitelist
+        access(all) view
+        fun isInAdminWhitelist(addr: Address): Bool {
+            return self.adminWhitelist[addr] ?? false
+        }
+
         // ---- Accessable settings ----
+
+        /// Check if the address is in the whitelist or admin whitelist or the market is accessable
+        ///
+        access(all) view
+        fun canAccess(addr: Address): Bool {
+            let isAccessableNow = self.isAccessable()
+            if isAccessableNow {
+                return true
+            }
+
+            let isWhitelisted = self.accessWhitelist[addr] ?? false
+            if isWhitelisted {
+                return true
+            }
+
+            let isAdmin = self.isInAdminWhitelist(addr: addr)
+            if isAdmin {
+                return true
+            }
+            return false
+        }
 
         /// Check if the market is accessable
         ///
@@ -358,7 +404,7 @@ pub contract FRC20Marketplace {
         access(all) view
         fun accessableAfter(): UInt64? {
             if let storeRef = self.borrowSharedStore() {
-                return storeRef.get("market:AccessableAfter") as! UInt64?
+                return storeRef.getByEnum(FRC20FTShared.ConfigType.MarketAccessableAfter) as! UInt64?
             }
             return nil
         }
@@ -369,20 +415,13 @@ pub contract FRC20Marketplace {
         fun whitelistClaimingConditions(): {String: UFix64} {
             let ret: {String: UFix64} = {}
             if let storeRef = self.borrowSharedStore() {
-                let name = storeRef.get("market:whitelistClaimingTickName") as! String?
-                let amt = storeRef.get("market:whitelistClaimingTickAmount") as! UFix64?
+                let name = storeRef.getByEnum(FRC20FTShared.ConfigType.MarketWhitelistClaimingToken) as! String?
+                let amt = storeRef.getByEnum(FRC20FTShared.ConfigType.MarketWhitelistClaimingAmount) as! UFix64?
                 if name != nil && amt != nil {
                     ret[name!] = amt
                 }
             }
             return ret
-        }
-
-        /// Check if the address is in the whitelist
-        ///
-        access(all) view
-        fun isInWhitelist(addr: Address): Bool {
-            return self.accessWhitelist[addr] ?? false
         }
 
         /// Claim the address to the whitelist before the accessable timestamp
@@ -395,6 +434,7 @@ pub contract FRC20Marketplace {
             }
 
             let conds = self.whitelistClaimingConditions()
+            // no conditions set, so you can not claim
             if conds.keys.length == 0 {
                 return
             }
