@@ -15,11 +15,35 @@ pub contract FRC20FTShared {
     /// The event that is emitted when tokens are extracted
     pub event TokenChangeExtracted(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
 
+    /// The event that is emitted when a hook is added
+    pub event TransactionHookAdded(
+        hooksOwner: Address,
+        hookType: Type,
+    )
+    /// The event that is emitted when a deal is updated
+    pub event TransactionHooksOnDeal(
+        hooksOwner: Address,
+        executedHookType: Type,
+        storefront: Address,
+        listingId: UInt64,
+        seller: Address,
+        buyer: Address,
+        tick: String,
+        dealAmount: UFix64,
+        dealPrice: UFix64,
+        totalAmountInListing: UFix64,
+    )
+
     /* --- Variable, Enums and Structs --- */
     access(all)
     let SharedStoreStoragePath: StoragePath
     access(all)
     let SharedStorePublicPath: PublicPath
+
+    access(all)
+    let TransactionHookStoragePath: StoragePath
+    access(all)
+    let TransactionHookPublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
 
@@ -489,8 +513,97 @@ pub contract FRC20FTShared {
     /// It a general interface for the Transaction Hook
     ///
     pub resource interface TransactionHook {
+        /// The method that is invoked when the transaction is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
         access(account)
-        fun onDeal()
+        fun onDeal(
+            storefront: Address,
+            listingId: UInt64,
+            seller: Address,
+            buyer: Address,
+            tick: String,
+            dealAmount: UFix64,
+            dealPrice: UFix64,
+            totalAmountInListing: UFix64,
+        )
+    }
+
+    /// It a general resource for the Transaction Hook
+    ///
+    pub resource Hooks: TransactionHook {
+        access(self)
+        let hooks: {Type: Capability<&AnyResource{TransactionHook}>}
+
+        init() {
+            self.hooks = {}
+        }
+
+        access(account)
+        fun addHook(_ hook: Capability<&AnyResource{TransactionHook}>) {
+            pre {
+                hook.check(): "The hook must be valid"
+            }
+            let hookRef = hook.borrow() ?? panic("Could not borrow reference from hook capability.")
+            let type = hookRef.getType()
+            assert(
+                self.hooks[type] == nil,
+                message: "Hook of type ".concat(type.identifier).concat("already exists.")
+            )
+            self.hooks[type] = hook
+
+            emit TransactionHookAdded(
+                hooksOwner: self.owner?.address ?? panic("Hooks owner must not be nil"),
+                hookType: type
+            )
+        }
+
+        /// The method that is invoked when the transaction is executed
+        ///
+        access(account)
+        fun onDeal(
+            storefront: Address,
+            listingId: UInt64,
+            seller: Address,
+            buyer: Address,
+            tick: String,
+            dealAmount: UFix64,
+            dealPrice: UFix64,
+            totalAmountInListing: UFix64,
+        ) {
+            let hooksOwnerAddr = self.owner?.address
+            if hooksOwnerAddr == nil {
+                return
+            }
+
+            // call all hooks
+            for type in self.hooks.keys {
+                if let hookCap = self.hooks[type] {
+                    let valid = hookCap.check()
+                    if !valid {
+                        continue
+                    }
+                    if let ref = hookCap.borrow() {
+                        // call hook
+                        ref.onDeal(storefront: storefront, listingId: listingId, seller: seller, buyer: buyer, tick: tick, dealAmount: dealAmount, dealPrice: dealPrice, totalAmountInListing: totalAmountInListing)
+
+                        // emit event
+                        emit TransactionHooksOnDeal(
+                            hooksOwner: hooksOwnerAddr!,
+                            executedHookType: type,
+                            storefront: storefront,
+                            listingId: listingId,
+                            seller: seller,
+                            buyer: buyer,
+                            tick: tick,
+                            dealAmount: dealAmount,
+                            dealPrice: dealPrice,
+                            totalAmountInListing: totalAmountInListing,
+                        )
+                    }
+                }
+            }
+        }
     }
 
     /* --- Public Methods --- */
@@ -513,16 +626,6 @@ pub contract FRC20FTShared {
             .borrow()
     }
 
-    /// Get the path to the transaction hook
-    ///
-    access(all)
-    fun getTransactionHookPublicPath(): PublicPath {
-        let identifier = "FRC20FTShared_"
-            .concat(self.account.address.toString())
-            .concat("_transactionHook")
-        return PublicPath(identifier: identifier)!
-    }
-
     /* --- Account Methods --- */
 
     /// Create the instance of the shared store
@@ -530,6 +633,13 @@ pub contract FRC20FTShared {
     access(account)
     fun createSharedStore(): @SharedStore {
         return <- create SharedStore()
+    }
+
+    /// Create the instance of the hooks resource
+    ///
+    access(account)
+    fun createHooks(): @Hooks {
+        return <- create Hooks()
     }
 
     /// Only the contracts in this account can call this method
@@ -572,16 +682,24 @@ pub contract FRC20FTShared {
     ///
     access(account)
     fun borrowTransactionHook(_ address: Address): &AnyResource{TransactionHook}? {
-        let path = self.getTransactionHookPublicPath()
         return getAccount(address)
-            .getCapability<&AnyResource{TransactionHook}>(path)
+            .getCapability<&AnyResource{TransactionHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
     init() {
+        // Transaction Hook
+        let hookIdentifier = "FRC20FTShared_"
+            .concat(self.account.address.toString())
+            .concat("_transactionHook")
+        self.TransactionHookStoragePath = StoragePath(identifier: hookIdentifier)!
+        self.TransactionHookPublicPath = PublicPath(identifier: hookIdentifier)!
+
+        // Shared Store
         let identifier = "FRC20SharedStore_".concat(self.account.address.toString())
         self.SharedStoreStoragePath = StoragePath(identifier: identifier)!
         self.SharedStorePublicPath = PublicPath(identifier: identifier)!
+
         // create the indexer
         self.account.save(<- self.createSharedStore(), to: self.SharedStoreStoragePath)
         self.account.link<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath, target: self.SharedStoreStoragePath)

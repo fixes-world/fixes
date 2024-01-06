@@ -27,6 +27,7 @@ pub contract FRC20Storefront {
     )
 
     pub event ListingPartiallyDeal(
+        storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
         inscriptionId: UInt64,
@@ -39,8 +40,8 @@ pub contract FRC20Storefront {
         commissionAmount: UFix64,
         commissionReceiver: Address?,
     )
-
     pub event ListingCompleted(
+        storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
         inscriptionId: UInt64,
@@ -53,6 +54,7 @@ pub contract FRC20Storefront {
         commissionReceiver: Address?,
     )
     pub event ListingCancelled(
+        storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
         inscriptionId: UInt64,
@@ -63,6 +65,7 @@ pub contract FRC20Storefront {
         customID: String?,
     )
     pub event ListingRemoved(
+        storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
         inscriptionId: UInt64,
@@ -473,8 +476,10 @@ pub contract FRC20Storefront {
                 message: "Given inscription is not a valid FRC20 listing inscription"
             )
 
-            // The indexer for all the FRC20 tokens.
+            // Some singleton resources
             let frc20Indexer = FRC20Indexer.getIndexer()
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
             // give the change to the buyer
             var frc20TokenChange: @FRC20FTShared.Change? <- nil
             frc20TokenChange <-> self.frozenChange
@@ -485,9 +490,19 @@ pub contract FRC20Storefront {
 
             let currentAmount = frc20TokenChange?.getBalance() ?? panic("Unable to fetch the current amount")
             let maxAmount = self.details.amount - self.details.transactedAmount
+
+            let sellerIns = self.borrowInspection()
+            let seller = sellerIns.owner?.address ?? panic("Unable to fetch the seller address")
+            let buyer = ins.owner?.address ?? panic("Unable to fetch the buyer address")
+            let storefrontAddress = self.owner?.address ?? panic("Unable to fetch the storefront address")
+            assert(
+                seller != buyer && seller == storefrontAddress,
+                message: "Seller should be the storefront address and buyer should not be the storefront address"
+            )
+
             // apply the change and both inscriptions in frc20 indexer
             var restChange <- frc20Indexer.applyBuyNowOrder(
-                makerIns: self.borrowInspection(),
+                makerIns: sellerIns,
                 takerIns: ins,
                 maxAmount: maxAmount,
                 change: <- (frc20TokenChange ?? panic("Unable to extract the change")),
@@ -515,7 +530,7 @@ pub contract FRC20Storefront {
             // The payment vault for the sale.
             let paymentChange <- frc20Indexer.extractFlowVaultChangeFromInscription(ins, amount: transactedPrice)
             assert(
-                paymentChange.from == ins.owner?.address
+                paymentChange.from == buyer
                 && paymentChange.tick == ""
                 && paymentChange.getVaultType() == Type<@FlowToken.Vault>(),
                 message: "Payment change should be backed by the inscription owner"
@@ -530,13 +545,32 @@ pub contract FRC20Storefront {
                 paymentRecipient: nil,
             )
 
+            let tickName = self.details.tick
+            let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
+            if let marketTransactionHook = FRC20FTShared.borrowTransactionHook(marketAddress) {
+                // Invoke transaction hooks to do things like:
+                // -- Record the transction record
+                // -- Record trading Volume
+                marketTransactionHook.onDeal(
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickName,
+                    dealAmount: transactedAmt,
+                    dealPrice: transactedPrice,
+                    totalAmountInListing: self.details.amount,
+                )
+            }
+
             // emit ListingPartiallyDeal event
             emit ListingPartiallyDeal(
+                storefrontAddress: storefrontAddress,
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
                 inscriptionId: self.details.inscriptionId,
                 type: self.details.type.rawValue,
-                tick: self.details.tick,
+                tick: tickName,
                 totalAmount: self.details.amount,
                 transactedAmount: transactedAmt,
                 transactedPrice: transactedPrice,
@@ -544,8 +578,6 @@ pub contract FRC20Storefront {
                 commissionAmount: commissionAmount,
                 commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
             )
-
-            // TODO: Record the transction record and trading Volume, using Hooks model
 
             // if the listing is fully transacted, then set it to completed
             if self.details.isFullyTransacted() {
@@ -564,6 +596,7 @@ pub contract FRC20Storefront {
 
                 // emit ListingCompleted event
                 emit ListingCompleted(
+                    storefrontAddress: storefrontAddress,
                     storefrontId: self.details.storefrontId,
                     listingResourceID: self.uuid,
                     inscriptionId: self.details.inscriptionId,
@@ -601,6 +634,7 @@ pub contract FRC20Storefront {
 
             // The indexer for all the FRC20 tokens.
             let frc20Indexer = FRC20Indexer.getIndexer()
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
             // give the change to the buyer
             var flowTokenChange: @FRC20FTShared.Change? <- nil
@@ -613,11 +647,20 @@ pub contract FRC20Storefront {
 
             let maxAmount = self.details.amount - self.details.transactedAmount
 
+            let buyerIns = self.borrowInspection()
+            let buyer = buyerIns.owner?.address ?? panic("Unable to fetch the buyer address")
+            let seller = ins.owner?.address ?? panic("Unable to fetch the seller address")
+            let storefrontAddress = self.owner?.address ?? panic("Unable to fetch the storefront address")
+            assert(
+                seller != buyer && buyer == storefrontAddress,
+                message: "Buyer should be the storefront address and seller should not be the storefront address"
+            )
+
             let detailRef = &self.details as &ListingDetails
             var payment: @FlowToken.Vault? <- nil
             var transactedAmt: UFix64? = nil
             let restChange <- frc20Indexer.applySellNowOrder(
-                makerIns: self.borrowInspection(),
+                makerIns: buyerIns,
                 takerIns: ins,
                 maxAmount: maxAmount,
                 change: <- (flowTokenChange ?? panic("Unable to get the flow token change")),
@@ -651,6 +694,7 @@ pub contract FRC20Storefront {
 
             // emit ListingPartiallyDeal event
             emit ListingPartiallyDeal(
+                storefrontAddress: storefrontAddress,
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
                 inscriptionId: self.details.inscriptionId,
@@ -664,7 +708,23 @@ pub contract FRC20Storefront {
                 commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
             )
 
-            // TODO: Record the transction record and trading Volume, using Hooks model
+            let tickName = self.details.tick
+            let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
+            if let marketTransactionHook = FRC20FTShared.borrowTransactionHook(marketAddress) {
+                // Invoke transaction hooks to do things like:
+                // -- Record the transction record
+                // -- Record trading Volume
+                marketTransactionHook.onDeal(
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickName,
+                    dealAmount: transactedAmt!,
+                    dealPrice: transactedPrice,
+                    totalAmountInListing: self.details.amount,
+                )
+            }
 
             // if the listing is fully transacted, then set it to completed
             if self.details.isFullyTransacted() {
@@ -684,6 +744,7 @@ pub contract FRC20Storefront {
 
                 // emit ListingCompleted event
                 emit ListingCompleted(
+                    storefrontAddress: storefrontAddress,
                     storefrontId: self.details.storefrontId,
                     listingResourceID: self.uuid,
                     inscriptionId: self.details.inscriptionId,
@@ -727,6 +788,7 @@ pub contract FRC20Storefront {
             )
 
             emit ListingCancelled(
+                storefrontAddress: self.owner?.address ?? panic("Unable to fetch the storefront address"),
                 storefrontId: self.details.storefrontId,
                 listingResourceID: self.uuid,
                 inscriptionId: self.details.inscriptionId,
@@ -1143,6 +1205,7 @@ pub contract FRC20Storefront {
             let details = listing.getDetails()
 
             emit ListingRemoved(
+                storefrontAddress: self.owner?.address ?? panic("Storefront owner is not set"),
                 storefrontId: self.uuid,
                 listingResourceID: listingResourceID,
                 inscriptionId: details.inscriptionId,
@@ -1172,6 +1235,7 @@ pub contract FRC20Storefront {
             let listing <- self.listings.remove(key: listingResourceID)!
 
             emit ListingRemoved(
+                storefrontAddress: self.owner?.address ?? panic("Storefront owner is not set"),
                 storefrontId: self.uuid,
                 listingResourceID: listingResourceID,
                 inscriptionId: details.inscriptionId,
