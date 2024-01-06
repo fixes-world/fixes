@@ -189,6 +189,9 @@ pub contract FRC20Indexer {
         /// Allocate the tokens to some address
         access(account)
         fun allocate(ins: &Fixes.Inscription): @FlowToken.Vault
+        /// Extract the ins and ensure this ins is owned by the deployer
+        access(account)
+        fun executeByDeployer(ins: &Fixes.Inscription): Bool
     }
 
     /// The resource that stores the inscriptions mapping
@@ -700,6 +703,37 @@ pub contract FRC20Indexer {
             self._transferToken(tick: tick, fromAddr: fromAddr, to: to, amt: amt)
 
             return <- ins.extract()
+        }
+
+        /// Extract the ins and ensure this ins is owned by the deployer
+        ///
+        access(account)
+        fun executeByDeployer(ins: &Fixes.Inscription): Bool {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            // only check the tick property
+            assert(
+                meta["tick"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for deployer execution"
+            )
+
+            // only the deployer can execute the inscription
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+
+            assert(
+                ins.owner!.address == tokenMeta.deployer,
+                message: "The inscription is not owned by the deployer"
+            )
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: ins)
+
+            return true
         }
 
         /** ---- Account Methods without Inscription extrasction ---- */

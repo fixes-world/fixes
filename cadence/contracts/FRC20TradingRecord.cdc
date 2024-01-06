@@ -22,6 +22,10 @@ pub contract FRC20TradingRecord {
 
     /* --- Variable, Enums and Structs --- */
     access(all)
+    let TradingRecordingHookStoragePath: StoragePath
+    access(all)
+    let TradingRecordingHookPublicPath: PublicPath
+    access(all)
     let TradingRecordsStoragePath: StoragePath
     access(all)
     let TradingRecordsPublicPath: PublicPath
@@ -325,6 +329,10 @@ pub contract FRC20TradingRecord {
             if dailyRecordsRef == nil {
                 return // DO NOT PANIC
             }
+            // if tick is not nil, check the ticker name
+            if self.tick != nil && self.tick != record.tick {
+                return // DO NOT PANIC
+            }
 
             // update the trading status
             let statusRef = self.borrowStatus()
@@ -426,9 +434,13 @@ pub contract FRC20TradingRecord {
     }
 
     init() {
-        let identifier = "FRC20TradingRecords_".concat(self.account.address.toString())
-        self.TradingRecordsStoragePath = StoragePath(identifier: identifier)!
-        self.TradingRecordsPublicPath = PublicPath(identifier: identifier)!
+        let recordsIdentifier = "FRC20TradingRecords_".concat(self.account.address.toString())
+        self.TradingRecordsStoragePath = StoragePath(identifier: recordsIdentifier)!
+        self.TradingRecordsPublicPath = PublicPath(identifier: recordsIdentifier)!
+
+        let recordingHookIdentifier = "FRC20TradingRecordingHook_".concat(self.account.address.toString())
+        self.TradingRecordingHookStoragePath = StoragePath(identifier: recordingHookIdentifier)!
+        self.TradingRecordingHookPublicPath = PublicPath(identifier: recordingHookIdentifier)!
 
         emit ContractInitialized()
     }

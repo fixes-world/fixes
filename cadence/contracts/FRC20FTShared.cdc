@@ -26,12 +26,6 @@ pub contract FRC20FTShared {
         executedHookType: Type,
         storefront: Address,
         listingId: UInt64,
-        seller: Address,
-        buyer: Address,
-        tick: String,
-        dealAmount: UFix64,
-        dealPrice: UFix64,
-        totalAmountInListing: UFix64,
     )
 
     /* --- Variable, Enums and Structs --- */
@@ -744,12 +738,6 @@ pub contract FRC20FTShared {
                             executedHookType: type,
                             storefront: storefront,
                             listingId: listingId,
-                            seller: seller,
-                            buyer: buyer,
-                            tick: tick,
-                            dealAmount: dealAmount,
-                            dealPrice: dealPrice,
-                            totalAmountInListing: totalAmountInListing,
                         )
                     }
                 }

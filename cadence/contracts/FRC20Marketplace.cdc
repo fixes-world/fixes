@@ -529,7 +529,14 @@ pub contract FRC20Marketplace {
 
     /** ---– Account Access methods ---- */
 
-    // NOTHING
+    /// Create a new market
+    ///
+    access(account)
+    fun createMarket(_ tick: String): @Market {
+        let market <- create Market(tick: tick)
+        emit MarketCreated(tick: tick, uuid: market.uuid)
+        return <- market
+    }
 
     /** ---– Public methods ---- */
 
@@ -540,15 +547,6 @@ pub contract FRC20Marketplace {
         return getAccount(addr)
             .getCapability<&Market{MarketPublic}>(self.FRC20MarketPublicPath)
             .borrow()
-    }
-
-    /// Create a new market
-    ///
-    access(all)
-    fun createMarket(_ tick: String): @Market {
-        let market <- create Market(tick: tick)
-        emit MarketCreated(tick: tick, uuid: market.uuid)
-        return <- market
     }
 
     init() {
