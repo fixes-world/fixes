@@ -257,7 +257,7 @@ pub contract FRC20FungibleToken: FungibleToken {
 
     access(all)
     fun getPathPrefix(): String {
-        return "FRC20FungibleToken_".concat(self.account.address.toString()).concat(self.getTickerName()).concat("_")
+        return "FRC20FT_".concat(self.account.address.toString()).concat(self.getTickerName()).concat("_")
     }
 
     init() {
