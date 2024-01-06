@@ -25,6 +25,9 @@ pub contract FRC20Marketplace {
     /// Event emitted when the market is accessable
     pub event MarketWhitelistClaimed(tick: String, addr: Address)
 
+    /// Event emitted when the market accessable after timestamp is updated
+    pub event MarketAdminWhitelistUpdated(tick: String, addr: Address, isWhitelisted: Bool)
+
     /* --- Variable, Enums and Structs --- */
 
     pub let FRC20MarketStoragePath: StoragePath
@@ -153,9 +156,12 @@ pub contract FRC20Marketplace {
     /// Market public interface
     ///
     pub resource interface MarketPublic {
-        /// The ticker name of the FRC20 market
+        // ---- Public read methods ----
         access(all) view
         fun getTickerName(): String
+
+        access(all) view
+        fun getSuperAdmin(): Address
 
         access(all) view
         fun getPriceRanks(type: FRC20Storefront.ListingType): [UInt64]
@@ -206,7 +212,7 @@ pub contract FRC20Marketplace {
 
         /// Check if the address is in the admin whitelist
         access(all) view
-        fun isInAdminWhitelist(addr: Address): Bool
+        fun isInAdminWhitelist(_ addr: Address): Bool
 
     }
 
@@ -250,6 +256,15 @@ pub contract FRC20Marketplace {
         access(all) view
         fun getTickerName(): String {
             return self.tick
+        }
+
+        /// Get the super admin address
+        ///
+        access(all) view
+        fun getSuperAdmin(): Address {
+            let meta = FRC20Indexer.getIndexer().getTokenMeta(tick: self.tick)
+                ?? panic("Invalid tick")
+            return meta.deployer
         }
 
         /// Get the price ranks
@@ -365,9 +380,32 @@ pub contract FRC20Marketplace {
 
         /// Check if the address is in the admin whitelist
         access(all) view
-        fun isInAdminWhitelist(addr: Address): Bool {
+        fun isInAdminWhitelist(_ addr: Address): Bool {
             return self.adminWhitelist[addr] ?? false
         }
+
+        /// The method is called by the manager resource
+        ///
+        access(account)
+        fun updateAdminWhitelist(
+            mananger: Address,
+            address: Address,
+            isWhitelisted: Bool
+        ) {
+            pre {
+                self.isInAdminWhitelist(mananger): "The manager is not in the admin whitelist"
+            }
+            let superAdmin = self.getSuperAdmin()
+            if superAdmin == address && !isWhitelisted {
+                panic("The super admin can not be removed from the admin whitelist")
+            }
+
+            self.adminWhitelist[address] = isWhitelisted
+
+            emit MarketAdminWhitelistUpdated(tick: self.tick, addr: address, isWhitelisted: isWhitelisted)
+        }
+
+        // TODO more admin operations
 
         // ---- Accessable settings ----
 
@@ -385,7 +423,7 @@ pub contract FRC20Marketplace {
                 return true
             }
 
-            let isAdmin = self.isInAdminWhitelist(addr: addr)
+            let isAdmin = self.isInAdminWhitelist(addr)
             if isAdmin {
                 return true
             }
