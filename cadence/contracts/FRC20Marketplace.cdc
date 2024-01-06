@@ -213,7 +213,7 @@ pub contract FRC20Marketplace {
     /// The Market resource
     ///
     pub resource Market: MarketPublic {
-        access(contract)
+        access(all)
         let tick:String
         access(self)
         let collections: @{FRC20Storefront.ListingType: {UInt64: ListingCollection}}
@@ -288,6 +288,9 @@ pub contract FRC20Marketplace {
         /// Add a listing to the market
         access(all)
         fun addToList(storefront: Address, listingId: UInt64) {
+            pre {
+                self.canAccess(addr: storefront): "The storefront address is not accessable"
+            }
             let item = ListedItem(address: storefront, listingID: listingId)
             let listingRef = item.borrowListing()
                 ?? panic("no listing id found in storefront:".concat(storefront.toString()))

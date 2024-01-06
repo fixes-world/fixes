@@ -825,6 +825,7 @@ pub contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: makerIns): "The MAKER inscription is not a valid FRC20 inscription"
                 self.isValidFRC20Inscription(ins: takerIns): "The TAKER inscription is not a valid FRC20 inscription"
                 change.isBackedByVault() == false: "The change should not be backed by a vault"
+                maxAmount > 0.0: "No Enough amount to transact"
                 maxAmount <= change.getBalance(): "The max amount should be less than or equal to the change balance"
             }
 
@@ -856,8 +857,8 @@ pub contract FRC20Indexer {
             // set the transact amount, max
             let transactAmount = takerAmt > maxAmount ? maxAmount : takerAmt
             assert(
-                transactAmount <= change.getBalance(),
-                message: "The available amount should be less than or equal to the change balance"
+                transactAmount > 0.0 && transactAmount <= change.getBalance(),
+                message: "The transact amount should be greater than 0.0 and less than or equal to the change balance"
             )
 
             let makerAddr = makerIns.owner!.address
@@ -900,6 +901,7 @@ pub contract FRC20Indexer {
                 takerIns.isExtractable(): "The TAKER inscription is not extractable"
                 self.isValidFRC20Inscription(ins: makerIns): "The MAKER inscription is not a valid FRC20 inscription"
                 self.isValidFRC20Inscription(ins: takerIns): "The TAKER inscription is not a valid FRC20 inscription"
+                maxAmount > 0.0: "No Enough amount to transact"
                 change.isBackedByFlowTokenVault() == true: "The change should be backed by a flow vault"
             }
 

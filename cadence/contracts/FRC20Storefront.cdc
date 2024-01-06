@@ -313,7 +313,6 @@ pub contract FRC20Storefront {
         access(all)
         fun takeSellNow(
             ins: &Fixes.Inscription,
-            paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
             commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
         )
 
@@ -629,7 +628,6 @@ pub contract FRC20Storefront {
         access(all)
         fun takeSellNow(
             ins: &Fixes.Inscription,
-            paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
             commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
         ) {
             pre {
@@ -697,6 +695,9 @@ pub contract FRC20Storefront {
             self.frozenChange <-! restChange
 
             let transactedPrice = payment?.balance ?? panic("Unable to fetch the payment balance")
+            // The payment vault for the sale is from the taker's address
+            let paymentRecipient = FRC20Indexer.borrowFlowTokenReceiver(seller)
+                ?? panic("Unable to fetch the payment recipient")
 
             // Pay the sale cuts to the recipients.
             let commissionAmount = self._payToSaleCuts(
@@ -829,7 +830,7 @@ pub contract FRC20Storefront {
         fun _payToSaleCuts(
             payment: @FlowToken.Vault,
             commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
-            paymentRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            paymentRecipient: &FlowToken.Vault{FungibleToken.Receiver}?,
         ): UFix64 {
             // Some singleton resources
             let frc20Indexer = FRC20Indexer.getIndexer()
@@ -956,12 +957,8 @@ pub contract FRC20Storefront {
                     }
                     break
                 case FRC20FTShared.SaleCutType.BuyTaker:
-                    let receiver = paymentRecipient?.borrow() ?? panic("Payment recipient should not be nil")
-                    assert(
-                        receiver != nil,
-                        message: "Payment recipient capability is not valid"
-                    )
-                    receiver!.deposit(from: <- payment.withdraw(amount: paymentAmt))
+                    let receiver = paymentRecipient ?? panic("Payment recipient should not be nil")
+                    receiver.deposit(from: <- payment.withdraw(amount: paymentAmt))
                 case FRC20FTShared.SaleCutType.Commission:
                     commissionAmount = paymentAmt
                     payCommissionFunc(<- payment.withdraw(amount: paymentAmt))
