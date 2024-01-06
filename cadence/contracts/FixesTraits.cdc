@@ -159,43 +159,15 @@ pub contract FixesTraits {
         if randForTypePercent >= 60 {
             return nil
         }
-        // generate a random number for the entry
-        let randForEntry = revertibleRandom() % 10000
         var type: Type? = nil
-        var defs: [Definition]? = nil
         if randForTypePercent < 5 {
-            defs = self.getSeason0SecretPlacesDefs()
             type = Type<Season0SecretPlaces>()
         } else if randForTypePercent < 15 {
-            defs = self.getSeason0AbilityDefs()
             type = Type<Season0Ability>()
         } else {
-            defs = self.getSeason0WeaponsDefs()
             type = Type<Season0Weapons>()
         }
-
-        var totalWeight: UInt64 = 0
-        var lastThreshold: UInt8 = 0
-        var currentThreshold: UInt8 = 0
-        let maxRarity = UInt8(defs!.length - 1)
-        var currentRarity: UInt8 = 0
-        // find the right rarity
-        for i, def in defs! {
-            totalWeight = totalWeight + def.weight
-            if randForEntry < totalWeight {
-                currentThreshold = def.threshold
-                currentRarity = maxRarity - UInt8(i)
-                break
-            }
-            lastThreshold = def.threshold
-        }
-        // create the entry
-        return <- self.createEntry(
-            type!,
-            // calculate the value
-            lastThreshold + (UInt8(randForEntry % 255) % (currentThreshold - lastThreshold)),
-            currentRarity
-        )
+        return <- self.generateRandomEntry(type!)
     }
 
     /**
@@ -205,7 +177,8 @@ pub contract FixesTraits {
     /// Get the rarity definition array for a given series
     /// The higher the rarity in front.
     ///
-    access(all) fun getRarityArray(_ series: Type): [Definition] {
+    access(all)
+    fun getRarityDefinition(_ series: Type): [Definition]? {
         switch series {
         case Type<Season0SecretPlaces>():
             return self.getSeason0SecretPlacesDefs()
@@ -214,14 +187,17 @@ pub contract FixesTraits {
         case Type<Season0Weapons>():
             return self.getSeason0WeaponsDefs()
         }
-        return []
+        return nil
     }
 
     /// Get the maximum rarity for a given series
     ///
-    access(all) fun getMaxRarity(_ series: Type): UInt8 {
-        let arr = self.getRarityArray(series)
-        return UInt8(arr.length - 1)
+    access(all)
+    fun getMaxRarity(_ series: Type): UInt8 {
+        if let arr = self.getRarityDefinition(series) {
+            return UInt8(arr.length - 1)
+        }
+        return UInt8.max
     }
 
     /**
@@ -245,9 +221,9 @@ pub contract FixesTraits {
         }
     }
 
-    /// The `Entry` resource
+    /// The TraitWithOffset Definition
     ///
-    pub resource Entry: MetadataViews.Resolver {
+    pub struct TraitWithOffset {
         // Series is the identifier of the series enum
         access(all)
         let series: Type
@@ -261,7 +237,7 @@ pub contract FixesTraits {
         access(all)
         let offset: Int8
 
-        init (
+        init(
             series: Type,
             value: UInt8,
             rarity: UInt8
@@ -273,6 +249,32 @@ pub contract FixesTraits {
             let rand = revertibleRandom()
             self.offset = Int8(rand % 40) - 20
         }
+    }
+
+    /// The `Entry` resource
+    ///
+    pub resource Entry: MetadataViews.Resolver {
+        access(self)
+        let trait: TraitWithOffset
+
+        init (
+            series: Type,
+            value: UInt8,
+            rarity: UInt8
+        ) {
+            self.trait = TraitWithOffset(
+                series: series,
+                value: value,
+                rarity: rarity
+            )
+        }
+
+        /// Get the trait
+        ///
+        access(all)
+        fun getTrait(): TraitWithOffset {
+            return self.trait
+        }
 
         // ---- implement Resolver ----
 
@@ -281,6 +283,7 @@ pub contract FixesTraits {
         access(all)
         fun getViews(): [Type] {
             return [
+                Type<TraitWithOffset>(),
                 Type<MetadataViews.Trait>()
             ]
         }
@@ -290,14 +293,16 @@ pub contract FixesTraits {
         access(all)
         fun resolveView(_ view: Type): AnyStruct? {
             switch view {
+            case Type<TraitWithOffset>():
+                return self.trait
             case Type<MetadataViews.Trait>():
                 return MetadataViews.Trait(
-                    name: self.series.identifier,
-                    value: self.value,
+                    name: self.trait.series.identifier,
+                    value: self.trait.value,
                     displayType: "number",
                     rarity: MetadataViews.Rarity(
-                        score: UFix64(self.rarity),
-                        max: UFix64(FixesTraits.getMaxRarity(self.series)),
+                        score: UFix64(self.trait.rarity),
+                        max: UFix64(FixesTraits.getMaxRarity(self.trait.series)),
                         description: nil
                     )
                 )
@@ -314,6 +319,42 @@ pub contract FixesTraits {
             series: series,
             value: value,
             rarity: rarity
+        )
+    }
+
+    /// Generate a random entry
+    ///
+    access(account)
+    fun generateRandomEntry(_ series: Type): @Entry? {
+        let defs = self.getRarityDefinition(series)
+        if defs == nil {
+            return nil // DO NOT PANIC
+        }
+
+        // generate a random number for the entry
+        let randForEntry = revertibleRandom() % 10000
+        // calculate the rarity
+        var totalWeight: UInt64 = 0
+        var lastThreshold: UInt8 = 0
+        var currentThreshold: UInt8 = 0
+        let maxRarity = UInt8(defs!.length - 1)
+        var currentRarity: UInt8 = 0
+        // find the right rarity
+        for i, def in defs! {
+            totalWeight = totalWeight + def.weight
+            if randForEntry < totalWeight {
+                currentThreshold = def.threshold
+                currentRarity = maxRarity - UInt8(i)
+                break
+            }
+            lastThreshold = def.threshold
+        }
+        // create the entry
+        return <- self.createEntry(
+            series,
+            // calculate the value
+            lastThreshold + (UInt8(randForEntry % 255) % (currentThreshold - lastThreshold)),
+            currentRarity
         )
     }
 }
