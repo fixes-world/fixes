@@ -500,6 +500,18 @@ pub contract FRC20Storefront {
                 message: "Seller should be the storefront address and buyer should not be the storefront address"
             )
 
+            // The change to use
+            let extractedFlowChange <- frc20Indexer.extractFlowVaultChangeFromInscription(
+                ins,
+                amount: ins.getInscriptionValue() - ins.getMinCost()
+            )
+            assert(
+                extractedFlowChange.from == buyer
+                && extractedFlowChange.tick == ""
+                && extractedFlowChange.getVaultType() == Type<@FlowToken.Vault>(),
+                message: "Extracted change should be backed by the inscription owner"
+            )
+
             // apply the change and both inscriptions in frc20 indexer
             var restChange <- frc20Indexer.applyBuyNowOrder(
                 makerIns: sellerIns,
@@ -521,22 +533,13 @@ pub contract FRC20Storefront {
 
             // transacted price should be paid to the sale cuts
             let transactedPrice = self.details.getPriceByTransactedAmount(transactedAmt)
-
             assert(
-                ins.getInscriptionValue() >= transactedPrice + ins.getMinCost(),
+                extractedFlowChange.getBalance() >= transactedPrice + ins.getMinCost(),
                 message: "Insufficient payment value"
             )
 
             // The payment vault for the sale.
-            let paymentChange <- frc20Indexer.extractFlowVaultChangeFromInscription(ins, amount: transactedPrice)
-            assert(
-                paymentChange.from == buyer
-                && paymentChange.tick == ""
-                && paymentChange.getVaultType() == Type<@FlowToken.Vault>(),
-                message: "Payment change should be backed by the inscription owner"
-            )
-            let flowVault <- paymentChange.extractAsVault()
-            destroy paymentChange
+            let flowVault <- extractedFlowChange.withdrawAsVault(amount: transactedPrice)
 
             // Pay the sale cuts to the recipients.
             let commissionAmount = self._payToSaleCuts(
@@ -544,6 +547,18 @@ pub contract FRC20Storefront {
                 commissionRecipient: commissionRecipient,
                 paymentRecipient: nil,
             )
+
+            // Pay the residual change to the buyer.
+            if extractedFlowChange.getBalance() > 0.0 {
+                // If there is residual change, pay to the buyer
+                let residualVault <- extractedFlowChange.extractAsVault()
+                destroy extractedFlowChange
+                let buyerVault = FRC20Indexer.borrowFlowTokenReceiver(buyer)
+                    ?? panic("Unable to fetch the buyer vault")
+                buyerVault.deposit(from: <- residualVault)
+            } else {
+                destroy extractedFlowChange
+            }
 
             let tickName = self.details.tick
             let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
