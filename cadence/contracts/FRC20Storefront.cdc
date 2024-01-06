@@ -94,7 +94,6 @@ pub contract FRC20Storefront {
     pub enum ListingType: UInt8 {
         pub case FixedPriceBuyNow
         pub case FixedPriceSellNow
-        pub case FixedPricePrivate
     }
 
     /// ListingDetails
@@ -352,7 +351,6 @@ pub contract FRC20Storefront {
         ) {
             // Store the commission recipients capability
             self.commissionRecipientCaps = commissionRecipientCaps
-            // TODO: check the commission recipients address before storing them
 
             // Analyze the listing inscription and build the details
             let indexer = FRC20Indexer.getIndexer()
