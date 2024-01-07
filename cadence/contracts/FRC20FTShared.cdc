@@ -684,6 +684,17 @@ pub contract FRC20FTShared {
             self.hooks = {}
         }
 
+        // --- Public Methods ---
+
+        /// Check if the hook exists
+        ///
+        access(all)
+        fun hasHook(_ type: Type): Bool {
+            return self.hooks[type] != nil
+        }
+
+        // --- Account Methods ---
+
         access(account)
         fun addHook(_ hook: Capability<&AnyResource{TransactionHook}>) {
             pre {

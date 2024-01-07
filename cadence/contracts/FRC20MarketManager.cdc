@@ -34,54 +34,15 @@ pub contract FRC20MarketManager {
         // TODO: implement the details
     }
 
-    // --- Public methods ---
+    /* --- Account access methods  --- */
 
-    access(all)
-    fun enableAndCreateFRC20Market(
-        ins: &Fixes.Inscription,
-        newAccount: Capability<&AuthAccount>,
-    ): @Manager {
-        // singletoken resources
-        let frc20Indexer = FRC20Indexer.getIndexer()
+    access(account)
+    fun ensureMarketResourcesAvailable(tick: String) {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-
-        // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
-
-        // Check if the token is already registered
-        let tokenMeta = frc20Indexer.getTokenMeta(tick: tick) ?? panic("The token is not registered")
-        /// Check if the market is already enabled
-        assert(
-            acctsPool.getFRC20MarketAddress(tick: tick) == nil,
-            message: "The market is already enabled"
-        )
-
-        // execute the inscription to ensure you are the deployer of the token
-        let ret = frc20Indexer.executeByDeployer(ins: ins)
-        assert(
-            ret == true,
-            message: "The inscription execution failed"
-        )
-
-        // create the account for the market at the accounts pool
-        acctsPool.setupNewChildForTick(
-            type: FRC20AccountsPool.ChildAccountType.Market,
-            tick: tick,
-            newAccount
-        )
 
         // try to borrow the account to check if it was created
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Market, tick: tick)
             ?? panic("The market account was not created")
-
-        // ensure market is not in the account
-        assert(
-            childAcctRef.borrow<&FRC20Marketplace.Market>(from: FRC20Marketplace.FRC20MarketStoragePath) == nil,
-            message: "The market is already in the account"
-        )
-        // create the market and save it in the account
-        let market <- FRC20Marketplace.createMarket(tick)
 
         // The market should have the following resources in the account:
         // - FRC20Marketplace.Market: Market resource
@@ -90,14 +51,23 @@ pub contract FRC20MarketManager {
         // - FRC20TradingRecord.TradingRecordingHook: Hook for the trading records
         // - FRC20TradingRecord.TradingRecords: Trading records resource
 
-        // save the market in the account
-        childAcctRef.save(<- market, to: FRC20Marketplace.FRC20MarketStoragePath)
-        // link the market to the public path
-        childAcctRef.unlink(FRC20Marketplace.FRC20MarketPublicPath)
-        childAcctRef.link<&FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}>(
-            FRC20Marketplace.FRC20MarketPublicPath,
-            target: FRC20Marketplace.FRC20MarketStoragePath
-        )
+        if let market = childAcctRef.borrow<&FRC20Marketplace.Market>(from: FRC20Marketplace.FRC20MarketStoragePath) {
+            assert(
+                market.tick == tick,
+                message: "The market tick is not the same as the expected one"
+            )
+        } else {
+            // create the market and save it in the account
+            let market <- FRC20Marketplace.createMarket(tick)
+            // save the market in the account
+            childAcctRef.save(<- market, to: FRC20Marketplace.FRC20MarketStoragePath)
+            // link the market to the public path
+            childAcctRef.unlink(FRC20Marketplace.FRC20MarketPublicPath)
+            childAcctRef.link<&FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}>(
+                FRC20Marketplace.FRC20MarketPublicPath,
+                target: FRC20Marketplace.FRC20MarketStoragePath
+            )
+        }
 
         // create the shared store and save it in the account
         if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
@@ -138,15 +108,20 @@ pub contract FRC20MarketManager {
                 target: FRC20TradingRecord.TradingRecordingHookStoragePath
             )
         }
-        // add the trading record hook to the hooks
+
+        // add the trading record hook to the hooks, if it is not added yet
         // get the public capability of the trading record hook
         let tradingRecordingCap = childAcctRef
             .getCapability<&FRC20TradingRecord.TradingRecordingHook{FRC20FTShared.TransactionHook}>(
                 FRC20TradingRecord.TradingRecordingHookPublicPath
             )
         assert(tradingRecordingCap.check(), message: "The trading record hook is not valid")
-        // add the trading record hook to the hooks
-        hooksRef.addHook(tradingRecordingCap)
+        // get the reference of the trading record hook
+        let tradingRecordingHookRef = tradingRecordingCap.borrow()
+            ?? panic("The trading record hook is not valid")
+        if hooksRef.hasHook(tradingRecordingHookRef.getType()) == nil {
+            hooksRef.addHook(tradingRecordingCap)
+        }
 
         // create trading records and save it in the account
         if childAcctRef.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
@@ -159,11 +134,55 @@ pub contract FRC20MarketManager {
                 target: FRC20TradingRecord.TradingRecordsStoragePath
             )
         }
+    }
+
+    // --- Public methods ---
+
+    access(all)
+    fun enableAndCreateFRC20Market(
+        ins: &Fixes.Inscription,
+        newAccount: Capability<&AuthAccount>,
+    ): @Manager {
+        // singletoken resources
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+
+        // Check if the token is already registered
+        let tokenMeta = frc20Indexer.getTokenMeta(tick: tick) ?? panic("The token is not registered")
+        /// Check if the market is already enabled
+        assert(
+            acctsPool.getFRC20MarketAddress(tick: tick) == nil,
+            message: "The market is already enabled"
+        )
+
+        // execute the inscription to ensure you are the deployer of the token
+        let ret = frc20Indexer.executeByDeployer(ins: ins)
+        assert(
+            ret == true,
+            message: "The inscription execution failed"
+        )
+
+        // get the new account address
+        let newAcctAddress = newAccount.address
+
+        // create the account for the market at the accounts pool
+        acctsPool.setupNewChildForTick(
+            type: FRC20AccountsPool.ChildAccountType.Market,
+            tick: tick,
+            newAccount
+        )
+
+        // ensure all market resources are available
+        self.ensureMarketResourcesAvailable(tick: tick)
 
         // emit the event
         emit NewMarketEnabled(
             tick: tick,
-            address: childAcctRef.address,
+            address: newAcctAddress,
             by: ins.owner!.address
         )
 
