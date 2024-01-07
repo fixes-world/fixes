@@ -588,6 +588,15 @@ pub contract FRC20FTShared {
             }
             return nil
         }
+
+        // --- Account Methods ---
+
+        /// Set the value
+        access(account)
+        fun set(_ key: String, value: AnyStruct)
+        /// Set the value by type
+        access(account)
+        fun setByEnum(_ type: ConfigType, value: AnyStruct)
     }
 
     pub resource SharedStore: SharedStorePublic {

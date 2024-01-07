@@ -27,6 +27,8 @@ pub contract FRC20Marketplace {
 
     /// Event emitted when the market accessable after timestamp is updated
     pub event MarketAdminWhitelistUpdated(tick: String, addr: Address, isWhitelisted: Bool)
+    /// Event emitted when the market properties are updated
+    pub event MarketAdminPropertiesUpdated(tick: String, key: UInt8, value: String)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -153,6 +155,16 @@ pub contract FRC20Marketplace {
         }
     }
 
+    /// The interface for the market manager
+    ///
+    pub resource interface MarketManager {
+        /// Get the owner address
+        access(all)
+        fun getOwnerAddress(): Address {
+            return self.owner?.address ?? panic("The owner is not set")
+        }
+    }
+
     /// Market public interface
     ///
     pub resource interface MarketPublic {
@@ -214,6 +226,20 @@ pub contract FRC20Marketplace {
         access(all) view
         fun isInAdminWhitelist(_ addr: Address): Bool
 
+        /// Update the admin whitelist
+        access(account)
+        fun updateAdminWhitelist(
+            mananger: &AnyResource{MarketManager},
+            address: Address,
+            isWhitelisted: Bool
+        )
+
+        /// Update the marketplace properties
+        access(account)
+        fun updateMarketplaceProperties(
+            mananger: &AnyResource{MarketManager},
+            _ props: {FRC20FTShared.ConfigType: String}
+        )
     }
 
     /// The Market resource
@@ -384,16 +410,17 @@ pub contract FRC20Marketplace {
             return self.adminWhitelist[addr] ?? false
         }
 
+        /// Update the admin whitelist
         /// The method is called by the manager resource
         ///
         access(account)
         fun updateAdminWhitelist(
-            mananger: Address,
+            mananger: &{MarketManager},
             address: Address,
             isWhitelisted: Bool
         ) {
             pre {
-                self.isInAdminWhitelist(mananger): "The manager is not in the admin whitelist"
+                self.isInAdminWhitelist(mananger.getOwnerAddress()): "The manager is not in the admin whitelist"
             }
             let superAdmin = self.getSuperAdmin()
             if superAdmin == address && !isWhitelisted {
@@ -403,6 +430,57 @@ pub contract FRC20Marketplace {
             self.adminWhitelist[address] = isWhitelisted
 
             emit MarketAdminWhitelistUpdated(tick: self.tick, addr: address, isWhitelisted: isWhitelisted)
+        }
+
+        /// Update the marketplace properties
+        /// The method is called by the manager resource
+        ///
+        access(account)
+        fun updateMarketplaceProperties(
+            mananger: &{MarketManager},
+            _ props: {FRC20FTShared.ConfigType: String}
+        ) {
+            pre {
+                self.isInAdminWhitelist(mananger.getOwnerAddress()): "The manager is not in the admin whitelist"
+            }
+            // save the properties to the shared store
+            if let storeRef = self.borrowSharedStore() {
+                for key in props.keys {
+                    var value: AnyStruct? = nil
+                    switch key {
+                    case FRC20FTShared.ConfigType.MarketFeeSharedRatio:
+                        value = UFix64.fromString(props[key]!) ?? panic("Invalid ratio")
+                        break
+                    case FRC20FTShared.ConfigType.MarketFeeTokenSpecificRatio:
+                        value = UFix64.fromString(props[key]!) ?? panic("Invalid ratio")
+                        break
+                    case FRC20FTShared.ConfigType.MarketFeeDeployerRatio:
+                        value = UFix64.fromString(props[key]!) ?? panic("Invalid ratio")
+                        break
+                    case FRC20FTShared.ConfigType.MarketAccessableAfter:
+                        value = UInt64.fromString(props[key]!) ?? panic("Invalid timestamp")
+                        break
+                    case FRC20FTShared.ConfigType.MarketWhitelistClaimingToken:
+                        value = props[key]!
+                        break
+                    case FRC20FTShared.ConfigType.MarketWhitelistClaimingAmount:
+                        value = UFix64.fromString(props[key]!) ?? panic("Invalid amount")
+                        break
+                    }
+                    if value != nil {
+                        storeRef.setByEnum(key, value: value)
+
+                        // emit event
+                        emit MarketAdminPropertiesUpdated(
+                            tick: self.tick,
+                            key: key.rawValue,
+                            value: props[key]!
+                        )
+                    }
+                }
+            } else {
+                panic("Failed to borrow the shared store for the market: ".concat(self.tick))
+            }
         }
 
         // TODO more admin operations

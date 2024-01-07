@@ -17,21 +17,43 @@ pub contract FRC20MarketManager {
     /* --- Variable, Enums and Structs --- */
 
     pub let FRC20MarketManagerStoragePath: StoragePath
-    pub let FRC20MarketManagerPublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
 
     /// The resource manager for the FRC20MarketManager
     ///
-    pub resource Manager {
+    pub resource Manager: FRC20Marketplace.MarketManager {
+        /// Update the admin whitelist
+        ///
         access(all)
-        let tick: String
-
-        init(_ tick: String) {
-            self.tick = tick
+        fun updateAdminWhitelist(
+            tick: String,
+            address: Address,
+            isWhitelisted: Bool
+        ) {
+            let market = FRC20MarketManager.borrowMarket(tick)
+                ?? panic("The market is not enabled")
+            market.updateAdminWhitelist(
+                mananger: (&self as &{FRC20Marketplace.MarketManager}),
+                address: address,
+                isWhitelisted: isWhitelisted
+            )
         }
 
-        // TODO: implement the details
+        /// Update the marketplace properties
+        ///
+        access(all)
+        fun updateMarketplaceProperties(
+            tick: String,
+            _ props: {FRC20FTShared.ConfigType: String}
+        ) {
+            let market = FRC20MarketManager.borrowMarket(tick)
+                ?? panic("The market is not enabled")
+            market.updateMarketplaceProperties(
+                mananger: (&self as &{FRC20Marketplace.MarketManager}),
+                props
+            )
+        }
     }
 
     /* --- Account access methods  --- */
@@ -138,6 +160,9 @@ pub contract FRC20MarketManager {
 
     // --- Public methods ---
 
+    /// Enable a new market, and create the market account
+    /// The inscription owner should be the deployer of the token
+    ///
     access(all)
     fun enableAndCreateFRC20Market(
         ins: &Fixes.Inscription,
@@ -151,12 +176,17 @@ pub contract FRC20MarketManager {
         let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
 
-        // Check if the token is already registered
-        let tokenMeta = frc20Indexer.getTokenMeta(tick: tick) ?? panic("The token is not registered")
         /// Check if the market is already enabled
         assert(
             acctsPool.getFRC20MarketAddress(tick: tick) == nil,
             message: "The market is already enabled"
+        )
+
+        // Check if the token is already registered
+        let tokenMeta = frc20Indexer.getTokenMeta(tick: tick) ?? panic("The token is not registered")
+        assert(
+            tokenMeta.deployer == ins.owner!.address,
+            message: "The token is not deployed by the inscription owner"
         )
 
         // execute the inscription to ensure you are the deployer of the token
@@ -165,9 +195,6 @@ pub contract FRC20MarketManager {
             ret == true,
             message: "The inscription execution failed"
         )
-
-        // get the new account address
-        let newAcctAddress = newAccount.address
 
         // create the account for the market at the accounts pool
         acctsPool.setupNewChildForTick(
@@ -182,18 +209,35 @@ pub contract FRC20MarketManager {
         // emit the event
         emit NewMarketEnabled(
             tick: tick,
-            address: newAcctAddress,
+            address: newAccount.address,
             by: ins.owner!.address
         )
 
         // return the market manager
-        return <- create Manager(tick)
+        return <- self.createManager()
+    }
+
+    /// Borrow the market reference
+    ///
+    access(all)
+    fun borrowMarket(_ tick: String): &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}? {
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        if let address = acctsPool.getFRC20MarketAddress(tick: tick) {
+            return FRC20Marketplace.borrowMarket(address)
+        }
+        return nil
+    }
+
+    /// Anyone can create a market manager resource.
+    ///
+    access(all)
+    fun createManager(): @Manager {
+        return <- create Manager()
     }
 
     init() {
         let identifier = "FRC20MarketManager_".concat(self.account.address.toString())
         self.FRC20MarketManagerStoragePath = StoragePath(identifier: identifier)!
-        self.FRC20MarketManagerPublicPath = PublicPath(identifier: identifier)!
 
         emit ContractInitialized()
     }
