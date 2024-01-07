@@ -22,10 +22,6 @@ pub contract FRC20TradingRecord {
 
     /* --- Variable, Enums and Structs --- */
     access(all)
-    let TradingRecordingHookStoragePath: StoragePath
-    access(all)
-    let TradingRecordingHookPublicPath: PublicPath
-    access(all)
     let TradingRecordsStoragePath: StoragePath
     access(all)
     let TradingRecordsPublicPath: PublicPath
@@ -247,16 +243,11 @@ pub contract FRC20TradingRecord {
 
         access(all)
         fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
-
-        // ---- Contract Methods ----
-        /// Add a record
-        access(contract)
-        fun addRecord(record: TransactionRecord)
     }
 
     /// The resource containing the trading volume
     ///
-    pub resource TradingRecords: TradingRecordsPublic, TradingStatusViewer {
+    pub resource TradingRecords: TradingRecordsPublic, TradingStatusViewer, FRC20FTShared.TransactionHook {
         access(self)
         let tick: String?
         /// Trading status
@@ -317,6 +308,44 @@ pub contract FRC20TradingRecord {
             return self.borrowDailyRecordsPriv(date)
         }
 
+        // --- FRC20FTShared.TransactionHook ---
+
+        /// The method that is invoked when the transaction is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onDeal(
+            storefront: Address,
+            listingId: UInt64,
+            seller: Address,
+            buyer: Address,
+            tick: String,
+            dealAmount: UFix64,
+            dealPrice: UFix64,
+            totalAmountInListing: UFix64,
+        ) {
+            if self.owner == nil {
+                return // DO NOT PANIC
+            }
+
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let meta = frc20Indexer.getTokenMeta(tick: tick)
+            if meta == nil {
+                return // DO NOT PANIC
+            }
+            let newRecord = TransactionRecord(
+                storefront: storefront,
+                buyer: buyer,
+                seller: seller,
+                tick: tick,
+                dealAmount: dealAmount,
+                dealPrice: dealPrice,
+                dealPricePerMint: meta!.limit / dealAmount * dealPrice
+            )
+
+            self.addRecord(record: newRecord)
+        }
+
         /** Internal Methods */
 
         access(contract)
@@ -358,60 +387,6 @@ pub contract FRC20TradingRecord {
         }
     }
 
-    /// The resource containing the trading volume of a token
-    //
-    pub resource TradingRecordingHook: FRC20FTShared.TransactionHook {
-
-        /// The method that is invoked when the transaction is executed
-        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
-        ///
-        access(account)
-        fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
-            seller: Address,
-            buyer: Address,
-            tick: String,
-            dealAmount: UFix64,
-            dealPrice: UFix64,
-            totalAmountInListing: UFix64,
-        ) {
-            if self.owner == nil {
-                return // DO NOT PANIC
-            }
-
-            let frc20Indexer = FRC20Indexer.getIndexer()
-            let meta = frc20Indexer.getTokenMeta(tick: tick)
-            if meta == nil {
-                return // DO NOT PANIC
-            }
-            let newRecord = TransactionRecord(
-                storefront: storefront,
-                buyer: buyer,
-                seller: seller,
-                tick: tick,
-                dealAmount: dealAmount,
-                dealPrice: dealPrice,
-                dealPricePerMint: meta!.limit / dealAmount * dealPrice
-            )
-
-            // check owner's trading records
-            if let marketRecords = FRC20TradingRecord.borrowTradingRecords(self.owner!.address) {
-                marketRecords.addRecord(record: newRecord)
-            }
-
-            // check seller's trading records
-            if let sellerRecords = FRC20TradingRecord.borrowTradingRecords(seller) {
-                sellerRecords.addRecord(record: newRecord)
-            }
-
-            // check buyer's trading records
-            if let buyerRecords = FRC20TradingRecord.borrowTradingRecords(buyer) {
-                buyerRecords.addRecord(record: newRecord)
-            }
-        }
-    }
-
     /** ---– Public methods ---- */
 
     /// The helper method to get the market resource reference
@@ -430,22 +405,10 @@ pub contract FRC20TradingRecord {
         return <-create TradingRecords(tick)
     }
 
-    /// Create a trading recorder resource
-    /// This method should be called by the contracts in the same account
-    ///
-    access(account)
-    fun createTradingRecordingHook(): @TradingRecordingHook {
-        return <-create TradingRecordingHook()
-    }
-
     init() {
         let recordsIdentifier = "FRC20TradingRecords_".concat(self.account.address.toString())
         self.TradingRecordsStoragePath = StoragePath(identifier: recordsIdentifier)!
         self.TradingRecordsPublicPath = PublicPath(identifier: recordsIdentifier)!
-
-        let recordingHookIdentifier = "FRC20TradingRecordingHook_".concat(self.account.address.toString())
-        self.TradingRecordingHookStoragePath = StoragePath(identifier: recordingHookIdentifier)!
-        self.TradingRecordingHookPublicPath = PublicPath(identifier: recordingHookIdentifier)!
 
         emit ContractInitialized()
     }

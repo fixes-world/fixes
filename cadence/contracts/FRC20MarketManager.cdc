@@ -85,10 +85,7 @@ pub contract FRC20MarketManager {
             childAcctRef.save(<- market, to: FRC20Marketplace.FRC20MarketStoragePath)
             // link the market to the public path
             childAcctRef.unlink(FRC20Marketplace.FRC20MarketPublicPath)
-            childAcctRef.link<&FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}>(
-                FRC20Marketplace.FRC20MarketPublicPath,
-                target: FRC20Marketplace.FRC20MarketStoragePath
-            )
+            childAcctRef.link<&FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}>(FRC20Marketplace.FRC20MarketPublicPath, target: FRC20Marketplace.FRC20MarketStoragePath)
         }
 
         // create the shared store and save it in the account
@@ -97,10 +94,7 @@ pub contract FRC20MarketManager {
             childAcctRef.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
             // link the shared store to the public path
             childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
-            childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(
-                FRC20FTShared.SharedStorePublicPath,
-                target: FRC20FTShared.SharedStoreStoragePath
-            )
+            childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
         }
 
         // create the hooks and save it in the account
@@ -109,52 +103,33 @@ pub contract FRC20MarketManager {
             childAcctRef.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
             // link the hooks to the public path
             childAcctRef.unlink(FRC20FTShared.TransactionHookPublicPath)
-            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook}>(
-                FRC20FTShared.TransactionHookPublicPath,
-                target: FRC20FTShared.TransactionHookStoragePath
-            )
+            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook}>(FRC20FTShared.TransactionHookPublicPath, target: FRC20FTShared.TransactionHookStoragePath)
         }
-
+        // borrow the hooks reference
         let hooksRef = childAcctRef.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
 
-        // create trading record hook and save it in the account
-        if childAcctRef.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordingHookStoragePath) == nil {
-            let tradingRecord <- FRC20TradingRecord.createTradingRecordingHook()
-            childAcctRef.save(<- tradingRecord, to: FRC20TradingRecord.TradingRecordingHookStoragePath)
-            // link the trading record to the public path
-            childAcctRef.unlink(FRC20TradingRecord.TradingRecordingHookPublicPath)
-            // Trading recording hook is one of the hooks
-            childAcctRef.link<&FRC20TradingRecord.TradingRecordingHook{FRC20FTShared.TransactionHook}>(
-                FRC20TradingRecord.TradingRecordingHookPublicPath,
-                target: FRC20TradingRecord.TradingRecordingHookStoragePath
-            )
-        }
-
-        // add the trading record hook to the hooks, if it is not added yet
-        // get the public capability of the trading record hook
-        let tradingRecordingCap = childAcctRef
-            .getCapability<&FRC20TradingRecord.TradingRecordingHook{FRC20FTShared.TransactionHook}>(
-                FRC20TradingRecord.TradingRecordingHookPublicPath
-            )
-        assert(tradingRecordingCap.check(), message: "The trading record hook is not valid")
-        // get the reference of the trading record hook
-        let tradingRecordingHookRef = tradingRecordingCap.borrow()
-            ?? panic("The trading record hook is not valid")
-        if hooksRef.hasHook(tradingRecordingHookRef.getType()) == nil {
-            hooksRef.addHook(tradingRecordingCap)
-        }
-
-        // create trading records and save it in the account
+        // ensure trading records are available
         if childAcctRef.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
             let tradingRecords <- FRC20TradingRecord.createTradingRecords(tick)
             childAcctRef.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
             // link the trading records to the public path
             childAcctRef.unlink(FRC20TradingRecord.TradingRecordsPublicPath)
-            childAcctRef.link<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer}>(
-                FRC20TradingRecord.TradingRecordsPublicPath,
-                target: FRC20TradingRecord.TradingRecordsStoragePath
+            childAcctRef.link<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(FRC20TradingRecord.TradingRecordsPublicPath, target: FRC20TradingRecord.TradingRecordsStoragePath)
+        }
+
+        // add the trading records to the hooks, if it is not added yet
+        // get the public capability of the trading record hook
+        let tradingRecordsCap = childAcctRef
+            .getCapability<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(
+                FRC20TradingRecord.TradingRecordsPublicPath
             )
+        assert(tradingRecordsCap.check(), message: "The trading record hook is not valid")
+        // get the reference of the trading record hook
+        let recordsRef = tradingRecordsCap.borrow()
+            ?? panic("The trading record hook is not valid")
+        if !hooksRef.hasHook(recordsRef.getType()) {
+            hooksRef.addHook(tradingRecordsCap)
         }
     }
 
