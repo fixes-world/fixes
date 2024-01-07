@@ -5,6 +5,7 @@ import "FlowToken"
 import "HybridCustody"
 // Fixes imports
 import "Fixes"
+import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
 import "FRC20MarketManager"
@@ -12,10 +13,12 @@ import "FRC20MarketManager"
 transaction(
     tick: String,
     initialFundingAmt: UFix64,
+    properties: {UInt8: String}
 ) {
     let pool: &FRC20AccountsPool.Pool{FRC20AccountsPool.PoolPublic}
     let ins: &Fixes.Inscription
     let childAccountCap: Capability<&AuthAccount>
+    let manager: &FRC20MarketManager.Manager
 
     prepare(acct: AuthAccount) {
         // ----------- Prepare the pool -----------
@@ -95,6 +98,8 @@ transaction(
         if acct.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath) == nil {
             acct.save(<- FRC20MarketManager.createManager(), to: FRC20MarketManager.FRC20MarketManagerStoragePath)
         }
+        self.manager = acct.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath)
+            ?? panic("Could not borrow reference to the FRC20MarketManager")
     }
 
     pre {
@@ -108,6 +113,16 @@ transaction(
             newAccount: self.childAccountCap,
         )
 
+        // set the properties
+        let initProps: {FRC20FTShared.ConfigType: String} = {}
+        for key in properties.keys {
+            if let configType = FRC20FTShared.ConfigType(rawValue: key) {
+                initProps[configType] = properties[key]!
+            }
+        }
+        if initProps.keys.length > 0 {
+            self.manager.updateMarketplaceProperties(tick: tick, initProps)
+        }
         log("Done")
     }
 
