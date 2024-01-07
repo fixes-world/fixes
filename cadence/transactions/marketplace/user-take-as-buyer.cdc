@@ -14,15 +14,57 @@ import "FRC20MarketManager"
 
 transaction(
     tick: String,
+    rankedId: String,
     buyAmount: UFix64,
-    buyPrice: UFix64
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
-    let storefront: &FRC20Storefront.Storefront
-    let flowTokenReceiver: Capability<&FlowToken.Vault{FungibleToken.Receiver}>
-    let ins: @Fixes.Inscription
+    let listedItem: FRC20Marketplace.ListedItem
+    let listing: &FRC20Storefront.Listing{FRC20Storefront.ListingPublic}
+    let storefront: &FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}
+    let ins: &Fixes.Inscription
 
     prepare(acct: AuthAccount) {
+        /** ------------- Start -- FRC20 Marketplace -------------  */
+        // Borrow a reference to the FRC20Marketplace contract
+        self.market = FRC20MarketManager.borrowMarket(tick)
+            ?? panic("Could not borrow reference to the FRC20Market")
+
+        assert(
+            self.market.getTickerName() == tick,
+            message: "The market is not for the FRC20 token with tick ".concat(tick)
+        )
+        assert(
+            self.market.canAccess(addr: acct.address),
+            message: "You are not allowed to access this market for now."
+        )
+        /** ------------- End -------------------------------------  */
+
+        self.listedItem = self.market.getListedItemByRankdedId(rankedId: rankedId)
+            ?? panic("Could not borrow reference to the listed item")
+
+        /** ------------- Start -- FRC20 Storefront Initialization -------------  */
+        self.storefront = self.listedItem.borrowStorefront()
+            ?? panic("Could not borrow reference to the NFTStorefront")
+
+        self.listing = self.listedItem.borrowListing()
+            ?? panic("Could not borrow reference to the listing")
+
+        let listingDetails = self.listing.getDetails()
+        assert(
+            listingDetails.status == FRC20Storefront.ListingStatus.Available,
+            message: "The listing is not available"
+        )
+        assert(
+            listingDetails.type == FRC20Storefront.ListingType.FixedPriceBuyNow,
+            message: "The listing is not a fixed price buy now listing"
+        )
+        /** ------------- End --------------------------------------------------  */
+
+        assert(
+            listingDetails.tick == tick,
+            message: "The listing is not for the FRC20 token with tick ".concat(tick)
+        )
+
         /** ------------- Start -- FRC20 Marketing Account General Initialization -------------  */
         // Ensure hooks are initialized
         if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
@@ -73,27 +115,15 @@ transaction(
         }
         /** ------------- End -----------------------------------------------------------------  */
 
-        /** ------------- Start -- FRC20 Storefront Initialization -------------  */
-        // Create Storefront if it doesn't exist
-        if acct.borrow<&AnyResource>(from: FRC20Storefront.StorefrontStoragePath) == nil {
-            acct.save(<- FRC20Storefront.createStorefront(), to: FRC20Storefront.StorefrontStoragePath)
-            acct.unlink(FRC20Storefront.StorefrontPublicPath)
-            acct.link<&FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}>(FRC20Storefront.StorefrontPublicPath, target: FRC20Storefront.StorefrontStoragePath)
-        }
-        self.storefront = acct.borrow<&FRC20Storefront.Storefront>(from: FRC20Storefront.StorefrontStoragePath)
-            ?? panic("Missing or mis-typed NFTStorefront Storefront")
-
-        self.flowTokenReceiver = acct.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-        assert(self.flowTokenReceiver.check(), message: "Missing or mis-typed FlowToken receiver")
-        /** ------------- End --------------------------------------------------  */
+        // calculate the buy price
+        let buyPrice = listingDetails.totalPrice * buyAmount / listingDetails.amount
 
         /** ------------- Start -- Inscription Initialization -------------  */
         // basic attributes
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
-        let dataStr = "op=list-sellnow,tick=".concat(tick)
+        let dataStr = "op=list-take-buynow,tick=".concat(tick)
             .concat(",amt=").concat(buyAmount.toString())
-            .concat(",price=").concat(buyPrice.toString())
         let metadata = dataStr.utf8
 
         // estimate the required storage
@@ -113,7 +143,7 @@ transaction(
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
 
         // Create the Inscription first
-        self.ins <- Fixes.createInscription(
+        let newIns <- Fixes.createInscription(
             // Withdraw tokens from the signer's stored vault
             value: <- (flowToReserve as! @FlowToken.Vault),
             mimeType: mimeType,
@@ -122,30 +152,28 @@ transaction(
             encoding: nil,
             parentId: nil
         )
+        // save the new Inscription to storage
+        let newInsId = newIns.getId()
+        let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
+        assert(
+            acct.borrow<&AnyResource>(from: newInsPath) == nil,
+            message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
+        )
+        acct.save(<- newIns, to: newInsPath)
+
+        // borrow a reference to the new Inscription
+        self.ins = acct.borrow<&Fixes.Inscription>(from: newInsPath)
+            ?? panic("Could not borrow reference to the new Inscription!")
         /** ------------- End ---------------------------------------------  */
-
-        // Borrow a reference to the FRC20Marketplace contract
-        self.market = FRC20MarketManager.borrowMarket(tick)
-            ?? panic("Could not borrow reference to the FRC20Market")
-    }
-
-    pre {
-        self.market.canAccess(addr: self.storefront.owner!.address): "You are not allowed to access this market for now."
     }
 
     execute {
-        // add to user's storefront
-        let listingId = self.storefront.createListing(
-            ins: <- self.ins,
-            commissionRecipientCaps: nil,
-            customID: nil
-        )
+        // execute taking
+        self.listing.takeBuyNow(ins: self.ins, commissionRecipient: nil)
 
-        // add to market
-        self.market.addToList(
-            storefront: self.storefront.owner!.address,
-            listingId: listingId
-        )
+        // cleanup
+        self.storefront.tryCleanupFinishedListing(self.listedItem.id)
+        self.market.tryRemoveCompletedListing(rankedId: self.listedItem.rankedId)
 
         log("Done")
     }

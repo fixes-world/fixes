@@ -1055,7 +1055,7 @@ pub contract FRC20Storefront {
         fun borrowListing(_ listingResourceID: UInt64): &Listing{ListingPublic}?
         // Cleanup methods
         access(all)
-        fun cleanupFinishedListing(_ listingResourceID: UInt64)
+        fun tryCleanupFinishedListing(_ listingResourceID: UInt64)
         /** ---- Contract Methods ---- */
         /// borrow the inscription reference
         access(contract)
@@ -1235,15 +1235,15 @@ pub contract FRC20Storefront {
         /// Allows anyone to remove already completed listings.
         ///
         access(all)
-        fun cleanupFinishedListing(_ listingResourceID: UInt64) {
+        fun tryCleanupFinishedListing(_ listingResourceID: UInt64) {
             let listingRef = self.borrowListing(listingResourceID)
                 ?? panic("Could not find listing with given id")
             let details = listingRef.getDetails()
 
-            assert(
-                details.isCompleted() || details.isCancelled(),
-                message: "Given listing is not completed or cancelled"
-            )
+            // If the listing is not completed or cancelled, then we don't need to do anything.
+            if !details.isCompleted() && !details.isCancelled() {
+                return
+            }
 
             let listing <- self.listings.remove(key: listingResourceID)!
 
@@ -1257,6 +1257,7 @@ pub contract FRC20Storefront {
             )
             // destroy listing
             destroy listing
+
             // destory the inscription
             let ins <- self.inscriptions.remove(key: details.inscriptionId)
             destroy ins

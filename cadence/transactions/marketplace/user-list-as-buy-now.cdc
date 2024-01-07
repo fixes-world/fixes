@@ -129,7 +129,7 @@ transaction(
     }
 
     pre {
-        self.market.canAccess(addr: self.ins.owner!.address): "You are not allowed to access this market for now."
+        self.market.canAccess(addr: self.storefront.owner!.address): "You are not allowed to access this market for now."
     }
 
     execute {
