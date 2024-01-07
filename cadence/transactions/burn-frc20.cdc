@@ -28,7 +28,8 @@ transaction(
 
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-			?? panic("Could not borrow reference to the owner's Vault!")
+            ?? panic("Could not borrow reference to the owner's Vault!")
+        // Withdraw tokens from the signer's stored vault
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first

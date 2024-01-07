@@ -14,8 +14,8 @@ import "FRC20Marketplace"
 
 transaction(
     tick: String,
-    sellAmount: UFix64,
-    sellPrice: UFix64
+    buyAmount: UFix64,
+    buyPrice: UFix64
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
     let storefront: &FRC20Storefront.Storefront
@@ -91,9 +91,9 @@ transaction(
         // basic attributes
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
-        let dataStr = "op=list-buynow,tick=".concat(tick)
-            .concat(",amt=").concat(sellAmount.toString())
-            .concat(",price=").concat(sellPrice.toString())
+        let dataStr = "op=list-sellnow,tick=".concat(tick)
+            .concat(",amt=").concat(buyAmount.toString())
+            .concat(",price=").concat(buyPrice.toString())
         let metadata = dataStr.utf8
 
         // estimate the required storage
@@ -109,7 +109,8 @@ transaction(
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
         // Withdraw tokens from the signer's stored vault
-        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
+        // Total amount to withdraw is the estimated required value + the buy price
+        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
 
         // Create the Inscription first
         self.ins <- Fixes.createInscription(
