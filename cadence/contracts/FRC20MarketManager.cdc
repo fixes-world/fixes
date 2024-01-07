@@ -167,13 +167,19 @@ pub contract FRC20MarketManager {
     fun enableAndCreateFRC20Market(
         ins: &Fixes.Inscription,
         newAccount: Capability<&AuthAccount>,
-    ): @Manager {
+    ) {
         // singletoken resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
         let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
+        assert(
+            op == "enable-market",
+            message: "The inscription is not for enabling a market"
+        )
+
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
 
         /// Check if the market is already enabled
@@ -212,9 +218,6 @@ pub contract FRC20MarketManager {
             address: newAccount.address,
             by: ins.owner!.address
         )
-
-        // return the market manager
-        return <- self.createManager()
     }
 
     /// Borrow the market reference
