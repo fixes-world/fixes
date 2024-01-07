@@ -89,6 +89,8 @@ pub contract FRC20TradingRecord {
         access(all)
         var dealCeilingPricePerMint: UFix64
         access(all)
+        var dealAmount: UFix64
+        access(all)
         var volume: UFix64
         access(all)
         var sales: UInt64
@@ -98,6 +100,7 @@ pub contract FRC20TradingRecord {
             self.dealFloorPricePerMint = 0.0
             self.dealCeilingPricePerToken = 0.0
             self.dealCeilingPricePerMint = 0.0
+            self.dealAmount = 0.0
             self.volume = 0.0
             self.sales = 0
         }
@@ -126,8 +129,10 @@ pub contract FRC20TradingRecord {
             if dealPricePerMint > self.dealCeilingPricePerMint {
                 self.dealCeilingPricePerMint = dealPricePerMint
             }
+            // update the deal amount
+            self.dealAmount = self.dealAmount + recordRef.dealAmount
             // update the volume
-            self.volume = self.volume + recordRef.dealAmount
+            self.volume = self.volume + recordRef.dealPrice
             // update the sales
             self.sales = self.sales + 1
         }
@@ -212,8 +217,8 @@ pub contract FRC20TradingRecord {
             let statusRef = self.borrowStatus()
             statusRef.updateByNewRecord(&record as &TransactionRecord)
 
-            // add the record
-            self.records.append(record)
+            // add the record, sorted by timestamp, descending
+            self.records.insert(at: 0, record)
 
             // emit the event
             emit RecordCreated(
