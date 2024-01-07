@@ -1,9 +1,9 @@
 import "Fixes"
-import "FRC20AccountsPool"
-import "FRC20Indexer"
 import "FRC20FTShared"
-import "FRC20TradingRecord"
+import "FRC20Indexer"
+import "FRC20AccountsPool"
 import "FRC20Marketplace"
+import "FRC20TradingRecord"
 
 pub contract FRC20MarketManager {
     /* --- Events --- */

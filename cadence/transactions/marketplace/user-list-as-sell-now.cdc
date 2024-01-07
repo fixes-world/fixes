@@ -7,10 +7,10 @@ import "Fixes"
 import "FixesAvatar"
 import "FRC20FTShared"
 import "FRC20Indexer"
-import "FRC20AccountsPool"
 import "FRC20TradingRecord"
 import "FRC20Storefront"
 import "FRC20Marketplace"
+import "FRC20MarketManager"
 
 transaction(
     tick: String,
@@ -125,10 +125,7 @@ transaction(
         /** ------------- End ---------------------------------------------  */
 
         // Borrow a reference to the FRC20Marketplace contract
-        let pool = FRC20AccountsPool.borrowAccountsPool()
-        let marketAddr = pool.getFRC20MarketAddress(tick: tick)
-            ?? panic("FRC20Market does not exist for tick ".concat(tick))
-        self.market = FRC20Marketplace.borrowMarket(marketAddr)
+        self.market = FRC20MarketManager.borrowMarket(tick)
             ?? panic("Could not borrow reference to the FRC20Market")
     }
 
