@@ -886,7 +886,7 @@ pub contract FRC20Indexer {
             // the max amount should be less than or equal to the maker amount
             assert(
                 maxAmount <= makerAmt,
-                message: "The MAKER and TAKER should be the same amount"
+                message: "The max takeable amount should be less than or equal to the maker amount"
             )
             // set the transact amount, max
             let transactAmount = takerAmt > maxAmount ? maxAmount : takerAmt
