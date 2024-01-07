@@ -475,7 +475,6 @@ pub contract FRC20Storefront {
 
             // Some singleton resources
             let frc20Indexer = FRC20Indexer.getIndexer()
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
             // give the change to the buyer
             var frc20TokenChange: @FRC20FTShared.Change? <- nil
@@ -557,70 +556,16 @@ pub contract FRC20Storefront {
                 destroy extractedFlowChange
             }
 
-            let tickName = self.details.tick
-            let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
-            if let marketTransactionHook = FRC20FTShared.borrowTransactionHook(marketAddress) {
-                // Invoke transaction hooks to do things like:
-                // -- Record the transction record
-                // -- Record trading Volume
-                marketTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
-                    seller: seller,
-                    buyer: buyer,
-                    tick: tickName,
-                    dealAmount: transactedAmt,
-                    dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
-                )
-            }
-
-            // emit ListingPartiallyDeal event
-            emit ListingPartiallyDeal(
+            // handle the transaction deal
+            self._onTransactionDeal(
                 storefrontAddress: storefrontAddress,
-                storefrontId: self.details.storefrontId,
-                listingResourceID: self.uuid,
-                inscriptionId: self.details.inscriptionId,
-                type: self.details.type.rawValue,
-                tick: tickName,
-                totalAmount: self.details.amount,
-                transactedAmount: transactedAmt,
+                seller: seller,
+                buyer: buyer,
+                transactedAmt: transactedAmt,
                 transactedPrice: transactedPrice,
-                customID: self.details.customID,
                 commissionAmount: commissionAmount,
-                commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
+                commissionRecipientAddress: commissionRecipient?.address
             )
-
-            // if the listing is fully transacted, then set it to completed
-            if self.details.isFullyTransacted() {
-                // Make sure the listing cannot be completed again.
-                self.details.setToCompleted()
-                // set the frozen change to nil
-                var nilChange: @FRC20FTShared.Change? <- nil
-                nilChange <-> self.frozenChange
-                if nilChange?.getBalance() != 0.0 {
-                    frc20Indexer.returnChange(
-                        change: <- (nilChange ?? panic("Unable to extract the change"))
-                    )
-                } else {
-                    destroy nilChange
-                }
-
-                // emit ListingCompleted event
-                emit ListingCompleted(
-                    storefrontAddress: storefrontAddress,
-                    storefrontId: self.details.storefrontId,
-                    listingResourceID: self.uuid,
-                    inscriptionId: self.details.inscriptionId,
-                    type: self.details.type.rawValue,
-                    tick: self.details.tick,
-                    amount: self.details.amount,
-                    totalPrice: self.details.totalPrice,
-                    customID: self.details.customID,
-                    commissionAmount: commissionAmount,
-                    commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
-                )
-            }
         }
 
         /// Purchase the listing, selling the token.
@@ -645,7 +590,6 @@ pub contract FRC20Storefront {
 
             // The indexer for all the FRC20 tokens.
             let frc20Indexer = FRC20Indexer.getIndexer()
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
             // give the change to the buyer
             var flowTokenChange: @FRC20FTShared.Change? <- nil
@@ -706,6 +650,81 @@ pub contract FRC20Storefront {
                 paymentRecipient: paymentRecipient,
             )
 
+            // handle the transaction deal
+            self._onTransactionDeal(
+                storefrontAddress: storefrontAddress,
+                seller: seller,
+                buyer: buyer,
+                transactedAmt: transactedAmt!,
+                transactedPrice: transactedPrice,
+                commissionAmount: commissionAmount,
+                commissionRecipientAddress: commissionRecipient?.address
+            )
+        }
+
+        /// Invoked when the listing is partially or fully transacted.
+        ///
+        access(self)
+        fun _onTransactionDeal(
+            storefrontAddress: Address,
+            seller: Address,
+            buyer: Address,
+            transactedAmt: UFix64,
+            transactedPrice: UFix64,
+            commissionAmount: UFix64,
+            commissionRecipientAddress: Address?,
+        ) {
+            // Some singleton resources
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let tickName = self.details.tick
+
+            // ------- start -- Invoke Hooks --------------
+            // Invoke transaction hooks to do things like:
+            // -- Record the transction record
+            // -- Record trading Volume
+            // for market hook
+            let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
+            if let marketTransactionHook = FRC20FTShared.borrowTransactionHook(marketAddress) {
+                marketTransactionHook.onDeal(
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickName,
+                    dealAmount: transactedAmt,
+                    dealPrice: transactedPrice,
+                    totalAmountInListing: self.details.amount,
+                )
+            }
+            // for seller hook
+            if let sellerTransactionHook = FRC20FTShared.borrowTransactionHook(seller) {
+                sellerTransactionHook.onDeal(
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickName,
+                    dealAmount: transactedAmt,
+                    dealPrice: transactedPrice,
+                    totalAmountInListing: self.details.amount,
+                )
+            }
+            // for buyer hook
+            if let buyerTransactionHook = FRC20FTShared.borrowTransactionHook(buyer) {
+                buyerTransactionHook.onDeal(
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickName,
+                    dealAmount: transactedAmt,
+                    dealPrice: transactedPrice,
+                    totalAmountInListing: self.details.amount,
+                )
+            }
+            // ------- end ---------------------------------
+
             // emit ListingPartiallyDeal event
             emit ListingPartiallyDeal(
                 storefrontAddress: storefrontAddress,
@@ -713,32 +732,14 @@ pub contract FRC20Storefront {
                 listingResourceID: self.uuid,
                 inscriptionId: self.details.inscriptionId,
                 type: self.details.type.rawValue,
-                tick: self.details.tick,
+                tick: tickName,
                 totalAmount: self.details.amount,
-                transactedAmount: transactedAmt!,
+                transactedAmount: transactedAmt,
                 transactedPrice: transactedPrice,
                 customID: self.details.customID,
                 commissionAmount: commissionAmount,
-                commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
+                commissionReceiver: commissionAmount != 0.0 ? commissionRecipientAddress : nil,
             )
-
-            let tickName = self.details.tick
-            let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
-            if let marketTransactionHook = FRC20FTShared.borrowTransactionHook(marketAddress) {
-                // Invoke transaction hooks to do things like:
-                // -- Record the transction record
-                // -- Record trading Volume
-                marketTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
-                    seller: seller,
-                    buyer: buyer,
-                    tick: tickName,
-                    dealAmount: transactedAmt!,
-                    dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
-                )
-            }
 
             // if the listing is fully transacted, then set it to completed
             if self.details.isFullyTransacted() {
@@ -768,7 +769,7 @@ pub contract FRC20Storefront {
                     totalPrice: self.details.totalPrice,
                     customID: self.details.customID,
                     commissionAmount: commissionAmount,
-                    commissionReceiver: commissionAmount != 0.0 ? commissionRecipient!.address : nil,
+                    commissionReceiver: commissionAmount != 0.0 ? commissionRecipientAddress : nil,
                 )
             }
         }
