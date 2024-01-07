@@ -83,6 +83,13 @@ pub contract FRC20MarketManager {
         // create the market and save it in the account
         let market <- FRC20Marketplace.createMarket(tick)
 
+        // The market should have the following resources in the account:
+        // - FRC20Marketplace.Market: Market resource
+        // - FRC20FTShared.SharedStore: Market configuration
+        // - FRC20FTShared.Hooks: Hooks for the transactions done in the market
+        // - FRC20TradingRecord.TradingRecordingHook: Hook for the trading records
+        // - FRC20TradingRecord.TradingRecords: Trading records resource
+
         // save the market in the account
         childAcctRef.save(<- market, to: FRC20Marketplace.FRC20MarketStoragePath)
         // link the market to the public path
@@ -91,6 +98,18 @@ pub contract FRC20MarketManager {
             FRC20Marketplace.FRC20MarketPublicPath,
             target: FRC20Marketplace.FRC20MarketStoragePath
         )
+
+        // create the shared store and save it in the account
+        if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+            let sharedStore <- FRC20FTShared.createSharedStore()
+            childAcctRef.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+            // link the shared store to the public path
+            childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
+            childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(
+                FRC20FTShared.SharedStorePublicPath,
+                target: FRC20FTShared.SharedStoreStoragePath
+            )
+        }
 
         // create the hooks and save it in the account
         if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
