@@ -1139,15 +1139,17 @@ pub contract FRC20Storefront {
                 message: "Given inscription is not a valid FRC20 listing inscription"
             )
 
+            let storefrontId = self.uuid
+
             // store the inscription to local
-            let uuid = insRef.uuid
-            let nothing <- self.inscriptions[ins.uuid] <- ins
+            let inscriptionId = insRef.getId()
+            let nothing <- self.inscriptions[inscriptionId] <- ins
             destroy nothing
 
             // Instead of letting an arbitrary value be set for the UUID of a given NFT, the contract
             // should fetch it itself
             let listing <- create Listing(
-                storefrontId: self.uuid,
+                storefrontId: storefrontId,
                 listIns: insRef,
                 commissionRecipientCaps: commissionRecipientCaps,
                 customID: customID
@@ -1174,7 +1176,7 @@ pub contract FRC20Storefront {
 
             emit ListingAvailable(
                 storefrontAddress: self.owner?.address ?? panic("Storefront owner is not set"),
-                storefrontId: self.uuid,
+                storefrontId: storefrontId,
                 listingResourceID: listingResourceID,
                 inscriptionId: details.inscriptionId,
                 type: details.type.rawValue,

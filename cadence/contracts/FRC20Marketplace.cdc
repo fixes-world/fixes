@@ -196,7 +196,7 @@ pub contract FRC20Marketplace {
 
         // Anyone can remove it if the listing item has been removed or purchased.
         access(all)
-        fun removeCompletedListing(rankedId: String)
+        fun tryRemoveCompletedListing(rankedId: String)
 
         // ---- Accessable settings ----
 
@@ -378,26 +378,30 @@ pub contract FRC20Marketplace {
         }
 
         // Anyone can remove it if the listing item has been removed or purchased.
+        // Do not panic
         access(all)
-        fun removeCompletedListing(rankedId: String) {
+        fun tryRemoveCompletedListing(rankedId: String) {
             let parsed = self.parseRankedId(rankedId: rankedId)
             if let collRef = self.borrowCollection(parsed.type, parsed.rank) {
                 if let listedItemRef = collRef.borrowListedItem(parsed.listingId) {
                     let listingRef = listedItemRef.borrowListing()
+                    var removed = false
                     if listingRef == nil {
                         // remove the listed item if the listing resource is not found
                         collRef.removeListedItem(parsed.listingId)
+                        removed = true
                     } else {
                         let details = listingRef!.getDetails()
-                        assert(
-                            details.isCancelled() || details.isCompleted(),
-                            message: "The listing is not cancelled or completed"
-                        )
-                        // remove the listed item if the listing is cancelled or completed
-                        collRef.removeListedItem(parsed.listingId)
+                        if details.isCancelled() || details.isCompleted() {
+                            // remove the listed item if the listing is cancelled or completed
+                            collRef.removeListedItem(parsed.listingId)
+                            removed = true
+                        }
                     }
-                    // emit event
-                    emit ListingRemoved(tick: self.tick, storefront: listedItemRef.storefront, listingId: parsed.listingId, type: parsed.type.rawValue)
+                    // emit event if removed
+                    if removed {
+                        emit ListingRemoved(tick: self.tick, storefront: listedItemRef.storefront, listingId: parsed.listingId, type: parsed.type.rawValue)
+                    }
                 }
             }
         }

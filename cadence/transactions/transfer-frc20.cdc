@@ -13,7 +13,9 @@ transaction(
         // basic attributes
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
-        let dataStr = "op=transfer,tick=".concat(tick).concat(",amt=").concat(amt.toString()).concat(",to=").concat(to.toString())
+        let dataStr = "op=transfer,tick=".concat(tick)
+            .concat(",amt=").concat(amt.toString())
+            .concat(",to=").concat(to.toString())
         let metadata = dataStr.utf8
 
         // estimate the required storage
