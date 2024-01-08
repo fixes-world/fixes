@@ -1,10 +1,12 @@
 import "Fixes"
 
 pub fun main(
-    addr: Address
+    addr: Address,
 ): [Inscription] {
     let acct = getAuthAccount(addr)
 
+    let limit = 500
+    var i = 0
     let ret: [Inscription] = []
     acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
         if type == Type<@Fixes.Inscription>() {
@@ -17,6 +19,10 @@ pub fun main(
                     rarity: ins.getInscriptionRarity().rawValue,
                     parentId: ins.getParentId()
                 ))
+                i = i + 1
+                if i > limit {
+                    return false
+                }
             }
         }
         return true
