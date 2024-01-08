@@ -15,7 +15,7 @@ import "FRC20MarketManager"
 transaction(
     tick: String,
     rankedId: String,
-    buyAmount: UFix64,
+    sellAmount: UFix64,
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
     let listedItem: FRC20Marketplace.ListedItem
@@ -55,7 +55,7 @@ transaction(
             message: "The listing is not available"
         )
         assert(
-            listingDetails.type == FRC20Storefront.ListingType.FixedPriceBuyNow,
+            listingDetails.type == FRC20Storefront.ListingType.FixedPriceSellNow,
             message: "The listing is not a fixed price buy now listing"
         )
         assert(
@@ -114,15 +114,12 @@ transaction(
         }
         /** ------------- End -----------------------------------------------------------------  */
 
-        // calculate the buy price
-        let buyPrice = listingDetails.totalPrice * buyAmount / listingDetails.amount
-
         /** ------------- Start -- Inscription Initialization -------------  */
         // basic attributes
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
-        let dataStr = "op=list-take-buynow,tick=".concat(tick)
-            .concat(",amt=").concat(buyAmount.toString())
+        let dataStr = "op=list-take-sellnow,tick=".concat(tick)
+            .concat(",amt=").concat(sellAmount.toString())
         let metadata = dataStr.utf8
 
         // estimate the required storage
@@ -139,7 +136,7 @@ transaction(
             ?? panic("Could not borrow reference to the owner's Vault!")
         // Withdraw tokens from the signer's stored vault
         // Total amount to withdraw is the estimated required value + the buy price
-        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
+        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first
         let newIns <- Fixes.createInscription(
@@ -168,7 +165,7 @@ transaction(
 
     execute {
         // execute taking
-        self.listing.takeBuyNow(ins: self.ins, commissionRecipient: nil)
+        self.listing.takeSellNow(ins: self.ins, commissionRecipient: nil)
 
         // cleanup
         self.storefront.tryCleanupFinishedListing(self.listedItem.id)
