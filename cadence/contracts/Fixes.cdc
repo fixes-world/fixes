@@ -70,11 +70,16 @@ pub contract Fixes {
     /// The metadata view for Fixes Inscription
     ///
     pub struct InscriptionView {
-        pub let id: UInt64
-        pub let parentId: UInt64?
-        pub let data: Fixes.InscriptionData
-        pub let value: UFix64
-        pub let extractable: Bool
+        access(all)
+        let id: UInt64
+        access(all)
+        let parentId: UInt64?
+        access(all)
+        let data: Fixes.InscriptionData
+        access(all)
+        let value: UFix64
+        access(all)
+        let extractable: Bool
 
         init(
             id: UInt64,
@@ -319,7 +324,8 @@ pub contract Fixes {
 
         /** ---- Implementation of MetadataViews.Resolver ---- */
 
-        pub fun getViews(): [Type] {
+        access(all)
+        fun getViews(): [Type] {
             return [
                 Type<Fixes.InscriptionView>(),
                 Type<MetadataViews.Serial>(),
@@ -331,7 +337,8 @@ pub contract Fixes {
             ]
         }
 
-        pub fun resolveView(_ view: Type): AnyStruct? {
+        access(all)
+        fun resolveView(_ view: Type): AnyStruct? {
             let rarity = self.getInscriptionRarity()
             let ratityView = MetadataViews.Rarity(
                 UFix64(rarity.rawValue),

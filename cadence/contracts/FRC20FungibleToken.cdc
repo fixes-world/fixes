@@ -16,12 +16,16 @@ pub contract FRC20FungibleToken: FungibleToken {
     /// This value is only a record of the quantity existing in the form of Flow Fungible Tokens.
     /// It does not represent the total quantity of the token that has been minted.
     /// The total quantity of the token that has been minted is loaded from the FRC20Indexer.
-    pub var totalSupply: UFix64
+    access(all)
+    var totalSupply: UFix64
 
     /// Storage and Public Paths
-    pub let VaultStoragePath: StoragePath
-    pub let VaultPublicPath: PublicPath
-    pub let ReceiverPublicPath: PublicPath
+    access(all)
+    let VaultStoragePath: StoragePath
+    access(all)
+    let VaultPublicPath: PublicPath
+    access(all)
+    let ReceiverPublicPath: PublicPath
 
     /// The event that is emitted when the contract is created
     pub event TokensInitialized(initialSupply: UFix64)

@@ -16,7 +16,8 @@ pub contract FRC20MarketManager {
 
     /* --- Variable, Enums and Structs --- */
 
-    pub let FRC20MarketManagerStoragePath: StoragePath
+    access(all)
+    let FRC20MarketManagerStoragePath: StoragePath
 
     /* --- Interfaces & Resources --- */
 

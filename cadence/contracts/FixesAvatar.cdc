@@ -19,8 +19,10 @@ pub contract FixesAvatar {
 
     /* --- Variable, Enums and Structs --- */
 
-    pub let AvatarStoragePath: StoragePath
-    pub let AvatarPublicPath: PublicPath
+    access(all)
+    let AvatarStoragePath: StoragePath
+    access(all)
+    let AvatarPublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
 

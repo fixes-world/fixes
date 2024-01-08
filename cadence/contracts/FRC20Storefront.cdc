@@ -80,8 +80,10 @@ pub contract FRC20Storefront {
 
 
     /* --- Variable, Enums and Structs --- */
-    pub let StorefrontStoragePath: StoragePath
-    pub let StorefrontPublicPath: PublicPath
+    access(all)
+    let StorefrontStoragePath: StoragePath
+    access(all)
+    let StorefrontPublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
 

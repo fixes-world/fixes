@@ -141,6 +141,29 @@ pub contract FRC20TradingRecord {
         fun getStatus(): TradingStatus
     }
 
+    /// The resource containing the trading status
+    ///
+    pub resource BasicRecord: TradingStatusViewer {
+        access(all)
+        let status: TradingStatus
+
+        init() {
+            self.status = TradingStatus()
+        }
+
+        access(all) view
+        fun getStatus(): TradingStatus {
+            return self.status
+        }
+
+        access(contract)
+        fun updateByNewRecord(
+            _ recordRef: &TransactionRecord
+        ) {
+            self.status.updateByNewRecord(recordRef)
+        }
+    }
+
     /// The interface for viewing the daily records
     ///
     pub resource interface DailyRecordsPublic {
@@ -150,6 +173,12 @@ pub contract FRC20TradingRecord {
         /// Get the records of the page
         access(all) view
         fun getRecords(page: Int, pageSize: Int): [TransactionRecord]
+        /// Available minutes
+        access(all) view
+        fun getMintesWithStatus(): [UInt64]
+        /// Get the trading status
+        access(all) view
+        fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}?
     }
 
     /// The resource containing the daily records
@@ -164,11 +193,19 @@ pub contract FRC20TradingRecord {
         /// Deal records, sorted by timestamp, descending
         access(contract)
         let records: [TransactionRecord]
+        /// Minute => TradingStatus
+        access(self)
+        let minutes: @{UInt64: BasicRecord}
 
         init(date: UInt64) {
             self.date = date
             self.status = TradingStatus()
             self.records = []
+            self.minutes <- {}
+        }
+
+        destroy() {
+            destroy self.minutes
         }
 
         /** Public methods */
@@ -190,12 +227,22 @@ pub contract FRC20TradingRecord {
             return self.status
         }
 
-        /** Internal Methods */
-
-        access(contract)
-        fun borrowStatus(): &TradingStatus {
-            return &self.status as &TradingStatus
+        /// Available minutes
+        ///
+        access(all) view
+        fun getMintesWithStatus(): [UInt64] {
+            return self.minutes.keys
         }
+
+        /// Get the trading status
+        ///
+        access(all) view
+        fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}? {
+            let minuteTime = self.convertToMinute(time)
+            return &self.minutes[minuteTime] as &BasicRecord{TradingStatusViewer}?
+        }
+
+        /** Internal Methods */
 
         access(contract)
         fun addRecord(record: TransactionRecord) {
@@ -209,9 +256,21 @@ pub contract FRC20TradingRecord {
             if recorder == nil {
                 return // DO NOT PANIC
             }
+            let recordRef = &record as &TransactionRecord
             // update the trading status
             let statusRef = self.borrowStatus()
-            statusRef.updateByNewRecord(&record as &TransactionRecord)
+            statusRef.updateByNewRecord(recordRef)
+
+            // update the minutes
+            let minuteTime = self.convertToMinute(timestamp)
+            var minuteRecordsRef = self.borrowMinute(minuteTime)
+            if minuteRecordsRef == nil {
+                self.minutes[minuteTime] <-! create BasicRecord()
+                minuteRecordsRef = self.borrowMinute(minuteTime)
+            }
+            if minuteRecordsRef != nil {
+                minuteRecordsRef!.updateByNewRecord(recordRef)
+            }
 
             // add the record, sorted by timestamp, descending
             self.records.insert(at: 0, record)
@@ -227,6 +286,22 @@ pub contract FRC20TradingRecord {
                 dealPrice: record.dealPrice,
                 dealPricePerMint: record.dealPricePerMint
             )
+        }
+
+        access(self)
+        fun convertToMinute(_ time: UInt64): UInt64 {
+            return time - time % 60
+        }
+
+        access(self)
+        fun borrowStatus(): &TradingStatus {
+            return &self.status as &TradingStatus
+        }
+
+        access(self)
+        fun borrowMinute(_ time: UInt64): &BasicRecord? {
+            let minuteTime = self.convertToMinute(time)
+            return &self.minutes[minuteTime] as &BasicRecord?
         }
     }
 
@@ -350,10 +425,14 @@ pub contract FRC20TradingRecord {
 
         access(contract)
         fun addRecord(record: TransactionRecord) {
+            // if tick is not nil, check the ticker name
+            if self.tick != nil && self.tick != record.tick {
+                return // DO NOT PANIC
+            }
+
             // timestamp is in seconds, not milliseconds
             let timestamp = record.timestamp
-            // date is up to the timestamp of UTC 00:00:00
-            let date = timestamp - timestamp % 86400
+            let date = self.convertToDate(timestamp)
 
             var dailyRecordsRef = self.borrowDailyRecordsPriv(date)
             if dailyRecordsRef == nil {
@@ -361,10 +440,6 @@ pub contract FRC20TradingRecord {
                 dailyRecordsRef = self.borrowDailyRecordsPriv(date)
             }
             if dailyRecordsRef == nil {
-                return // DO NOT PANIC
-            }
-            // if tick is not nil, check the ticker name
-            if self.tick != nil && self.tick != record.tick {
                 return // DO NOT PANIC
             }
 
@@ -382,8 +457,15 @@ pub contract FRC20TradingRecord {
         }
 
         access(self)
-        fun borrowDailyRecordsPriv(_ date: UInt64): &DailyRecords? {
+        fun borrowDailyRecordsPriv(_ time: UInt64): &DailyRecords? {
+            let date = self.convertToDate(time)
             return &self.dailyRecords[date] as &DailyRecords?
+        }
+
+        access(self)
+        fun convertToDate(_ time: UInt64): UInt64 {
+            // date is up to the timestamp of UTC 00:00:00
+            return time - time % 86400
         }
     }
 

@@ -85,13 +85,16 @@ pub contract FRC20FTShared {
         /// The ticker symbol of this change
         /// If the tick is "", it means the change is backed by FlowToken.Vault
         ///
-        pub let tick: String
+        access(all)
+        let tick: String
         /// The type of the FT Vault, Optional
         ///
-        pub var ftVault: @FungibleToken.Vault?
+        access(all)
+        var ftVault: @FungibleToken.Vault?
         /// The balance of this change
         ///
-        pub var balance: UFix64?
+        access(all)
+        var balance: UFix64?
 
         // The conforming type must declare an initializer
         // that allows providing the initial balance of the Vault
@@ -184,13 +187,17 @@ pub contract FRC20FTShared {
     ///
     pub resource Change: Balance, Settler {
         /// The ticker symbol of this change
-        pub let tick: String
+        access(all)
+        let tick: String
         /// The address of the owner of this change
-        pub let from: Address
+        access(all)
+        let from: Address
         /// The type of the FT Vault, Optional
-        pub var ftVault: @FungibleToken.Vault?
+        access(all)
+        var ftVault: @FungibleToken.Vault?
         // The token balance of this Change
-        pub var balance: UFix64?
+        access(all)
+        var balance: UFix64?
 
         init(
             tick: String,
@@ -439,11 +446,16 @@ pub contract FRC20FTShared {
     /// It a temporary resource combining change and cuts
     ///
     pub resource ValidFrozenOrder {
-        pub let tick: String
-        pub let amount: UFix64
-        pub let totalPrice: UFix64
-        pub let cuts: [SaleCut]
-        pub var change: @Change?
+        access(all)
+        let tick: String
+        access(all)
+        let amount: UFix64
+        access(all)
+        let totalPrice: UFix64
+        access(all)
+        let cuts: [SaleCut]
+        access(all)
+        var change: @Change?
 
         init(
             tick: String,

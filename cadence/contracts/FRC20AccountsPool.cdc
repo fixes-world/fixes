@@ -19,8 +19,10 @@ pub contract FRC20AccountsPool {
 
     /* --- Variable, Enums and Structs --- */
 
-    pub let AccountsPoolStoragePath: StoragePath
-    pub let AccountsPoolPublicPath: PublicPath
+    access(all)
+    let AccountsPoolStoragePath: StoragePath
+    access(all)
+    let AccountsPoolPublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
 

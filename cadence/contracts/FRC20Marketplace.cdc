@@ -32,21 +32,27 @@ pub contract FRC20Marketplace {
 
     /* --- Variable, Enums and Structs --- */
 
-    pub let FRC20MarketStoragePath: StoragePath
-    pub let FRC20MarketPublicPath: PublicPath
+    access(all)
+    let FRC20MarketStoragePath: StoragePath
+    access(all)
+    let FRC20MarketPublicPath: PublicPath
 
     /* --- Interfaces & Resources --- */
 
     /// The Listing item information
     pub struct ListedItem {
         // The combined uid for querying in the market
-        pub let rankedId: String
+        access(all)
+        let rankedId: String
         // The address of the storefront
-        pub let storefront: Address
+        access(all)
+        let storefront: Address
         // The listing resource uuid
-        pub let id: UInt64
+        access(all)
+        let id: UInt64
         // The timestamp when the listing was added
-        pub let timestamp: UFix64
+        access(all)
+        let timestamp: UFix64
 
         init(address: Address, listingID: UInt64) {
             let storefront = FRC20Storefront.borrowStorefront(address: address)
