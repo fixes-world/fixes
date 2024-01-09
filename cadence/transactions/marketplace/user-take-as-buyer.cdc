@@ -14,14 +14,10 @@ import "FRC20MarketManager"
 
 transaction(
     tick: String,
-    rankedId: String,
-    buyAmount: UFix64,
+    // RankedId => BuyAmount
+    batchBuyItems: {String: UFix64},
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
-    let listedItem: FRC20Marketplace.ListedItem
-    let listing: &FRC20Storefront.Listing{FRC20Storefront.ListingPublic}
-    let storefront: &FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}
-    let ins: &Fixes.Inscription
 
     prepare(acct: AuthAccount) {
         /** ------------- Start -- FRC20 Marketplace -------------  */
@@ -38,31 +34,6 @@ transaction(
             message: "You are not allowed to access this market for now."
         )
         /** ------------- End -------------------------------------  */
-
-        self.listedItem = self.market.getListedItemByRankdedId(rankedId: rankedId)
-            ?? panic("Could not borrow reference to the listed item")
-
-        /** ------------- Start -- FRC20 Storefront Initialization -------------  */
-        self.storefront = self.listedItem.borrowStorefront()
-            ?? panic("Could not borrow reference to the NFTStorefront")
-
-        self.listing = self.listedItem.borrowListing()
-            ?? panic("Could not borrow reference to the listing")
-
-        let listingDetails = self.listing.getDetails()
-        assert(
-            listingDetails.status == FRC20Storefront.ListingStatus.Available,
-            message: "The listing is not available"
-        )
-        assert(
-            listingDetails.type == FRC20Storefront.ListingType.FixedPriceBuyNow,
-            message: "The listing is not a fixed price buy now listing"
-        )
-        assert(
-            listingDetails.tick == tick,
-            message: "The listing is not for the FRC20 token with tick ".concat(tick)
-        )
-        /** ------------- End --------------------------------------------------  */
 
         /** ------------- Start -- FRC20 Marketing Account General Initialization -------------  */
         // Ensure hooks are initialized
@@ -114,66 +85,98 @@ transaction(
         }
         /** ------------- End -----------------------------------------------------------------  */
 
-        // calculate the buy price
-        let buyPrice = listingDetails.totalPrice * buyAmount / listingDetails.amount
-
-        /** ------------- Start -- Inscription Initialization -------------  */
-        // basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
-        let dataStr = "op=list-take-buynow,tick=".concat(tick)
-            .concat(",amt=").concat(buyAmount.toString())
-        let metadata = dataStr.utf8
-
-        // estimate the required storage
-        let estimatedReqValue = Fixes.estimateValue(
-            index: Fixes.totalInscriptions,
-            mimeType: mimeType,
-            data: metadata,
-            protocol: metaProtocol,
-            encoding: nil
-        )
-
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
-        // Withdraw tokens from the signer's stored vault
-        // Total amount to withdraw is the estimated required value + the buy price
-        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
+        // frc20 basic attributes
+        let mimeType = "text/plain"
+        let metaProtocol = "frc20"
 
-        // Create the Inscription first
-        let newIns <- Fixes.createInscription(
+        // For each buy item, check the listing
+        for rankedId in batchBuyItems.keys {
+            /** ------------- Start -- FRC20 Storefront Initialization -------------  */
+            let listedItem = self.market.getListedItemByRankdedId(rankedId: rankedId)
+            // Do not panic for better UX
+            if listedItem == nil {
+                continue
+            }
+            let storefront = listedItem!.borrowStorefront()
+            let listing = listedItem!.borrowListing()
+            // Do not panic for better UX
+            if storefront == nil || listing == nil {
+                continue
+            }
+            let listingDetails = listing!.getDetails()
+            // Do not panic for better UX
+            if listingDetails.status != FRC20Storefront.ListingStatus.Available {
+                continue
+            }
+            if listingDetails.type != FRC20Storefront.ListingType.FixedPriceBuyNow {
+                continue
+            }
+            if listingDetails.tick != tick {
+                continue
+            }
+            /** ------------- End --------------------------------------------------  */
+
+            let buyAmount = batchBuyItems[rankedId]!
+            // calculate the buy price
+            let buyPrice = listingDetails.totalPrice * buyAmount / listingDetails.amount
+
+            /** ------------- Start -- Inscription Initialization -------------  */
+            // basic attributes
+            let dataStr = "op=list-take-buynow,tick=".concat(tick)
+                .concat(",amt=").concat(buyAmount.toString())
+            let metadata = dataStr.utf8
+
+            // estimate the required storage
+            let estimatedReqValue = Fixes.estimateValue(
+                index: Fixes.totalInscriptions,
+                mimeType: mimeType,
+                data: metadata,
+                protocol: metaProtocol,
+                encoding: nil
+            )
+
             // Withdraw tokens from the signer's stored vault
-            value: <- (flowToReserve as! @FlowToken.Vault),
-            mimeType: mimeType,
-            metadata: metadata,
-            metaProtocol: metaProtocol,
-            encoding: nil,
-            parentId: nil
-        )
-        // save the new Inscription to storage
-        let newInsId = newIns.getId()
-        let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
-        assert(
-            acct.borrow<&AnyResource>(from: newInsPath) == nil,
-            message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
-        )
-        acct.save(<- newIns, to: newInsPath)
+            // Total amount to withdraw is the estimated required value + the buy price
+            let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
 
-        // borrow a reference to the new Inscription
-        self.ins = acct.borrow<&Fixes.Inscription>(from: newInsPath)
-            ?? panic("Could not borrow reference to the new Inscription!")
-        /** ------------- End ---------------------------------------------  */
+            // Create the Inscription first
+            let newIns <- Fixes.createInscription(
+                // Withdraw tokens from the signer's stored vault
+                value: <- (flowToReserve as! @FlowToken.Vault),
+                mimeType: mimeType,
+                metadata: metadata,
+                metaProtocol: metaProtocol,
+                encoding: nil,
+                parentId: nil
+            )
+            // save the new Inscription to storage
+            let newInsId = newIns.getId()
+            let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
+            assert(
+                acct.borrow<&AnyResource>(from: newInsPath) == nil,
+                message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
+            )
+            acct.save(<- newIns, to: newInsPath)
+
+            // borrow a reference to the new Inscription
+            let insRef = acct.borrow<&Fixes.Inscription>(from: newInsPath)
+                ?? panic("Could not borrow reference to the new Inscription!")
+            /** ------------- End ---------------------------------------------  */
+
+            // Execute the buy
+            // execute taking
+            listing?.takeBuyNow(ins: insRef, commissionRecipient: nil)
+
+            // cleanup
+            storefront?.tryCleanupFinishedListing(listedItem!.id)
+            self.market.tryRemoveCompletedListing(rankedId: listedItem!.rankedId)
+        }
     }
 
     execute {
-        // execute taking
-        self.listing.takeBuyNow(ins: self.ins, commissionRecipient: nil)
-
-        // cleanup
-        self.storefront.tryCleanupFinishedListing(self.listedItem.id)
-        self.market.tryRemoveCompletedListing(rankedId: self.listedItem.rankedId)
-
         log("Done")
     }
 }
