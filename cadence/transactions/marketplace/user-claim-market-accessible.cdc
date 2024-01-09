@@ -84,7 +84,7 @@ transaction(
     }
 
     post {
-        self.market.canAccess(addr: self.signerAddress): "Failed to update your accessable properties"
+        self.market.canAccess(addr: self.signerAddress): "Failed to update your Accessible properties"
     }
 }
 

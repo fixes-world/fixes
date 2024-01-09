@@ -22,10 +22,10 @@ access(all) contract FRC20Marketplace {
     /// Event emitted when a listing is removed
     access(all) event ListingRemoved(tick: String, storefront: Address, listingId: UInt64, type: UInt8)
 
-    /// Event emitted when the market is accessable
+    /// Event emitted when the market is Accessible
     access(all) event MarketWhitelistClaimed(tick: String, addr: Address)
 
-    /// Event emitted when the market accessable after timestamp is updated
+    /// Event emitted when the market Accessible after timestamp is updated
     access(all) event MarketAdminWhitelistUpdated(tick: String, addr: Address, isWhitelisted: Bool)
     /// Event emitted when the market properties are updated
     access(all) event MarketAdminPropertiesUpdated(tick: String, key: UInt8, value: String)
@@ -204,25 +204,25 @@ access(all) contract FRC20Marketplace {
         access(all)
         fun tryRemoveCompletedListing(rankedId: String)
 
-        // ---- Accessable settings ----
+        // ---- Accessible settings ----
 
-        /// Check if the address is in the whitelist or admin whitelist or the market is accessable
+        /// Check if the address is in the whitelist or admin whitelist or the market is Accessible
         access(all) view
         fun canAccess(addr: Address): Bool
 
-        /// Check if the market is accessable
+        /// Check if the market is Accessible
         access(all) view
-        fun isAccessable(): Bool
+        fun isAccessible(): Bool
 
-        /// The accessable after timestamp
+        /// The Accessible after timestamp
         access(all) view
-        fun accessableAfter(): UInt64?
+        fun AccessibleAfter(): UInt64?
 
-        /// The accessable conditions: tick => amount, the conditions are OR relationship
+        /// The Accessible conditions: tick => amount, the conditions are OR relationship
         access(all) view
         fun whitelistClaimingConditions(): {String: UFix64}
 
-        /// Claim the address to the whitelist before the accessable timestamp
+        /// Claim the address to the whitelist before the Accessible timestamp
         access(all)
         fun claimWhitelist(addr: Address)
 
@@ -336,7 +336,7 @@ access(all) contract FRC20Marketplace {
         access(all)
         fun addToList(storefront: Address, listingId: UInt64) {
             pre {
-                self.canAccess(addr: storefront): "The storefront address is not accessable"
+                self.canAccess(addr: storefront): "The storefront address is not Accessible"
             }
             let item = ListedItem(address: storefront, listingID: listingId)
             let listingRef = item.borrowListing()
@@ -467,7 +467,7 @@ access(all) contract FRC20Marketplace {
                     case FRC20FTShared.ConfigType.MarketFeeDeployerRatio:
                         value = UFix64.fromString(props[key]!) ?? panic("Invalid ratio")
                         break
-                    case FRC20FTShared.ConfigType.MarketAccessableAfter:
+                    case FRC20FTShared.ConfigType.MarketAccessibleAfter:
                         value = UInt64.fromString(props[key]!) ?? panic("Invalid timestamp")
                         break
                     case FRC20FTShared.ConfigType.MarketWhitelistClaimingToken:
@@ -495,14 +495,14 @@ access(all) contract FRC20Marketplace {
 
         // TODO more admin operations
 
-        // ---- Accessable settings ----
+        // ---- Accessible settings ----
 
-        /// Check if the address is in the whitelist or admin whitelist or the market is accessable
+        /// Check if the address is in the whitelist or admin whitelist or the market is Accessible
         ///
         access(all) view
         fun canAccess(addr: Address): Bool {
-            let isAccessableNow = self.isAccessable()
-            if isAccessableNow {
+            let isAccessibleNow = self.isAccessible()
+            if isAccessibleNow {
                 return true
             }
 
@@ -518,27 +518,27 @@ access(all) contract FRC20Marketplace {
             return false
         }
 
-        /// Check if the market is accessable
+        /// Check if the market is Accessible
         ///
         access(all) view
-        fun isAccessable(): Bool {
-            if let after = self.accessableAfter() {
+        fun isAccessible(): Bool {
+            if let after = self.AccessibleAfter() {
                 return UInt64(getCurrentBlock().timestamp) >= after
             }
             return true
         }
 
-        /// The accessable after timestamp
+        /// The Accessible after timestamp
         ///
         access(all) view
-        fun accessableAfter(): UInt64? {
+        fun AccessibleAfter(): UInt64? {
             if let storeRef = self.borrowSharedStore() {
-                return storeRef.getByEnum(FRC20FTShared.ConfigType.MarketAccessableAfter) as! UInt64?
+                return storeRef.getByEnum(FRC20FTShared.ConfigType.MarketAccessibleAfter) as! UInt64?
             }
             return nil
         }
 
-        /// The accessable conditions: tick => amount, the conditions are OR relationship
+        /// The Accessible conditions: tick => amount, the conditions are OR relationship
         ///
         access(all) view
         fun whitelistClaimingConditions(): {String: UFix64} {
@@ -553,12 +553,12 @@ access(all) contract FRC20Marketplace {
             return ret
         }
 
-        /// Claim the address to the whitelist before the accessable timestamp
+        /// Claim the address to the whitelist before the Accessible timestamp
         ///
         access(all)
         fun claimWhitelist(addr: Address) {
-            let isAccessableNow = self.isAccessable()
-            if isAccessableNow {
+            let isAccessibleNow = self.isAccessible()
+            if isAccessibleNow {
                 return
             }
 

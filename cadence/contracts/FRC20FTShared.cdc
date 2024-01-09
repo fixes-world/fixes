@@ -533,7 +533,7 @@ access(all) contract FRC20FTShared {
         access(all) case MarketFeeSharedRatio
         access(all) case MarketFeeTokenSpecificRatio
         access(all) case MarketFeeDeployerRatio
-        access(all) case MarketAccessableAfter
+        access(all) case MarketAccessibleAfter
         access(all) case MarketWhitelistClaimingToken
         access(all) case MarketWhitelistClaimingAmount
     }
@@ -575,8 +575,8 @@ access(all) contract FRC20FTShared {
             case ConfigType.MarketFeeDeployerRatio:
                 key = "market:FeeDeployerRatio"
                 break
-            case ConfigType.MarketAccessableAfter:
-                key = "market:AccessableAfter"
+            case ConfigType.MarketAccessibleAfter:
+                key = "market:AccessibleAfter"
                 break
             case ConfigType.MarketWhitelistClaimingToken:
                 key = "market:WhitelistClaimingToken"
