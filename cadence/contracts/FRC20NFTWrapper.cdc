@@ -7,27 +7,27 @@ import "FRC20Indexer"
 import "StringUtils"
 import "NFTCatalog"
 
-pub contract FRC20NFTWrapper {
+access(all) contract FRC20NFTWrapper {
 
     /// The event that is emitted when the contract is created
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// The event that is emitted when the internal flow vault is donated to
-    pub event InternalFlowVaultDonated(amount: UFix64)
+    access(all) event InternalFlowVaultDonated(amount: UFix64)
 
     /// The event that is emitted when a new Wrapper is created
-    pub event WrapperCreated()
+    access(all) event WrapperCreated()
     /// The event that is emitted when the wrapper options is updated
-    pub event WrapperOptionsUpdated(wrapper: Address, key: String)
+    access(all) event WrapperOptionsUpdated(wrapper: Address, key: String)
 
     /// The event that is emitted when the whitelist is updated
-    pub event AuthorizedWhitelistUpdated(
+    access(all) event AuthorizedWhitelistUpdated(
         addr: Address,
         isAuthorized: Bool,
     )
 
     /// The event that is emitted when an NFT is unwrapped
-    pub event FRC20StrategyRegistered(
+    access(all) event FRC20StrategyRegistered(
         wrapper: Address,
         deployer: Address,
         nftType: Type,
@@ -37,7 +37,7 @@ pub contract FRC20NFTWrapper {
         cond: String?
     )
     /// The event that is emitted when an NFT is wrapped
-    pub event NFTWrappedWithFRC20Allocated(
+    access(all) event NFTWrappedWithFRC20Allocated(
         wrapper: Address,
         nftType: Type,
         srcNftId: UInt64,
@@ -49,9 +49,9 @@ pub contract FRC20NFTWrapper {
 
     // Indexer
     /// The event that is emitted when a new wrapper is added to the indexer
-    pub event WrapperAddedToIndexer(wrapper: Address)
+    access(all) event WrapperAddedToIndexer(wrapper: Address)
     /// The event that is emitted when the extra NFT collection display is updated
-    pub event WrapperIndexerUpdatedNFTCollectionDisplay(nftType: Type, name: String, description: String)
+    access(all) event WrapperIndexerUpdatedNFTCollectionDisplay(nftType: Type, name: String, description: String)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -66,14 +66,14 @@ pub contract FRC20NFTWrapper {
 
     /* --- Interfaces & Resources --- */
 
-    pub struct FRC20Strategy {
-        pub let tick: String
-        pub let nftType: Type
-        pub let alloc: UFix64
-        pub let copies: UInt64
-        pub let cond: String?
-        pub let createdAt: UFix64
-        pub var usedAmt: UInt64
+    access(all) struct FRC20Strategy {
+        access(all) let tick: String
+        access(all) let nftType: Type
+        access(all) let alloc: UFix64
+        access(all) let copies: UInt64
+        access(all) let cond: String?
+        access(all) let createdAt: UFix64
+        access(all) var usedAmt: UInt64
 
         init(
             tick: String,
@@ -106,7 +106,7 @@ pub contract FRC20NFTWrapper {
     }
 
 
-    pub resource interface WrapperPublic {
+    access(all) resource interface WrapperPublic {
         // public methods ----
 
         /// Get the internal flow vault balance
@@ -165,7 +165,7 @@ pub contract FRC20NFTWrapper {
 
     /// The resource for the Wrapper contract
     ///
-    pub resource Wrapper: WrapperPublic {
+    access(all) resource Wrapper: WrapperPublic {
         access(self)
         let strategies: {Type: FRC20Strategy}
         access(self)
@@ -558,7 +558,7 @@ pub contract FRC20NFTWrapper {
 
     /// The public resource interface for the Wrapper Indexer
     ///
-    pub resource interface WrapperIndexerPublic {
+    access(all) resource interface WrapperIndexerPublic {
         // public methods ----
 
         /// Check if the wrapper is registered
@@ -593,7 +593,7 @@ pub contract FRC20NFTWrapper {
 
     /// The resource for the Wrapper indexer contract
     ///
-    pub resource WrapperIndexer: WrapperIndexerPublic {
+    access(all) resource WrapperIndexer: WrapperIndexerPublic {
         /// The event that is emitted when the contract is created
         access(self)
         let wrappers: {Address: Bool}

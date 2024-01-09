@@ -9,13 +9,13 @@ import "FRC20FTShared"
 
 /// The `FixesTraits` contract
 ///
-pub contract FixesAvatar {
+access(all) contract FixesAvatar {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// Event emitted when a new trait entry is added
-    pub event TraitEntryAdd(owner: Address?, traitId: UInt64, series: String, value: UInt8, rarity: UInt8, offset: Int8)
+    access(all) event TraitEntryAdd(owner: Address?, traitId: UInt64, series: String, value: UInt8, rarity: UInt8, offset: Int8)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -26,7 +26,7 @@ pub contract FixesAvatar {
 
     /* --- Interfaces & Resources --- */
 
-    pub resource interface ProfilePublic {
+    access(all) resource interface ProfilePublic {
         access(all) view
         fun getEnabledTraits(): [MetadataViews.Trait]
 
@@ -42,7 +42,7 @@ pub contract FixesAvatar {
 
     /// The resource that stores the metadata for this contract
     ///
-    pub resource Profile: ProfilePublic, FRC20FTShared.TransactionHook, MetadataViews.Resolver {
+    access(all) resource Profile: ProfilePublic, FRC20FTShared.TransactionHook, MetadataViews.Resolver {
         // Holds the properties for this profile, key is the property name, value is the property value
         access(self)
         let properties: {String: String}

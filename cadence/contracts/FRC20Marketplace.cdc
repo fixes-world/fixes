@@ -9,26 +9,26 @@ import "FRC20Indexer"
 import "FRC20Storefront"
 import "FRC20AccountsPool"
 
-pub contract FRC20Marketplace {
+access(all) contract FRC20Marketplace {
 
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// Event emitted when a new market is created
-    pub event MarketCreated(tick: String, uuid: UInt64)
+    access(all) event MarketCreated(tick: String, uuid: UInt64)
     /// Event emitted when a new listing is added
-    pub event ListingAdded(tick: String, storefront: Address, listingId: UInt64, type: UInt8)
+    access(all) event ListingAdded(tick: String, storefront: Address, listingId: UInt64, type: UInt8)
     /// Event emitted when a listing is removed
-    pub event ListingRemoved(tick: String, storefront: Address, listingId: UInt64, type: UInt8)
+    access(all) event ListingRemoved(tick: String, storefront: Address, listingId: UInt64, type: UInt8)
 
     /// Event emitted when the market is accessable
-    pub event MarketWhitelistClaimed(tick: String, addr: Address)
+    access(all) event MarketWhitelistClaimed(tick: String, addr: Address)
 
     /// Event emitted when the market accessable after timestamp is updated
-    pub event MarketAdminWhitelistUpdated(tick: String, addr: Address, isWhitelisted: Bool)
+    access(all) event MarketAdminWhitelistUpdated(tick: String, addr: Address, isWhitelisted: Bool)
     /// Event emitted when the market properties are updated
-    pub event MarketAdminPropertiesUpdated(tick: String, key: UInt8, value: String)
+    access(all) event MarketAdminPropertiesUpdated(tick: String, key: UInt8, value: String)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -40,7 +40,7 @@ pub contract FRC20Marketplace {
     /* --- Interfaces & Resources --- */
 
     /// The Listing item information
-    pub struct ListedItem {
+    access(all) struct ListedItem {
         // The combined uid for querying in the market
         access(all)
         let rankedId: String
@@ -96,7 +96,7 @@ pub contract FRC20Marketplace {
 
     /// The Item identifier in the market
     ///
-    pub struct ItemIdentifier {
+    access(all) struct ItemIdentifier {
         access(all)
         let type: FRC20Storefront.ListingType
         access(all)
@@ -113,7 +113,7 @@ pub contract FRC20Marketplace {
 
     /// The Listing collection public interface
     ///
-    pub resource interface ListingCollectionPublic {
+    access(all) resource interface ListingCollectionPublic {
         access(all)
         fun getListedIds(): [UInt64]
         access(all)
@@ -122,7 +122,7 @@ pub contract FRC20Marketplace {
 
     /// The Listing collection
     ///
-    pub resource ListingCollection: ListingCollectionPublic {
+    access(all) resource ListingCollection: ListingCollectionPublic {
         // Listing ID => ListedItem
         access(contract)
         let listingIDItems: {UInt64: ListedItem}
@@ -163,7 +163,7 @@ pub contract FRC20Marketplace {
 
     /// The interface for the market manager
     ///
-    pub resource interface MarketManager {
+    access(all) resource interface MarketManager {
         /// Get the owner address
         access(all)
         fun getOwnerAddress(): Address {
@@ -173,7 +173,7 @@ pub contract FRC20Marketplace {
 
     /// Market public interface
     ///
-    pub resource interface MarketPublic {
+    access(all) resource interface MarketPublic {
         // ---- Public read methods ----
         access(all) view
         fun getTickerName(): String
@@ -250,7 +250,7 @@ pub contract FRC20Marketplace {
 
     /// The Market resource
     ///
-    pub resource Market: MarketPublic {
+    access(all) resource Market: MarketPublic {
         access(all)
         let tick:String
         access(self)

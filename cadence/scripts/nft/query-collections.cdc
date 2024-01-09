@@ -4,7 +4,8 @@ import "InscriptionMetadata"
 import "StringUtils"
 import "FixesWrappedNFT"
 
-pub fun main(
+access(all)
+fun main(
     addr: Address
 ): {String: MetadataViews.NFTCollectionDisplay} {
     let acct = getAuthAccount(addr)

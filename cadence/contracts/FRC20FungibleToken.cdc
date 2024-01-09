@@ -10,7 +10,7 @@ import "FRC20Indexer"
 /// all instances of the string "FRC20FungibleToken" with the name of the
 /// "FRC20TokenTICKER_NAME" contract and then replace all instances of the string
 /// "TICKER_NAME" with the ticker name of the token.
-pub contract FRC20FungibleToken: FungibleToken {
+access(all) contract FRC20FungibleToken: FungibleToken {
 
     /// Total supply of FRC20FungibleToken in existence
     /// This value is only a record of the quantity existing in the form of Flow Fungible Tokens.
@@ -28,19 +28,19 @@ pub contract FRC20FungibleToken: FungibleToken {
     let ReceiverPublicPath: PublicPath
 
     /// The event that is emitted when the contract is created
-    pub event TokensInitialized(initialSupply: UFix64)
+    access(all) event TokensInitialized(initialSupply: UFix64)
 
     /// The event that is emitted when tokens are withdrawn from a Vault
-    pub event TokensWithdrawn(amount: UFix64, from: Address?)
+    access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
 
     /// The event that is emitted when tokens are deposited to a Vault
-    pub event TokensDeposited(amount: UFix64, to: Address?)
+    access(all) event TokensDeposited(amount: UFix64, to: Address?)
 
     /// The event that is emitted when new tokens are minted
-    pub event TokensConvertedToStanard(amount: UFix64)
+    access(all) event TokensConvertedToStanard(amount: UFix64)
 
     /// The event that is emitted when tokens are destroyed
-    pub event TokensConvertedToFRC20(amount: UFix64)
+    access(all) event TokensConvertedToFRC20(amount: UFix64)
 
     /// Each user stores an instance of only the Vault in their storage
     /// The functions in the Vault and governed by the pre and post conditions
@@ -52,7 +52,7 @@ pub contract FRC20FungibleToken: FungibleToken {
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    pub resource Vault: FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
@@ -79,7 +79,8 @@ pub contract FRC20FungibleToken: FungibleToken {
         /// @param amount: The amount of tokens to be withdrawn from the vault
         /// @return The Vault resource containing the withdrawn funds
         ///
-        pub fun withdraw(amount: UFix64): @FungibleToken.Vault {
+        access(all)
+        fun withdraw(amount: UFix64): @FungibleToken.Vault {
             self.balance = self.balance - amount
             emit TokensWithdrawn(amount: amount, from: self.owner?.address)
             return <-create Vault(balance: amount)
@@ -93,7 +94,8 @@ pub contract FRC20FungibleToken: FungibleToken {
         ///
         /// @param from: The Vault resource containing the funds that will be deposited
         ///
-        pub fun deposit(from: @FungibleToken.Vault) {
+        access(all)
+        fun deposit(from: @FungibleToken.Vault) {
             let vault <- from as! @FRC20FungibleToken.Vault
             self.balance = self.balance + vault.balance
             emit TokensDeposited(amount: vault.balance, to: self.owner?.address)
@@ -116,7 +118,8 @@ pub contract FRC20FungibleToken: FungibleToken {
         /// @return An array of Types defining the implemented views. This value will be used by
         ///         developers to know which parameter to pass to the resolveView() method.
         ///
-        pub fun getViews(): [Type] {
+        access(all)
+        fun getViews(): [Type] {
             return [
                 Type<FungibleTokenMetadataViews.FTView>(),
                 Type<FungibleTokenMetadataViews.FTDisplay>(),
@@ -130,7 +133,8 @@ pub contract FRC20FungibleToken: FungibleToken {
         /// @param view: The Type of the desired view.
         /// @return A structure representing the requested view.
         ///
-        pub fun resolveView(_ view: Type): AnyStruct? {
+        access(all)
+        fun resolveView(_ view: Type): AnyStruct? {
             switch view {
                 case Type<FungibleTokenMetadataViews.FTView>():
                     return FungibleTokenMetadataViews.FTView(
@@ -177,7 +181,8 @@ pub contract FRC20FungibleToken: FungibleToken {
     ///
     /// @return The new Vault resource
     ///
-    pub fun createEmptyVault(): @Vault {
+    access(all)
+    fun createEmptyVault(): @Vault {
         return <-create Vault(balance: 0.0)
     }
 

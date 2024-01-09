@@ -7,13 +7,13 @@ import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
 
-pub contract FRC20Storefront {
+access(all) contract FRC20Storefront {
 
     /* --- Events --- */
 
-    pub event StorefrontInitialized(uuid: UInt64)
+    access(all) event StorefrontInitialized(uuid: UInt64)
 
-    pub event ListingAvailable(
+    access(all) event ListingAvailable(
         storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
@@ -26,7 +26,7 @@ pub contract FRC20Storefront {
         commissionReceivers: [Address]?,
     )
 
-    pub event ListingPartiallyDeal(
+    access(all) event ListingPartiallyDeal(
         storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
@@ -40,7 +40,7 @@ pub contract FRC20Storefront {
         commissionAmount: UFix64,
         commissionReceiver: Address?,
     )
-    pub event ListingCompleted(
+    access(all) event ListingCompleted(
         storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
@@ -53,7 +53,7 @@ pub contract FRC20Storefront {
         commissionAmount: UFix64,
         commissionReceiver: Address?,
     )
-    pub event ListingCancelled(
+    access(all) event ListingCancelled(
         storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
@@ -64,7 +64,7 @@ pub contract FRC20Storefront {
         price: UFix64,
         customID: String?,
     )
-    pub event ListingRemoved(
+    access(all) event ListingRemoved(
         storefrontAddress: Address,
         storefrontId: UInt64,
         listingResourceID: UInt64,
@@ -76,7 +76,7 @@ pub contract FRC20Storefront {
     /// UnpaidReceiver
     /// A entitled receiver has not been paid during the sale of the NFT.
     ///
-    pub event UnpaidReceiver(receiver: Address, entitledSaleCut: UFix64)
+    access(all) event UnpaidReceiver(receiver: Address, entitledSaleCut: UFix64)
 
 
     /* --- Variable, Enums and Structs --- */
@@ -87,21 +87,21 @@ pub contract FRC20Storefront {
 
     /* --- Interfaces & Resources --- */
 
-    pub enum ListingStatus: UInt8 {
-        pub case Available
-        pub case Completed
-        pub case Cancelled
+    access(all) enum ListingStatus: UInt8 {
+        access(all) case Available
+        access(all) case Completed
+        access(all) case Cancelled
     }
 
-    pub enum ListingType: UInt8 {
-        pub case FixedPriceBuyNow
-        pub case FixedPriceSellNow
+    access(all) enum ListingType: UInt8 {
+        access(all) case FixedPriceBuyNow
+        access(all) case FixedPriceSellNow
     }
 
     /// ListingDetails
     /// A struct containing a Listing's data.
     ///
-    pub struct ListingDetails {
+    access(all) struct ListingDetails {
         // constants data values
         access(all)
         let storefrontId: UInt64
@@ -273,7 +273,7 @@ pub contract FRC20Storefront {
     /// ListingPublic
     /// An interface providing a useful public interface to a Listing.
     ///
-    pub resource interface ListingPublic {
+    access(all) resource interface ListingPublic {
         /** ---- Public Methods ---- */
 
         /// Get the address of the owner of the NFT that is being sold.
@@ -330,7 +330,7 @@ pub contract FRC20Storefront {
     /// A resource that allows an NFT to be sold for an amount of a given FungibleToken,
     /// and for the proceeds of that sale to be split between several recipients.
     ///
-    pub resource Listing: ListingPublic {
+    access(all) resource Listing: ListingPublic {
         /// The simple (non-Capability, non-complex) details of the sale
         access(self)
         let details: ListingDetails
@@ -1026,7 +1026,7 @@ pub contract FRC20Storefront {
     /// An interface for adding and removing Listings within a Storefront,
     /// intended for use by the Storefront's owner
     ///
-    pub resource interface StorefrontManager {
+    access(all) resource interface StorefrontManager {
         /// createListing
         /// Allows the Storefront owner to create and insert Listings.
         ///
@@ -1047,7 +1047,7 @@ pub contract FRC20Storefront {
     /// An interface to allow listing and borrowing Listings, and purchasing items via Listings
     /// in a Storefront.
     ///
-    pub resource interface StorefrontPublic {
+    access(all) resource interface StorefrontPublic {
         /** ---- Public Methods ---- */
         /// get all listingIDs
         access(all)
@@ -1068,7 +1068,7 @@ pub contract FRC20Storefront {
     /// A resource that allows its owner to manage a list of Listings, and anyone to interact with them
     /// in order to query their details and purchase the NFTs that they represent.
     ///
-    pub resource Storefront : StorefrontManager, StorefrontPublic {
+    access(all) resource Storefront : StorefrontManager, StorefrontPublic {
         /// The dictionary of stored inscriptions.
         access(contract)
         var inscriptions: @{UInt64: Fixes.Inscription}

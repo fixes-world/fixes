@@ -2,7 +2,8 @@ import "Fixes"
 import "FungibleToken"
 import "FlowToken"
 
-pub fun main(
+access(all)
+fun main(
     mimeType: String,
     data: String,
     protocol: String,
@@ -24,9 +25,9 @@ pub fun main(
     return Estimated(cost: cost, balance: vaultRef.balance)
 }
 
-pub struct Estimated {
-    pub let cost: UFix64
-    pub let balance: UFix64
+access(all) struct Estimated {
+    access(all) let cost: UFix64
+    access(all) let balance: UFix64
 
     init(
         cost: UFix64,

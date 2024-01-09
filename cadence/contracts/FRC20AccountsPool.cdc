@@ -9,13 +9,13 @@ import "HybridCustody"
 // import "FRC20FTShared"
 import "FRC20Indexer"
 
-pub contract FRC20AccountsPool {
+access(all) contract FRC20AccountsPool {
 
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
     /// Event emitted when a new child account is added, if tick is nil, it means the child account is not a shared account
-    pub event NewChildAccountAdded(type: UInt8, address: Address, tick: String?)
+    access(all) event NewChildAccountAdded(type: UInt8, address: Address, tick: String?)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -26,14 +26,14 @@ pub contract FRC20AccountsPool {
 
     /* --- Interfaces & Resources --- */
 
-    pub enum ChildAccountType: UInt8 {
-        pub case Market
-        pub case Staking
+    access(all) enum ChildAccountType: UInt8 {
+        access(all) case Market
+        access(all) case Staking
     }
 
     /// The public interface can be accessed by anyone
     ///
-    pub resource interface PoolPublic {
+    access(all) resource interface PoolPublic {
         /// ---- Getters ----
         /// Returns the address of the FRC20 staking for the given tick
         access(all) view
@@ -67,7 +67,7 @@ pub contract FRC20AccountsPool {
 
     /// The admin interface can only be accessed by the the account manager's owner
     ///
-    pub resource interface PoolAdmin {
+    access(all) resource interface PoolAdmin {
         /// Sets up a new child account
         access(all)
         fun setupNewChildForShared(
@@ -76,7 +76,7 @@ pub contract FRC20AccountsPool {
         )
     }
 
-    pub resource Pool: PoolPublic, PoolAdmin {
+    access(all) resource Pool: PoolPublic, PoolAdmin {
         access(self)
         let hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
         // AccountType -> Tick -> Address

@@ -3,7 +3,8 @@ import "FixesWrappedNFT"
 import "FRC20NFTWrapper"
 import "FRC20Indexer"
 
-pub fun main(
+access(all)
+fun main(
     addr: Address
 ): UFix64 {
     let wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: addr)

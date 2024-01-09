@@ -2,14 +2,14 @@ import "Fixes"
 import "FRC20Indexer"
 import "FRC20FTShared"
 
-pub contract FRC20TradingRecord {
+access(all) contract FRC20TradingRecord {
     /* --- Events --- */
 
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// Event emitted when a record is created
-    pub event RecordCreated(
+    access(all) event RecordCreated(
         recorder: Address,
         storefront: Address,
         buyer: Address,
@@ -30,7 +30,7 @@ pub contract FRC20TradingRecord {
 
     /// The struct containing the transaction record
     ///
-    pub struct TransactionRecord {
+    access(all) struct TransactionRecord {
         access(all)
         let storefront: Address
         access(all)
@@ -75,7 +75,7 @@ pub contract FRC20TradingRecord {
 
     /// The struct containing the trading status
     ///
-    pub struct TradingStatus {
+    access(all) struct TradingStatus {
         access(all)
         var dealFloorPricePerToken: UFix64
         access(all)
@@ -136,14 +136,14 @@ pub contract FRC20TradingRecord {
 
     /// The interface for viewing the trading status
     ///
-    pub resource interface TradingStatusViewer {
+    access(all) resource interface TradingStatusViewer {
         access(all) view
         fun getStatus(): TradingStatus
     }
 
     /// The resource containing the trading status
     ///
-    pub resource BasicRecord: TradingStatusViewer {
+    access(all) resource BasicRecord: TradingStatusViewer {
         access(all)
         let status: TradingStatus
 
@@ -166,7 +166,7 @@ pub contract FRC20TradingRecord {
 
     /// The interface for viewing the daily records
     ///
-    pub resource interface DailyRecordsPublic {
+    access(all) resource interface DailyRecordsPublic {
         /// Get the length of the records
         access(all) view
         fun getRecordLength(): UInt64
@@ -183,7 +183,7 @@ pub contract FRC20TradingRecord {
 
     /// The resource containing the daily records
     //
-    pub resource DailyRecords: DailyRecordsPublic, TradingStatusViewer {
+    access(all) resource DailyRecords: DailyRecordsPublic, TradingStatusViewer {
         /// The date of the records, in seconds
         access(all)
         let date: UInt64
@@ -305,7 +305,7 @@ pub contract FRC20TradingRecord {
         }
     }
 
-    pub resource interface TradingRecordsPublic {
+    access(all) resource interface TradingRecordsPublic {
         // ---- Public Methods ----
         access(all) view
         fun isSharedRecrds(): Bool
@@ -322,7 +322,7 @@ pub contract FRC20TradingRecord {
 
     /// The resource containing the trading volume
     ///
-    pub resource TradingRecords: TradingRecordsPublic, TradingStatusViewer, FRC20FTShared.TransactionHook {
+    access(all) resource TradingRecords: TradingRecordsPublic, TradingStatusViewer, FRC20FTShared.TransactionHook {
         access(self)
         let tick: String?
         /// Trading status

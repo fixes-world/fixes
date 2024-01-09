@@ -1,13 +1,13 @@
 import "Fixes"
 import "FRC20Indexer"
 
-pub contract FRC20Votes {
+access(all) contract FRC20Votes {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// Event emitted when a proposal is created
-    pub event ProposalCreated(
+    access(all) event ProposalCreated(
         tick: String,
         proposalId: UInt64,
         proposer: Address,
@@ -16,14 +16,14 @@ pub contract FRC20Votes {
         inscriptions: [UInt64],
     )
     /// Event emitted when a proposal is voted
-    pub event ProposalVoted(
+    access(all) event ProposalVoted(
         tick: String,
         proposalId: UInt64,
         voter: Address,
         choice: UInt8
     )
     /// Event emitted when a proposal is executed
-    pub event ProposalExecuted(
+    access(all) event ProposalExecuted(
         tick: String,
         proposalId: UInt64,
         choice: UInt8,
@@ -44,7 +44,7 @@ pub contract FRC20Votes {
 
     /* --- Interfaces & Resources --- */
 
-    pub resource interface VoterPublic {
+    access(all) resource interface VoterPublic {
         access(all)
         fun hasVoted(tick: String, proposalId: UInt64): Bool
         access(all)
@@ -53,7 +53,7 @@ pub contract FRC20Votes {
 
     /// The resource of the FixesVotes voter identifier.
     ///
-    pub resource VoterIdentity: VoterPublic {
+    access(all) resource VoterIdentity: VoterPublic {
         access(self)
         let voted: {String: {UInt64: Bool}}
 
@@ -100,24 +100,24 @@ pub contract FRC20Votes {
 
     /// The Proposal status.
     ///
-    pub enum ProposalStatus: UInt8 {
-        pub case Drafting;
-        pub case Voting;
-        pub case Executed;
-        pub case Cancelled;
+    access(all) enum ProposalStatus: UInt8 {
+        access(all) case Drafting;
+        access(all) case Voting;
+        access(all) case Executed;
+        access(all) case Cancelled;
     }
 
     /// The Proposal command type.
     ///
-    pub enum CommandType: UInt8 {
-        pub case MarketplaceFee;
-        pub case BurnUnsupplied;
-        pub case SetBurnable;
+    access(all) enum CommandType: UInt8 {
+        access(all) case MarketplaceFee;
+        access(all) case BurnUnsupplied;
+        access(all) case SetBurnable;
     }
 
     /// The struct of the FixesVotes proposal.
     ///
-    pub struct Proposal {
+    access(all) struct Proposal {
         access(all)
         let proposer: Address
         access(all)
@@ -231,13 +231,13 @@ pub contract FRC20Votes {
 
     /// The public interface of the FixesVotes manager.
     ///
-    pub resource interface VotesManagerPublic {
+    access(all) resource interface VotesManagerPublic {
 
     }
 
     /// The resource of the FixesVotes manager.
     ///
-    pub resource VotesManager: VotesManagerPublic {
+    access(all) resource VotesManager: VotesManagerPublic {
         access(self)
         let proposals: {String: [UInt64]}
         access(self)

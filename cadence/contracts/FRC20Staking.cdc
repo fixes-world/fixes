@@ -1,10 +1,10 @@
 import "Fixes"
 import "FRC20Indexer"
 
-pub contract FRC20Staking {
+access(all) contract FRC20Staking {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /* --- Variable, Enums and Structs --- */
 

@@ -3,32 +3,32 @@ import "MetadataViews"
 
 /// The `FixesTraits` contract
 ///
-pub contract FixesTraits {
+access(all) contract FixesTraits {
 
     /// =============  Trait: Season 0 - Secret Garden =============
 
     /// The Definition of the Marketplace Season 0
-    pub enum Season0SecretPlaces: UInt8 {
-        pub case HeartOfTheAzureOcean // 蔚蓝海洋之心
-        pub case HeartOfTheDarkForest // 黑暗森林之心
-        pub case GardenofVenus // 维纳斯的花园
-        pub case CityOfTheDead // 亡者之城
-        pub case DragonboneWasteland // 龙骨荒原
-        pub case MysticForest // 神秘森林
-        pub case SoulWaterfall // 灵魂瀑布
-        pub case AbyssalHollow // 深渊之穴
-        pub case SilentGlacier // 静寂冰川
-        pub case FrostWasteland // 霜冻荒原
-        pub case DesolateGround // 荒芜之地
-        pub case MirageCity // 海市蜃楼
-        pub case ScorpionGorge // 蛇蝎峡谷
-        pub case MysteriousIceLake // 神秘冰湖
-        pub case NightShadowForest // 夜影密林
-        pub case SpiritualValley // 灵犀山谷
-        pub case RavensPerch // 乌鸦栖息地
-        pub case RainbowFalls // 彩虹瀑布
-        pub case TwilightValley // 暮色谷地
-        pub case RuggedHill // 乱石山岗
+    access(all) enum Season0SecretPlaces: UInt8 {
+        access(all) case HeartOfTheAzureOcean // 蔚蓝海洋之心
+        access(all) case HeartOfTheDarkForest // 黑暗森林之心
+        access(all) case GardenofVenus // 维纳斯的花园
+        access(all) case CityOfTheDead // 亡者之城
+        access(all) case DragonboneWasteland // 龙骨荒原
+        access(all) case MysticForest // 神秘森林
+        access(all) case SoulWaterfall // 灵魂瀑布
+        access(all) case AbyssalHollow // 深渊之穴
+        access(all) case SilentGlacier // 静寂冰川
+        access(all) case FrostWasteland // 霜冻荒原
+        access(all) case DesolateGround // 荒芜之地
+        access(all) case MirageCity // 海市蜃楼
+        access(all) case ScorpionGorge // 蛇蝎峡谷
+        access(all) case MysteriousIceLake // 神秘冰湖
+        access(all) case NightShadowForest // 夜影密林
+        access(all) case SpiritualValley // 灵犀山谷
+        access(all) case RavensPerch // 乌鸦栖息地
+        access(all) case RainbowFalls // 彩虹瀑布
+        access(all) case TwilightValley // 暮色谷地
+        access(all) case RuggedHill // 乱石山岗
     }
 
     access(all) view
@@ -44,56 +44,56 @@ pub contract FixesTraits {
 
     /// The Definition of the Marketplace Season 0
     ///
-    pub enum Season0Ability: UInt8 {
-        pub case Omniscience // 全知全能
-        pub case ElementalMastery // 全元素掌控
-        pub case TimeStand // 时间静止
-        pub case MillenniumFreeze // 千年冰封
-        pub case FossilResurgence // 化石重生
-        pub case MysticVision // 神秘视界
-        pub case PhoenixRebirth // 凤凰复生
-        pub case SoulBind // 灵魂束缚
-        pub case PrayerOfLight // 光明祈祷
-        pub case Starfall // 星辰坠落
-        pub case DragonsBreath // 龙焰吐息
-        pub case PsychicSense // 心灵感应
-        pub case MindControl // 心灵控制
-        pub case EndlessTorment // 无尽痛苦
-        pub case MeditationInDespair // 绝境冥思
-        pub case SilenceFear // 沉默恐惧
-        pub case GloryChallenge // 荣耀挑战
-        pub case ShieldWall // 防御罩墙
-        pub case TidalCall // 海潮呼唤
-        pub case FountainOfLife // 生命之泉
-        pub case PsychicInteraction // 精神互动
-        pub case PlagueTransmission // 疫病传染
-        pub case NinjaStealth // 忍者潜行
-        pub case BattleRoar // 战斗吼叫
-        pub case CongestiveStrike // 充血打击
-        pub case HolyGuidance // 圣光指引
-        pub case EmpoweredBarrier // 强化结界
-        pub case PerpetualLife // 生生不息
-        pub case CombatEvade // 战斗闪避
-        pub case AbyssArrow // 深渊之箭
-        pub case SoulEcho // 灵魂回响
-        pub case ArcaneBlink // 魔力闪现
-        pub case ArcaneExplosion // 魔力爆炸
-        pub case ShadowStep // 暗黑影步
-        pub case JadeStoneSpell // 玉石咒语
-        pub case PhantomDodge // 鬼魅闪避
-        pub case KissOfDeath // 死亡之吻
-        pub case PhantomSummoning // 幻影召唤
-        pub case EyeOfTheRaven // 乌鸦之眼
-        pub case RatSwarmSurge // 鼠群涌动
-        pub case FlameShock // 烈焰冲击
-        pub case GaleSpeedBlade // 疾风快剑
-        pub case InterstellarFlight // 星界飞行
-        pub case WraithSeal // 怨灵封印
-        pub case DivineRestoration // 神力恢复
-        pub case LifePull // 生命拉扯
-        pub case RapidFire // 快速射击
-        pub case MightyBlow // 强力打击
-        pub case PhysicalTraining // 锻炼体魄
+    access(all) enum Season0Ability: UInt8 {
+        access(all) case Omniscience // 全知全能
+        access(all) case ElementalMastery // 全元素掌控
+        access(all) case TimeStand // 时间静止
+        access(all) case MillenniumFreeze // 千年冰封
+        access(all) case FossilResurgence // 化石重生
+        access(all) case MysticVision // 神秘视界
+        access(all) case PhoenixRebirth // 凤凰复生
+        access(all) case SoulBind // 灵魂束缚
+        access(all) case PrayerOfLight // 光明祈祷
+        access(all) case Starfall // 星辰坠落
+        access(all) case DragonsBreath // 龙焰吐息
+        access(all) case PsychicSense // 心灵感应
+        access(all) case MindControl // 心灵控制
+        access(all) case EndlessTorment // 无尽痛苦
+        access(all) case MeditationInDespair // 绝境冥思
+        access(all) case SilenceFear // 沉默恐惧
+        access(all) case GloryChallenge // 荣耀挑战
+        access(all) case ShieldWall // 防御罩墙
+        access(all) case TidalCall // 海潮呼唤
+        access(all) case FountainOfLife // 生命之泉
+        access(all) case PsychicInteraction // 精神互动
+        access(all) case PlagueTransmission // 疫病传染
+        access(all) case NinjaStealth // 忍者潜行
+        access(all) case BattleRoar // 战斗吼叫
+        access(all) case CongestiveStrike // 充血打击
+        access(all) case HolyGuidance // 圣光指引
+        access(all) case EmpoweredBarrier // 强化结界
+        access(all) case PerpetualLife // 生生不息
+        access(all) case CombatEvade // 战斗闪避
+        access(all) case AbyssArrow // 深渊之箭
+        access(all) case SoulEcho // 灵魂回响
+        access(all) case ArcaneBlink // 魔力闪现
+        access(all) case ArcaneExplosion // 魔力爆炸
+        access(all) case ShadowStep // 暗黑影步
+        access(all) case JadeStoneSpell // 玉石咒语
+        access(all) case PhantomDodge // 鬼魅闪避
+        access(all) case KissOfDeath // 死亡之吻
+        access(all) case PhantomSummoning // 幻影召唤
+        access(all) case EyeOfTheRaven // 乌鸦之眼
+        access(all) case RatSwarmSurge // 鼠群涌动
+        access(all) case FlameShock // 烈焰冲击
+        access(all) case GaleSpeedBlade // 疾风快剑
+        access(all) case InterstellarFlight // 星界飞行
+        access(all) case WraithSeal // 怨灵封印
+        access(all) case DivineRestoration // 神力恢复
+        access(all) case LifePull // 生命拉扯
+        access(all) case RapidFire // 快速射击
+        access(all) case MightyBlow // 强力打击
+        access(all) case PhysicalTraining // 锻炼体魄
     }
 
     access(all) view
@@ -108,37 +108,37 @@ pub contract FixesTraits {
 
     /// =============  Trait: Season 0 - Weapons =============
 
-    pub enum Season0Weapons: UInt8 {
-        pub case Starstaff // 星辰法杖
-        pub case BowOfTheMysteriousBird // 九天玄鸟之弓
-        pub case VoidSpiritWand // 虚空灵杖
-        pub case GodlyWand // 神祇法杖
-        pub case SunriseHolySword // 旭日圣剑
-        pub case DeepSeaTrident // 深海三叉戟
-        pub case DragonboneBow // 龙骨弓
-        pub case RainbowHolySword // 虹光圣剑
-        pub case MysticalGrimoire // 神秘法书
-        pub case SaintsStaff // 圣者圣杖
-        pub case FirePhoenixWhip // 火凤长鞭
-        pub case SoulOrb // 灵魂法球
-        pub case LightningSpear // 闪电长矛
-        pub case DarkScepter // 黑暗权杖
-        pub case DawnLance // 破晓长枪
-        pub case RedLotusRocket // 红莲火箭
-        pub case DemonBoneSpike // 恶魔骨刺
-        pub case EvilStarCatapult // 魔星投石器
-        pub case SwordOfTenderness // 温柔之剑
-        pub case WindWarriorLongbow // 风战者长弓
-        pub case NightDagger // 黑夜匕首
-        pub case GalaxyHalberd // 银河双戟
-        pub case MoonshadowScimitar // 影月弯刀
-        pub case IceCrownDagger // 冰冠短剑
-        pub case StormBattleAxe // 风暴战斧
-        pub case ArcaneStaff // 奥术长杖
-        pub case AxeOfInferno // 烈火之斧
-        pub case SkybreakerDualBlade // 破空双刃
-        pub case IceGiantSword // 寒冰巨剑
-        pub case TrollsHammer // 巨魔之锤
+    access(all) enum Season0Weapons: UInt8 {
+        access(all) case Starstaff // 星辰法杖
+        access(all) case BowOfTheMysteriousBird // 九天玄鸟之弓
+        access(all) case VoidSpiritWand // 虚空灵杖
+        access(all) case GodlyWand // 神祇法杖
+        access(all) case SunriseHolySword // 旭日圣剑
+        access(all) case DeepSeaTrident // 深海三叉戟
+        access(all) case DragonboneBow // 龙骨弓
+        access(all) case RainbowHolySword // 虹光圣剑
+        access(all) case MysticalGrimoire // 神秘法书
+        access(all) case SaintsStaff // 圣者圣杖
+        access(all) case FirePhoenixWhip // 火凤长鞭
+        access(all) case SoulOrb // 灵魂法球
+        access(all) case LightningSpear // 闪电长矛
+        access(all) case DarkScepter // 黑暗权杖
+        access(all) case DawnLance // 破晓长枪
+        access(all) case RedLotusRocket // 红莲火箭
+        access(all) case DemonBoneSpike // 恶魔骨刺
+        access(all) case EvilStarCatapult // 魔星投石器
+        access(all) case SwordOfTenderness // 温柔之剑
+        access(all) case WindWarriorLongbow // 风战者长弓
+        access(all) case NightDagger // 黑夜匕首
+        access(all) case GalaxyHalberd // 银河双戟
+        access(all) case MoonshadowScimitar // 影月弯刀
+        access(all) case IceCrownDagger // 冰冠短剑
+        access(all) case StormBattleAxe // 风暴战斧
+        access(all) case ArcaneStaff // 奥术长杖
+        access(all) case AxeOfInferno // 烈火之斧
+        access(all) case SkybreakerDualBlade // 破空双刃
+        access(all) case IceGiantSword // 寒冰巨剑
+        access(all) case TrollsHammer // 巨魔之锤
     }
 
     access(all) view
@@ -206,7 +206,7 @@ pub contract FixesTraits {
 
     /// The Entry Definition
     ///
-    pub struct Definition {
+    access(all) struct Definition {
         access(all)
         let threshold: UInt8 // max value for this rarity, not included
         access(all)
@@ -223,7 +223,7 @@ pub contract FixesTraits {
 
     /// The TraitWithOffset Definition
     ///
-    pub struct TraitWithOffset {
+    access(all) struct TraitWithOffset {
         // Series is the identifier of the series enum
         access(all)
         let series: Type
@@ -253,7 +253,7 @@ pub contract FixesTraits {
 
     /// The `Entry` resource
     ///
-    pub resource Entry: MetadataViews.Resolver {
+    access(all) resource Entry: MetadataViews.Resolver {
         access(self)
         let trait: TraitWithOffset
 

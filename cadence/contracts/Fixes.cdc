@@ -3,12 +3,12 @@ import "FlowToken"
 
 /// FIXES contract to store inscriptions
 ///
-pub contract Fixes {
+access(all) contract Fixes {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
     /// Event emitted when a new inscription is created
-    pub event InscriptionCreated(
+    access(all) event InscriptionCreated(
         id: UInt64,
         mimeType: String,
         metadata: [UInt8],
@@ -17,10 +17,10 @@ pub contract Fixes {
         encoding: String?,
         parentId: UInt64?,
     )
-    pub event InscriptionBurned(id: UInt64)
-    pub event InscriptionExtracted(id: UInt64, value: UFix64)
-    pub event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
-    pub event InscriptionArchived(id: UInt64)
+    access(all) event InscriptionBurned(id: UInt64)
+    access(all) event InscriptionExtracted(id: UInt64, value: UFix64)
+    access(all) event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
+    access(all) event InscriptionArchived(id: UInt64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -30,18 +30,18 @@ pub contract Fixes {
 
     /// The rarity of a Inscription value
     ///
-    pub enum ValueRarity: UInt8 {
-        pub case Common
-        pub case Uncommon
-        pub case Rare
-        pub case SuperRare
-        pub case Epic
-        pub case Legendary
+    access(all) enum ValueRarity: UInt8 {
+        access(all) case Common
+        access(all) case Uncommon
+        access(all) case Rare
+        access(all) case SuperRare
+        access(all) case Epic
+        access(all) case Legendary
     }
 
     /// The data of an inscription
     ///
-    pub struct InscriptionData {
+    access(all) struct InscriptionData {
         /// whose value is the MIME type of the inscription
         access(all) let mimeType: String
         /// The metadata content of the inscription
@@ -69,7 +69,7 @@ pub contract Fixes {
 
     /// The metadata view for Fixes Inscription
     ///
-    pub struct InscriptionView {
+    access(all) struct InscriptionView {
         access(all)
         let id: UInt64
         access(all)
@@ -98,7 +98,7 @@ pub contract Fixes {
 
     /// The public interface to the inscriptions
     ///
-    pub resource interface InscriptionPublic {
+    access(all) resource interface InscriptionPublic {
         // identifiers
         access(all) view
         fun getId(): UInt64
@@ -130,7 +130,7 @@ pub contract Fixes {
 
     /// The resource that stores the inscriptions
     ///
-    pub resource Inscription: InscriptionPublic, MetadataViews.Resolver {
+    access(all) resource Inscription: InscriptionPublic, MetadataViews.Resolver {
         /// the id of the inscription
         access(self) let id: UInt64
         /// the id of the parent inscription
@@ -400,7 +400,7 @@ pub contract Fixes {
         }
     }
 
-    pub resource interface ArchivedInscriptionsPublic {
+    access(all) resource interface ArchivedInscriptionsPublic {
         access(all) view
         fun getIDs(): [UInt64]
         access(all) view
@@ -409,7 +409,7 @@ pub contract Fixes {
 
     /// The resource that stores the archived inscriptions
     ///
-    pub resource ArchivedInscriptions {
+    access(all) resource ArchivedInscriptions {
         access(self)
         let inscriptions: @{UInt64: Fixes.Inscription}
 

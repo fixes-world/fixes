@@ -1,6 +1,7 @@
 import "Fixes"
 
-pub fun main(
+access(all)
+fun main(
     addr: Address,
 ): [Inscription] {
     let acct = getAuthAccount(addr)
@@ -30,18 +31,18 @@ pub fun main(
     return ret
 }
 
-pub struct Inscription {
-    pub let id: UInt64
-    pub let parentId: UInt64?
-    pub let owner: Address
-    pub let value: UFix64
-    pub let rarity: UInt8
+access(all) struct Inscription {
+    access(all) let id: UInt64
+    access(all) let parentId: UInt64?
+    access(all) let owner: Address
+    access(all) let value: UFix64
+    access(all) let rarity: UInt8
     // content
-    pub let createdAt: UFix64;
-    pub let mimeType: String
-    pub let protocol: String?;
-    pub let encoding: String?;
-    pub let metadata: [UInt8];
+    access(all) let createdAt: UFix64;
+    access(all) let mimeType: String
+    access(all) let protocol: String?;
+    access(all) let encoding: String?;
+    access(all) let metadata: [UInt8];
 
     init(
         owner: Address,

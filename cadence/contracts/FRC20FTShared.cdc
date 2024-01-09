@@ -1,27 +1,27 @@
 import "FlowToken"
 import "FungibleToken"
 
-pub contract FRC20FTShared {
+access(all) contract FRC20FTShared {
     /* --- Events --- */
     /// The event that is emitted when the shared store is updated
-    pub event SharedStoreKeyUpdated(key: String, valueType: Type)
+    access(all) event SharedStoreKeyUpdated(key: String, valueType: Type)
 
     /// The event that is emitted when tokens are created
-    pub event TokenChangeCreated(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
+    access(all) event TokenChangeCreated(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
     /// The event that is emitted when tokens are withdrawn from a Vault
-    pub event TokenChangeWithdrawn(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
+    access(all) event TokenChangeWithdrawn(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
     /// The event that is emitted when tokens are deposited to a Vault
-    pub event TokenChangeMerged(tick:String, amount: UFix64, from: Address, changeUuid: UInt64, fromChangeUuid: UInt64)
+    access(all) event TokenChangeMerged(tick:String, amount: UFix64, from: Address, changeUuid: UInt64, fromChangeUuid: UInt64)
     /// The event that is emitted when tokens are extracted
-    pub event TokenChangeExtracted(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
+    access(all) event TokenChangeExtracted(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
 
     /// The event that is emitted when a hook is added
-    pub event TransactionHookAdded(
+    access(all) event TransactionHookAdded(
         hooksOwner: Address,
         hookType: Type,
     )
     /// The event that is emitted when a deal is updated
-    pub event TransactionHooksOnDeal(
+    access(all) event TransactionHooksOnDeal(
         hooksOwner: Address,
         executedHookType: Type,
         storefront: Address,
@@ -43,19 +43,19 @@ pub contract FRC20FTShared {
 
     /// Cut type for the sale
     ///
-    pub enum SaleCutType: UInt8 {
-        pub case TokenTreasury
-        pub case PlatformTreasury
-        pub case PlatformStakers
-        pub case SellMaker
-        pub case BuyTaker
-        pub case Commission
-        pub case MarketplacePortion
+    access(all) enum SaleCutType: UInt8 {
+        access(all) case TokenTreasury
+        access(all) case PlatformTreasury
+        access(all) case PlatformStakers
+        access(all) case SellMaker
+        access(all) case BuyTaker
+        access(all) case Commission
+        access(all) case MarketplacePortion
     }
 
     /// Sale cut struct for the sale
     ///
-    pub struct SaleCut {
+    access(all) struct SaleCut {
         access(all)
         let type: SaleCutType
         access(all)
@@ -81,7 +81,7 @@ pub contract FRC20FTShared {
 
     /// It a general interface for the Change of FRC20 Fungible Token
     ///
-    pub resource interface Balance {
+    access(all) resource interface Balance {
         /// The ticker symbol of this change
         /// If the tick is "", it means the change is backed by FlowToken.Vault
         ///
@@ -144,7 +144,7 @@ pub contract FRC20FTShared {
 
     /// It a general interface for the Settler of FRC20 Fungible Token
     ///
-    pub resource interface Settler {
+    access(all) resource interface Settler {
         /// Withdraw the given amount of tokens, as a FungibleToken Vault
         ///
         access(all)
@@ -185,7 +185,7 @@ pub contract FRC20FTShared {
 
     /// It a general resource for the Change of FRC20 Fungible Token
     ///
-    pub resource Change: Balance, Settler {
+    access(all) resource Change: Balance, Settler {
         /// The ticker symbol of this change
         access(all)
         let tick: String
@@ -445,7 +445,7 @@ pub contract FRC20FTShared {
 
     /// It a temporary resource combining change and cuts
     ///
-    pub resource ValidFrozenOrder {
+    access(all) resource ValidFrozenOrder {
         access(all)
         let tick: String
         access(all)
@@ -523,24 +523,24 @@ pub contract FRC20FTShared {
 
     /// The Market config type
     ///
-    pub enum ConfigType: UInt8 {
-        pub case PlatformSalesFee
-        pub case PlatformSalesCutTreasuryPoolRatio
-        pub case PlatformSalesCutPlatformPoolRatio
-        pub case PlatformSalesCutPlatformStakersRatio
-        pub case PlatformSalesCutMarketRatio
-        pub case PlatofrmMarketplaceStakingToken
-        pub case MarketFeeSharedRatio
-        pub case MarketFeeTokenSpecificRatio
-        pub case MarketFeeDeployerRatio
-        pub case MarketAccessableAfter
-        pub case MarketWhitelistClaimingToken
-        pub case MarketWhitelistClaimingAmount
+    access(all) enum ConfigType: UInt8 {
+        access(all) case PlatformSalesFee
+        access(all) case PlatformSalesCutTreasuryPoolRatio
+        access(all) case PlatformSalesCutPlatformPoolRatio
+        access(all) case PlatformSalesCutPlatformStakersRatio
+        access(all) case PlatformSalesCutMarketRatio
+        access(all) case PlatofrmMarketplaceStakingToken
+        access(all) case MarketFeeSharedRatio
+        access(all) case MarketFeeTokenSpecificRatio
+        access(all) case MarketFeeDeployerRatio
+        access(all) case MarketAccessableAfter
+        access(all) case MarketWhitelistClaimingToken
+        access(all) case MarketWhitelistClaimingAmount
     }
 
     /* --- Public Methods --- */
 
-    pub resource interface SharedStorePublic {
+    access(all) resource interface SharedStorePublic {
         /// Get the key by type
         ///
         access(all) view
@@ -611,7 +611,7 @@ pub contract FRC20FTShared {
         fun setByEnum(_ type: ConfigType, value: AnyStruct)
     }
 
-    pub resource SharedStore: SharedStorePublic {
+    access(all) resource SharedStore: SharedStorePublic {
         access(self)
         var data: {String: AnyStruct}
 
@@ -678,7 +678,7 @@ pub contract FRC20FTShared {
 
     /// It a general interface for the Transaction Hook
     ///
-    pub resource interface TransactionHook {
+    access(all) resource interface TransactionHook {
         /// The method that is invoked when the transaction is executed
         /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
         ///
@@ -697,7 +697,7 @@ pub contract FRC20FTShared {
 
     /// It a general resource for the Transaction Hook
     ///
-    pub resource Hooks: TransactionHook {
+    access(all) resource Hooks: TransactionHook {
         access(self)
         let hooks: {Type: Capability<&AnyResource{TransactionHook}>}
 

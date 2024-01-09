@@ -8,27 +8,27 @@ import "FlowToken"
 import "Fixes"
 import "FRC20FTShared"
 
-pub contract FRC20Indexer {
+access(all) contract FRC20Indexer {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// Event emitted when a FRC20 token is deployed
-    pub event FRC20Deployed(tick: String, max: UFix64, limit: UFix64, deployer: Address)
+    access(all) event FRC20Deployed(tick: String, max: UFix64, limit: UFix64, deployer: Address)
     /// Event emitted when a FRC20 token is minted
-    pub event FRC20Minted(tick: String, amount: UFix64, to: Address)
+    access(all) event FRC20Minted(tick: String, amount: UFix64, to: Address)
     /// Event emitted when the owner of an inscription is updated
-    pub event FRC20Transfer(tick: String, from: Address, to: Address, amount: UFix64)
+    access(all) event FRC20Transfer(tick: String, from: Address, to: Address, amount: UFix64)
     /// Event emitted when a FRC20 token is burned
-    pub event FRC20Burned(tick: String, amount: UFix64, from: Address, flowExtracted: UFix64)
+    access(all) event FRC20Burned(tick: String, amount: UFix64, from: Address, flowExtracted: UFix64)
     /// Event emitted when a FRC20 token is withdrawn as change
-    pub event FRC20WithdrawnAsChange(tick: String, amount: UFix64, from: Address)
+    access(all) event FRC20WithdrawnAsChange(tick: String, amount: UFix64, from: Address)
     /// Event emitted when a FRC20 token is deposited from change
-    pub event FRC20DepositedFromChange(tick: String, amount: UFix64, to: Address, from: Address)
+    access(all) event FRC20DepositedFromChange(tick: String, amount: UFix64, to: Address, from: Address)
     /// Event emitted when a FRC20 token is set to be burnable
-    pub event FRC20BurnableSet(tick: String, burnable: Bool)
+    access(all) event FRC20BurnableSet(tick: String, burnable: Bool)
     /// Event emitted when a FRC20 token is burned unsupplied tokens
-    pub event FRC20UnsuppliedBurned(tick: String, amount: UFix64)
+    access(all) event FRC20UnsuppliedBurned(tick: String, amount: UFix64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -39,7 +39,7 @@ pub contract FRC20Indexer {
     /* --- Interfaces & Resources --- */
 
     /// The meta-info of a FRC20 token
-    pub struct FRC20Meta {
+    access(all) struct FRC20Meta {
         access(all) let tick: String
         access(all) let max: UFix64
         access(all) let limit: UFix64
@@ -85,7 +85,7 @@ pub contract FRC20Indexer {
         }
     }
 
-    pub resource interface IndexerPublic {
+    access(all) resource interface IndexerPublic {
         /* --- read-only --- */
         /// Get all the tokens
         access(all) view
@@ -196,7 +196,7 @@ pub contract FRC20Indexer {
 
     /// The resource that stores the inscriptions mapping
     ///
-    pub resource InscriptionIndexer: IndexerPublic {
+    access(all) resource InscriptionIndexer: IndexerPublic {
         /// The mapping of tokens
         access(self)
         let tokens: {String: FRC20Meta}

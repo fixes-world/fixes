@@ -5,14 +5,14 @@ import "FRC20AccountsPool"
 import "FRC20Marketplace"
 import "FRC20TradingRecord"
 
-pub contract FRC20MarketManager {
+access(all) contract FRC20MarketManager {
     /* --- Events --- */
 
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// Event emitted when a new market is enabled
-    pub event NewMarketEnabled(tick: String, address: Address, by: Address)
+    access(all) event NewMarketEnabled(tick: String, address: Address, by: Address)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -23,7 +23,7 @@ pub contract FRC20MarketManager {
 
     /// The resource manager for the FRC20MarketManager
     ///
-    pub resource Manager: FRC20Marketplace.MarketManager {
+    access(all) resource Manager: FRC20Marketplace.MarketManager {
         /// Update the admin whitelist
         ///
         access(all)
