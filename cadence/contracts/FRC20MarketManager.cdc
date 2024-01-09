@@ -179,8 +179,7 @@ access(all) contract FRC20MarketManager {
         )
 
         // create the account for the market at the accounts pool
-        acctsPool.setupNewChildForTick(
-            type: FRC20AccountsPool.ChildAccountType.Market,
+        acctsPool.setupNewChildForMarket(
             tick: tick,
             newAccount
         )

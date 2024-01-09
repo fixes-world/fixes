@@ -60,9 +60,9 @@ access(all) contract FRC20AccountsPool {
         /// Borrow child's AuthAccount
         access(account)
         fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount?
-        /// Sets up a new child account
+        /// Sets up a new child account for market
         access(account)
-        fun setupNewChildForTick(type: ChildAccountType, tick: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -70,8 +70,15 @@ access(all) contract FRC20AccountsPool {
     access(all) resource interface PoolAdmin {
         /// Sets up a new child account
         access(all)
-        fun setupNewChildForShared(
+        fun setupNewSharedChildByType(
             type: ChildAccountType,
+            _ acctCap: Capability<&AuthAccount>,
+        )
+        /// Sets up a new child account
+        access(all)
+        fun setupNewChildByTick(
+            type: ChildAccountType,
+            tick: String,
             _ acctCap: Capability<&AuthAccount>,
         )
     }
@@ -81,7 +88,7 @@ access(all) contract FRC20AccountsPool {
         let hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
         // AccountType -> Tick -> Address
         access(self)
-        let tickAddressMapping: {ChildAccountType: {String: Address}}
+        let addressMapping: {ChildAccountType: {String: Address}}
         // AccountType -> Address
         access(self)
         let sharedAddressMappping: {ChildAccountType: Address}
@@ -90,7 +97,7 @@ access(all) contract FRC20AccountsPool {
             _ hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
         ) {
             self.hcManagerCap = hcManagerCap
-            self.tickAddressMapping = {}
+            self.addressMapping = {}
             self.sharedAddressMappping = {}
         }
 
@@ -99,7 +106,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the address of the FRC20 market for the given tick
         access(all) view
         fun getFRC20MarketAddress(tick: String): Address? {
-            if let tickDict = self.borrowTickDict(type: ChildAccountType.Market) {
+            if let tickDict = self.borrowDict(type: ChildAccountType.Market) {
                 return tickDict[tick]
             }
             return nil
@@ -108,7 +115,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the address of the FRC20 staking for the given tick
         access(all) view
         fun getFRC20StakingAddress(tick: String): Address? {
-            if let tickDict = self.borrowTickDict(type: ChildAccountType.Staking) {
+            if let tickDict = self.borrowDict(type: ChildAccountType.Staking) {
                 return tickDict[tick]
             }
             return nil
@@ -123,7 +130,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the addresses of the FRC20 with the given type
         access(all) view
         fun getFRC20Addresses(type: ChildAccountType): {String: Address} {
-            if let tickDict = self.tickAddressMapping[type] {
+            if let tickDict = self.addressMapping[type] {
                 return tickDict
             }
             return {}
@@ -164,7 +171,7 @@ access(all) contract FRC20AccountsPool {
             let hcManagerRef = self.hcManagerCap.borrow()
                 ?? panic("Failed to borrow hcManager")
             if let tickSpecified = tick {
-                let tickDict = self.borrowTickDict(type: type)
+                let tickDict = self.borrowDict(type: type)
                 if tickDict == nil {
                     return nil
                 }
@@ -183,10 +190,44 @@ access(all) contract FRC20AccountsPool {
             return nil
         }
 
-        /// Sets up a new child account
+        /// Sets up a new child account for market
         ///
         access(account)
-        fun setupNewChildForTick(
+        fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByTick(type: ChildAccountType.Market, tick: tick, acctCap)
+        }
+
+        /** ---- Admin Methods ---- */
+
+        /// Sets up a new shared child account
+        ///
+        access(all)
+        fun setupNewSharedChildByType(
+            type: ChildAccountType,
+            _ childAcctCap: Capability<&AuthAccount>,
+        ) {
+            pre {
+                childAcctCap.check(): "Child account capability is invalid"
+                self.sharedAddressMappping[type] == nil: "Shared child account already exists"
+            }
+
+            self.sharedAddressMappping[type] = childAcctCap.address
+
+            // setup new child account
+            self._setupChildAccount(childAcctCap)
+
+            // emit event
+            emit NewChildAccountAdded(
+                type: type.rawValue,
+                address: childAcctCap.address,
+                tick: nil,
+            )
+        }
+
+        /// Sets up a new child account
+        ///
+        access(all)
+        fun setupNewChildByTick(
             type: ChildAccountType,
             tick: String,
             _ childAcctCap: Capability<&AuthAccount>,
@@ -194,9 +235,9 @@ access(all) contract FRC20AccountsPool {
             pre {
                 childAcctCap.check(): "Child account capability is invalid"
             }
-            self._ensureTypeDictExists(type)
+            self._ensureDictExists(type)
 
-            let tickDict = self.borrowTickDict(type: type) ?? panic("Failed to borrow tick dict")
+            let tickDict = self.borrowDict(type: type) ?? panic("Failed to borrow tick ")
             assert(
                 tickDict[tick] == nil,
                 message: "Child account already exists"
@@ -221,33 +262,6 @@ access(all) contract FRC20AccountsPool {
                 type: type.rawValue,
                 address: childAcctCap.address,
                 tick: tick,
-            )
-        }
-
-        /** ---- Admin Methods ---- */
-
-        /// Sets up a new shared child account
-        ///
-        access(all)
-        fun setupNewChildForShared(
-            type: ChildAccountType,
-            _ childAcctCap: Capability<&AuthAccount>,
-        ) {
-            pre {
-                childAcctCap.check(): "Child account capability is invalid"
-                self.sharedAddressMappping[type] == nil: "Shared child account already exists"
-            }
-
-            self.sharedAddressMappping[type] = childAcctCap.address
-
-            // setup new child account
-            self._setupChildAccount(childAcctCap)
-
-            // emit event
-            emit NewChildAccountAdded(
-                type: type.rawValue,
-                address: childAcctCap.address,
-                tick: nil,
             )
         }
 
@@ -300,19 +314,19 @@ access(all) contract FRC20AccountsPool {
             hcManager.addOwnedAccount(cap: ownedPrivCap)
         }
 
-        /// Borrow tick dict
+        /// Borrow dictioinary
         ///
         access(self)
-        fun borrowTickDict(type: ChildAccountType): &{String: Address}? {
-            return &self.tickAddressMapping[type] as &{String: Address}?
+        fun borrowDict(type: ChildAccountType): &{String: Address}? {
+            return &self.addressMapping[type] as &{String: Address}?
         }
 
         /// ensure type dict exists
         ///
         access(self)
-        fun _ensureTypeDictExists(_ type: ChildAccountType) {
-            if self.tickAddressMapping[type] == nil {
-                self.tickAddressMapping[type] = {}
+        fun _ensureDictExists(_ type: ChildAccountType) {
+            if self.addressMapping[type] == nil {
+                self.addressMapping[type] = {}
             }
         }
     }
