@@ -278,38 +278,47 @@ access(all) contract FRC20AccountsPool {
             let hcManagerAddr = self.hcManagerCap.address
 
             // >>> [0] Get child AuthAccount
-            let child = childAcctCap.borrow()
+            var child = childAcctCap.borrow()
                 ?? panic("Failed to borrow child account")
 
             // >>> [1] Child: createOwnedAccount
-            if child.borrow<&HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath) == nil {
+            if child.borrow<&AnyResource>(from: HybridCustody.OwnedAccountStoragePath) == nil {
                 let ownedAccount <- HybridCustody.createOwnedAccount(acct: childAcctCap)
                 child.save(<-ownedAccount, to: HybridCustody.OwnedAccountStoragePath)
             }
 
             // ensure owned account exists
-            assert(
-                child.borrow<&HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath) != nil,
-                message: "owned account not found"
-            )
+            let childRef = child.borrow<&HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath)
+                ?? panic("owned account not found")
 
             // check that paths are all configured properly
             // public path
             child.unlink(HybridCustody.OwnedAccountPublicPath)
             child.link<&HybridCustody.OwnedAccount{HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPublicPath, target: HybridCustody.OwnedAccountStoragePath)
-            // private path(will deperated in the future)
-            child.unlink(HybridCustody.OwnedAccountPrivatePath)
-            child.link<&HybridCustody.OwnedAccount{HybridCustody.BorrowableAccount, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPrivatePath, target: HybridCustody.OwnedAccountStoragePath)
+
+            // // private path(will deperated in the future)
+            // child.unlink(HybridCustody.OwnedAccountPrivatePath)
+            // child.link<&HybridCustody.OwnedAccount{HybridCustody.BorrowableAccount, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPrivatePath, target: HybridCustody.OwnedAccountStoragePath)
+
+            let publishIdentifier = HybridCustody.getOwnerIdentifier(hcManagerAddr)
+            // give ownership to manager
+            childRef.giveOwnership(to: hcManagerAddr)
+
+            // only childRef will be available after 'giveaway', so we need to re-borrow it
+            child = childRef.borrowAccount()
+
+            // unpublish the priv capability
+            child.inbox.unpublish<
+                &{HybridCustody.OwnedAccountPrivate, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}
+            >(publishIdentifier)
 
             // >> [2] manager: add owned child account
+
             // Link a Capability for the new owner, retrieve & publish
-            let ownenPrivCapPath = PrivatePath(identifier: HybridCustody.getOwnerIdentifier(hcManagerAddr))!
-            child.unlink(ownenPrivCapPath)
             let ownedPrivCap = child
-                .link<&{HybridCustody.OwnedAccountPrivate, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(
-                    ownenPrivCapPath,
-                    target: HybridCustody.OwnedAccountStoragePath
-                ) ?? panic("failed to link child account capability")
+                .getCapability<&{HybridCustody.OwnedAccountPrivate, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(PrivatePath(identifier: publishIdentifier)!)
+            assert(ownedPrivCap.check(), message: "Failed to get owned account capability")
+
             // add owned account to manager
             hcManager.addOwnedAccount(cap: ownedPrivCap)
         }
