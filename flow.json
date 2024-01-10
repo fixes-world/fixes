@@ -275,7 +275,6 @@
 		"OracleInterface": {
 			"source": "cadence/deps/OracleInterface.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
 			}
@@ -283,7 +282,6 @@
 		"OracleConfig": {
 			"source": "cadence/deps/OracleConfig.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
 			}
@@ -291,7 +289,6 @@
 		"PriceOracle": {
 			"source": "cadence/deps/PriceOracle.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "e385412159992e11",
 				"testnet": "cbdb5a7b89c3c844"
 			}
@@ -299,7 +296,6 @@
 		"PublicPriceOracle": {
 			"source": "cadence/deps/PublicPriceOracle.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "ec67451f8a58216a",
 				"testnet": "866a9f1e81898147"
 			}
@@ -368,10 +364,6 @@
 				"CapabilityDelegator",
 				"CapabilityFilter",
 				"CapabilityFactory",
-				"OracleConfig",
-				"OracleInterface",
-				"PriceOracle",
-				"PublicPriceOracle",
 				"Fixes",
 				"FixesWrappedNFT",
 				"FRC20FTShared",
