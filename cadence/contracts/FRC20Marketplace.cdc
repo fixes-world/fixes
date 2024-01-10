@@ -194,6 +194,10 @@ access(all) contract FRC20Marketplace {
         access(all) view
         fun getListedItemByRankdedId(rankedId: String): ListedItem?
 
+        /// Get the listed item amount
+        access(all) view
+        fun getListedAmount(): UInt64
+
         // ---- Market operations ----
 
         /// Add a listing to the market
@@ -261,6 +265,8 @@ access(all) contract FRC20Marketplace {
         let adminWhitelist: {Address: Bool}
         access(self)
         let accessWhitelist: {Address: Bool}
+        access(self)
+        var listedItemAmount: UInt64
 
         init(
             tick: String
@@ -268,6 +274,7 @@ access(all) contract FRC20Marketplace {
             self.tick = tick
             self.collections <- {}
             self.sortedPriceRanks = {}
+            self.listedItemAmount = 0
             self.accessWhitelist = {}
             self.adminWhitelist = {}
 
@@ -332,6 +339,11 @@ access(all) contract FRC20Marketplace {
             return self.getListedItem(type: ret.type, rank: ret.rank, id: ret.listingId)
         }
 
+        access(all) view
+        fun getListedAmount(): UInt64 {
+            return self.listedItemAmount
+        }
+
         /// Add a listing to the market
         access(all)
         fun addToList(storefront: Address, listingId: UInt64) {
@@ -379,6 +391,7 @@ access(all) contract FRC20Marketplace {
                 // update the sorted price ranks
                 self.sortedPriceRanks[details.type] = ranks
             }
+            self.listedItemAmount = self.listedItemAmount + 1
             // emit event
             emit ListingAdded(tick: self.tick, storefront: storefront, listingId: listingId, type: details.type.rawValue)
         }
@@ -406,6 +419,7 @@ access(all) contract FRC20Marketplace {
                     }
                     // emit event if removed
                     if removed {
+                        self.listedItemAmount = self.listedItemAmount - 1
                         emit ListingRemoved(tick: self.tick, storefront: listedItemRef.storefront, listingId: parsed.listingId, type: parsed.type.rawValue)
                     }
                 }
