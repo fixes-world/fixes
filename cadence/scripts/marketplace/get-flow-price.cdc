@@ -1,9 +1,7 @@
-// Thirdparty imports
 import "AddressUtils"
 import "PublicPriceOracle"
 
-access(all)
-fun main(): UFix64 {
+access(all) fun main(): UFix64 {
     let network = AddressUtils.currentNetwork()
     // config flow address by network
     // reference: https://docs.increment.fi/protocols/decentralized-price-feed-oracle/deployment-addresses
