@@ -286,13 +286,6 @@
 				"testnet": "2a9b59c3e2b72ee0"
 			}
 		},
-		"PriceOracle": {
-			"source": "cadence/deps/PriceOracle.cdc",
-			"aliases": {
-				"mainnet": "e385412159992e11",
-				"testnet": "cbdb5a7b89c3c844"
-			}
-		},
 		"PublicPriceOracle": {
 			"source": "cadence/deps/PublicPriceOracle.cdc",
 			"aliases": {
