@@ -366,7 +366,11 @@ access(all) contract FRC20TradingRecord {
 
         access(all)
         fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
-
+        // ---- 2x Traders Points ----
+        access(all) view
+        fun getTraders(): [Address]
+        access(all) view
+        fun getTradersPoints(_ addr: Address): UFix64
         // ---- 10x Traders Points ----
         access(all) view
         fun get10xTraders(): [Address]
@@ -390,10 +394,13 @@ access(all) contract FRC20TradingRecord {
         /// Date => DailyRecords
         access(self)
         let dailyRecords: @{UInt64: DailyRecords}
-        /// 10x traders address => Points
+        // > 2x traders address => Points
+        access(self)
+        let traderPoints: {Address: UFix64}
+        /// > 10x traders address => Points
         access(self)
         let traders10xBenchmark: {Address: UFix64}
-        /// 100x traders address => Points
+        /// > 100x traders address => Points
         access(self)
         let traders100xBenchmark: {Address: UFix64}
 
@@ -403,6 +410,7 @@ access(all) contract FRC20TradingRecord {
             self.tick = tick
             self.dailyRecords <- {}
             self.status = TradingStatus()
+            self.traderPoints = {}
             self.traders10xBenchmark = {}
             self.traders100xBenchmark = {}
         }
@@ -451,6 +459,20 @@ access(all) contract FRC20TradingRecord {
         }
 
         // ---- Traders Points ----
+
+        /// Get the 2x traders
+        ///
+        access(all) view
+        fun getTraders(): [Address] {
+            return self.traderPoints.keys
+        }
+
+        /// Get the 2x traders points
+        ///
+        access(all) view
+        fun getTradersPoints(_ addr: Address): UFix64 {
+            return self.traderPoints[addr] ?? 0.0
+        }
 
         /// Get the 10x traders
         ///
@@ -556,19 +578,36 @@ access(all) contract FRC20TradingRecord {
 
             let benchmarkValue = frcIndexer.getBenchmarkValue(tick: record.tick)
             let benchmarkPrice = benchmarkValue * record.dealAmount
-            // Check if buyer / seller are an 10x traders
+            let mintAmount = record.dealAmount / tokenMeta!.limit
+            // Check if buyer / seller are an 2x traders
+            if record.dealPrice > benchmarkPrice * 2.0 {
+                let points = 1.0 * record.dealPrice / benchmarkPrice * mintAmount
+                // earn trading points = 2x points
+                self.traderPoints[record.buyer] = (self.traderPoints[record.buyer] ?? 0.0) + points
+                self.traderPoints[record.seller] = (self.traderPoints[record.seller] ?? 0.0) + points
+            }
+            // Check if buyer / seller are an 10x traders, if yes, add extra points
             if record.dealPrice > benchmarkPrice * 10.0 {
-                // earn trading points = 1.0 * dealPrice / benchmarkPrice * mint amount(= amt / limit)
-                let points = 1.0 * record.dealPrice / benchmarkPrice * record.dealAmount / tokenMeta!.limit
+                let points = 5.0 * (record.dealPrice - benchmarkPrice * 10.0) / benchmarkPrice * mintAmount
+                // earn trading points = 10x points + 2x points
                 self.traders10xBenchmark[record.buyer] = (self.traders10xBenchmark[record.buyer] ?? 0.0) + points
                 self.traders10xBenchmark[record.seller] = (self.traders10xBenchmark[record.seller] ?? 0.0) + points
+                // add to the 2x traders points
+                self.traderPoints[record.buyer] = (self.traderPoints[record.buyer] ?? 0.0) + points
+                self.traderPoints[record.seller] = (self.traderPoints[record.seller] ?? 0.0) + points
             }
-            // Check if buyer / seller are an 100x traders
+            // Check if buyer / seller are an 100x traders, if yes, add extra points
             if record.dealPrice > benchmarkPrice * 100.0 {
-                // earn trading points = 5.0 * dealPrice / benchmarkPrice * mint amount(= amt / limit)
-                let points = 5.0 * record.dealPrice / benchmarkPrice * record.dealAmount / tokenMeta!.limit
+                let points = 10.0 * (record.dealPrice - benchmarkPrice * 100.0) / benchmarkPrice * mintAmount
+                // earn trading points = 100x points + 10x points + 2x points
                 self.traders100xBenchmark[record.buyer] = (self.traders100xBenchmark[record.buyer] ?? 0.0) + points
                 self.traders100xBenchmark[record.seller] = (self.traders100xBenchmark[record.seller] ?? 0.0) + points
+                // add to the 10x traders points
+                self.traders10xBenchmark[record.buyer] = (self.traders10xBenchmark[record.buyer] ?? 0.0) + points
+                self.traders10xBenchmark[record.seller] = (self.traders10xBenchmark[record.seller] ?? 0.0) + points
+                // add to the 2x traders points
+                self.traderPoints[record.buyer] = (self.traderPoints[record.buyer] ?? 0.0) + points
+                self.traderPoints[record.seller] = (self.traderPoints[record.seller] ?? 0.0) + points
             }
         }
 
