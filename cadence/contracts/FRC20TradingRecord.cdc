@@ -366,6 +366,17 @@ access(all) contract FRC20TradingRecord {
 
         access(all)
         fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
+
+        // ---- 10x Traders Points ----
+        access(all) view
+        fun get10xTraders(): [Address]
+        access(all) view
+        fun get10xTradersPoints(_ addr: Address): UFix64
+        // ---- 100x Traders  Points ----
+        access(all) view
+        fun get100xTraders(): [Address]
+        access(all) view
+        fun get100xTradersPoints(_ addr: Address): UFix64
     }
 
     /// The resource containing the trading volume
@@ -379,13 +390,21 @@ access(all) contract FRC20TradingRecord {
         /// Date => DailyRecords
         access(self)
         let dailyRecords: @{UInt64: DailyRecords}
+        /// 10x traders address => Points
+        access(self)
+        let traders10xBenchmark: {Address: UFix64}
+        /// 100x traders address => Points
+        access(self)
+        let traders100xBenchmark: {Address: UFix64}
 
         init(
             _ tick: String?
         ) {
             self.tick = tick
-            self.status = TradingStatus()
             self.dailyRecords <- {}
+            self.status = TradingStatus()
+            self.traders10xBenchmark = {}
+            self.traders100xBenchmark = {}
         }
 
         destroy() {
@@ -429,6 +448,36 @@ access(all) contract FRC20TradingRecord {
         access(all)
         fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}? {
             return self.borrowDailyRecordsPriv(date)
+        }
+
+        // ---- Traders Points ----
+
+        /// Get the 10x traders
+        ///
+        access(all) view
+        fun get10xTraders(): [Address] {
+            return self.traders10xBenchmark.keys
+        }
+
+        /// Get the 10x traders points
+        ///
+        access(all) view
+        fun get10xTradersPoints(_ addr: Address): UFix64 {
+            return self.traders10xBenchmark[addr] ?? 0.0
+        }
+
+        /// Get the 100x traders
+        ///
+        access(all) view
+        fun get100xTraders(): [Address] {
+            return self.traders100xBenchmark.keys
+        }
+
+        /// Get the 100x traders points
+        ///
+        access(all) view
+        fun get100xTradersPoints(_ addr: Address): UFix64 {
+            return self.traders100xBenchmark[addr] ?? 0.0
         }
 
         // --- FRC20FTShared.TransactionHook ---
@@ -497,6 +546,30 @@ access(all) contract FRC20TradingRecord {
 
             // add to the daily records
             dailyRecordsRef!.addRecord(record: record)
+
+            /// calculate the traders points
+            let frcIndexer = FRC20Indexer.getIndexer()
+            let tokenMeta = frcIndexer.getTokenMeta(tick: record.tick)
+            if tokenMeta == nil {
+                return // DO NOT PANIC
+            }
+
+            let benchmarkValue = frcIndexer.getBenchmarkValue(tick: record.tick)
+            let benchmarkPrice = benchmarkValue * record.dealAmount
+            // Check if buyer / seller are an 10x traders
+            if record.dealPrice > benchmarkPrice * 10.0 {
+                // earn trading points = 1.0 * dealPrice / benchmarkPrice * mint amount(= amt / limit)
+                let points = 1.0 * record.dealPrice / benchmarkPrice * record.dealAmount / tokenMeta!.limit
+                self.traders10xBenchmark[record.buyer] = (self.traders10xBenchmark[record.buyer] ?? 0.0) + points
+                self.traders10xBenchmark[record.seller] = (self.traders10xBenchmark[record.seller] ?? 0.0) + points
+            }
+            // Check if buyer / seller are an 100x traders
+            if record.dealPrice > benchmarkPrice * 100.0 {
+                // earn trading points = 5.0 * dealPrice / benchmarkPrice * mint amount(= amt / limit)
+                let points = 5.0 * record.dealPrice / benchmarkPrice * record.dealAmount / tokenMeta!.limit
+                self.traders100xBenchmark[record.buyer] = (self.traders100xBenchmark[record.buyer] ?? 0.0) + points
+                self.traders100xBenchmark[record.seller] = (self.traders100xBenchmark[record.seller] ?? 0.0) + points
+            }
         }
 
         access(contract)
