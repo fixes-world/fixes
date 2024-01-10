@@ -7,8 +7,8 @@ fun main(): UFix64 {
     let network = AddressUtils.currentNetwork()
     // config flow address by network
     // reference: https://docs.increment.fi/protocols/decentralized-price-feed-oracle/deployment-addresses
-    let oracleAddress = network == "MAINNET"
-        ? Address(0xe385412159992e11)
+    let oracleAddress: Address? = network == "MAINNET"
+        ? 0xe385412159992e11
         : nil
     if oracleAddress == nil {
         return 1.0
