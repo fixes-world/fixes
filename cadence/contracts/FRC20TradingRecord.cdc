@@ -446,7 +446,13 @@ access(all) contract FRC20TradingRecord {
             let frc20Indexer = FRC20Indexer.getIndexer()
             if let meta = frc20Indexer.getTokenMeta(tick: self.tick!) {
                 let status = self.borrowStatus()
-                return status.dealCeilingPricePerToken * meta.max
+                let benchmarkValue = frc20Indexer.getBenchmarkValue(tick: self.tick!)
+                let marketValue = status.dealCeilingPricePerToken
+                if benchmarkValue > marketValue {
+                    return benchmarkValue * meta.max
+                } else {
+                    return marketValue * meta.max
+                }
             }
             return nil
         }
