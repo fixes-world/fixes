@@ -179,6 +179,18 @@ access(all) contract FRC20TradingRecord {
         /// Get the trading status
         access(all) view
         fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}?
+        /// Get the buyer addresses
+        access(all) view
+        fun getBuyerAddresses(): [Address]
+        /// Get the trading volume of the address
+        access(all) view
+        fun getAddressBuyVolume(_ addr: Address): UFix64?
+        /// Get the seller addresses
+        access(all) view
+        fun getSellerAddresses(): [Address]
+        /// Get the trading volume of the address
+        access(all) view
+        fun getAddressSellVolume(_ addr: Address): UFix64?
     }
 
     /// The resource containing the daily records
@@ -196,12 +208,20 @@ access(all) contract FRC20TradingRecord {
         /// Minute => TradingStatus
         access(self)
         let minutes: @{UInt64: BasicRecord}
+        // Address => TradingVolume
+        access(self)
+        let buyerVolumes: {Address: UFix64}
+        // Address => TradingVolume
+        access(self)
+        let sellerVolumes: {Address: UFix64}
 
         init(date: UInt64) {
             self.date = date
             self.status = TradingStatus()
             self.records = []
             self.minutes <- {}
+            self.buyerVolumes = {}
+            self.sellerVolumes = {}
         }
 
         destroy() {
@@ -242,6 +262,30 @@ access(all) contract FRC20TradingRecord {
             return &self.minutes[minuteTime] as &BasicRecord{TradingStatusViewer}?
         }
 
+        /// Get the buyer addresses
+        access(all) view
+        fun getBuyerAddresses(): [Address] {
+            return self.buyerVolumes.keys
+        }
+
+        /// Get the trading volume of the address
+        access(all) view
+        fun getAddressBuyVolume(_ addr: Address): UFix64? {
+            return self.buyerVolumes[addr]
+        }
+
+        /// Get the seller addresses
+        access(all) view
+        fun getSellerAddresses(): [Address] {
+            return self.sellerVolumes.keys
+        }
+
+        /// Get the trading volume of the address
+        access(all) view
+        fun getAddressSellVolume(_ addr: Address): UFix64? {
+            return self.sellerVolumes[addr]
+        }
+
         /** Internal Methods */
 
         access(contract)
@@ -271,6 +315,10 @@ access(all) contract FRC20TradingRecord {
             if minuteRecordsRef != nil {
                 minuteRecordsRef!.updateByNewRecord(recordRef)
             }
+
+            // record detailed trading volume
+            self.buyerVolumes[record.buyer] = (self.buyerVolumes[record.buyer] ?? 0.0) + record.dealPrice
+            self.sellerVolumes[record.seller] = (self.sellerVolumes[record.seller] ?? 0.0) + record.dealPrice
 
             // add the record, sorted by timestamp, descending
             self.records.insert(at: 0, record)
