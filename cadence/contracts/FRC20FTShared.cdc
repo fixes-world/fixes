@@ -225,7 +225,7 @@ access(all) contract FRC20FTShared {
                     message: "FT Vault must not be nil for tick = \"\""
                 )
                 assert(
-                    ftVault.isInstance(Type<@FlowToken.Vault>()),
+                    ftVault.isInstance(OptionalType(Type<@FlowToken.Vault>())),
                     message: "FT Vault must be an instance of FlowToken.Vault"
                 )
             }
