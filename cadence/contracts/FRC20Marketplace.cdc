@@ -404,14 +404,14 @@ access(all) contract FRC20Marketplace {
             if let collRef = self.borrowCollection(parsed.type, parsed.rank) {
                 if let listedItemRef = collRef.borrowListedItem(parsed.listingId) {
                     let listingRef = listedItemRef.borrowListing()
+                    let details = listingRef?.getDetails()
                     var removed = false
                     if listingRef == nil {
                         // remove the listed item if the listing resource is not found
                         collRef.removeListedItem(parsed.listingId)
                         removed = true
                     } else {
-                        let details = listingRef!.getDetails()
-                        if details.isCancelled() || details.isCompleted() {
+                        if details!.isCancelled() || details!.isCompleted() {
                             // remove the listed item if the listing is cancelled or completed
                             collRef.removeListedItem(parsed.listingId)
                             removed = true
@@ -419,6 +419,17 @@ access(all) contract FRC20Marketplace {
                     }
                     // emit event if removed
                     if removed {
+                        if let detailsRef = details {
+                            // remove the rank if the collection is empty
+                            if collRef.getListedIds().length == 0 {
+                                // update the sorted price ranks
+                                let ranks = self.getPriceRanks(type: detailsRef.type)
+                                let priceRank = detailsRef.priceRank()
+                                if let rankIdx = ranks.firstIndex(of: priceRank) {
+                                    self.sortedPriceRanks[detailsRef.type]!.remove(at: rankIdx)
+                                }
+                            }
+                        }
                         self.listedItemAmount = self.listedItemAmount - 1
                         emit ListingRemoved(tick: self.tick, storefront: listedItemRef.storefront, listingId: parsed.listingId, type: parsed.type.rawValue)
                     }
