@@ -357,7 +357,7 @@ access(all) contract FRC20Storefront {
             let indexer = FRC20Indexer.getIndexer()
             // find the op first
             let meta = indexer.parseMetadata(&listIns.getData() as &Fixes.InscriptionData)
-            let op = meta["op"] as! String
+            let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
 
             var order: @FRC20FTShared.ValidFrozenOrder? <- nil
             var listType: ListingType = ListingType.FixedPriceBuyNow
@@ -1293,7 +1293,7 @@ access(all) contract FRC20Storefront {
             return false
         }
         let meta = indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        let op = meta["op"]
+        let op = meta["op"]?.toLower()
         if op == nil || op!.slice(from: 0, upTo: 5) != "list-" {
             return false
         }

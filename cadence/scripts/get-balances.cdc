@@ -15,15 +15,9 @@ fun main(
     let ret: {String: UFix64} = {}
     for tick in ticks {
         if tick != "" {
-            let balance = indexer.getBalance(tick: tick, addr: addr)
-            if balance > 0.0 {
-                ret[tick] = balance
-            }
+            ret[tick] = indexer.getBalance(tick: tick, addr: addr)
         } else {
-            let balance = vaultRef.balance
-            if balance > 0.0 {
-                ret[""] = balance
-            }
+            ret[""] = vaultRef.balance
         }
     }
     return ret
