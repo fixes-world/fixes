@@ -757,8 +757,8 @@ access(all) contract FRC20Indexer {
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             assert(
-                amt >= tokenMeta.limit,
-                message: "The amount should be greater than or equal to the limit"
+                amt > 0.0,
+                message: "The amount should be greater than 0.0"
             )
 
             // the price here means the total price
@@ -812,8 +812,8 @@ access(all) contract FRC20Indexer {
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             assert(
-                amt >= tokenMeta.limit,
-                message: "The amount should be greater than or equal to the limit"
+                amt > 0.0,
+                message: "The amount should be greater than 0.0"
             )
 
             // the price here means the total price
