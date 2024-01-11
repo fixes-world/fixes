@@ -1,5 +1,6 @@
 // Fixes imports
 import "FRC20Indexer"
+import "FRC20FTShared"
 import "FRC20TradingRecord"
 import "FRC20AccountsPool"
 import "FRC20Storefront"
@@ -65,6 +66,20 @@ fun main(
         }
     }
 
+    let sharedSotre = FRC20FTShared.borrowStoreRef(marketAddr)
+        ?? panic("No shared store for the token")
+    let properties: {UInt8: String} = {}
+    properties[FRC20FTShared.ConfigType.MarketAccessibleAfter.rawValue] = (market.accessibleAfter() ?? 0).toString()
+    let claimableTokens = market.whitelistClaimingConditions()
+    for token in claimableTokens.keys {
+        properties[FRC20FTShared.ConfigType.MarketWhitelistClaimingToken.rawValue] = token
+        properties[FRC20FTShared.ConfigType.MarketWhitelistClaimingAmount.rawValue] = claimableTokens[token]!.toString()
+        break
+    }
+    properties[FRC20FTShared.ConfigType.MarketFeeSharedRatio.rawValue] = (sharedSotre.getByEnum(FRC20FTShared.ConfigType.MarketFeeSharedRatio) as! UFix64? ?? 0.0).toString()
+    properties[FRC20FTShared.ConfigType.MarketFeeTokenSpecificRatio.rawValue] = (sharedSotre.getByEnum(FRC20FTShared.ConfigType.MarketFeeTokenSpecificRatio) as! UFix64? ?? 0.0).toString()
+    properties[FRC20FTShared.ConfigType.MarketFeeDeployerRatio.rawValue] = (sharedSotre.getByEnum(FRC20FTShared.ConfigType.MarketFeeDeployerRatio) as! UFix64? ?? 0.0).toString()
+
     return TokenMarketDetailed(
         meta: tokenMeta,
         holders: indexer.getHoldersAmount(tick: tick),
@@ -80,9 +95,10 @@ fun main(
         floorPriceSellListing: floorPriceSellListing,
         floorPriceDeal: totalStatus.dealFloorPricePerToken,
         ceilingPriceDeal: totalStatus.dealCeilingPricePerToken,
-        properties: {},
+        properties: properties,
         // for the address
-        accessible: addr != nil ? market.canAccess(addr: addr!) : nil
+        accessible: addr != nil ? market.canAccess(addr: addr!) : nil,
+        isValidToClaimAccess: addr != nil ? market.isValidToClaimAccess(addr: addr!) : nil
     )
 }
 
@@ -106,6 +122,7 @@ struct TokenMarketDetailed {
     access(all) let properties: {UInt8: String}
     // for the address
     access(all) let accessible: Bool?
+    access(all) let isValidToClaimAccess: Bool?
 
     init(
         meta: FRC20Indexer.FRC20Meta,
@@ -122,7 +139,8 @@ struct TokenMarketDetailed {
         floorPriceDeal: UFix64,
         ceilingPriceDeal: UFix64,
         properties: {UInt8: String},
-        accessible: Bool?
+        accessible: Bool?,
+        isValidToClaimAccess: Bool?
     ) {
         self.meta = meta
         self.holders = holders
@@ -139,5 +157,6 @@ struct TokenMarketDetailed {
         self.ceilingPriceDeal = ceilingPriceDeal
         self.properties = properties
         self.accessible = accessible
+        self.isValidToClaimAccess = isValidToClaimAccess
     }
 }

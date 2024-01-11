@@ -14,7 +14,8 @@ access(all) contract FRC20FTShared {
     access(all) event TokenChangeMerged(tick:String, amount: UFix64, from: Address, changeUuid: UInt64, fromChangeUuid: UInt64)
     /// The event that is emitted when tokens are extracted
     access(all) event TokenChangeExtracted(tick:String, amount: UFix64, from: Address, changeUuid: UInt64)
-
+    /// The event that is emitted when a hook is added
+    access(all) event VaildatedHookTypeAdded(type: Type)
     /// The event that is emitted when a hook is added
     access(all) event TransactionHookAdded(
         hooksOwner: Address,
@@ -676,6 +677,9 @@ access(all) contract FRC20FTShared {
 
     /** Transaction hooks */
 
+    access(contract)
+    let validatedHookTypes: {Type: Bool}
+
     /// It a general interface for the Transaction Hook
     ///
     access(all) resource interface TransactionHook {
@@ -693,6 +697,24 @@ access(all) contract FRC20FTShared {
             dealPrice: UFix64,
             totalAmountInListing: UFix64,
         )
+    }
+
+    access(account)
+    fun registerHookType(_ type: Type) {
+        if type.isSubtype(of: Type<@AnyResource{TransactionHook}>()) {
+            self.validatedHookTypes[type] = true
+            emit VaildatedHookTypeAdded(type: type)
+        }
+    }
+
+    access(all)
+    fun getAllValidatedHookTypes(): [Type] {
+        return self.validatedHookTypes.keys
+    }
+
+    access(all)
+    fun isHookTypeValidated(_ type: Type): Bool {
+        return self.validatedHookTypes[type] == true
     }
 
     /// It a general resource for the Transaction Hook
@@ -716,7 +738,7 @@ access(all) contract FRC20FTShared {
 
         // --- Account Methods ---
 
-        access(account)
+        access(all)
         fun addHook(_ hook: Capability<&AnyResource{TransactionHook}>) {
             pre {
                 hook.check(): "The hook must be valid"
@@ -755,6 +777,11 @@ access(all) contract FRC20FTShared {
 
             // call all hooks
             for type in self.hooks.keys {
+                // check if the hook type is validated
+                if !FRC20FTShared.isHookTypeValidated(type) {
+                    continue
+                }
+                // get the hook capability
                 if let hookCap = self.hooks[type] {
                     let valid = hookCap.check()
                     if !valid {
@@ -779,7 +806,7 @@ access(all) contract FRC20FTShared {
 
     /// Create the instance of the hooks resource
     ///
-    access(account)
+    access(all)
     fun createHooks(): @Hooks {
         return <- create Hooks()
     }
@@ -800,6 +827,8 @@ access(all) contract FRC20FTShared {
             .concat("_transactionHook")
         self.TransactionHookStoragePath = StoragePath(identifier: hookIdentifier)!
         self.TransactionHookPublicPath = PublicPath(identifier: hookIdentifier)!
+
+        self.validatedHookTypes = {}
 
         // Shared Store
         let identifier = "FRC20SharedStore_".concat(self.account.address.toString())

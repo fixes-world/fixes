@@ -658,6 +658,9 @@ access(all) contract FRC20TradingRecord {
         self.TradingRecordsStoragePath = StoragePath(identifier: recordsIdentifier)!
         self.TradingRecordsPublicPath = PublicPath(identifier: recordsIdentifier)!
 
+        // Register the hooks
+        FRC20FTShared.registerHookType(Type<@FRC20TradingRecord.TradingRecords>())
+
         emit ContractInitialized()
     }
 }

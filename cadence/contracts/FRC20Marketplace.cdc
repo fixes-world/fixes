@@ -220,11 +220,15 @@ access(all) contract FRC20Marketplace {
 
         /// The Accessible after timestamp
         access(all) view
-        fun AccessibleAfter(): UInt64?
+        fun accessibleAfter(): UInt64?
 
         /// The Accessible conditions: tick => amount, the conditions are OR relationship
         access(all) view
         fun whitelistClaimingConditions(): {String: UFix64}
+
+        /// Check if the address is valid to claim Accessible
+        access(all) view
+        fun isValidToClaimAccess(addr: Address): Bool
 
         /// Claim the address to the whitelist before the Accessible timestamp
         access(all)
@@ -547,7 +551,7 @@ access(all) contract FRC20Marketplace {
         ///
         access(all) view
         fun isAccessible(): Bool {
-            if let after = self.AccessibleAfter() {
+            if let after = self.accessibleAfter() {
                 return UInt64(getCurrentBlock().timestamp) >= after
             }
             return true
@@ -556,7 +560,7 @@ access(all) contract FRC20Marketplace {
         /// The Accessible after timestamp
         ///
         access(all) view
-        fun AccessibleAfter(): UInt64? {
+        fun accessibleAfter(): UInt64? {
             if let storeRef = self.borrowSharedStore() {
                 return storeRef.getByEnum(FRC20FTShared.ConfigType.MarketAccessibleAfter) as! UInt64?
             }
@@ -578,31 +582,36 @@ access(all) contract FRC20Marketplace {
             return ret
         }
 
-        /// Claim the address to the whitelist before the Accessible timestamp
+        /// Check if the address is valid to claim Accessible
         ///
-        access(all)
-        fun claimWhitelist(addr: Address) {
+        access(all) view
+        fun isValidToClaimAccess(addr: Address): Bool {
             let isAccessibleNow = self.isAccessible()
             if isAccessibleNow {
-                return
+                return false
             }
 
             let conds = self.whitelistClaimingConditions()
             // no conditions set, so you can not claim
             if conds.keys.length == 0 {
-                return
+                return false
             }
 
             let frc20Indexer = FRC20Indexer.getIndexer()
-            var valid = false
             for tick in conds.keys {
                 let balance = frc20Indexer.getBalance(tick: tick, addr: addr)
                 if balance >= conds[tick]! {
-                    valid = true
-                    break
+                    return true
                 }
             }
+            return false
+        }
 
+        /// Claim the address to the whitelist before the Accessible timestamp
+        ///
+        access(all)
+        fun claimWhitelist(addr: Address) {
+            let valid = self.isValidToClaimAccess(addr: addr)
             // add to the whitelist if valid
             if valid {
                 self.accessWhitelist[addr] = true

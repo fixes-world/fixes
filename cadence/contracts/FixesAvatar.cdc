@@ -211,6 +211,9 @@ access(all) contract FixesAvatar {
         self.AvatarStoragePath  = StoragePath(identifier: identifier)!
         self.AvatarPublicPath = PublicPath(identifier: identifier)!
 
+        // Register the hooks
+        FRC20FTShared.registerHookType(Type<@FixesAvatar.Profile>())
+
         emit ContractInitialized()
     }
 }
