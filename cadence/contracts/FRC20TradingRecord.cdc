@@ -615,6 +615,9 @@ access(all) contract FRC20TradingRecord {
                 self.traderPoints[record.buyer] = (self.traderPoints[record.buyer] ?? 0.0) + points
                 self.traderPoints[record.seller] = (self.traderPoints[record.seller] ?? 0.0) + points
             }
+            // Log for debug
+            log("Trading Point For Buyer: ".concat(self.traderPoints[record.buyer]?.toString() ?? "0.0"))
+            log("Trading Point For Seller: ".concat(self.traderPoints[record.seller]?.toString() ?? "0.0"))
         }
 
         access(contract)

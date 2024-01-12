@@ -88,6 +88,7 @@ access(all) contract FixesAvatar {
             // "fixes", the tick for the FIXeS platform
             if tick == "flows" || tick == "fixes" {
                 if let entry <- FixesTraits.attemptToGenerateRandomEntryForSeason0() {
+                    log("Generated a random entry for season 0".concat(entry.uuid.toString()))
                     self.addTraitEntry(<- entry)
                 }
             }
