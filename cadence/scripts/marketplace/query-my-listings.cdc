@@ -21,9 +21,11 @@ fun main(
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
     let storefront = FRC20Storefront.borrowStorefront(address: addr)
-        ?? panic("No storefront resource")
+    if storefront == nil {
+        return []
+    }
 
-    let listingIds = storefront.getListingIDs()
+    let listingIds = storefront!.getListingIDs()
     var upTo = (page + 1) * limit
     if upTo > listingIds.length {
         upTo = listingIds.length
@@ -32,7 +34,7 @@ fun main(
 
     let ret: [ListedItemInfo] = []
     for id in slicedIds {
-        if let listing = storefront.borrowListing(id) {
+        if let listing = storefront!.borrowListing(id) {
             let details = listing.getDetails()
 
             let marketAddr = acctsPool.getFRC20MarketAddress(tick: details.tick)
