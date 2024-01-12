@@ -364,7 +364,23 @@
 				"FixesAvatar",
 				"FRC20Indexer",
 				"FRC20NFTWrapper",
-				"FRC20FungibleToken",
+				"FRC20Storefront",
+				"FRC20AccountsPool",
+				"FRC20TradingRecord",
+				"FRC20Marketplace",
+				"FRC20MarketManager",
+				"FRC20FungibleToken"
+			]
+		},
+		"mainnet": {
+			"mainnet-admin": [
+				"Fixes",
+				"FixesWrappedNFT",
+				"FRC20FTShared",
+				"FixesTraits",
+				"FixesAvatar",
+				"FRC20Indexer",
+				"FRC20NFTWrapper",
 				"FRC20Storefront",
 				"FRC20AccountsPool",
 				"FRC20TradingRecord",
@@ -372,20 +388,20 @@
 				"FRC20MarketManager"
 			]
 		},
-		"mainnet": {
-			"mainnet-admin": [
-				"FRC20Indexer",
-				"Fixes",
-				"FixesWrappedNFT",
-				"FRC20NFTWrapper"
-			]
-		},
 		"testnet": {
 			"testnet-admin": [
-				"FRC20Indexer",
 				"Fixes",
 				"FixesWrappedNFT",
-				"FRC20NFTWrapper"
+				"FRC20FTShared",
+				"FixesTraits",
+				"FixesAvatar",
+				"FRC20Indexer",
+				"FRC20NFTWrapper",
+				"FRC20Storefront",
+				"FRC20AccountsPool",
+				"FRC20TradingRecord",
+				"FRC20Marketplace",
+				"FRC20MarketManager"
 			]
 		}
 	}
