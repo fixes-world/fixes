@@ -1,7 +1,8 @@
 import "FIND"
 import "Domains"
 
-pub fun main(
+access(all)
+fun main(
     address: Address
 ): String? {
     if let name = FIND.reverseLookup(address) {

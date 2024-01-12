@@ -3,7 +3,8 @@ import "MetadataViews"
 import "StringUtils"
 import "FixesWrappedNFT"
 
-pub fun main(
+access(all)
+fun main(
     addr: Address,
     page: Int,
     size: Int,
@@ -51,13 +52,13 @@ pub fun main(
     return ret
 }
 
-pub struct WrappedNFTView {
-    pub let id: UInt64
-    pub let uuid: UInt64
-    pub let display: MetadataViews.Display?
-    pub let externalURL: MetadataViews.ExternalURL?
-    pub let traits: [MetadataViews.Trait]
-    pub let extras: [AnyStruct]
+access(all) struct WrappedNFTView {
+    access(all) let id: UInt64
+    access(all) let uuid: UInt64
+    access(all) let display: MetadataViews.Display?
+    access(all) let externalURL: MetadataViews.ExternalURL?
+    access(all) let traits: [MetadataViews.Trait]
+    access(all) let extras: [AnyStruct]
     init(
         basic: MetadataViews.NFTView,
         extras: [AnyStruct],

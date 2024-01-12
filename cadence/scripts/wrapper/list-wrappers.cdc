@@ -3,7 +3,8 @@ import "FixesWrappedNFT"
 import "FRC20NFTWrapper"
 import "FRC20Indexer"
 
-pub fun main(
+access(all)
+fun main(
     includeNoStrategy: Bool
 ): [WrapperHost] {
     let wrapperIndexer = FRC20NFTWrapper.borrowWrapperIndexerPublic()
@@ -22,10 +23,10 @@ pub fun main(
     return ret
 }
 
-pub struct WrapperHost {
-    pub let address: Address
-    pub let strategiesAmt: UInt64
-    pub let whitelisted: [Address]
+access(all) struct WrapperHost {
+    access(all) let address: Address
+    access(all) let strategiesAmt: UInt64
+    access(all) let whitelisted: [Address]
 
     init(
         _ address: Address,

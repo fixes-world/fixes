@@ -5,36 +5,36 @@ import ViewResolver from "ViewResolver"
 // Fixes Import
 import "Fixes"
 
-pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
+access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
 
     /// Total supply of FixesWrappedNFTs in existence
-    pub var totalSupply: UInt64
+    access(all) var totalSupply: UInt64
 
     /// The event that is emitted when the contract is created
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
 
     /// The event that is emitted when an NFT is withdrawn from a Collection
-    pub event Withdraw(id: UInt64, from: Address?)
+    access(all) event Withdraw(id: UInt64, from: Address?)
 
     /// The event that is emitted when an NFT is deposited to a Collection
-    pub event Deposit(id: UInt64, to: Address?)
+    access(all) event Deposit(id: UInt64, to: Address?)
 
     /// The event that is emitted when an NFT is wrapped
-    pub event Wrapped(id: UInt64, srcType: Type, srcId: UInt64, inscriptionId: UInt64?)
+    access(all) event Wrapped(id: UInt64, srcType: Type, srcId: UInt64, inscriptionId: UInt64?)
 
     /// The event that is emitted when an NFT is unwrapped
-    pub event Unwrapped(id: UInt64, srcType: Type, srcId: UInt64)
+    access(all) event Unwrapped(id: UInt64, srcType: Type, srcId: UInt64)
 
     /// Storage and Public Paths
-    pub let CollectionStoragePath: StoragePath
-    pub let CollectionPublicPath: PublicPath
-    pub let MinterStoragePath: StoragePath
-    pub let CollectionPrivatePath: PrivatePath
-    pub let MinterPrivatePath: PrivatePath
+    access(all) let CollectionStoragePath: StoragePath
+    access(all) let CollectionPublicPath: PublicPath
+    access(all) let MinterStoragePath: StoragePath
+    access(all) let CollectionPrivatePath: PrivatePath
+    access(all) let MinterPrivatePath: PrivatePath
 
     /// Deprecated, use `Fixes.InscriptionView` instead
     ///
-    pub struct FixesInscriptionView {
+    access(all) struct FixesInscriptionView {
         init() {}
     }
 
@@ -42,9 +42,9 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     /// New instances will be created using the NFTMinter resource
     /// and stored in the Collection resource
     ///
-    pub resource NFT: NonFungibleToken.INFT, MetadataViews.Resolver {
+    access(all) resource NFT: NonFungibleToken.INFT, MetadataViews.Resolver {
         /// The unique ID that each NFT has
-        pub let id: UInt64
+        access(all) let id: UInt64
 
         access(self)
         var wrappedNFT: @NonFungibleToken.NFT?
@@ -60,7 +60,7 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             self.wrappedInscription <- inscription
         }
 
-        destroy () {
+        destroy() {
             destroy self.wrappedNFT
             destroy self.wrappedInscription
         }
@@ -70,7 +70,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @return An array of Types defining the implemented views. This value will be used by
         ///         developers to know which parameter to pass to the resolveView() method.
         ///
-        pub fun getViews(): [Type] {
+        access(all)
+        fun getViews(): [Type] {
             var nftViews: [Type] = []
             if let nftRef = &self.wrappedNFT as &NonFungibleToken.NFT? {
                 nftViews = nftRef.getViews()
@@ -101,7 +102,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @param view: The Type of the desired view.
         /// @return A structure representing the requested view.
         ///
-        pub fun resolveView(_ view: Type): AnyStruct? {
+        access(all)
+        fun resolveView(_ view: Type): AnyStruct? {
             let colViews = [
                 Type<MetadataViews.ExternalURL>(),
                 Type<MetadataViews.NFTCollectionData>(),
@@ -229,11 +231,15 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
 
     /// Defines the methods that are particular to this NFT contract collection
     ///
-    pub resource interface FixesWrappedNFTCollectionPublic {
-        pub fun deposit(token: @NonFungibleToken.NFT)
-        pub fun getIDs(): [UInt64]
-        pub fun borrowNFT(id: UInt64): &NonFungibleToken.NFT
-        pub fun borrowFixesWrappedNFT(id: UInt64): &FixesWrappedNFT.NFT? {
+    access(all) resource interface FixesWrappedNFTCollectionPublic {
+        access(all)
+        fun deposit(token: @NonFungibleToken.NFT)
+        access(all)
+        fun getIDs(): [UInt64]
+        access(all)
+        fun borrowNFT(id: UInt64): &NonFungibleToken.NFT
+        access(all)
+        fun borrowFixesWrappedNFT(id: UInt64): &FixesWrappedNFT.NFT? {
             post {
                 (result == nil) || (result?.id == id):
                     "Cannot borrow FixesWrappedNFT reference: the ID of the returned reference is incorrect"
@@ -245,10 +251,10 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     /// In order to be able to manage NFTs any account will need to create
     /// an empty collection first
     ///
-    pub resource Collection: FixesWrappedNFTCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection {
+    access(all) resource Collection: FixesWrappedNFTCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection {
         // dictionary of NFT conforming tokens
         // NFT is a resource type with an `UInt64` ID field
-        pub var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
+        access(all) var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
 
         init () {
             self.ownedNFTs <- {}
@@ -259,7 +265,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @param withdrawID: The ID of the NFT that wants to be withdrawn
         /// @return The NFT resource that has been taken out of the collection
         ///
-        pub fun withdraw(withdrawID: UInt64): @NonFungibleToken.NFT {
+        access(all)
+        fun withdraw(withdrawID: UInt64): @NonFungibleToken.NFT {
             let token <- self.ownedNFTs.remove(key: withdrawID) ?? panic("missing NFT")
 
             emit Withdraw(id: token.id, from: self.owner?.address)
@@ -271,7 +278,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         ///
         /// @param token: The NFT resource to be included in the collection
         ///
-        pub fun deposit(token: @NonFungibleToken.NFT) {
+        access(all)
+        fun deposit(token: @NonFungibleToken.NFT) {
             let token <- token as! @FixesWrappedNFT.NFT
 
             let id: UInt64 = token.id
@@ -288,7 +296,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         ///
         /// @return An array containing the IDs of the NFTs in the collection
         ///
-        pub fun getIDs(): [UInt64] {
+        access(all)
+        fun getIDs(): [UInt64] {
             return self.ownedNFTs.keys
         }
 
@@ -298,7 +307,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @param id: The ID of the wanted NFT
         /// @return A reference to the wanted NFT resource
         ///
-        pub fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
+        access(all)
+        fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
             return (&self.ownedNFTs[id] as &NonFungibleToken.NFT?)!
         }
 
@@ -308,7 +318,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @param id: The ID of the wanted NFT
         /// @return A reference to the wanted NFT resource
         ///
-        pub fun borrowFixesWrappedNFT(id: UInt64): &FixesWrappedNFT.NFT? {
+        access(all)
+        fun borrowFixesWrappedNFT(id: UInt64): &FixesWrappedNFT.NFT? {
             if self.ownedNFTs[id] != nil {
                 // Create an authorized reference to allow downcasting
                 let ref = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
@@ -325,7 +336,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @param id: The ID of the wanted NFT
         /// @return The resource reference conforming to the Resolver interface
         ///
-        pub fun borrowViewResolver(id: UInt64): &AnyResource{MetadataViews.Resolver} {
+        access(all)
+        fun borrowViewResolver(id: UInt64): &AnyResource{MetadataViews.Resolver} {
             let nft = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
             let FixesWrappedNFT = nft as! &FixesWrappedNFT.NFT
             return FixesWrappedNFT as &AnyResource{MetadataViews.Resolver}
@@ -340,7 +352,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     ///
     /// @return The new Collection resource
     ///
-    pub fun createEmptyCollection(): @NonFungibleToken.Collection {
+    access(all)
+    fun createEmptyCollection(): @NonFungibleToken.Collection {
         return <- create Collection()
     }
 
@@ -348,7 +361,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     /// recipients collection using their collection reference
     /// -- recipient, the collection of FixesWrappedNFTs
     ///
-    pub fun wrap(
+    access(all)
+    fun wrap(
         recipient: &FixesWrappedNFT.Collection{NonFungibleToken.CollectionPublic},
         nftToWrap: @NonFungibleToken.NFT,
         inscription: @Fixes.Inscription?,
@@ -386,7 +400,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     /// using their collection reference
     /// -- recipient, the collection of wrapped NFTs
     ///
-    pub fun unwrap(
+    access(all)
+    fun unwrap(
         recipient: &{NonFungibleToken.CollectionPublic},
         nftToUnwrap: @FixesWrappedNFT.NFT,
     ): @Fixes.Inscription? {
@@ -428,7 +443,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     /// @param view: The Type of the desired view.
     /// @return A structure representing the requested view.
     ///
-    pub fun resolveView(_ view: Type): AnyStruct? {
+    access(all)
+    fun resolveView(_ view: Type): AnyStruct? {
         switch view {
             case Type<MetadataViews.ExternalURL>():
                 return MetadataViews.ExternalURL("https://fixes.world/")
@@ -476,7 +492,8 @@ pub contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
     /// @return An array of Types defining the implemented views. This value will be used by
     ///         developers to know which parameter to pass to the resolveView() method.
     ///
-    pub fun getViews(): [Type] {
+    access(all)
+    fun getViews(): [Type] {
         return [
             Type<MetadataViews.ExternalURL>(),
             Type<MetadataViews.NFTCollectionData>(),

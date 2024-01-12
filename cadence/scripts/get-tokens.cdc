@@ -1,6 +1,7 @@
 import "FRC20Indexer"
 
-pub fun main(
+access(all)
+fun main(
     page: Int,
     size: Int
 ): [FRC20Info] {
@@ -25,10 +26,10 @@ pub fun main(
     return ret
 }
 
-pub struct FRC20Info {
-    pub let meta: FRC20Indexer.FRC20Meta
-    pub let holders: UInt64
-    pub let pool: UFix64
+access(all) struct FRC20Info {
+    access(all) let meta: FRC20Indexer.FRC20Meta
+    access(all) let holders: UInt64
+    access(all) let pool: UFix64
 
     init(
         meta: FRC20Indexer.FRC20Meta,

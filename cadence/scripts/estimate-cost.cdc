@@ -1,6 +1,7 @@
 import "Fixes"
 
-pub fun main(
+access(all)
+fun main(
     mimeType: String,
     data: String,
     protocol: String

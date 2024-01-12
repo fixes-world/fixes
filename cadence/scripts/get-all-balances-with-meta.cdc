@@ -1,6 +1,7 @@
 import "FRC20Indexer"
 
-pub fun main(
+access(all)
+fun main(
     addr: Address
 ): [BalanceInfo] {
     let indexer = FRC20Indexer.getIndexer()
@@ -21,12 +22,12 @@ pub fun main(
     return ret
 }
 
-pub struct BalanceInfo {
-    pub let tick: String
-    pub let balance: UFix64
-    pub let meta: FRC20Indexer.FRC20Meta
-    pub let holders: UInt64
-    pub let pool: UFix64
+access(all) struct BalanceInfo {
+    access(all) let tick: String
+    access(all) let balance: UFix64
+    access(all) let meta: FRC20Indexer.FRC20Meta
+    access(all) let holders: UInt64
+    access(all) let pool: UFix64
 
     init(
         tick: String,

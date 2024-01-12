@@ -20,10 +20,17 @@ transaction(
 
         // Get a reference to the Fixes Indexer
         let indexer = FRC20Indexer.getIndexer()
+        let tokenMeta = indexer.getTokenMeta(tick: tick)
+        assert(tokenMeta != nil, message: "TokenMeta for tick ".concat(tick).concat(" does not exist!"))
 
         var i = 0 as UInt64
         while i < repeats {
             i = i + 1
+
+            let tokenMeta = indexer.getTokenMeta(tick: tick)
+            if tokenMeta!.max == tokenMeta!.supplied {
+                break
+            }
 
             // estimate the required storage
             let estimatedReqValue = Fixes.estimateValue(

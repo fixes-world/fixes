@@ -1,6 +1,7 @@
 import "FRC20Indexer"
 
-pub fun main(
+access(all)
+fun main(
     tick: String,
     addr: Address
 ): UFix64 {

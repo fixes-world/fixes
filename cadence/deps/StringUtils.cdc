@@ -1,7 +1,7 @@
-import ArrayUtils from "ArrayUtils"
+import "ArrayUtils"
 
 pub contract StringUtils {
-   
+
     pub fun format(_ s: String, _ args: {String:String}): String{
       var formatted = s
       for key in args.keys{
@@ -14,7 +14,7 @@ pub contract StringUtils {
         var chars : [String] =  []
         for i in ArrayUtils.range(0, s.length){
             chars.append(s[i].toString())
-        }  
+        }
         return chars
     }
 
@@ -75,14 +75,14 @@ pub contract StringUtils {
     }
 
     pub fun split(_ s: String, _ delimiter: String): [String] {
-        let segments: [String] = [] 
+        let segments: [String] = []
         var p = 0
         while p<=s.length{
             var preDelimiter = self.substringUntil(s, delimiter, p)
             segments.append(preDelimiter)
-            p = p + preDelimiter.length + delimiter.length 
+            p = p + preDelimiter.length + delimiter.length
         }
-        return segments 
+        return segments
     }
 
     pub fun join(_ strs: [String], _ separator: String): String {

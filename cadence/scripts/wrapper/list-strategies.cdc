@@ -4,7 +4,8 @@ import "FixesWrappedNFT"
 import "FRC20NFTWrapper"
 import "FRC20Indexer"
 
-pub fun main(
+access(all)
+fun main(
     all: Bool
 ): [Strategy] {
     let wrapperIndexer = FRC20NFTWrapper.borrowWrapperIndexerPublic()
@@ -32,13 +33,13 @@ pub fun main(
     return ret
 }
 
-pub struct Strategy {
-    pub let host: Address
-    pub let info: FRC20NFTWrapper.FRC20Strategy
-    pub let holders: UInt64
-    pub let meta: FRC20Indexer.FRC20Meta
-    pub let pool: UFix64
-    pub let collectionDisplay: MetadataViews.NFTCollectionDisplay
+access(all) struct Strategy {
+    access(all) let host: Address
+    access(all) let info: FRC20NFTWrapper.FRC20Strategy
+    access(all) let holders: UInt64
+    access(all) let meta: FRC20Indexer.FRC20Meta
+    access(all) let pool: UFix64
+    access(all) let collectionDisplay: MetadataViews.NFTCollectionDisplay
 
     init(
         host: Address,

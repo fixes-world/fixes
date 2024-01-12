@@ -8,8 +8,59 @@
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
+		"AddressUtils": {
+			"source": "cadence/deps/AddressUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"CapabilityDelegator": {
+			"source": "./cadence/deps/CapabilityDelegator.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
+			}
+		},
+		"CapabilityFactory": {
+			"source": "./cadence/deps/CapabilityFactory.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
+			}
+		},
+		"CapabilityFilter": {
+			"source": "./cadence/deps/CapabilityFilter.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
+			}
+		},
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20FTShared": {
+			"source": "cadence/contracts/FRC20FTShared.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20FungibleToken": {
+			"source": "cadence/contracts/FRC20FungibleToken.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -24,8 +75,80 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20Storefront": {
+			"source": "cadence/contracts/FRC20Storefront.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20AccountsPool": {
+			"source": "cadence/contracts/FRC20AccountsPool.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20Marketplace": {
+			"source": "cadence/contracts/FRC20Marketplace.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20MarketManager": {
+			"source": "cadence/contracts/FRC20MarketManager.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20TradingRecord": {
+			"source": "cadence/contracts/FRC20TradingRecord.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20Staking": {
+			"source": "cadence/contracts/FRC20Staking.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "43f16acb483bbee0"
+			}
+		},
+		"FRC20Votes": {
+			"source": "cadence/contracts/FRC20Votes.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "43f16acb483bbee0"
+			}
+		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FixesAvatar": {
+			"source": "cadence/contracts/FixesAvatar.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FixesTraits": {
+			"source": "cadence/contracts/FixesTraits.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -62,6 +185,15 @@
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "f233dcee88fe0abe",
 				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"HybridCustody": {
+			"source": "cadence/deps/HybridCustody.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6",
+				"mainnet": "d8a7e05a7ac670c0"
 			}
 		},
 		"MetadataViews": {
@@ -139,10 +271,32 @@
 				"mainnet": "233eb012d34b0070",
 				"testnet": "b05b2abb42335e88"
 			}
+		},
+		"OracleInterface": {
+			"source": "cadence/deps/OracleInterface.cdc",
+			"aliases": {
+				"mainnet": "cec15c814971c1dc",
+				"testnet": "2a9b59c3e2b72ee0"
+			}
+		},
+		"OracleConfig": {
+			"source": "cadence/deps/OracleConfig.cdc",
+			"aliases": {
+				"mainnet": "cec15c814971c1dc",
+				"testnet": "2a9b59c3e2b72ee0"
+			}
+		},
+		"PublicPriceOracle": {
+			"source": "cadence/deps/PublicPriceOracle.cdc",
+			"aliases": {
+				"mainnet": "ec67451f8a58216a",
+				"testnet": "866a9f1e81898147"
+			}
 		}
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
+		"testing": "127.0.0.1:3569",
 		"mainnet": "access.mainnet.nodes.onflow.org:9000",
 		"testnet": "access.devnet.nodes.onflow.org:9000"
 	},
@@ -195,12 +349,27 @@
 			"default": [],
 			"emulator-account": [
 				"FungibleTokenMetadataViews",
+				"NFTCatalog",
 				"StringUtils",
 				"ArrayUtils",
-				"FRC20Indexer",
+				"AddressUtils",
+				"HybridCustody",
+				"CapabilityDelegator",
+				"CapabilityFilter",
+				"CapabilityFactory",
 				"Fixes",
 				"FixesWrappedNFT",
-				"FRC20NFTWrapper"
+				"FRC20FTShared",
+				"FixesTraits",
+				"FixesAvatar",
+				"FRC20Indexer",
+				"FRC20NFTWrapper",
+				"FRC20FungibleToken",
+				"FRC20Storefront",
+				"FRC20AccountsPool",
+				"FRC20TradingRecord",
+				"FRC20Marketplace",
+				"FRC20MarketManager"
 			]
 		},
 		"mainnet": {

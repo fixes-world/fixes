@@ -1,6 +1,7 @@
 import "FRC20Indexer"
 
-pub fun main(
+access(all)
+fun main(
     addr: Address
 ): {String: UFix64} {
     let indexer = FRC20Indexer.getIndexer()

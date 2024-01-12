@@ -3,12 +3,12 @@ import "FlowToken"
 
 /// FIXES contract to store inscriptions
 ///
-pub contract Fixes {
+access(all) contract Fixes {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
-    pub event ContractInitialized()
+    access(all) event ContractInitialized()
     /// Event emitted when a new inscription is created
-    pub event InscriptionCreated(
+    access(all) event InscriptionCreated(
         id: UInt64,
         mimeType: String,
         metadata: [UInt8],
@@ -17,9 +17,10 @@ pub contract Fixes {
         encoding: String?,
         parentId: UInt64?,
     )
-    pub event InscriptionBurned(id: UInt64)
-    pub event InscriptionExtracted(id: UInt64, value: UFix64)
-    pub event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
+    access(all) event InscriptionBurned(id: UInt64)
+    access(all) event InscriptionExtracted(id: UInt64, value: UFix64)
+    access(all) event InscriptionFused(from: UInt64, to: UInt64, value: UFix64)
+    access(all) event InscriptionArchived(id: UInt64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -29,18 +30,18 @@ pub contract Fixes {
 
     /// The rarity of a Inscription value
     ///
-    pub enum ValueRarity: UInt8 {
-        pub case Common
-        pub case Uncommon
-        pub case Rare
-        pub case SuperRare
-        pub case Epic
-        pub case Legendary
+    access(all) enum ValueRarity: UInt8 {
+        access(all) case Common
+        access(all) case Uncommon
+        access(all) case Rare
+        access(all) case SuperRare
+        access(all) case Epic
+        access(all) case Legendary
     }
 
     /// The data of an inscription
     ///
-    pub struct InscriptionData {
+    access(all) struct InscriptionData {
         /// whose value is the MIME type of the inscription
         access(all) let mimeType: String
         /// The metadata content of the inscription
@@ -68,12 +69,17 @@ pub contract Fixes {
 
     /// The metadata view for Fixes Inscription
     ///
-    pub struct InscriptionView {
-        pub let id: UInt64
-        pub let parentId: UInt64?
-        pub let data: Fixes.InscriptionData
-        pub let value: UFix64
-        pub let extractable: Bool
+    access(all) struct InscriptionView {
+        access(all)
+        let id: UInt64
+        access(all)
+        let parentId: UInt64?
+        access(all)
+        let data: Fixes.InscriptionData
+        access(all)
+        let value: UFix64
+        access(all)
+        let extractable: Bool
 
         init(
             id: UInt64,
@@ -92,7 +98,7 @@ pub contract Fixes {
 
     /// The public interface to the inscriptions
     ///
-    pub resource interface InscriptionPublic {
+    access(all) resource interface InscriptionPublic {
         // identifiers
         access(all) view
         fun getId(): UInt64
@@ -124,7 +130,7 @@ pub contract Fixes {
 
     /// The resource that stores the inscriptions
     ///
-    pub resource Inscription: InscriptionPublic, MetadataViews.Resolver {
+    access(all) resource Inscription: InscriptionPublic, MetadataViews.Resolver {
         /// the id of the inscription
         access(self) let id: UInt64
         /// the id of the parent inscription
@@ -143,7 +149,7 @@ pub contract Fixes {
             parentId: UInt64?
         ) {
             post {
-                self.value?.balance ?? panic("No value") >= self.getMinCost(): "Inscription value should be bigger than minimium $FLOW at least."
+                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
             }
             self.id = Fixes.totalInscriptions
             Fixes.totalInscriptions = Fixes.totalInscriptions + 1
@@ -172,6 +178,13 @@ pub contract Fixes {
         access(all) view
         fun isExtractable(): Bool {
             return !self.isExtracted() && self.owner != nil
+        }
+
+        /// Check if the inscription value is valid
+        ///
+        access(all) view
+        fun isValueValid(): Bool {
+            return self.value?.balance ?? panic("No value") >= self.getMinCost()
         }
 
         /// Fuse the inscription with another inscription
@@ -203,12 +216,32 @@ pub contract Fixes {
                 !self.isExtracted(): "Inscription already extracted"
             }
             post {
-                self.isExtracted(): "Inscription extracted"
+                self.isExtracted(): "Inscription not extracted"
             }
             let balance = self.value?.balance ?? panic("No value")
             let res <- self.value <- nil
             emit InscriptionExtracted(id: self.id, value: balance)
             return <- res!
+        }
+
+        /// Extract a part of the inscription value, but keep the inscription be not extracted
+        ///
+        access(all)
+        fun partialExtract(_ amount: UFix64): @FlowToken.Vault {
+            pre {
+                !self.isExtracted(): "Inscription already extracted"
+            }
+            post {
+                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
+                !self.isExtracted(): "Inscription should not be extracted"
+            }
+            let ret <- self.value?.withdraw(amount: amount) ?? panic("No value")
+            assert(
+                ret.balance == amount,
+                message: "Returned value should be equal to the amount"
+            )
+            emit InscriptionExtracted(id: self.id, value: amount)
+            return <- (ret as! @FlowToken.Vault)
         }
 
         /// Get the minimum value of the inscription
@@ -291,7 +324,8 @@ pub contract Fixes {
 
         /** ---- Implementation of MetadataViews.Resolver ---- */
 
-        pub fun getViews(): [Type] {
+        access(all)
+        fun getViews(): [Type] {
             return [
                 Type<Fixes.InscriptionView>(),
                 Type<MetadataViews.Serial>(),
@@ -303,7 +337,8 @@ pub contract Fixes {
             ]
         }
 
-        pub fun resolveView(_ view: Type): AnyStruct? {
+        access(all)
+        fun resolveView(_ view: Type): AnyStruct? {
             let rarity = self.getInscriptionRarity()
             let ratityView = MetadataViews.Rarity(
                 UFix64(rarity.rawValue),
@@ -316,7 +351,7 @@ pub contract Fixes {
             let isUTF8 = encoding == "utf8" || encoding == "utf-8" || encoding == nil
             let fileView = MetadataViews.HTTPFile(
                 url: "data:".concat(mimeType).concat(";")
-                    .concat(isUTF8 ? "utf8,charset=UTF-8" : encoding!)
+                    .concat(isUTF8 ? "utf8;charset=UTF-8" : encoding!)
                     .concat(",").concat(
                         isUTF8 ? String.fromUTF8(metadata)! : encoding == "hex" ? String.encodeHex(metadata) : ""
                     ),
@@ -362,6 +397,61 @@ pub contract Fixes {
                 ])
             }
             return nil
+        }
+    }
+
+    access(all) resource interface ArchivedInscriptionsPublic {
+        access(all) view
+        fun getIDs(): [UInt64]
+        access(all) view
+        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
+    }
+
+    /// The resource that stores the archived inscriptions
+    ///
+    access(all) resource ArchivedInscriptions {
+        access(self)
+        let inscriptions: @{UInt64: Fixes.Inscription}
+
+        init() {
+            self.inscriptions <- {}
+        }
+
+        destroy() {
+            destroy self.inscriptions
+        }
+
+        // --- Public Methods ---
+
+        access(all) view
+        fun getIDs(): [UInt64] {
+            return self.inscriptions.keys
+        }
+
+        access(all) view
+        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+            return self.borrowInscriptionWritableRef(id)
+        }
+
+        // --- Private Methods ---
+
+        access(all)
+        fun archive(_ ins: @Fixes.Inscription) {
+            pre {
+                ins.isExtracted(): "Inscription should be extracted"
+            }
+            // inscription id should be unique
+            let id = ins.getId()
+            let old <- self.inscriptions.insert(key: id, <- ins)
+
+            emit InscriptionArchived(id: id)
+
+            destroy old
+        }
+
+        access(all)
+        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription? {
+            return &self.inscriptions[id] as &Fixes.Inscription?
         }
     }
 
@@ -426,6 +516,12 @@ pub contract Fixes {
         return StoragePath(
             identifier: prefix.concat("_").concat(index.toString())
         )!
+    }
+
+    access(all) view
+    fun getArchivedFixesStoragePath(): StoragePath {
+        let prefix = "Fixes_".concat(self.account.address.toString())
+        return StoragePath(identifier: prefix.concat("_archived"))!
     }
 
     init() {
