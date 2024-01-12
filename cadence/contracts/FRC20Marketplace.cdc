@@ -409,30 +409,35 @@ access(all) contract FRC20Marketplace {
                 if let listedItemRef = collRef.borrowListedItem(parsed.listingId) {
                     let listingRef = listedItemRef.borrowListing()
                     let storefrontAddr = listedItemRef.storefront
-                    let details = listingRef?.getDetails()
+
                     var removed = false
                     if listingRef == nil {
                         // remove the listed item if the listing resource is not found
                         collRef.removeListedItem(parsed.listingId)
                         removed = true
                     } else {
+                        let details = listingRef?.getDetails()
+                        // remove the listed item if the listing is cancelled or completed
                         if details!.isCancelled() || details!.isCompleted() {
-                            // remove the listed item if the listing is cancelled or completed
+                            // clean up the listing if it's cancelled or completed
+                            if let storefront = listedItemRef.borrowStorefront() {
+                                storefront.tryCleanupFinishedListing(parsed.listingId)
+                            }
+                            // remove the listed item
                             collRef.removeListedItem(parsed.listingId)
                             removed = true
                         }
                     }
                     // emit event if removed
                     if removed {
-                        if let detailsRef = details {
-                            // remove the rank if the collection is empty
-                            if collRef.getListedIds().length == 0 {
-                                // update the sorted price ranks
-                                let ranks = self.getPriceRanks(type: detailsRef.type)
-                                let priceRank = detailsRef.priceRank()
-                                if let rankIdx = ranks.firstIndex(of: priceRank) {
-                                    self.sortedPriceRanks[detailsRef.type]!.remove(at: rankIdx)
-                                }
+                        let listedIds = collRef.getListedIds()
+                        // remove the rank if the collection is empty
+                        if collRef.getListedIds().length == 0 {
+                            // update the sorted price ranks
+                            let ranks = self.getPriceRanks(type: parsed.type)
+                            let priceRank = parsed.rank
+                            if let rankIdx: Int = ranks.firstIndex(of: priceRank) {
+                                self.sortedPriceRanks[parsed.type]!.remove(at: rankIdx)
                             }
                         }
                         self.listedItemAmount = self.listedItemAmount - 1

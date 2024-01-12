@@ -168,7 +168,6 @@ transaction(
             listing?.takeSellNow(ins: insRef, commissionRecipient: nil)
 
             // cleanup
-            storefront?.tryCleanupFinishedListing(listedItem!.id)
             self.market.tryRemoveCompletedListing(rankedId: listedItem!.rankedId)
         }
     }
