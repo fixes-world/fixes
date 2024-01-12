@@ -154,9 +154,9 @@ access(all) contract FixesTraits {
     access(account)
     fun attemptToGenerateRandomEntryForSeason0(): @Entry? {
         let randForType = revertibleRandom()
-        // 5% for secret places, 10% for ability, 25% for weapons, 60% for nothing
+        // 5% for secret places, 10% for ability, 15% for weapons, 70% for nothing
         let randForTypePercent = UInt8(randForType % 100)
-        if randForTypePercent >= 60 {
+        if randForTypePercent >= 70 {
             return nil
         }
         var type: Type? = nil
