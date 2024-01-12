@@ -37,7 +37,8 @@ fun main():[TokenMarketInfo] {
                 volumeTotal: totalStatus.volume,
                 salesTotal: totalStatus.sales,
                 marketCap: marketRecords!.getMarketCap() ?? 0.0,
-                listedAmount: market!.getListedAmount()
+                listedAmount: market!.getListedAmount(),
+                address: marketAddr,
             ))
         }
     }
@@ -55,6 +56,7 @@ struct TokenMarketInfo {
     access(all) let salesTotal: UInt64
     access(all) let marketCap: UFix64
     access(all) let listedAmount: UInt64
+    access(all) let address: Address
 
     init(
         meta: FRC20Indexer.FRC20Meta,
@@ -65,7 +67,8 @@ struct TokenMarketInfo {
         volumeTotal: UFix64,
         salesTotal: UInt64,
         marketCap: UFix64,
-        listedAmount: UInt64
+        listedAmount: UInt64,
+        address: Address
     ) {
         self.meta = meta
         self.holders = holders
@@ -76,5 +79,6 @@ struct TokenMarketInfo {
         self.salesTotal = salesTotal
         self.marketCap = marketCap
         self.listedAmount = listedAmount
+        self.address = address
     }
 }
