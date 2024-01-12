@@ -237,8 +237,16 @@ access(all) contract FRC20TradingRecord {
 
         access(all) view
         fun getRecords(page: Int, pageSize: Int): [TransactionRecord] {
-            let start = page * pageSize
-            let end = start + pageSize
+            var start = page * pageSize
+            if start < 0 {
+                start = 0
+            } else if start > self.records.length {
+                return []
+            }
+            var end = start + pageSize
+            if end > self.records.length {
+                end = self.records.length
+            }
             return self.records.slice(from: start, upTo: end)
         }
 
