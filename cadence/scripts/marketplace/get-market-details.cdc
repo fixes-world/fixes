@@ -97,7 +97,7 @@ fun main(
         ceilingPriceDeal: totalStatus.dealCeilingPricePerToken,
         properties: properties,
         // for the address
-        accessible: addr != nil ? market.canAccess(addr: addr!) : nil,
+        accessible: market.isAccessible() || (addr != nil ? market.canAccess(addr: addr!) : false),
         isValidToClaimAccess: addr != nil ? market.isValidToClaimAccess(addr: addr!) : nil
     )
 }
@@ -121,7 +121,7 @@ struct TokenMarketDetailed {
     access(all) let ceilingPriceDeal: UFix64
     access(all) let properties: {UInt8: String}
     // for the address
-    access(all) let accessible: Bool?
+    access(all) let accessible: Bool
     access(all) let isValidToClaimAccess: Bool?
 
     init(
@@ -139,7 +139,7 @@ struct TokenMarketDetailed {
         floorPriceDeal: UFix64,
         ceilingPriceDeal: UFix64,
         properties: {UInt8: String},
-        accessible: Bool?,
+        accessible: Bool,
         isValidToClaimAccess: Bool?
     ) {
         self.meta = meta
