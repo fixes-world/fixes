@@ -226,7 +226,7 @@ access(all) contract FRC20Storefront {
         access(all) view
         fun getPriceByTransactedAmount(_ transactedAmount: UFix64): UFix64 {
             pre {
-                transactedAmount < self.amount: "Transacted amount should not exceed the total amount"
+                transactedAmount <= self.amount: "Transacted amount should not exceed the total amount"
             }
             return self.totalPrice.saturatingMultiply(transactedAmount / self.amount)
         }
@@ -532,7 +532,7 @@ access(all) contract FRC20Storefront {
             // transacted price should be paid to the sale cuts
             let transactedPrice = self.details.getPriceByTransactedAmount(transactedAmt)
             assert(
-                extractedFlowChange.getBalance() >= transactedPrice + ins.getMinCost(),
+                extractedFlowChange.getBalance() >= transactedPrice,
                 message: "Insufficient payment value"
             )
 
@@ -581,7 +581,6 @@ access(all) contract FRC20Storefront {
                 self.details.type == ListingType.FixedPriceSellNow: "Listing must be a buy now listing"
                 self.details.status == ListingStatus.Available: "Listing must be available"
                 self.owner != nil : "Resource doesn't have the assigned owner"
-                ins.getInscriptionValue() >= self.details.totalPrice + ins.getMinCost(): "Insufficient payment value"
             }
 
             // just check if the inscription is valid, the further check will be done in applyListedOrder

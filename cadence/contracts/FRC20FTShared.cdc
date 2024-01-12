@@ -268,7 +268,7 @@ access(all) contract FRC20FTShared {
                 self.ftVault?.balance == before(self.ftVault?.balance)! - amount:
                     "New FT Vault balance must be the difference of the previous balance and the withdrawn Vault"
                 // result's type must be the same as the type of the original Vault
-                result.getType() == self.ftVault.getType():
+                result.getType() == (self.ftVault?.getType() ?? panic("The FT Vault must not be nil")):
                     "The type of the returned Vault must be the same as the type of the original Vault"
             }
             let vaultRef = self.borrowVault()

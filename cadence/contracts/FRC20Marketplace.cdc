@@ -408,6 +408,7 @@ access(all) contract FRC20Marketplace {
             if let collRef = self.borrowCollection(parsed.type, parsed.rank) {
                 if let listedItemRef = collRef.borrowListedItem(parsed.listingId) {
                     let listingRef = listedItemRef.borrowListing()
+                    let storefrontAddr = listedItemRef.storefront
                     let details = listingRef?.getDetails()
                     var removed = false
                     if listingRef == nil {
@@ -435,7 +436,12 @@ access(all) contract FRC20Marketplace {
                             }
                         }
                         self.listedItemAmount = self.listedItemAmount - 1
-                        emit ListingRemoved(tick: self.tick, storefront: listedItemRef.storefront, listingId: parsed.listingId, type: parsed.type.rawValue)
+                        emit ListingRemoved(
+                            tick: self.tick,
+                            storefront: storefrontAddr,
+                            listingId: parsed.listingId,
+                            type: parsed.type.rawValue
+                        )
                     }
                 }
             }
