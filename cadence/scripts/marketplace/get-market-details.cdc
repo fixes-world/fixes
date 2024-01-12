@@ -31,38 +31,52 @@ fun main(
 
     // calculate floor price
     var floorPriceBuyListing = 0.0
-    var floorPriceSellListing = 0.0
+    var ceilingPriceSellListing = 0.0
 
     let buyPriceRanks = market.getPriceRanks(type: FRC20Storefront.ListingType.FixedPriceBuyNow)
     if buyPriceRanks.length > 0 {
-        let floorPriceRank = buyPriceRanks[0]
-        let listIds = market.getListedIds(type: FRC20Storefront.ListingType.FixedPriceBuyNow, rank: floorPriceRank)
-        if listIds.length > 0 {
-            if let listing = market.getListedItem(
-                type: FRC20Storefront.ListingType.FixedPriceBuyNow,
-                rank: floorPriceRank,
-                id: listIds[0]
-            ) {
-                if let details = listing.getDetails() {
-                    floorPriceBuyListing = details.pricePerToken()
+        let len = buyPriceRanks.length - 1
+        let limit = len > 10 ? 10 : len
+        var i = 0
+        while i < limit {
+            let floorPriceRank = buyPriceRanks[i]
+            let listIds = market.getListedIds(type: FRC20Storefront.ListingType.FixedPriceBuyNow, rank: floorPriceRank)
+            if listIds.length > 0 {
+                if let listing = market.getListedItem(
+                    type: FRC20Storefront.ListingType.FixedPriceBuyNow,
+                    rank: floorPriceRank,
+                    id: listIds[0]
+                ) {
+                    if let details = listing.getDetails() {
+                        floorPriceBuyListing = details.pricePerToken()
+                    }
                 }
+                break
             }
+            i = i + 1
         }
     }
     let sellPriceRanks = market.getPriceRanks(type: FRC20Storefront.ListingType.FixedPriceSellNow)
     if sellPriceRanks.length > 0 {
-        let floorPriceRank = sellPriceRanks[0]
-        let listIds = market.getListedIds(type: FRC20Storefront.ListingType.FixedPriceSellNow, rank: floorPriceRank)
-        if listIds.length > 0 {
-            if let listing = market.getListedItem(
-                type: FRC20Storefront.ListingType.FixedPriceSellNow,
-                rank: floorPriceRank,
-                id: listIds[0]
-            ) {
-                if let details = listing.getDetails() {
-                    floorPriceSellListing = details.pricePerToken()
+        let len = sellPriceRanks.length - 1
+        let limit = len > 10 ? 10 : len
+        var i = 0
+        while i < limit {
+            let ceilingPriceRank = sellPriceRanks[sellPriceRanks.length - 1 - i]
+            let listIds = market.getListedIds(type: FRC20Storefront.ListingType.FixedPriceSellNow, rank: ceilingPriceRank)
+            if listIds.length > 0 {
+                if let listing = market.getListedItem(
+                    type: FRC20Storefront.ListingType.FixedPriceSellNow,
+                    rank: ceilingPriceRank,
+                    id: listIds[0]
+                ) {
+                    if let details = listing.getDetails() {
+                        ceilingPriceSellListing = details.pricePerToken()
+                    }
                 }
+                break
             }
+            i = i + 1
         }
     }
 
@@ -92,7 +106,7 @@ fun main(
         listedAmount: market.getListedAmount(),
         // detailed info
         floorPriceBuyListing: floorPriceBuyListing,
-        floorPriceSellListing: floorPriceSellListing,
+        ceilingPriceSellListing: ceilingPriceSellListing,
         floorPriceDeal: totalStatus.dealFloorPricePerToken,
         ceilingPriceDeal: totalStatus.dealCeilingPricePerToken,
         properties: properties,
@@ -116,7 +130,7 @@ struct TokenMarketDetailed {
     access(all) let listedAmount: UInt64
     // detailed info
     access(all) let floorPriceBuyListing: UFix64
-    access(all) let floorPriceSellListing: UFix64
+    access(all) let ceilingPriceSellListing: UFix64
     access(all) let floorPriceDeal: UFix64
     access(all) let ceilingPriceDeal: UFix64
     access(all) let properties: {UInt8: String}
@@ -135,7 +149,7 @@ struct TokenMarketDetailed {
         marketCap: UFix64,
         listedAmount: UInt64,
         floorPriceBuyListing: UFix64,
-        floorPriceSellListing: UFix64,
+        ceilingPriceSellListing: UFix64,
         floorPriceDeal: UFix64,
         ceilingPriceDeal: UFix64,
         properties: {UInt8: String},
@@ -152,7 +166,7 @@ struct TokenMarketDetailed {
         self.marketCap = marketCap
         self.listedAmount = listedAmount
         self.floorPriceBuyListing = floorPriceBuyListing
-        self.floorPriceSellListing = floorPriceSellListing
+        self.ceilingPriceSellListing = ceilingPriceSellListing
         self.floorPriceDeal = floorPriceDeal
         self.ceilingPriceDeal = ceilingPriceDeal
         self.properties = properties
