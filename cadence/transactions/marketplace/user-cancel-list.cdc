@@ -13,16 +13,28 @@ import "FRC20Marketplace"
 import "FRC20MarketManager"
 
 transaction(
-    tick: String,
-    sellAmount: UFix64,
-    sellPrice: UFix64
+    listingId: UInt64
 ) {
-    let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
     let storefront: &FRC20Storefront.Storefront
-    let flowTokenReceiver: Capability<&FlowToken.Vault{FungibleToken.Receiver}>
-    let ins: @Fixes.Inscription
+    let listing: &FRC20Storefront.Listing{FRC20Storefront.ListingPublic}
 
     prepare(acct: AuthAccount) {
+        /** ------------- Start -- FRC20 Storefront Initialization -------------  */
+        // Create Storefront if it doesn't exist
+        if acct.borrow<&AnyResource>(from: FRC20Storefront.StorefrontStoragePath) == nil {
+            acct.save(<- FRC20Storefront.createStorefront(), to: FRC20Storefront.StorefrontStoragePath)
+            acct.unlink(FRC20Storefront.StorefrontPublicPath)
+            acct.link<&FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}>(FRC20Storefront.StorefrontPublicPath, target: FRC20Storefront.StorefrontStoragePath)
+        }
+        self.storefront = acct.borrow<&FRC20Storefront.Storefront>(from: FRC20Storefront.StorefrontStoragePath)
+            ?? panic("Missing or mis-typed NFTStorefront Storefront")
+        /** ------------- End --------------------------------------------------  */
+
+        self.listing = self.storefront.borrowListing(listingId)
+            ?? panic("Failed to borrow listing:".concat(listingId.toString()))
+
+        let tick = self.listing.getTickName()
+
         /** ------------- Start -- FRC20 Marketing Account General Initialization -------------  */
         // Ensure hooks are initialized
         if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
@@ -72,81 +84,33 @@ transaction(
             hooksRef.addHook(profileCap)
         }
         /** ------------- End -----------------------------------------------------------------  */
-
-        /** ------------- Start -- FRC20 Storefront Initialization -------------  */
-        // Create Storefront if it doesn't exist
-        if acct.borrow<&AnyResource>(from: FRC20Storefront.StorefrontStoragePath) == nil {
-            acct.save(<- FRC20Storefront.createStorefront(), to: FRC20Storefront.StorefrontStoragePath)
-            acct.unlink(FRC20Storefront.StorefrontPublicPath)
-            acct.link<&FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}>(FRC20Storefront.StorefrontPublicPath, target: FRC20Storefront.StorefrontStoragePath)
-        }
-        self.storefront = acct.borrow<&FRC20Storefront.Storefront>(from: FRC20Storefront.StorefrontStoragePath)
-            ?? panic("Missing or mis-typed NFTStorefront Storefront")
-
-        self.flowTokenReceiver = acct.getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-        assert(self.flowTokenReceiver.check(), message: "Missing or mis-typed FlowToken receiver")
-        /** ------------- End --------------------------------------------------  */
-
-        /** ------------- Start -- Inscription Initialization -------------  */
-        // basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
-        let dataStr = "op=list-buynow,tick=".concat(tick)
-            .concat(",amt=").concat(sellAmount.toString())
-            .concat(",price=").concat(sellPrice.toString())
-        let metadata = dataStr.utf8
-
-        // estimate the required storage
-        let estimatedReqValue = Fixes.estimateValue(
-            index: Fixes.totalInscriptions,
-            mimeType: mimeType,
-            data: metadata,
-            protocol: metaProtocol,
-            encoding: nil
-        )
-
-        // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-            ?? panic("Could not borrow reference to the owner's Vault!")
-        // Withdraw tokens from the signer's stored vault
-        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
-
-        // Create the Inscription first
-        self.ins <- Fixes.createInscription(
-            // Withdraw tokens from the signer's stored vault
-            value: <- (flowToReserve as! @FlowToken.Vault),
-            mimeType: mimeType,
-            metadata: metadata,
-            metaProtocol: metaProtocol,
-            encoding: nil,
-            parentId: nil
-        )
-        /** ------------- End ---------------------------------------------  */
-
-        // Borrow a reference to the FRC20Marketplace contract
-        self.market = FRC20MarketManager.borrowMarket(tick)
-            ?? panic("Could not borrow reference to the FRC20Market")
-    }
-
-    pre {
-        self.market.canAccess(addr: self.storefront.owner!.address): "You are not allowed to access this market for now."
     }
 
     execute {
-        // add to user's storefront
-        let listingId = self.storefront.createListing(
-            ins: <- self.ins,
-            commissionRecipientCaps: nil,
-            customID: nil
-        )
+        let userAddress = self.storefront.owner!.address
+        let details = self.listing.getDetails()
 
-        // add to market
-        self.market.addToList(
-            storefront: self.storefront.owner!.address,
-            listingId: listingId
-        )
+        let market = FRC20MarketManager.borrowMarket(details.tick)
+        var rankedIdInMarket: String? = nil
+        // get from market
+        if market != nil  {
+            let accessible = market!.canAccess(addr: userAddress)
+            if accessible {
+                if let item = market!.getListedItem(type: details.type, rank: details.priceRank(), id: listingId) {
+                    rankedIdInMarket = item.rankedId
+                }
+            }
+        }
 
-        log("Done: list as buy now")
+        // remove listing
+        let ins <- self.storefront.removeListing(listingResourceID: listingId)
+        destroy ins
+        // remove from market
+
+        if rankedIdInMarket != nil {
+            market!.tryRemoveCompletedListing(rankedId: rankedIdInMarket!)
+        }
+        log("Done: User cancel list")
     }
 }
 

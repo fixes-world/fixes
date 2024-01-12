@@ -176,7 +176,7 @@ transaction(
     }
 
     execute {
-        log("Done")
+        log("Done: user take as buyer")
     }
 }
 

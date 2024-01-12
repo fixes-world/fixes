@@ -147,7 +147,7 @@ transaction(
             listingId: listingId
         )
 
-        log("Done")
+        log("Done: list as sell now")
     }
 }
 

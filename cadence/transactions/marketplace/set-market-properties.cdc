@@ -45,7 +45,7 @@ transaction(
         if initProps.keys.length > 0 {
             self.manager.updateMarketplaceProperties(tick: tick, initProps)
         }
-        log("Done")
+        log("Done: set market properties")
     }
 }
 

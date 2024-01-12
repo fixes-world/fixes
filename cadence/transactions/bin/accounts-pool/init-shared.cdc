@@ -55,8 +55,8 @@ transaction(
 
     execute {
         // add the newly created account to the pool
-        self.acctsPool.setupNewChildForShared(type: self.accountType, self.childAccountCap)
+        self.acctsPool.setupNewSharedChildByType(type: self.accountType, self.childAccountCap)
 
-        log("Done")
+        log("Done: Init Shared Pool")
     }
 }

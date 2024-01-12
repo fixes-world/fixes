@@ -38,7 +38,7 @@ transaction(
     execute {
         // set whitelist
         self.manager.updateAdminWhitelist(tick: tick, address: address, isWhitelisted: isWhitelisted)
-        log("Done")
+        log("Done: Set market admin white list")
     }
 }
 

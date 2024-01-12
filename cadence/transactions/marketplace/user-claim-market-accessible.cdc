@@ -80,7 +80,7 @@ transaction(
         // Actually, anyone can invoke this method.
         self.market.claimWhitelist(addr: self.signerAddress)
 
-        log("Done")
+        log("Done: user claim access")
     }
 
     post {
