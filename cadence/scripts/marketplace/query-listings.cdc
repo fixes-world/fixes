@@ -33,7 +33,11 @@ fun main(
 
     let ret: [ListedItemInfo] = []
 
-    let priceRanks = market.getPriceRanks(type: type)
+    var priceRanks = market.getPriceRanks(type: type)
+    // reverse price ranks if sell now
+    if type == FRC20Storefront.ListingType.FixedPriceSellNow {
+        priceRanks = priceRanks.reverse()
+    }
     let startRankIdx = startRank == nil ? 0 : (priceRanks.firstIndex(of: startRank!) ?? 0)
 
     var rankSliceFromIdx = startRankIdxFrom ?? 0
