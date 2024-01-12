@@ -183,6 +183,8 @@ access(all) contract FRC20MarketManager {
             tick: tick,
             newAccount
         )
+        let address = acctsPool.getFRC20MarketAddress(tick: tick)
+            ?? panic("The market account was not created")
 
         // ensure all market resources are available
         self.ensureMarketResourcesAvailable(tick: tick)
@@ -190,7 +192,7 @@ access(all) contract FRC20MarketManager {
         // emit the event
         emit NewMarketEnabled(
             tick: tick,
-            address: newAccount.address,
+            address: address,
             by: ins.owner!.address
         )
     }

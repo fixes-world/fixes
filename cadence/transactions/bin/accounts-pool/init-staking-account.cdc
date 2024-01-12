@@ -8,11 +8,10 @@ import "FRC20Indexer"
 import "FRC20AccountsPool"
 
 transaction(
-    type: UInt8,
+    tick: String,
     initialFundingAmt: UFix64
 ) {
     let acctsPool: &FRC20AccountsPool.Pool
-    let accountType: FRC20AccountsPool.ChildAccountType
     let childAccountCap: Capability<&AuthAccount>
 
     prepare(acct: AuthAccount) {
@@ -20,9 +19,6 @@ transaction(
             ?? panic("There is no FRC20AccountsPool on this account")
 
         self.acctsPool = pool
-
-        self.accountType = FRC20AccountsPool.ChildAccountType(rawValue: type)
-            ?? panic("Invalid child account type")
 
         // create a new Account, no keys needed
         let newAccount = AuthAccount(payer: acct)
@@ -48,7 +44,11 @@ transaction(
 
     execute {
         // add the newly created account to the pool
-        self.acctsPool.setupNewSharedChildByType(type: self.accountType, self.childAccountCap)
+        self.acctsPool.setupNewChildByTick(
+            type: FRC20AccountsPool.ChildAccountType.Staking,
+            tick: tick,
+            self.childAccountCap
+        )
         log("Done: Init Pool")
     }
 }

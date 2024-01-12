@@ -238,10 +238,10 @@ access(all) contract FRC20AccountsPool {
             self._ensureDictExists(type)
 
             let tickDict = self.borrowDict(type: type) ?? panic("Failed to borrow tick ")
-            assert(
-                tickDict[tick] == nil,
-                message: "Child account already exists"
-            )
+            // no need to setup if already exists
+            if tickDict[tick] != nil {
+                return
+            }
 
             let frc20Indexer = FRC20Indexer.getIndexer()
             // ensure token meta exists
