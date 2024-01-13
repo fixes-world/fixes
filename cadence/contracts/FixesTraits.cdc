@@ -156,7 +156,7 @@ access(all) contract FixesTraits {
         let randForType = revertibleRandom()
         // 5% for secret places, 10% for ability, 15% for weapons, 70% for nothing
         let randForTypePercent = UInt8(randForType % 100)
-        if randForTypePercent >= 70 {
+        if randForTypePercent >= 30 {
             return nil
         }
         var type: Type? = nil
