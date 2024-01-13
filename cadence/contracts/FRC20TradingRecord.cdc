@@ -69,7 +69,7 @@ access(all) contract FRC20TradingRecord {
 
         access(all)
         fun getDealPricePerToken(): UFix64 {
-            return self.dealPricePerMint / self.dealAmount
+            return self.dealPrice / self.dealAmount
         }
     }
 
