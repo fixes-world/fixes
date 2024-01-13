@@ -563,7 +563,7 @@ access(all) contract FRC20Marketplace {
         access(all) view
         fun isAccessible(): Bool {
             if let after = self.accessibleAfter() {
-                return UInt64(getCurrentBlock().timestamp) >= after
+                return UInt64(getCurrentBlock().timestamp) >= (after / 1000)
             }
             return true
         }
