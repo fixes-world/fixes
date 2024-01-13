@@ -2,9 +2,6 @@
 import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20TradingRecord"
-import "FRC20AccountsPool"
-import "FRC20Storefront"
-import "FRC20Marketplace"
 
 access(all)
 fun main(addr: Address): TraderStatus {
