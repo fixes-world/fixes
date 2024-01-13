@@ -35,10 +35,10 @@ fun main(
 
     let buyPriceRanks = market.getPriceRanks(type: FRC20Storefront.ListingType.FixedPriceBuyNow)
     if buyPriceRanks.length > 0 {
-        let len = buyPriceRanks.length - 1
-        let limit = len > 10 ? 10 : len
+        // let len = buyPriceRanks.length - 1
+        // let limit = len > 10 ? 10 : len
         var i = 0
-        while i < limit {
+        // while i < limit {
             let floorPriceRank = buyPriceRanks[i]
             let listIds = market.getListedIds(type: FRC20Storefront.ListingType.FixedPriceBuyNow, rank: floorPriceRank)
             if listIds.length > 0 {
@@ -51,17 +51,17 @@ fun main(
                         floorPriceBuyListing = details.pricePerToken()
                     }
                 }
-                break
+                // break
             }
-            i = i + 1
-        }
+        //     i = i + 1
+        // }
     }
     let sellPriceRanks = market.getPriceRanks(type: FRC20Storefront.ListingType.FixedPriceSellNow)
     if sellPriceRanks.length > 0 {
-        let len = sellPriceRanks.length - 1
-        let limit = len > 10 ? 10 : len
+        // let len = sellPriceRanks.length - 1
+        // let limit = len > 10 ? 10 : len
         var i = 0
-        while i < limit {
+        // while i < limit {
             let ceilingPriceRank = sellPriceRanks[sellPriceRanks.length - 1 - i]
             let listIds = market.getListedIds(type: FRC20Storefront.ListingType.FixedPriceSellNow, rank: ceilingPriceRank)
             if listIds.length > 0 {
@@ -74,10 +74,10 @@ fun main(
                         ceilingPriceSellListing = details.pricePerToken()
                     }
                 }
-                break
+            //     break
             }
-            i = i + 1
-        }
+            // i = i + 1
+        // }
     }
 
     let sharedSotre = FRC20FTShared.borrowStoreRef(marketAddr)
