@@ -13,6 +13,9 @@ access(all) contract FRC20Indexer {
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
 
+    /// Event emitted when the admin calls the sponsorship method
+    access(all) event PlatformTreasurySponsorship(amount: UFix64, to: Address, forTick: String)
+
     /// Event emitted when a FRC20 token is deployed
     access(all) event FRC20Deployed(tick: String, max: UFix64, limit: UFix64, deployer: Address)
     /// Event emitted when a FRC20 token is minted
@@ -361,6 +364,50 @@ access(all) contract FRC20Indexer {
             let pool = self._borrowPlatformTreasury()
             // Force cast to FungibleToken.Receiver, don't care about the warning, just for avoiding some mistakes
             return pool as &FlowToken.Vault{FungibleToken.Receiver}
+        }
+
+        // ---- Admin Methods ----
+
+        /// Extract some $FLOW from global pool to sponsor the tick deployer
+        ///
+        access(all)
+        fun sponsorship(
+            amount: UFix64,
+            to: Capability<&FlowToken.Vault{FungibleToken.Receiver}>,
+            forTick: String,
+        ) {
+            pre {
+                amount > 0.0: "The amount should be greater than 0.0"
+                to.check() != nil: "The receiver should be a valid capability"
+            }
+
+            let recipient = to.address
+            let meta = self.borrowTokenMeta(tick: forTick)
+            // The receiver should be the deployer of the token
+            assert(
+                recipient == meta.deployer,
+                message: "The receiver should be the deployer of the token"
+            )
+
+            let platformPool = self._borrowPlatformTreasury()
+            // check the balance
+            assert(
+                platformPool.balance >= amount,
+                message: "The platform treasury does not have enough balance"
+            )
+
+            let flowReceiver = to.borrow()
+                ?? panic("The receiver should be a valid capability")
+
+            let flowExtracted <- platformPool.withdraw(amount: amount)
+            let sponsorAmt = flowExtracted.balance
+            flowReceiver.deposit(from: <- (flowExtracted as! @FlowToken.Vault))
+
+            emit PlatformTreasurySponsorship(
+                amount: sponsorAmt,
+                to: recipient,
+                forTick: forTick
+            )
         }
 
         /** ------ Functionality ------  */
