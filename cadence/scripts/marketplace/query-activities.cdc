@@ -28,7 +28,26 @@ fun main(
 
     var ret: [FRC20TradingRecord.TransactionRecord] = []
     if let allData = marketRecords.borrowDailyRecords(dateToQuery) {
+        let todayLen = allData.getRecordLength()
         ret = allData.getRecords(page: page, pageSize: size)
+        // to load yesterday's data if not enough
+        if ret.length < size {
+            let prevDatetime = dateToQuery - 86400
+            if let prevDateData = marketRecords.borrowDailyRecords(prevDatetime) {
+                let prevLength = prevDateData.getRecordLength()
+                if prevLength > 0 {
+                    // calculate how many records are loaded
+                    let loadedCount = page * size
+                    let needCount = size - ret.length
+                    let prevPage = (page - (Int(todayLen) + needCount) / size)
+                    let prevData: [FRC20TradingRecord.TransactionRecord] = prevDateData.getRecords(page: prevPage, pageSize: size)
+                    if prevData.length > 0 {
+                        let upTo = prevData.length < needCount ? prevData.length : needCount
+                        ret = ret.concat(prevData.slice(from: 0, upTo: upTo))
+                    }
+                }
+            }
+        }
     }
     return ret
 }
