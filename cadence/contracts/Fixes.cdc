@@ -430,7 +430,7 @@ access(all) contract Fixes {
 
         access(all) view
         fun isFull(): Bool {
-            return self.inscriptions.keys.length >= 10000
+            return self.inscriptions.keys.length >= 8000
         }
 
         access(all) view
