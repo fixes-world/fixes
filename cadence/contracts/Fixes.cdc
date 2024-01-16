@@ -401,15 +401,20 @@ access(all) contract Fixes {
     }
 
     access(all) resource interface ArchivedInscriptionsPublic {
+        // returns true if the archived inscriptions reached the 10000 amount
+        access(all) view
+        fun isFull(): Bool
+        // returns the ids of the archived inscriptions
         access(all) view
         fun getIDs(): [UInt64]
+        // returns the inscription with the given id
         access(all) view
         fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
     }
 
     /// The resource that stores the archived inscriptions
     ///
-    access(all) resource ArchivedInscriptions {
+    access(all) resource ArchivedInscriptions: ArchivedInscriptionsPublic {
         access(self)
         let inscriptions: @{UInt64: Fixes.Inscription}
 
@@ -422,6 +427,11 @@ access(all) contract Fixes {
         }
 
         // --- Public Methods ---
+
+        access(all) view
+        fun isFull(): Bool {
+            return self.inscriptions.keys.length >= 10000
+        }
 
         access(all) view
         fun getIDs(): [UInt64] {
@@ -439,6 +449,7 @@ access(all) contract Fixes {
         fun archive(_ ins: @Fixes.Inscription) {
             pre {
                 ins.isExtracted(): "Inscription should be extracted"
+                !self.isFull(): "This archived inscriptions resource is full"
             }
             // inscription id should be unique
             let id = ins.getId()
@@ -519,9 +530,11 @@ access(all) contract Fixes {
     }
 
     access(all) view
-    fun getArchivedFixesStoragePath(): StoragePath {
+    fun getArchivedFixesStoragePath(_ index: UInt64?): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
-        return StoragePath(identifier: prefix.concat("_archived"))!
+        return StoragePath(
+            identifier: prefix.concat(index == nil ? "_archived" : "_archived_".concat(index!.toString()))
+        )!
     }
 
     init() {

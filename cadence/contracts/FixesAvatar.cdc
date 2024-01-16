@@ -3,11 +3,10 @@ import "NonFungibleToken"
 import "FungibleToken"
 import "MetadataViews"
 // Fixes Imports
-// import "Fixes"
 import "FixesTraits"
 import "FRC20FTShared"
 
-/// The `FixesTraits` contract
+/// The `FixesAvatar` contract
 ///
 access(all) contract FixesAvatar {
     /* --- Events --- */
@@ -27,6 +26,9 @@ access(all) contract FixesAvatar {
     /* --- Interfaces & Resources --- */
 
     access(all) resource interface ProfilePublic {
+        access(all) view
+        fun getProperty(_ name: String): String?
+
         access(all) view
         fun getEnabledTraits(): [MetadataViews.Trait]
 
@@ -118,6 +120,13 @@ access(all) contract FixesAvatar {
 
         // ---- Public methods ----
 
+        /// Get the property with the given name
+        ///
+        access(all) view
+        fun getProperty(_ name: String): String? {
+            return self.properties[name]
+        }
+
         access(all) view
         fun getEnabledTraits(): [MetadataViews.Trait] {
             let traits: [MetadataViews.Trait] = []
@@ -176,6 +185,15 @@ access(all) contract FixesAvatar {
                 rarity: trait.rarity,
                 offset: trait.offset
             )
+        }
+
+        // ---- Private methods ----
+
+        /// Set the property with the given name to the given value
+        ///
+        access(all)
+        fun setProperty(_ name: String, _ value: String) {
+            self.properties[name] = value
         }
 
         // ---- Internal methods ----
