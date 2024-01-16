@@ -501,6 +501,15 @@ access(all) contract Fixes {
         return <- ins
     }
 
+    /// Create a new ArchivedInscriptions
+    ///
+    access(all)
+    fun createArchivedInscriptions(): @ArchivedInscriptions {
+        return <- create ArchivedInscriptions()
+    }
+
+    /// Estimate the value of an inscription
+    ///
     access(all) view
     fun estimateValue(
         index: UInt64,
