@@ -201,7 +201,7 @@ access(all) contract FRC20NFTWrapper {
         access(all) view
         fun isFRC20NFTWrappered(nft: &NonFungibleToken.NFT): Bool {
             let collectionType = FRC20NFTWrapper.asCollectionType(nft.getType().identifier)
-            if let nftHistories = self.histories[collectionType] {
+            if let nftHistories = &self.histories[collectionType] as &{UInt64: Bool}? {
                 return nftHistories[nft.id] ?? false
             }
             return false
