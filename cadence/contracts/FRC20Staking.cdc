@@ -72,9 +72,9 @@ access(all) contract FRC20Staking {
         /// Returns the details of the staking pool
         access(all) view
         fun getDetails(): StakingInfo
-        /// Returns the delegator ID of the given address
-        access(all) view
-        fun getDelegatorID(_ addr: Address): UInt32?
+        /** ---- Delegators ---- */
+
+        /** ---- Rewards ---- */
         /// Returns the reward strategy names
         access(all) view
         fun getRewardNames(): [String]
@@ -99,10 +99,7 @@ access(all) contract FRC20Staking {
         var delegatorIDCounter: UInt32
         /// The delegators of this staking pool
         access(self)
-        let delegators: @{UInt32: DelegatorRecord}
-        /// The delegator address to ID mapping
-        access(self)
-        let delegatorAddrToID: {Address: UInt32}
+        let delegators: @{Address: DelegatorRecord}
         /** ----- Rewards ----- */
         /// The rewards of this staking pool
         access(contract)
@@ -122,7 +119,6 @@ access(all) contract FRC20Staking {
             self.totalUnstakingLocked <- FRC20FTShared.createChange(tick: tick, from: owner, balance: 0.0, ftVault: nil)
             self.delegators <- {}
             self.delegatorIDCounter = 0
-            self.delegatorAddrToID = {}
             self.rewards <- {}
 
             // emit event
@@ -151,11 +147,6 @@ access(all) contract FRC20Staking {
         }
 
         access(all) view
-        fun getDelegatorID(_ addr: Address): UInt32? {
-            return self.delegatorAddrToID[addr]
-        }
-
-        access(all) view
         fun getRewardNames(): [String] {
             return self.rewards.keys
         }
@@ -178,18 +169,8 @@ access(all) contract FRC20Staking {
         /// Borrow Delegator Record
         ///
         access(contract)
-        fun borrowDelegatorRecord(_ delegatorID: UInt32): &DelegatorRecord? {
-            return &self.delegators[delegatorID] as &DelegatorRecord?
-        }
-
-        /// Borrow Delegator Record by Address
-        ///
-        access(contract)
-        fun borrowDelegatorRecordByAddress(_ addr: Address): &DelegatorRecord? {
-            if let id = self.getDelegatorID(addr) {
-                return self.borrowDelegatorRecord(id)
-            }
-            return nil
+        fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord? {
+            return &self.delegators[addr] as &DelegatorRecord?
         }
 
         /// Borrow Reward Strategy
@@ -197,32 +178,6 @@ access(all) contract FRC20Staking {
         access(contract)
         fun borrowRewardStrategy(_ name: String): &RewardStrategy? {
             return &self.rewards[name] as &RewardStrategy?
-        }
-
-        /// Add the Delegator Record
-        ///
-        access(contract)
-        fun addDelegator(_ delegator: @DelegatorRecord) {
-            pre {
-                self.delegators[delegator.id] == nil: "Delegator id already exists"
-            }
-            let delegatorID = delegator.id
-            self.delegatorAddrToID[delegator.delegator] = delegatorID
-            self.delegators[delegatorID] <-! delegator
-
-            // increase delegator ID counter
-            self.delegatorIDCounter = self.delegatorIDCounter + 1
-
-            let ref = self.borrowDelegatorRecord(delegatorID)
-                ?? panic("Delegator record must exist")
-
-            // emit event
-            emit DelegatorRecordAdded(
-                pool: self.owner?.address ?? panic("Pool owner must exist"),
-                tick: self.tick,
-                delegatorID: delegatorID,
-                delegatorAddress: ref.delegator
-            )
         }
 
         /// register reward strategy
@@ -243,6 +198,121 @@ access(all) contract FRC20Staking {
                 rewardTick: rewardTick
             )
         }
+
+        /// Stake FRC20 token
+        ///
+        access(contract)
+        fun stake(_ change: @FRC20FTShared.Change) {
+            pre {
+                change.tick == self.tick: "Staked change tick must match"
+            }
+
+            let stakedAmount = change.getBalance()
+            let delegator = change.from
+
+            // check if delegator's record exists
+            if self.delegators[delegator] == nil {
+                self.addDelegator(<- create DelegatorRecord(
+                    self.delegatorIDCounter,
+                    delegator
+                ))
+            }
+            // ensure delegator record exists
+            let delegatorRecordRef = self.borrowDelegatorRecord(delegator)
+                ?? panic("Delegator record must exist")
+
+            // update staked change
+            FRC20FTShared.depositToChange(
+                receiver: self.borrowTotalStaked(),
+                change: <- change
+            )
+
+            // update staked change for delegator
+            let delegatorRef = delegatorRecordRef.borrowDelegatorRef()
+            // call onFRC20Staked to save the staked change
+            delegatorRef.onFRC20Staked(
+                staking: self.borrowSelf(),
+                stakedChange: <- FRC20FTShared.createChange(
+                    tick: "!".concat(self.tick),
+                    from: delegator,
+                    balance: stakedAmount,
+                    ftVault: nil
+                )
+            )
+        }
+
+        /** ---- Internal Methods */
+
+        /// Add the Delegator Record
+        ///
+        access(self)
+        fun addDelegator(_ newRecord: @DelegatorRecord) {
+            pre {
+                self.delegators[newRecord.delegator] == nil: "Delegator id already exists"
+            }
+            let delegatorID = newRecord.id
+            let address = newRecord.delegator
+            self.delegators[newRecord.delegator] <-! newRecord
+
+            // increase delegator ID counter
+            self.delegatorIDCounter = self.delegatorIDCounter + 1
+
+            let ref = self.borrowDelegatorRecord(address)
+                ?? panic("Delegator record must exist")
+
+            // emit event
+            emit DelegatorRecordAdded(
+                pool: self.owner?.address ?? panic("Pool owner must exist"),
+                tick: self.tick,
+                delegatorID: delegatorID,
+                delegatorAddress: ref.delegator
+            )
+        }
+
+        /// Borrow Staking Reference
+        ///
+        access(self)
+        fun borrowSelf(): &Staking {
+            return &self as &Staking
+        }
+
+        /// Borrow Staked Change
+        ///
+        access(self)
+        fun borrowTotalStaked(): &FRC20FTShared.Change {
+            return &self.totalStaked as &FRC20FTShared.Change
+        }
+
+        /// Borrow Unstaking Locked Change
+        ///
+        access(self)
+        fun borrowTotalUnstakingLocked(): &FRC20FTShared.Change {
+            return &self.totalUnstakingLocked as &FRC20FTShared.Change
+        }
+    }
+
+    access(all) resource UnstakingEntry {
+        access(all)
+        let tick: String
+        access(all)
+        let amount: UFix64
+        access(all)
+        let unlockTime: UInt64
+
+        init(
+            tick: String,
+            amount: UFix64,
+            unlockTime: UInt64
+        ) {
+            self.tick = tick
+            self.amount = amount
+            self.unlockTime = unlockTime
+        }
+
+        access(contract)
+        fun isUnlocked(): Bool {
+            return UInt64(getCurrentBlock().timestamp) >= self.unlockTime
+        }
     }
 
     /// Delegator Record Resource, represents a delegator record for a FRC20 token and store in pool's account
@@ -254,7 +324,9 @@ access(all) contract FRC20Staking {
         // The delegator address
         access(all)
         let delegator: Address
-        // Record unstaking status
+        // Record status
+        access(all)
+        let unstakingEntries: @[UnstakingEntry]
 
         init(
             _ id: UInt32,
@@ -265,6 +337,12 @@ access(all) contract FRC20Staking {
             }
             self.id = id
             self.delegator = address
+            self.unstakingEntries <- []
+        }
+
+        /// @deprecated after Cadence 1.0
+        destroy() {
+            destroy self.unstakingEntries
         }
 
         /// Borrow Delegator reference
@@ -437,10 +515,8 @@ access(all) contract FRC20Staking {
             let totalRewardBalance = self.totalReward.getBalance()
 
             // delegator info
-            let delegatorID = by.id
-            let delegatorRecordRef = stakingRef.borrowDelegatorRecord(delegatorID)
-                ?? panic("Delegator record must exist")
-            let delegatorRef = delegatorRecordRef.borrowDelegatorRef()
+            let delegatorRef = FRC20Staking.borrowDelegator(by.delegator)
+                ?? panic("Delegator must exist")
             let delegatorClaimingRef = delegatorRef.borrowClaimingRecord(rewardUniqueName)
 
             // calculate reward
@@ -627,6 +703,13 @@ access(all) contract FRC20Staking {
         access(contract)
         fun borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord?
 
+        /// Invoked when the staking is successful
+        access(contract)
+        fun onFRC20Staked(
+            staking: &Staking{StakingPublic},
+            stakedChange: @FRC20FTShared.Change
+        )
+
         /// Update the claiming record
         access(contract)
         fun onClaimingReward(
@@ -671,7 +754,18 @@ access(all) contract FRC20Staking {
 
         /** ----- Contract Methods ----- */
 
+        /// Invoked when the staking is successful
+        ///
+        access(contract)
+        fun onFRC20Staked(
+            staking: &Staking{StakingPublic},
+            stakedChange: @FRC20FTShared.Change
+        ) {
+
+        }
+
         /// Update the claiming record
+        ///
         access(contract)
         fun onClaimingReward(
             reward: &RewardStrategy{RewardStrategyPublic},
@@ -708,6 +802,14 @@ access(all) contract FRC20Staking {
     }
 
     /** ---- public methods ---- */
+
+    /// Get the lock time of unstaking
+    ///
+    access(all)
+    fun getUnstakingLockTime(): UInt64 {
+        // 1 day = 86400 seconds
+        return 86400
+    }
 
     /// Borrow Pool by address
     ///
