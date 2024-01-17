@@ -107,6 +107,23 @@ access(all) contract FRC20FTShared {
             ftVault: @FungibleToken.Vault?
         )
 
+        /// Check if this Change is a staked tick's change
+        ///
+        access(all) view
+        fun isStakedTick(): Bool {
+            return self.isBackedByVault() == false && self.tick[0] == "!"
+        }
+
+        access(all) view
+        fun getOriginalTick(): String {
+            // if the tick is a staked tick, remove the first character
+            if self.isStakedTick() {
+                return self.tick.slice(from: 1, upTo: self.tick.length)
+            }
+            // otherwise, return the tick
+            return self.tick
+        }
+
         /// Get the balance of this Change
         ///
         access(all) view
@@ -425,6 +442,7 @@ access(all) contract FRC20FTShared {
         }
     }
 
+    /// Create a new Change
     /// Only the owner of the account can call this method
     ///
     access(account)
@@ -440,6 +458,46 @@ access(all) contract FRC20FTShared {
             balance: balance,
             ftVault: <-ftVault
         )
+    }
+
+    /// Deposit one Change to another Change
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun depositToChange(
+        receiver: &Change,
+        change: @Change
+    ) {
+        pre {
+            change.isBackedByVault() == receiver.isBackedByVault():
+                "The Change must be backed by a Vault if and only if the input Change is backed by a Vault"
+            change.tick == receiver.tick: "Tick must be equal to the provided tick"
+        }
+        if change.from == receiver.from {
+            receiver.merge(from: <- change)
+        } else {
+            if change.isBackedByVault() {
+                // withdraw from the input Change
+                let extracted <- change.extractAsVault()
+                // deposit to the receiver
+                let vaultRef = receiver.borrowVault()
+                vaultRef.deposit(from: <- extracted)
+            } else {
+                // withdraw from the input Change
+                let extracted = change.extract()
+                // create a same source Change
+                let newChange <- self.createChange(
+                    tick: receiver.tick,
+                    from: receiver.from,
+                    balance: extracted,
+                    ftVault: nil
+                )
+                // deposit to the receiver
+                receiver.merge(from: <- newChange)
+            }
+            // destroy the input Change
+            destroy change
+        }
     }
 
     /** --- Temporary order resources --- */
