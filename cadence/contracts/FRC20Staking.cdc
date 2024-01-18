@@ -20,9 +20,16 @@ access(all) contract FRC20Staking {
     access(all) event RewardIncomeAdded(pool: Address, name: String, tick: String, amount: UFix64, from: Address)
     /// Event emitted when the delegator record is added
     access(all) event DelegatorRecordAdded(pool: Address, tick: String, delegatorID: UInt32, delegatorAddress: Address)
-
+    /// Event emitted when the delegator staked FRC20 token
+    access(all) event DelegatorStaked(pool: Address, tick: String, delegatorID: UInt32, delegatorAddress: Address, amount: UFix64)
+    /// Event emitted when the delegator try to staking FRC20 token and lock tokens
+    access(all) event DelegatorUnStakingLocked(pool: Address, tick: String, delegatorID: UInt32, delegatorAddress: Address, amount: UFix64, unlockTime: UInt64)
+    /// Event emitted when the delegator unstaked FRC20 token
+    access(all) event DelegatorUnStaked(pool: Address, tick: String, delegatorID: UInt32, delegatorAddress: Address, amount: UFix64)
     /// Event emitted when the delegator claim status is updated
     access(all) event DelegatorClaimedReward(pool: Address, strategyName: String, stakeTick: String, rewardTick: String, amount: UFix64, yieldAdded: UFix64)
+    /// Event emitted when the delegator received staked FRC20 token
+    access(all) event DelegatorStakedTokenDeposited(tick: String, pool: Address, receiver: Address, amount: UFix64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -227,18 +234,37 @@ access(all) contract FRC20Staking {
                 change: <- change
             )
 
+            let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
             // update staked change for delegator
             let delegatorRef = delegatorRecordRef.borrowDelegatorRef()
             // call onFRC20Staked to save the staked change
             delegatorRef.onFRC20Staked(
-                staking: self.borrowSelf(),
                 stakedChange: <- FRC20FTShared.createChange(
-                    tick: "!".concat(self.tick),
-                    from: delegator,
+                    tick: "!".concat(self.tick), // staked tick is prefixed with "!"
+                    from: poolAddr, // all staked changes are from pool
                     balance: stakedAmount,
                     ftVault: nil
                 )
             )
+
+            // emit stake event
+            emit DelegatorStaked(
+                pool: poolAddr,
+                tick: self.tick,
+                delegatorID: delegatorRecordRef.id,
+                delegatorAddress: delegator,
+                amount: stakedAmount
+            )
+        }
+
+        access(contract)
+        fun unstake() {
+            // TODO
+        }
+
+        access(contract)
+        fun claimUnlocked() {
+            // TODO
         }
 
         /** ---- Internal Methods */
@@ -706,7 +732,6 @@ access(all) contract FRC20Staking {
         /// Invoked when the staking is successful
         access(contract)
         fun onFRC20Staked(
-            staking: &Staking{StakingPublic},
             stakedChange: @FRC20FTShared.Change
         )
 
@@ -758,10 +783,21 @@ access(all) contract FRC20Staking {
         ///
         access(contract)
         fun onFRC20Staked(
-            staking: &Staking{StakingPublic},
             stakedChange: @FRC20FTShared.Change
         ) {
-
+            pre {
+                stakedChange.isStakedTick(): "Staked change tick must be staked tick"
+            }
+            let from = stakedChange.from
+            let pool = FRC20Staking.borrowPool(from)
+                ?? panic("Pool must exist")
+            let stakeTick = pool.getStakingTickerName()
+            assert(
+                stakeTick == stakedChange.getOriginalTick(),
+                message: "Staked change tick must match"
+            )
+            // deposit
+            self._depositStakedToken(change: <- stakedChange)
         }
 
         /// Update the claiming record
@@ -792,6 +828,38 @@ access(all) contract FRC20Staking {
         }
 
         /** ----- Internal Methods ----- */
+
+        access(self)
+        fun _depositStakedToken(change: @FRC20FTShared.Change) {
+            let tick = change.getOriginalTick()
+            if self.stakedTicks[tick] == nil {
+                self.stakedTicks[tick] <-! FRC20FTShared.createChange(
+                    tick: "!".concat(tick),
+                    from: change.from,
+                    balance: 0.0,
+                    ftVault: nil
+                )
+            }
+            let delegatorRef = self.borrowStakedChange(tick)
+                ?? panic("Staked change must exist")
+            assert(
+                delegatorRef.getOriginalTick() == tick,
+                message: "Staked change tick must match"
+            )
+            assert(
+                delegatorRef.from == change.from,
+                message: "Staked change must be from delegator"
+            )
+            let amount = change.getBalance()
+            delegatorRef.merge(from: <- change)
+
+            emit DelegatorStakedTokenDeposited(
+                tick: tick,
+                pool: delegatorRef.from,
+                receiver: self.owner?.address ?? panic("Delegator owner must exist"),
+                amount: amount
+            )
+        }
 
         /// Borrow Staked Change
         ///
