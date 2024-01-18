@@ -1,3 +1,8 @@
+/**
+#
+# Author: FIXeS World <https://fixes.world/>
+#
+*/
 // Third-party imports
 import "StringUtils"
 import "MetadataViews"

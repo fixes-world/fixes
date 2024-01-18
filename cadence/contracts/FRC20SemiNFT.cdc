@@ -1,3 +1,8 @@
+/**
+#
+# Author: FIXeS World <https://fixes.world/>
+#
+*/
 // Third party imports
 import "NonFungibleToken"
 import "MetadataViews"
@@ -9,6 +14,8 @@ import "Fixes"
 import "FRC20FTShared"
 
 access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
+
+    /* --- Events --- */
 
     /// Total supply of FRC20SemiNFTs in existence
     access(all) var totalSupply: UInt64
@@ -28,10 +35,56 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// The event that is emitted when an NFT is unwrapped
     access(all) event Unwrapped(id: UInt64, srcType: Type, srcId: UInt64)
 
+    /// Set
+
+    /* --- Variable, Enums and Structs --- */
+
     /// Storage and Public Paths
     access(all) let CollectionStoragePath: StoragePath
     access(all) let CollectionPublicPath: PublicPath
     access(all) let CollectionPrivatePath: PrivatePath
+
+    /* --- Interfaces & Resources --- */
+
+    /// Reward Claiming Record Struct, stored in SemiNFT
+    ///
+    access(all) struct RewardClaimRecord {
+        // The pool address
+        access(all)
+        let poolAddress: Address
+        // The reward strategy name
+        access(all)
+        let rewardStrategy: String
+        // The last claimed time
+        access(all)
+        var lastClaimedTime: UInt64
+        // The last global yield rate
+        access(all)
+        var lastGlobalYieldRate: UFix64
+        // The total claimed amount by this record
+        access(all)
+        var totalClaimedAmount: UFix64
+
+        init (
+            address: Address,
+            name: String,
+        ) {
+            self.poolAddress = address
+            self.rewardStrategy = name
+            self.lastClaimedTime = 0
+            self.lastGlobalYieldRate = 0.0
+            self.totalClaimedAmount = 0.0
+        }
+
+        /// Update the claiming record
+        ///
+        access(contract)
+        fun updateClaiming(amount: UFix64, currentGlobalYieldRate: UFix64) {
+            self.lastClaimedTime = UInt64(getCurrentBlock().timestamp)
+            self.lastGlobalYieldRate = currentGlobalYieldRate
+            self.totalClaimedAmount = self.totalClaimedAmount + amount
+        }
+    }
 
     /// The core resource that represents a Non Fungible Token.
     /// New instances will be created using the NFTMinter resource
@@ -41,14 +94,20 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// The unique ID that each NFT has
         access(all) let id: UInt64
 
+        /// Wrapped FRC20FTShared.Change
         access(self)
-        var wrappedChange: @FRC20FTShared.Change?
+        var wrappedChange: @FRC20FTShared.Change
+        /// Claiming Records for staked FRC20FTShared.Change
+        // Unique Name => Reward Claim Record
+        access(self)
+        let claimingRecords: {String: RewardClaimRecord}
 
         init(
             change: @FRC20FTShared.Change
         ) {
             self.id = self.uuid
             self.wrappedChange <- change
+            self.claimingRecords = {}
         }
 
         destroy() {
@@ -128,6 +187,60 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         }
 
         /** ----- Semi-NFT Methods ----- */
+
+        access(all) view
+        fun getOriginalTick(): String {
+            return self.wrappedChange.getOriginalTick()
+        }
+
+        /// Get the the claiming record(copy) by the unique name
+        access(all) view
+        fun getClaimingRecord(_ uniqueName: String): RewardClaimRecord? {
+            return self.claimingRecords[uniqueName]
+        }
+
+        /** ---- Account level methods ---- */
+
+        /// Borrow the claiming record(writeable reference) by the unique name
+        ///
+        access(account)
+        fun borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord? {
+            return &self.claimingRecords[uniqueName] as &RewardClaimRecord?
+        }
+
+        /** ----- Hook Methods for Account ----- */
+
+        /// Update the claiming record
+        ///
+        access(account)
+        fun onClaimingReward(
+            poolAddress: Address,
+            rewardStrategy: String,
+            amount: UFix64,
+            currentGlobalYieldRate: UFix64
+        ) {
+            let uniqueName = self.buildUniqueName(poolAddress, rewardStrategy)
+            // ensure the claiming record exists
+            if self.claimingRecords[uniqueName] == nil {
+                self.claimingRecords[uniqueName] = RewardClaimRecord(
+                    address: poolAddress,
+                    name: rewardStrategy,
+                )
+            }
+            // update claiming record
+            let recordRef = self.borrowClaimingRecord(uniqueName)
+                ?? panic("Claiming record must exist")
+            recordRef.updateClaiming(amount: amount, currentGlobalYieldRate: currentGlobalYieldRate)
+        }
+
+        /** Internal Method */
+
+        /// Get the unique name of the reward strategy
+        ///
+        access(self) view
+        fun buildUniqueName(_ addr: Address, _ strategy: String): String {
+            return addr.toString().concat("_").concat(self.rewardTick).concat("_").concat(self.name)
+        }
     }
 
     /// Defines the methods that are particular to this NFT contract collection

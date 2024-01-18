@@ -1,3 +1,8 @@
+/**
+#
+# Author: FIXeS World <https://fixes.world/>
+#
+*/
 // Third Party Imports
 import "FungibleToken"
 import "FlowToken"
@@ -419,10 +424,6 @@ access(all) contract FRC20Staking {
         /// The global yield rate of the reward strategy
         access(contract)
         var globalYieldRate: UFix64
-
-        /// Get the unique name of the reward strategy
-        access(all) view
-        fun getUniqueName(): String
     }
 
     /// Reward Strategy Resource, represents a reward strategy for a FRC20 token and store in pool's account
@@ -483,14 +484,6 @@ access(all) contract FRC20Staking {
             destroy self.totalReward
         }
 
-        /// Get the unique name of the reward strategy
-        ///
-        access(all) view
-        fun getUniqueName(): String {
-            let addr = self.owner?.address ?? panic("Owner must be set")
-            return addr.toString().concat("_").concat(self.rewardTick).concat("_").concat(self.name)
-        }
-
         access(contract)
         fun addIncome(income: @FRC20FTShared.Change, pool: &Pool) {
             pre {
@@ -534,7 +527,6 @@ access(all) contract FRC20Staking {
                 pool.tick == self.stakeTick: "Pool tick must match with reward strategy tick"
             }
             let stakingRef = pool.borrowStakingRef()
-            let rewardUniqueName = self.getUniqueName()
 
             // global info
             let totalStakedToken = stakingRef.totalStaked.getBalance()
@@ -676,46 +668,6 @@ access(all) contract FRC20Staking {
         }
     }
 
-    /// Reward Claiming Record Struct, stored in delegator's resource
-    ///
-    access(all) struct RewardClaimRecord {
-        // The pool address
-        access(all)
-        let poolAddress: Address
-        // The reward strategy name
-        access(all)
-        let rewardStrategy: String
-        // The last claimed time
-        access(all)
-        var lastClaimedTime: UInt64
-        // The last global yield rate
-        access(all)
-        var lastGlobalYieldRate: UFix64
-        // The total claimed amount
-        access(all)
-        var totalClaimedAmount: UFix64
-
-        init (
-            address: Address,
-            name: String,
-        ) {
-            self.poolAddress = address
-            self.rewardStrategy = name
-            self.lastClaimedTime = 0
-            self.lastGlobalYieldRate = 0.0
-            self.totalClaimedAmount = 0.0
-        }
-
-        /// Update the claiming record
-        ///
-        access(contract)
-        fun updateClaiming(amount: UFix64, currentGlobalYieldRate: UFix64) {
-            self.lastClaimedTime = UInt64(getCurrentBlock().timestamp)
-            self.lastGlobalYieldRate = currentGlobalYieldRate
-            self.totalClaimedAmount = self.totalClaimedAmount + amount
-        }
-    }
-
     /// Delegator Public Interface
     ///
     access(all) resource interface DelegatorPublic {
@@ -725,9 +677,6 @@ access(all) contract FRC20Staking {
         fun getStakedBalance(tick: String): UFix64
 
         /** ---- Contract level methods ---- */
-        /// Borrow the claiming record
-        access(contract)
-        fun borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord?
 
         /// Invoked when the staking is successful
         access(contract)
@@ -750,13 +699,9 @@ access(all) contract FRC20Staking {
         // Tick(original name) => Staked Tick Change
         access(contract)
         let stakedTicks: @{String: FRC20FTShared.Change}
-        // Unique Name => Reward Claim Record
-        access(self)
-        let claimingRecords: {String: RewardClaimRecord}
 
         init() {
             self.stakedTicks <- {}
-            self.claimingRecords = {}
         }
 
         /// @deprecated after Cadence 1.0
@@ -820,11 +765,6 @@ access(all) contract FRC20Staking {
             let recordRef = self.borrowClaimingRecord(uid)
                 ?? panic("Claiming record must exist")
             recordRef.updateClaiming(amount: amount, currentGlobalYieldRate: currentGlobalYieldRate)
-        }
-
-        access(contract)
-        fun borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord? {
-            return &self.claimingRecords[uniqueName] as &RewardClaimRecord?
         }
 
         /** ----- Internal Methods ----- */

@@ -1,3 +1,9 @@
+/**
+#
+# Author: FIXeS World <https://fixes.world/>
+#
+*/
+
 // Third party imports
 import NonFungibleToken from "NonFungibleToken"
 import MetadataViews from "MetadataViews"

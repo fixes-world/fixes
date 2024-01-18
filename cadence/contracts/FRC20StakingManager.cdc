@@ -1,3 +1,8 @@
+/**
+#
+# Author: FIXeS World <https://fixes.world/>
+#
+*/
 // Third Party Imports
 import "FungibleToken"
 import "FlowToken"

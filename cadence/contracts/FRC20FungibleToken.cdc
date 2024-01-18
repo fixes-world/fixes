@@ -1,3 +1,9 @@
+/**
+#
+# Author: FIXeS World <https://fixes.world/>
+#
+*/
+
 import "FungibleToken"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"

@@ -1,3 +1,8 @@
+/**
+#
+# Author: FIXeS World <https://fixes.world/>
+#
+*/
 import "Fixes"
 import "FRC20FTShared"
 import "FRC20Indexer"
