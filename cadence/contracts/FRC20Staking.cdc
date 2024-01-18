@@ -875,8 +875,8 @@ access(all) contract FRC20Staking {
     ///
     access(all)
     fun getUnstakingLockTime(): UInt64 {
-        // 1 day = 86400 seconds
-        return 86400
+        // 2 day = 172,800 seconds
+        return 172800
     }
 
     /// Borrow Pool by address

@@ -115,6 +115,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20SemiNFT": {
+			"source": "cadence/contracts/FRC20SemiNFT.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "43f16acb483bbee0"
+			}
+		},
 		"FRC20Staking": {
 			"source": "cadence/contracts/FRC20Staking.cdc",
 			"aliases": {
@@ -377,7 +385,7 @@
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
 				"FRC20MarketManager",
-				"FRC20FungibleToken",
+				"FRC20SemiNFT",
 				"FRC20Staking",
 				"FRC20StakingManager"
 			]
