@@ -12,6 +12,7 @@ import "FlowToken"
 // Fixes Import
 import "Fixes"
 import "FRC20FTShared"
+import "FRC20Indexer"
 
 access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
@@ -30,12 +31,13 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     access(all) event Deposit(id: UInt64, to: Address?)
 
     /// The event that is emitted when an NFT is wrapped
-    access(all) event Wrapped(id: UInt64, srcType: Type, srcId: UInt64)
+    access(all) event Wrapped(id: UInt64, pool: Address, tick: String, balance: UFix64)
 
     /// The event that is emitted when an NFT is unwrapped
-    access(all) event Unwrapped(id: UInt64, srcType: Type, srcId: UInt64)
+    access(all) event Unwrapped(id: UInt64, pool: Address, tick: String, balance: UFix64)
 
-    /// Set
+    /// The event that is emitted when the claiming record is updated
+    access(all) event ClaimingRecordUpdated(id: UInt64, tick: String, pool: Address, strategy: String, time: UInt64, globalYieldRate: UFix64, claimedAmount: UFix64)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -98,12 +100,12 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(self)
         var wrappedChange: @FRC20FTShared.Change
         /// Claiming Records for staked FRC20FTShared.Change
-        // Unique Name => Reward Claim Record
+        /// Unique Name => Reward Claim Record
         access(self)
         let claimingRecords: {String: RewardClaimRecord}
 
         init(
-            change: @FRC20FTShared.Change
+            _ change: @FRC20FTShared.Change
         ) {
             self.id = self.uuid
             self.wrappedChange <- change
@@ -158,15 +160,14 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                     return nil
                 case Type<MetadataViews.Traits>():
                     let traits = MetadataViews.Traits([])
-                    if let changeRef: &FRC20FTShared.Change = &self.wrappedChange as &FRC20FTShared.Change? {
-                        traits.addTrait(MetadataViews.Trait(name: "originTick", value: changeRef.getOriginalTick(), nil, nil))
-                        traits.addTrait(MetadataViews.Trait(name: "tick", value: changeRef.tick, nil, nil))
-                        traits.addTrait(MetadataViews.Trait(name: "balance", value: changeRef.getBalance(), nil, nil))
-                        let isVault = changeRef.isBackedByVault()
-                        traits.addTrait(MetadataViews.Trait(name: "isFlowFT", value: isVault, nil, nil))
-                        if isVault {
-                            traits.addTrait(MetadataViews.Trait(name: "ftType", value: changeRef.getVaultType()!.identifier, nil, nil))
-                        }
+                    let changeRef: &FRC20FTShared.Change = self.borrowChange()
+                    traits.addTrait(MetadataViews.Trait(name: "originTick", value: changeRef.getOriginalTick(), nil, nil))
+                    traits.addTrait(MetadataViews.Trait(name: "tick", value: changeRef.tick, nil, nil))
+                    traits.addTrait(MetadataViews.Trait(name: "balance", value: changeRef.getBalance(), nil, nil))
+                    let isVault = changeRef.isBackedByVault()
+                    traits.addTrait(MetadataViews.Trait(name: "isFlowFT", value: isVault, nil, nil))
+                    if isVault {
+                        traits.addTrait(MetadataViews.Trait(name: "ftType", value: changeRef.getVaultType()!.identifier, nil, nil))
                     }
                     return traits
                 case Type<MetadataViews.Royalties>():
@@ -193,24 +194,38 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             return self.wrappedChange.getOriginalTick()
         }
 
+        access(all) view
+        fun isStakedTick(): Bool {
+            return self.wrappedChange.isStakedTick()
+        }
+
+        access(all) view
+        fun isBackedByVault(): Bool {
+            return self.wrappedChange.isBackedByVault()
+        }
+
+        access(all) view
+        fun getVaultType(): Type? {
+            return self.wrappedChange.getVaultType()
+        }
+
+        access(all) view
+        fun getBalance(): UFix64 {
+            return self.wrappedChange.getBalance()
+        }
+
         /// Get the the claiming record(copy) by the unique name
         access(all) view
         fun getClaimingRecord(_ uniqueName: String): RewardClaimRecord? {
+            pre {
+                self.isStakedTick(): "The tick must be a staked 𝔉rc20 token"
+            }
             return self.claimingRecords[uniqueName]
         }
 
         /** ---- Account level methods ---- */
 
-        /// Borrow the claiming record(writeable reference) by the unique name
-        ///
-        access(account)
-        fun borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord? {
-            return &self.claimingRecords[uniqueName] as &RewardClaimRecord?
-        }
-
-        /** ----- Hook Methods for Account ----- */
-
-        /// Update the claiming record
+        /// Hook method: Update the claiming record
         ///
         access(account)
         fun onClaimingReward(
@@ -219,6 +234,9 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             amount: UFix64,
             currentGlobalYieldRate: UFix64
         ) {
+            pre {
+                self.isStakedTick(): "The tick must be a staked 𝔉rc20 token"
+            }
             let uniqueName = self.buildUniqueName(poolAddress, rewardStrategy)
             // ensure the claiming record exists
             if self.claimingRecords[uniqueName] == nil {
@@ -231,6 +249,24 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             let recordRef = self.borrowClaimingRecord(uniqueName)
                 ?? panic("Claiming record must exist")
             recordRef.updateClaiming(amount: amount, currentGlobalYieldRate: currentGlobalYieldRate)
+
+            // emit event
+            emit ClaimingRecordUpdated(
+                id: self.id,
+                tick: self.getOriginalTick(),
+                pool: poolAddress,
+                strategy: rewardStrategy,
+                time: recordRef.lastClaimedTime,
+                globalYieldRate: currentGlobalYieldRate,
+                claimedAmount: amount
+            )
+        }
+
+        /// Borrow the claiming record(writeable reference) by the unique name
+        ///
+        access(account)
+        fun borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord? {
+            return &self.claimingRecords[uniqueName] as &RewardClaimRecord?
         }
 
         /** Internal Method */
@@ -239,7 +275,15 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         ///
         access(self) view
         fun buildUniqueName(_ addr: Address, _ strategy: String): String {
-            return addr.toString().concat("_").concat(self.rewardTick).concat("_").concat(self.name)
+            let ref = self.borrowChange()
+            return addr.toString().concat("_").concat(ref.getOriginalTick()).concat("_").concat(strategy)
+        }
+
+        /// Borrow the wrapped FRC20FTShared.Change
+        ///
+        access(self)
+        fun borrowChange(): &FRC20FTShared.Change {
+            return &self.wrappedChange as &FRC20FTShared.Change
         }
     }
 
@@ -272,6 +316,11 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
         init () {
             self.ownedNFTs <- {}
+        }
+
+        /// @deprecated after Cadence 1.0
+        destroy() {
+            destroy self.ownedNFTs
         }
 
         /// Removes an NFT from the collection and moves it to the caller
@@ -356,10 +405,6 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             let FRC20SemiNFT = nft as! &FRC20SemiNFT.NFT
             return FRC20SemiNFT as &AnyResource{MetadataViews.Resolver}
         }
-
-        destroy() {
-            destroy self.ownedNFTs
-        }
     }
 
     /// Allows anyone to create a new empty collection
@@ -369,6 +414,58 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     access(all)
     fun createEmptyCollection(): @NonFungibleToken.Collection {
         return <- create Collection()
+    }
+
+    /// Mints a new NFT with a new ID and deposit it in the
+    /// recipients collection using their collection reference
+    /// -- recipient, the collection of FRC20SemiNFT
+    ///
+    access(all)
+    fun wrap(
+        recipient: &FRC20SemiNFT.Collection{NonFungibleToken.CollectionPublic},
+        change: @FRC20FTShared.Change,
+    ): UInt64 {
+        let poolAddress = change.from
+        let tick = change.tick
+        let balance = change.getBalance()
+        // create a new NFT
+        var newNFT <- create NFT(<- change)
+        let nftId = newNFT.id
+        // deposit it in the recipient's account using their reference
+        recipient.deposit(token: <-newNFT)
+
+        FRC20SemiNFT.totalSupply = FRC20SemiNFT.totalSupply + 1
+
+        // emit the event
+        emit Wrapped(
+            id: nftId,
+            pool: poolAddress,
+            tick: tick,
+            balance: balance
+        )
+        return nftId
+    }
+
+    /// Unwraps an NFT and deposits it in the recipients collection
+    /// using their collection reference
+    ///
+    access(all)
+    fun unwrapFRC20(
+        nftToUnwrap: @FRC20SemiNFT.NFT,
+    ): @FRC20FTShared.Change {
+        let nftId = nftToUnwrap.id
+
+        // destroy the FRC20SemiNFT
+        destroy nftToUnwrap
+        // decrease the total supply
+        FRC20SemiNFT.totalSupply = FRC20SemiNFT.totalSupply - UInt64(1)
+
+        // emit the event
+        emit Unwrapped(
+            id: nftId,
+        )
+        // return the inscription
+        return <- out
     }
 
     /// Function that resolves a metadata view for this contract.
