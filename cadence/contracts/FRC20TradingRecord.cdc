@@ -444,24 +444,9 @@ access(all) contract FRC20TradingRecord {
             return self.tick
         }
 
-        /// Get the market cap
-        ///
+        /// @deprecated
         access(all) view
         fun getMarketCap(): UFix64? {
-            if self.tick == nil {
-                return nil
-            }
-            let frc20Indexer = FRC20Indexer.getIndexer()
-            if let meta = frc20Indexer.getTokenMeta(tick: self.tick!) {
-                let status = self.borrowStatus()
-                let benchmarkValue = frc20Indexer.getBenchmarkValue(tick: self.tick!)
-                let marketValue = status.dealCeilingPricePerToken
-                if benchmarkValue > marketValue {
-                    return benchmarkValue * meta.max
-                } else {
-                    return marketValue * meta.max
-                }
-            }
             return nil
         }
 
