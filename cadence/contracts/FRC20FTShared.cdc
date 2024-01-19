@@ -385,31 +385,44 @@ access(all) contract FRC20FTShared {
         access(account)
         fun withdrawAsChange(amount: UFix64): @Change {
             pre {
-                self.isBackedByVault() == false: "The Change must not be backed by a Vault"
-                self.balance != nil: "Balance must not be nil for withdrawAsChange"
-                self.balance! >= amount:
+                self.getBalance() >= amount:
                     "Amount withdrawn must be less than or equal than the balance of the Vault"
             }
             post {
                 // result's type must be the same as the type of the original Change
                 result.tick == self.tick: "Tick must be equal to the provided tick"
                 // use the special function `before` to get the value of the `balance` field
-                self.balance == before(self.balance)! - amount:
+                self.getBalance() == before(self.getBalance()) - amount:
                     "New Change balance must be the difference of the previous balance and the withdrawn Change"
             }
-            self.balance = self.balance! - amount
-            emit TokenChangeWithdrawn(
-                tick: self.tick,
-                amount: amount,
-                from: self.from,
-                changeUuid: self.uuid
-            )
-            return <- create Change(
-                tick: self.tick,
-                from: self.from,
-                balance: amount,
-                ftVault: nil
-            )
+            var newChange: @Change? <- nil
+            if self.isBackedByVault() {
+                // withdraw from the input Change, the TokenChangeWithdrawn event will be emitted inside
+                let extracted <- self.withdrawAsVault(amount: amount)
+                // create a same source Change
+                newChange <-! create Change(
+                    tick: self.tick,
+                    from: self.from,
+                    balance: nil,
+                    ftVault: <- extracted
+                )
+            } else {
+                self.balance = self.balance! - amount
+                newChange <-! create Change(
+                    tick: self.tick,
+                    from: self.from,
+                    balance: amount,
+                    ftVault: nil
+                )
+                // emit TokenChangeWithdrawn event
+                emit TokenChangeWithdrawn(
+                    tick: self.tick,
+                    amount: amount,
+                    from: self.from,
+                    changeUuid: self.uuid
+                )
+            }
+            return <- (newChange ?? panic("The new Change must not be nil"))
         }
 
         /// Extract all balance of this Change, this method is only available for the contracts in the same account
