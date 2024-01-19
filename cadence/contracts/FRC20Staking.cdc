@@ -6,10 +6,13 @@
 // Third Party Imports
 import "FungibleToken"
 import "FlowToken"
+import "MetadataViews"
+import "NonFungibleToken"
 // Fixes Imports
 import "Fixes"
 import "FRC20Indexer"
 import "FRC20FTShared"
+import "FRC20SemiNFT"
 
 access(all) contract FRC20Staking {
     /* --- Events --- */
@@ -34,7 +37,7 @@ access(all) contract FRC20Staking {
     /// Event emitted when the delegator claim status is updated
     access(all) event DelegatorClaimedReward(pool: Address, strategyName: String, stakeTick: String, rewardTick: String, amount: UFix64, yieldAdded: UFix64)
     /// Event emitted when the delegator received staked FRC20 token
-    access(all) event DelegatorStakedTokenDeposited(tick: String, pool: Address, receiver: Address, amount: UFix64)
+    access(all) event DelegatorStakedTokenDeposited(tick: String, pool: Address, receiver: Address, amount: UFix64, semiNftId: UInt64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -114,7 +117,7 @@ access(all) contract FRC20Staking {
         let delegators: @{Address: DelegatorRecord}
         /** ----- Rewards ----- */
         /// The rewards of this staking pool
-        access(contract)
+        access(self)
         let rewards: @{String: RewardStrategy}
 
         init(
@@ -262,8 +265,13 @@ access(all) contract FRC20Staking {
             )
         }
 
+        /// Unstake FRC20 token
+        ///
         access(contract)
-        fun unstake() {
+        fun unstake(nft: @FRC20SemiNFT.NFT) {
+            pre {
+                nft.getOriginalTick() == self.tick: "NFT tick must match with staking tick"
+            }
             // TODO
         }
 
@@ -429,6 +437,8 @@ access(all) contract FRC20Staking {
     /// Reward Strategy Resource, represents a reward strategy for a FRC20 token and store in pool's account
     ///
     access(all) resource RewardStrategy: RewardStrategyPublic {
+        access(self)
+        let poolCap: Capability<&Pool{PoolPublic}>
         /// The name of the reward strategy
         access(all)
         let name: String
@@ -446,17 +456,18 @@ access(all) contract FRC20Staking {
         var globalYieldRate: UFix64
 
         init(
+            pool: Capability<&Pool{PoolPublic}>,
             name: String,
             rewardTick: String,
-            _ pool: &Pool,
         ) {
             pre {
-                pool.owner?.address != nil: "Pool owner must be set"
+                pool.check(): "Pool must be valid"
             }
-            let owner = pool.owner?.address!
+            self.poolCap = pool
+            let poolRef = pool.borrow() ?? panic("Pool must exist")
 
             self.name = name
-            self.stakeTick = pool.tick
+            self.stakeTick = poolRef.getStakingTickerName()
             self.rewardTick = rewardTick
             self.globalYieldRate = 0.0
 
@@ -465,14 +476,14 @@ access(all) contract FRC20Staking {
             /// create empty change
             if isFtVault {
                 // TODO: support other Flow FT
-                self.totalReward <- FRC20FTShared.createChange(tick: rewardTick, from: owner, balance: nil, ftVault: <- FlowToken.createEmptyVault())
+                self.totalReward <- FRC20FTShared.createChange(tick: rewardTick, from: pool.address, balance: nil, ftVault: <- FlowToken.createEmptyVault())
             } else {
-                self.totalReward <- FRC20FTShared.createChange(tick: rewardTick, from: owner, balance: 0.0, ftVault: nil)
+                self.totalReward <- FRC20FTShared.createChange(tick: rewardTick, from: pool.address, balance: 0.0, ftVault: nil)
             }
 
             // emit event
             emit RewardStrategyInitialized(
-                pool: owner,
+                pool: pool.address,
                 name: name,
                 tick: rewardTick,
                 ftVaultType: isFtVault ? self.totalReward.getVaultType()?.identifier! : nil
@@ -485,12 +496,14 @@ access(all) contract FRC20Staking {
         }
 
         access(contract)
-        fun addIncome(income: @FRC20FTShared.Change, pool: &Pool) {
+        fun addIncome(income: @FRC20FTShared.Change) {
             pre {
-                self.owner?.address == pool.owner?.address: "Pool owner must match with reward strategy owner"
-                pool.tick == self.stakeTick: "Pool tick must match with reward strategy tick"
+                self.poolCap.check(): "Pool must be valid"
+                self.owner?.address == self.poolCap.address: "Pool owner must match with reward strategy owner"
                 income.tick == self.rewardTick: "Income tick must match with reward strategy tick"
             }
+
+            let pool = self.poolCap.borrow() ?? panic("Pool must exist")
 
             let incomeFrom = income.from
             let incomeValue = income.getBalance()
@@ -521,25 +534,34 @@ access(all) contract FRC20Staking {
         }
 
         access(contract)
-        fun claim(by: &DelegatorRecord, pool: &Pool): @FRC20FTShared.Change {
+        fun claim(
+            byNft: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT},
+        ): @FRC20FTShared.Change {
             pre {
-                self.owner?.address == pool.owner?.address: "Pool owner must match with reward strategy owner"
-                pool.tick == self.stakeTick: "Pool tick must match with reward strategy tick"
+                self.poolCap.check(): "Pool must be valid"
+                self.owner?.address == self.poolCap.address: "Pool owner must match with reward strategy owner"
+                byNft.getOriginalTick() == self.stakeTick: "NFT tick must match with reward strategy tick"
             }
-            let stakingRef = pool.borrowStakingRef()
+            let pool = self.poolCap.borrow() ?? panic("Pool must exist")
 
             // global info
+            let stakingRef = pool.borrowStakingRef()
             let totalStakedToken = stakingRef.totalStaked.getBalance()
             let totalRewardBalance = self.totalReward.getBalance()
 
+            // related addreses info
+            let poolAddr = pool.owner?.address ?? panic("Pool owner must exist")
+            let delegator = byNft.owner?.address ?? panic("Delegator must exist")
+
             // delegator info
-            let delegatorRef = FRC20Staking.borrowDelegator(by.delegator)
+            let delegatorRef = FRC20Staking.borrowDelegator(delegator)
                 ?? panic("Delegator must exist")
-            let delegatorClaimingRef = delegatorRef.borrowClaimingRecord(rewardUniqueName)
+            let strategyUniqueName = byNft.buildUniqueName(poolAddr, self.name)
+            let claimingRecord = byNft.getClaimingRecord(strategyUniqueName)
 
             // calculate reward
-            let delegatorLastGlobalYieldRate = delegatorClaimingRef?.lastGlobalYieldRate ?? 0.0
-            let delegatorStakedToken = delegatorRef.getStakedBalance(tick: self.stakeTick)
+            let delegatorLastGlobalYieldRate = claimingRecord?.lastGlobalYieldRate ?? 0.0
+            let delegatorStakedToken = byNft.getBalance() // staked token's balance is the same as NFT's balance
 
             assert(
                 self.globalYieldRate > delegatorLastGlobalYieldRate,
@@ -551,23 +573,14 @@ access(all) contract FRC20Staking {
                 yieldReward <= totalRewardBalance,
                 message: "Reward must be less than total reward"
             )
+
             // withdraw from totalReward
-            var ret: @FRC20FTShared.Change? <- nil
-            if self.totalReward.isBackedByVault() {
-                let vault <- self.totalReward.withdrawAsVault(amount: yieldReward)
-                ret <-! FRC20FTShared.createChange(
-                    tick: self.totalReward.tick,
-                    from: self.totalReward.from,
-                    balance: nil,
-                    ftVault: <- vault
-                )
-            } else {
-                ret <-! self.totalReward.withdrawAsChange(amount: yieldReward)
-            }
+            let ret: @FRC20FTShared.Change <- self.totalReward.withdrawAsChange(amount: yieldReward)
 
             // update delegator claiming record
             delegatorRef.onClaimingReward(
                 reward: self.borrowSelf(),
+                byNftId: byNft.id,
                 amount: yieldReward,
                 currentGlobalYieldRate: self.globalYieldRate
             )
@@ -583,7 +596,7 @@ access(all) contract FRC20Staking {
             )
 
             // return the change
-            return <- (ret ?? panic("Reward must exist"))
+            return <- ret
         }
 
         /** ---- Internal Methods ---- */
@@ -607,6 +620,12 @@ access(all) contract FRC20Staking {
         fun getStakingTickerName(): String
 
         // ---- Operations ----
+
+
+        // ---- Contract level methods ----
+
+        access(contract)
+        fun borrowStakingRef(): &Staking
     }
 
     /// Staking Pool Resource, represents a staking pool and store in platform staking pool child account
@@ -623,7 +642,6 @@ access(all) contract FRC20Staking {
             tick: String
         ) {
             self.tick = tick
-
             self.record <- nil
         }
 
@@ -672,9 +690,14 @@ access(all) contract FRC20Staking {
     ///
     access(all) resource interface DelegatorPublic {
         /** ---- Public methods ---- */
+
         /// Get the staked frc20 token balance of the delegator
         access(all) view
         fun getStakedBalance(tick: String): UFix64
+
+        /// Get the staked frc20 Semi-NFTs of the delegator
+        access(all) view
+        fun getStakedNFTIds(tick: String): [UInt64]
 
         /** ---- Contract level methods ---- */
 
@@ -688,6 +711,7 @@ access(all) contract FRC20Staking {
         access(contract)
         fun onClaimingReward(
             reward: &RewardStrategy{RewardStrategyPublic},
+            byNftId: UInt64,
             amount: UFix64,
             currentGlobalYieldRate: UFix64
         )
@@ -696,17 +720,16 @@ access(all) contract FRC20Staking {
     /// Delegator Resource, represents a delegator and store in user's account
     ///
     access(all) resource Delegator: DelegatorPublic {
-        // Tick(original name) => Staked Tick Change
-        access(contract)
-        let stakedTicks: @{String: FRC20FTShared.Change}
+        access(self)
+        let semiNFTcolCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
 
-        init() {
-            self.stakedTicks <- {}
-        }
-
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.stakedTicks
+        init(
+            _ semiNFTCol: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+        ) {
+            pre {
+                semiNFTCol.check(): "SemiNFT Collection must be valid"
+            }
+            self.semiNFTcolCap = semiNFTCol
         }
 
         /** ----- Public Methods ----- */
@@ -715,11 +738,32 @@ access(all) contract FRC20Staking {
         ///
         access(all) view
         fun getStakedBalance(tick: String): UFix64 {
-            if let change = self.borrowStakedChange(tick) {
-                assert(change.getOriginalTick() == tick, message: "Staked change tick must match")
-                return change.getBalance()
+            let colRef = self.borrowSemiNFTCollection()
+            let tickIds = colRef.getIDsByTick(tick: tick)
+            if tickIds.length > 0 {
+                var totalBalance = 0.0
+                for id in tickIds {
+                    if let nft = colRef.borrowFRC20SemiNFT(id: id) {
+                        if nft.getOriginalTick() != tick {
+                            continue
+                        }
+                        if !nft.isStakedTick() {
+                            continue
+                        }
+                        totalBalance = totalBalance + nft.getBalance()
+                    }
+                }
+                return totalBalance
             }
             return 0.0
+        }
+
+        /// Get the staked frc20 Semi-NFTs of the delegator
+        ///
+        access(all) view
+        fun getStakedNFTIds(tick: String): [UInt64] {
+            let colRef = self.borrowSemiNFTCollection()
+            return colRef.getIDsByTick(tick: tick)
         }
 
         /** ----- Contract Methods ----- */
@@ -750,21 +794,25 @@ access(all) contract FRC20Staking {
         access(contract)
         fun onClaimingReward(
             reward: &RewardStrategy{RewardStrategyPublic},
+            byNftId: UInt64,
             amount: UFix64,
             currentGlobalYieldRate: UFix64
         ) {
-            let uid = reward.getUniqueName()
-            let owner = reward.owner?.address ?? panic("Reward owner must exist")
-            if self.claimingRecords[uid] == nil {
-                self.claimingRecords[uid] = RewardClaimRecord(
-                    address: owner,
-                    name: reward.name, // use basic name
-                )
-            }
-            // update claiming record
-            let recordRef = self.borrowClaimingRecord(uid)
-                ?? panic("Claiming record must exist")
-            recordRef.updateClaiming(amount: amount, currentGlobalYieldRate: currentGlobalYieldRate)
+            let pool = reward.owner?.address ?? panic("Reward owner must exist")
+            let name = reward.name
+
+            // borrow the nft from semiNFT collection
+            let semiNFTCol = self.borrowSemiNFTCollection()
+            let stakedNFT = semiNFTCol.borrowFRC20SemiNFT(id: byNftId)
+                ?? panic("Staked NFT must exist")
+
+            // update the claiming record
+            stakedNFT.onClaimingReward(
+                poolAddress: pool,
+                rewardStrategy: name,
+                amount: amount,
+                currentGlobalYieldRate: currentGlobalYieldRate
+            )
         }
 
         /** ----- Internal Methods ----- */
@@ -772,40 +820,27 @@ access(all) contract FRC20Staking {
         access(self)
         fun _depositStakedToken(change: @FRC20FTShared.Change) {
             let tick = change.getOriginalTick()
-            if self.stakedTicks[tick] == nil {
-                self.stakedTicks[tick] <-! FRC20FTShared.createChange(
-                    tick: "!".concat(tick),
-                    from: change.from,
-                    balance: 0.0,
-                    ftVault: nil
-                )
-            }
-            let delegatorRef = self.borrowStakedChange(tick)
-                ?? panic("Staked change must exist")
-            assert(
-                delegatorRef.getOriginalTick() == tick,
-                message: "Staked change tick must match"
-            )
-            assert(
-                delegatorRef.from == change.from,
-                message: "Staked change must be from delegator"
-            )
-            let amount = change.getBalance()
-            delegatorRef.merge(from: <- change)
+            let semiNFTCol = self.borrowSemiNFTCollection()
 
+            let fromPool = change.from
+            let amount = change.getBalance()
+            let nftId = FRC20SemiNFT.wrap(recipient: semiNFTCol, change: <- change)
+
+            // emit event
             emit DelegatorStakedTokenDeposited(
                 tick: tick,
-                pool: delegatorRef.from,
+                pool: fromPool,
                 receiver: self.owner?.address ?? panic("Delegator owner must exist"),
-                amount: amount
+                amount: amount,
+                semiNftId: nftId
             )
         }
 
         /// Borrow Staked Change
         ///
         access(self)
-        fun borrowStakedChange(_ tick: String): &FRC20FTShared.Change? {
-            return &self.stakedTicks[tick] as &FRC20FTShared.Change?
+        fun borrowSemiNFTCollection(): &FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection} {
+            return self.semiNFTcolCap.borrow() ?? panic("The SemiNFT Collection must exist")
         }
     }
 
