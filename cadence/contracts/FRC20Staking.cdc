@@ -268,11 +268,33 @@ access(all) contract FRC20Staking {
         /// Unstake FRC20 token
         ///
         access(contract)
-        fun unstake(nft: @FRC20SemiNFT.NFT) {
-            pre {
-                nft.getOriginalTick() == self.tick: "NFT tick must match with staking tick"
-            }
-            // TODO
+        fun unstake(
+            _ semiNFTCol: &FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection},
+            nftId: UInt64
+        ) {
+            let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
+            let delegator = semiNFTCol.owner?.address ?? panic("Delegator must exist")
+            // ensure the nft is valid
+            let nftRef = semiNFTCol.borrowFRC20SemiNFT(id: nftId)
+                ?? panic("Staked NFT must exist")
+            assert(
+                nftRef.getOriginalTick() == self.tick,
+                message: "NFT tick must match"
+            )
+            assert(
+                nftRef.getFromAddress() == poolAddr,
+                message: "NFT must be created from pool"
+            )
+
+            // withdraw the nft from semiNFT collection
+            let nft <- semiNFTCol.withdraw(withdrawID: nftId)
+
+            // ensure delegator record exists
+            let delegatorRecordRef = self.borrowDelegatorRecord(delegator)
+                ?? panic("Delegator record must exist")
+
+            // save the nft to unstaking queue in delegator record
+
         }
 
         access(contract)

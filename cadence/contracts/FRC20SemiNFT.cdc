@@ -120,6 +120,9 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         fun getVaultType(): Type?
 
         access(all) view
+        fun getFromAddress(): Address
+
+        access(all) view
         fun getBalance(): UFix64
 
         access(all) view
@@ -275,6 +278,11 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(all) view
         fun getVaultType(): Type? {
             return self.wrappedChange.getVaultType()
+        }
+
+        access(all) view
+        fun getFromAddress(): Address {
+            return self.wrappedChange.from
         }
 
         access(all) view
