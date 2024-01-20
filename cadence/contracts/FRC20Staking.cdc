@@ -228,8 +228,9 @@ access(all) contract FRC20Staking {
             // check if delegator's record exists
             if self.delegators[delegator] == nil {
                 self.addDelegator(<- create DelegatorRecord(
-                    self.delegatorIDCounter,
-                    delegator
+                    id: self.delegatorIDCounter,
+                    tick: self.tick,
+                    address: delegator
                 ))
             }
             // ensure delegator record exists
@@ -287,14 +288,14 @@ access(all) contract FRC20Staking {
             )
 
             // withdraw the nft from semiNFT collection
-            let nft <- semiNFTCol.withdraw(withdrawID: nftId)
+            let nft <- semiNFTCol.withdraw(withdrawID: nftId) as! @FRC20SemiNFT.NFT
 
             // ensure delegator record exists
             let delegatorRecordRef = self.borrowDelegatorRecord(delegator)
                 ?? panic("Delegator record must exist")
 
             // save the nft to unstaking queue in delegator record
-
+            delegatorRecordRef.addUnstakingEntry(<- nft)
         }
 
         access(contract)
@@ -352,27 +353,68 @@ access(all) contract FRC20Staking {
         }
     }
 
-    access(all) resource UnstakingEntry {
-        access(all)
-        let tick: String
-        access(all)
-        let amount: UFix64
+    access(all) resource interface UnstakingEntryPublic {
         access(all)
         let unlockTime: UInt64
 
+        access(all)
+        fun isUnlocked(): Bool
+
+        access(all)
+        fun unlockingBalance(): UFix64
+
+        access(all)
+        fun isExtracted(): Bool
+    }
+
+    /// Unstaking Entry Resource, represents a unstaking entry for a FRC20 token
+    ///
+    access(all) resource UnstakingEntry {
+        access(all)
+        let unlockTime: UInt64
+        access(all)
+        var unstakingNFT: @FRC20SemiNFT.NFT?
+
         init(
-            tick: String,
-            amount: UFix64,
-            unlockTime: UInt64
+            unlockTime: UInt64,
+            unstakingNFT: @FRC20SemiNFT.NFT
         ) {
-            self.tick = tick
-            self.amount = amount
             self.unlockTime = unlockTime
+            self.unstakingNFT <- unstakingNFT
         }
 
-        access(contract)
+        destroy () {
+            destroy self.unstakingNFT
+        }
+
+        access(all)
         fun isUnlocked(): Bool {
             return UInt64(getCurrentBlock().timestamp) >= self.unlockTime
+        }
+
+        access(all)
+        fun unlockingBalance(): UFix64 {
+            return self.unstakingNFT?.getBalance() ?? 0.0
+        }
+
+        access(all)
+        fun isExtracted(): Bool {
+            return self.unstakingNFT == nil
+        }
+
+        /// Extract the unstaking FRC20 token
+        access(contract)
+        fun extract(): @FRC20FTShared.Change {
+            pre {
+                self.unstakingNFT != nil : "Unstaking NFT must exist"
+            }
+            post {
+                self.unstakingNFT == nil : "Unstaking NFT must be destroyed"
+            }
+            var toUnwrapNft: @FRC20SemiNFT.NFT? <- nil
+            self.unstakingNFT <-> toUnwrapNft
+
+            return <- FRC20SemiNFT.unwrapStakedFRC20(nftToUnwrap: <- toUnwrapNft!)
         }
     }
 
@@ -385,18 +427,23 @@ access(all) contract FRC20Staking {
         // The delegator address
         access(all)
         let delegator: Address
-        // Record status
+        // The staking tick
+        access(all)
+        let stakeTick: String
+        // The delegator's unstaking entries
         access(all)
         let unstakingEntries: @[UnstakingEntry]
 
         init(
-            _ id: UInt32,
-            _ address: Address
+            id: UInt32,
+            tick: String,
+            address: Address
         ) {
             pre {
                 FRC20Staking.borrowDelegator(address) != nil: "Delegator must exist"
             }
             self.id = id
+            self.stakeTick = tick
             self.delegator = address
             self.unstakingEntries <- []
         }
@@ -406,11 +453,117 @@ access(all) contract FRC20Staking {
             destroy self.unstakingEntries
         }
 
+        access(all)
+        fun entriesLength(): UInt64 {
+            return UInt64(self.unstakingEntries.length)
+        }
+
+        /// Is the frist unstaking entry unlocked
+        ///
+        access(all)
+        fun isFirstUnlocked(): Bool {
+            if self.unstakingEntries.length > 0 {
+                return self.unstakingEntries[0].isUnlocked()
+            }
+            return false
+        }
+
+        /// Locking unstaking FRC20 token
+        ///
+        access(contract)
+        fun addUnstakingEntry(
+            _ unstakingNFT: @FRC20SemiNFT.NFT
+        ) {
+            pre {
+                unstakingNFT.getOriginalTick() == self.stakeTick: "Unstaking NFT tick must match"
+            }
+            let unlockTime = UInt64(getCurrentBlock().timestamp) + FRC20Staking.getUnstakingLockTime()
+            let tick = unstakingNFT.getOriginalTick()
+            let amount = unstakingNFT.getBalance()
+            self.unstakingEntries.append(
+                <- create UnstakingEntry(
+                    unlockTime: unlockTime,
+                    unstakingNFT: <- unstakingNFT
+                )
+            )
+
+            // emit event
+            emit DelegatorUnStakingLocked(
+                pool: self.owner?.address ?? panic("Pool owner must exist"),
+                tick: tick,
+                delegatorID: self.id,
+                delegatorAddress: self.delegator,
+                amount: amount,
+                unlockTime: unlockTime
+            )
+        }
+
+        access(contract)
+        fun claimAllUnlockedEnties(): @FRC20FTShared.Change? {
+            if self.unstakingEntries.length > 0 {
+                // create new change
+                let ret: @FRC20FTShared.Change <- FRC20FTShared.createChange(
+                    tick: self.stakeTick,
+                    from: self.owner?.address ?? panic("Pool owner must exist"),
+                    balance: 0.0,
+                    ftVault: nil
+                )
+                let retRef = &ret as &FRC20FTShared.Change
+
+                let len = self.unstakingEntries.length
+                var isFirstUnlocked = self.isFirstUnlocked()
+                while isFirstUnlocked {
+                    let entryRef = self.borrowEntry(0)
+                    if entryRef.isUnlocked() {
+                        // remove the first entry
+                        let entry <- self.unstakingEntries.remove(at: 0)
+                        // extract the unstaked change
+                        let unwrappedChange <- entry.extract()
+                        // extracted
+                        assert(
+                            entry.isExtracted(),
+                            message: "Unstaking entry must be extracted"
+                        )
+                        destroy entry
+                        // merge to ret change
+                        let amount = unwrappedChange.getBalance()
+                        // deposit to change
+                        FRC20FTShared.depositToChange(
+                            receiver: retRef,
+                            change: <- unwrappedChange
+                        )
+
+                        // emit event
+                        emit DelegatorUnStaked(
+                            pool: self.owner?.address ?? panic("Pool owner must exist"),
+                            tick: self.stakeTick,
+                            delegatorID: self.id,
+                            delegatorAddress: self.delegator,
+                            amount: amount
+                        )
+                    }
+                    // check again, if the first entry is unlocked
+                    isFirstUnlocked = self.isFirstUnlocked()
+                }
+
+                return <- ret
+            }
+            return nil
+        }
+
         /// Borrow Delegator reference
         ///
         access(contract)
         fun borrowDelegatorRef(): &Delegator{DelegatorPublic} {
             return FRC20Staking.borrowDelegator(self.delegator) ?? panic("Delegator must exist")
+        }
+
+        access(self)
+        fun borrowEntry(_ index: Int): &UnstakingEntry {
+            pre {
+                index < self.unstakingEntries.length: "Index must be less than entries length"
+            }
+            return &self.unstakingEntries[index] as &UnstakingEntry
         }
     }
 
