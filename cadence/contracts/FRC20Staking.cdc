@@ -93,8 +93,6 @@ access(all) contract FRC20Staking {
         access(all) view
         fun getDetails(): StakingInfo
 
-        /** ---- Delegators ---- */
-
         /** ---- Rewards ---- */
         /// Returns the reward strategy names
         access(all) view
@@ -104,11 +102,23 @@ access(all) contract FRC20Staking {
         access(all) view
         fun getRewardDetails(_ name: String): RewardDetails?
 
-        /*** Internal Methods */
+        /** ---- Contract Level Methods ---- */
 
         /// Borrow the Pool reference
         access(contract)
         fun borrowSelf(): &Pool
+
+        /** -- Delegators -- */
+
+        /// Claim all unlocked staked changes
+        access(contract)
+        fun claimUnlockedUnstakingChange(
+            delegator: Address
+        ): @FRC20FTShared.Change?
+
+        /// Borrow Delegator Record
+        access(contract)
+        fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord?
     }
 
     access(all) resource Pool: PoolPublic {
@@ -310,7 +320,7 @@ access(all) contract FRC20Staking {
         /// Claim all unlocked staked changes
         ///
         access(contract)
-        fun claimUnlockedStakedChange(
+        fun claimUnlockedUnstakingChange(
             delegator: Address
         ): @FRC20FTShared.Change? {
             let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
@@ -878,9 +888,17 @@ access(all) contract FRC20Staking {
         )
     }
 
+    /// Delegator Private Interface
+    ///
+    access(all) resource interface DelegatorPriv {
+        /// Claim all unlocked staked changes
+        access(all)
+        fun claimUnlockedUnstakingChange(): Bool
+    }
+
     /// Delegator Resource, represents a delegator and store in user's account
     ///
-    access(all) resource Delegator: DelegatorPublic {
+    access(all) resource Delegator: DelegatorPublic, DelegatorPriv {
         access(self)
         let semiNFTcolCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
 
@@ -925,6 +943,13 @@ access(all) contract FRC20Staking {
         fun getStakedNFTIds(tick: String): [UInt64] {
             let colRef = self.borrowSemiNFTCollection()
             return colRef.getIDsByTick(tick: tick)
+        }
+
+        /** ----- Private Methods ----- */
+        /// Claim all unlocked staked changes
+        access(all)
+        fun claimUnlockedUnstakingChange(): Bool {
+
         }
 
         /** ----- Contract Methods ----- */
