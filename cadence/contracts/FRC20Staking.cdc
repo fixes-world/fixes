@@ -82,31 +82,42 @@ access(all) contract FRC20Staking {
         }
     }
 
-    access(all) resource interface StakingPublic {
+    /// Pool Public Interface
+    ///
+    access(all) resource interface PoolPublic {
         /// The ticker name of the FRC20 Staking Pool
         access(all)
         let tick: String
+
         /// Returns the details of the staking pool
         access(all) view
         fun getDetails(): StakingInfo
+
         /** ---- Delegators ---- */
 
         /** ---- Rewards ---- */
         /// Returns the reward strategy names
         access(all) view
         fun getRewardNames(): [String]
+
         /// Returns the reward details of the given name
         access(all) view
         fun getRewardDetails(_ name: String): RewardDetails?
+
+        /*** Internal Methods */
+
+        /// Borrow the Pool reference
+        access(contract)
+        fun borrowSelf(): &Pool
     }
 
-    access(all) resource Staking: StakingPublic {
+    access(all) resource Pool: PoolPublic {
         /// The ticker name of the FRC20 Staking Pool
         access(all)
         let tick:String
         /// The total FRC20 tokens staked in the pool
         access(contract)
-        let totalStaked: @FRC20FTShared.Change
+        var totalStaked: @FRC20FTShared.Change?
         /// The counter for FRC20 tokens unstaking locked in the pool
         access(all)
         var totalUnstakingLocked: UFix64
@@ -123,23 +134,14 @@ access(all) contract FRC20Staking {
         let rewards: @{String: RewardStrategy}
 
         init(
-            _ tick: String,
-            pool: &Pool
+            _ tick: String
         ) {
-            pre {
-                pool.owner?.address != nil: "Pool owner must be set"
-            }
-            let owner = pool.owner?.address!
-
             self.tick = tick
-            self.totalStaked <- FRC20FTShared.createChange(tick: tick, from: owner, balance: 0.0, ftVault: nil)
+            self.totalStaked <- nil
             self.totalUnstakingLocked = 0.0
             self.delegators <- {}
             self.delegatorIDCounter = 0
             self.rewards <- {}
-
-            // emit event
-            emit StakingInitialized(pool: owner, tick: tick)
         }
 
         /// @deprecated after Cadence 1.0
@@ -149,13 +151,28 @@ access(all) contract FRC20Staking {
             destroy self.rewards
         }
 
+        /// Initialize the staking record
+        ///
+        access(all)
+        fun initialize() {
+            pre {
+                self.totalStaked == nil: "Total staked must be nil"
+            }
+            let owner = self.owner?.address ?? panic("Pool owner must exist")
+            self.totalStaked <-! FRC20FTShared.createChange(tick: self.tick, from: owner, balance: 0.0, ftVault: nil)
+
+            // emit event
+            emit StakingInitialized(pool: owner, tick: self.tick)
+        }
+
         /** ---- Public Methods ---- */
 
         access(all) view
         fun getDetails(): StakingInfo {
+            let totalStakedRef = self.borrowTotalStaked()
             return StakingInfo(
                 tick: self.tick,
-                totalStaked: self.totalStaked.getBalance(),
+                totalStaked: totalStakedRef.getBalance(),
                 totalUnstakingLocked: self.totalUnstakingLocked,
                 delegatorsAmount: UInt32(self.delegators.keys.length),
                 rewardStrategies: self.getRewardNames()
@@ -228,7 +245,7 @@ access(all) contract FRC20Staking {
 
             // check if delegator's record exists
             if self.delegators[delegator] == nil {
-                self.addDelegator(<- create DelegatorRecord(
+                self._addDelegator(<- create DelegatorRecord(
                     id: self.delegatorIDCounter,
                     tick: self.tick,
                     address: delegator
@@ -317,8 +334,9 @@ access(all) contract FRC20Staking {
                 // destroy the unlocked staked change
                 destroy unlockedStakedChange
 
+                let totalStakedRef = self.borrowTotalStaked()
                 // withdraw from totalStaked
-                let unstakedChange <- self.totalStaked.withdrawAsChange(amount: amount)
+                let unstakedChange <- totalStakedRef.withdrawAsChange(amount: amount)
 
                 // decrease totalUnstakingLocked
                 self.totalUnstakingLocked = self.totalUnstakingLocked - amount
@@ -338,10 +356,24 @@ access(all) contract FRC20Staking {
 
         /** ---- Internal Methods */
 
+        /// Borrow Staking Reference
+        ///
+        access(contract)
+        fun borrowSelf(): &Pool {
+            return &self as &Pool
+        }
+
+        /// Borrow Staked Change
+        ///
+        access(contract)
+        fun borrowTotalStaked(): &FRC20FTShared.Change {
+            return &self.totalStaked as &FRC20FTShared.Change? ?? panic("Total staked must exist")
+        }
+
         /// Add the Delegator Record
         ///
         access(self)
-        fun addDelegator(_ newRecord: @DelegatorRecord) {
+        fun _addDelegator(_ newRecord: @DelegatorRecord) {
             pre {
                 self.delegators[newRecord.delegator] == nil: "Delegator id already exists"
             }
@@ -362,20 +394,6 @@ access(all) contract FRC20Staking {
                 delegatorID: delegatorID,
                 delegatorAddress: ref.delegator
             )
-        }
-
-        /// Borrow Staking Reference
-        ///
-        access(self)
-        fun borrowSelf(): &Staking {
-            return &self as &Staking
-        }
-
-        /// Borrow Staked Change
-        ///
-        access(self)
-        fun borrowTotalStaked(): &FRC20FTShared.Change {
-            return &self.totalStaked as &FRC20FTShared.Change
         }
     }
 
@@ -683,7 +701,7 @@ access(all) contract FRC20Staking {
             let poolRef = pool.borrow() ?? panic("Pool must exist")
 
             self.name = name
-            self.stakeTick = poolRef.getStakingTickerName()
+            self.stakeTick = poolRef.tick
             self.rewardTick = rewardTick
             self.globalYieldRate = 0.0
 
@@ -719,15 +737,14 @@ access(all) contract FRC20Staking {
                 income.tick == self.rewardTick: "Income tick must match with reward strategy tick"
             }
 
-            let pool = self.poolCap.borrow() ?? panic("Pool must exist")
+            let pool = (self.poolCap.borrow() ?? panic("Pool must exist")).borrowSelf()
 
             let incomeFrom = income.from
             let incomeValue = income.getBalance()
             if incomeValue > 0.0 {
-                let stakingRef = pool.borrowStakingRef()
-
+                let totalStakedRef = pool.borrowTotalStaked()
                 // add to total reward and update global yield rate
-                let totalStakedToken = stakingRef.totalStaked.getBalance()
+                let totalStakedToken = totalStakedRef.getBalance()
                 // update global yield rate
                 self.globalYieldRate = self.globalYieldRate + incomeValue / totalStakedToken
                 // add to total reward
@@ -758,11 +775,11 @@ access(all) contract FRC20Staking {
                 self.owner?.address == self.poolCap.address: "Pool owner must match with reward strategy owner"
                 byNft.getOriginalTick() == self.stakeTick: "NFT tick must match with reward strategy tick"
             }
-            let pool = self.poolCap.borrow() ?? panic("Pool must exist")
+            let pool = (self.poolCap.borrow() ?? panic("Pool must exist")).borrowSelf()
 
             // global info
-            let stakingRef = pool.borrowStakingRef()
-            let totalStakedToken = stakingRef.totalStaked.getBalance()
+            let totalStakedRef = pool.borrowTotalStaked()
+            let totalStakedToken = totalStakedRef.getBalance()
             let totalRewardBalance = self.totalReward.getBalance()
 
             // related addreses info
@@ -825,80 +842,6 @@ access(all) contract FRC20Staking {
         access(self)
         fun borrowSelf(): &RewardStrategy {
             return &self as &RewardStrategy
-        }
-    }
-
-    /// Staking Pool Public Interface
-    ///
-    access(all) resource interface PoolPublic {
-        // ---- Public read methods ----
-        access(all) view
-        fun getStakingTickerName(): String
-
-        // ---- Operations ----
-
-
-        // ---- Contract level methods ----
-
-        access(contract)
-        fun borrowStakingRef(): &Staking
-    }
-
-    /// Staking Pool Resource, represents a staking pool and store in platform staking pool child account
-    ///
-    access(all) resource Pool: PoolPublic {
-        /// The ticker name of the FRC20 Staking Pool
-        access(all)
-        let tick:String
-        /// The total FRC20 tokens staked in the pool
-        access(contract)
-        var record: @Staking?
-
-        init(
-            tick: String
-        ) {
-            self.tick = tick
-            self.record <- nil
-        }
-
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.record
-        }
-
-        /// Initialize the staking record
-        ///
-        access(all)
-        fun initialize() {
-            pre {
-                self.record == nil: "Staking record must not exist"
-            }
-            self.record <-! create Staking(self.tick, pool: self.borrowSelf())
-        }
-
-        /** ---- Public Methods ---- */
-
-        /// The ticker name of the FRC20 market
-        ///
-        access(all) view
-        fun getStakingTickerName(): String {
-            return self.tick
-        }
-
-        /** ---- Internal Methods ---- */
-
-        /// Borrow Staking Record
-        ///
-        access(contract)
-        fun borrowStakingRef(): &Staking {
-            return &self.record as &Staking? ?? panic("Staking record must exist")
-        }
-
-        /// Borrow Pool Reference
-        ///
-        access(self)
-        fun borrowSelf(): &Pool {
-            return &self as &Pool
         }
     }
 
@@ -996,9 +939,8 @@ access(all) contract FRC20Staking {
             let from = stakedChange.from
             let pool = FRC20Staking.borrowPool(from)
                 ?? panic("Pool must exist")
-            let stakeTick = pool.getStakingTickerName()
             assert(
-                stakeTick == stakedChange.getOriginalTick(),
+                pool.tick == stakedChange.getOriginalTick(),
                 message: "Staked change tick must match"
             )
             // deposit
