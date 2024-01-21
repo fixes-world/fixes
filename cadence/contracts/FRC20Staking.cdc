@@ -197,24 +197,10 @@ access(all) contract FRC20Staking {
             return nil
         }
 
-        /** ---- Contract Level Methods ----- */
-
-        /// Borrow Delegator Record
-        ///
-        access(contract)
-        fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord? {
-            return &self.delegators[addr] as &DelegatorRecord?
-        }
-
-        /// Borrow Reward Strategy
-        ///
-        access(contract)
-        fun borrowRewardStrategy(_ name: String): &RewardStrategy? {
-            return &self.rewards[name] as &RewardStrategy?
-        }
+        /** ---- Account Level Methods ----- */
 
         /// register reward strategy
-        access(contract)
+        access(account)
         fun registerRewardStrategy(_ strategy: @RewardStrategy) {
             pre {
                 self.rewards[strategy.name] == nil: "Reward strategy name already exists"
@@ -234,7 +220,7 @@ access(all) contract FRC20Staking {
 
         /// Stake FRC20 token
         ///
-        access(contract)
+        access(account)
         fun stake(_ change: @FRC20FTShared.Change) {
             pre {
                 change.tick == self.tick: "Staked change tick must match"
@@ -286,7 +272,7 @@ access(all) contract FRC20Staking {
 
         /// Unstake FRC20 token
         ///
-        access(contract)
+        access(account)
         fun unstake(
             _ semiNFTCol: &FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection},
             nftId: UInt64
@@ -318,6 +304,8 @@ access(all) contract FRC20Staking {
             // save the nft to unstaking queue in delegator record
             delegatorRecordRef.addUnstakingEntry(<- nft)
         }
+
+        /** ---- Contract Level Methods ----- */
 
         /// Claim all unlocked staked changes
         ///
@@ -354,7 +342,19 @@ access(all) contract FRC20Staking {
             return nil
         }
 
-        /** ---- Internal Methods */
+        /// Borrow Delegator Record
+        ///
+        access(contract)
+        fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord? {
+            return &self.delegators[addr] as &DelegatorRecord?
+        }
+
+        /// Borrow Reward Strategy
+        ///
+        access(contract)
+        fun borrowRewardStrategy(_ name: String): &RewardStrategy? {
+            return &self.rewards[name] as &RewardStrategy?
+        }
 
         /// Borrow Staking Reference
         ///
@@ -369,6 +369,8 @@ access(all) contract FRC20Staking {
         fun borrowTotalStaked(): &FRC20FTShared.Change {
             return &self.totalStaked as &FRC20FTShared.Change? ?? panic("Total staked must exist")
         }
+
+        /** ---- Internal Methods */
 
         /// Add the Delegator Record
         ///
