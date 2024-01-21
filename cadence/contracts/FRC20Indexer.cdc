@@ -184,6 +184,9 @@ access(all) contract FRC20Indexer {
         /// Cancel a listed order
         access(account)
         fun cancelListing(listedIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
+        /// Withdraw amount of a FRC20 token by a FRC20 inscription
+        access(account)
+        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change
         /// Return the change of a FRC20 order back to the owner
         access(account)
         fun returnChange(change: @FRC20FTShared.Change)
@@ -1077,6 +1080,38 @@ access(all) contract FRC20Indexer {
 
             // call the return change method
             self.returnChange(change: <- change)
+        }
+
+        /// Withdraw amount of a FRC20 token by a FRC20 inscription
+        ///
+        access(account)
+        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "withdraw" && meta["tick"] != nil && meta["amt"] != nil && meta["usage"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for transfer"
+            )
+
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let usage = meta["usage"]! // usage can be "staking"
+            assert(
+                usage == "staking",
+                message: "The usage should be 'staking'"
+            )
+            let fromAddr = ins.owner!.address
+
+            return <- self._withdrawToTokenChange(
+                tick: tick,
+                fromAddr: fromAddr,
+                amt: amt
+            )
         }
 
         /// Return the change of a FRC20 order back to the owner
