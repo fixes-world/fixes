@@ -33,6 +33,12 @@ access(all) contract FRC20FTShared {
         storefront: Address,
         listingId: UInt64,
     )
+    /// The event that is emitted when a heartbeat is occurred
+    access(all) event TransactionHooksOnHeartbeat(
+        hooksOwner: Address,
+        executedHookType: Type,
+        deltaTime: UFix64,
+    )
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -846,6 +852,14 @@ access(all) contract FRC20FTShared {
         ) {
             log("Default Empty Transaction Hook")
         }
+
+        /// The methods that is invoked when the heartbeat is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            log("Default Empty Transaction Hook")
+        }
     }
 
     access(account)
@@ -923,7 +937,47 @@ access(all) contract FRC20FTShared {
             if hooksOwnerAddr == nil {
                 return
             }
+            // iterate all hooks
+            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+                // call hook
+                ref.onDeal(storefront: storefront, listingId: listingId, seller: seller, buyer: buyer, tick: tick, dealAmount: dealAmount, dealPrice: dealPrice, totalAmountInListing: totalAmountInListing)
 
+                // emit event
+                emit TransactionHooksOnDeal(
+                    hooksOwner: hooksOwnerAddr!,
+                    executedHookType: type,
+                    storefront: storefront,
+                    listingId: listingId,
+                )
+            })
+        }
+
+        /// The methods that is invoked when the heartbeat is executed
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            let hooksOwnerAddr = self.owner?.address
+            if hooksOwnerAddr == nil {
+                return
+            }
+            // iterate all hooks
+            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+                // call hook
+                ref.onHeartbeat(deltaTime)
+
+                // emit event
+                emit TransactionHooksOnHeartbeat(
+                    hooksOwner: hooksOwnerAddr!,
+                    executedHookType: type,
+                    deltaTime: deltaTime,
+                )
+            })
+        }
+
+        /// Iterate all hooks
+        ///
+        access(self)
+        fun _iterateHooks(_ func: ((Type, &AnyResource{FRC20FTShared.TransactionHook}): Void)) {
             // call all hooks
             for type in self.hooks.keys {
                 // check if the hook type is validated
@@ -936,20 +990,11 @@ access(all) contract FRC20FTShared {
                     if !valid {
                         continue
                     }
-                    if let ref = hookCap.borrow() {
-                        // call hook
-                        ref.onDeal(storefront: storefront, listingId: listingId, seller: seller, buyer: buyer, tick: tick, dealAmount: dealAmount, dealPrice: dealPrice, totalAmountInListing: totalAmountInListing)
-
-                        // emit event
-                        emit TransactionHooksOnDeal(
-                            hooksOwner: hooksOwnerAddr!,
-                            executedHookType: type,
-                            storefront: storefront,
-                            listingId: listingId,
-                        )
+                    if let ref: &AnyResource{FRC20FTShared.TransactionHook} = hookCap.borrow() {
+                        func(type, ref)
                     }
                 }
-            }
+            } // end for
         }
     }
 
