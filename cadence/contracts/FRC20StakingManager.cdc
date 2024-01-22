@@ -12,9 +12,10 @@ import "MetadataViews"
 import "Fixes"
 import "FRC20Indexer"
 import "FRC20FTShared"
+import "FRC20SemiNFT"
 import "FRC20AccountsPool"
 import "FRC20Staking"
-import "FRC20SemiNFT"
+import "FRC20StakingForwarder"
 
 access(all) contract FRC20StakingManager {
     /* --- Events --- */
@@ -138,7 +139,6 @@ access(all) contract FRC20StakingManager {
         access(all)
         fun registerRewardStrategy(
             stakeTick: String,
-            strategyName: String,
             rewardTick: String,
         ) {
             pre {
@@ -154,7 +154,7 @@ access(all) contract FRC20StakingManager {
                 ?? panic("The staking pool is not found")
 
             assert(
-                pool.getRewardDetails(strategyName) == nil,
+                pool.getRewardDetails(rewardTick) == nil,
                 message: "The reward strategy is already registered"
             )
             assert(
@@ -162,10 +162,7 @@ access(all) contract FRC20StakingManager {
                 message: "The staking pool tick is not the same as the requested"
             )
 
-            pool.registerRewardStrategy(
-                name: strategyName,
-                rewardTick: rewardTick
-            )
+            pool.registerRewardStrategy(rewardTick: rewardTick)
         }
     }
 
@@ -184,6 +181,7 @@ access(all) contract FRC20StakingManager {
         // - FRC20Staking.Pool: Pool resource
         // - FRC20FTShared.SharedStore: Staking Pool configuration
         // - FRC20FTShared.Hooks: Hooks for the staking pool
+        // - FRC20StakingForwarder.Forwarder: Forward $FLOW to the staking pool
 
         if let pool = childAcctRef.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath) {
             assert(
@@ -226,6 +224,36 @@ access(all) contract FRC20StakingManager {
 
         // TODO: Add more hooks
 
+        // --- Forwarder ---
+        // This is the standard receiver path of FlowToken
+        let flowReceiverPath = /public/flowTokenReceiver
+        // check if the forwarder is already created
+        if childAcctRef.borrow<&AnyResource>(from: FRC20StakingForwarder.StakingForwarderStoragePath) == nil {
+            let forwarder <- FRC20StakingForwarder.createNewForwarder(childAcctRef.address)
+            childAcctRef.save(<- forwarder, to: FRC20StakingForwarder.StakingForwarderStoragePath)
+
+            // link public interface
+            childAcctRef.link<&FRC20StakingForwarder.Forwarder{FRC20StakingForwarder.ForwarderPublic}>(
+                FRC20StakingForwarder.StakingForwarderPublicPath,
+                target: FRC20StakingForwarder.StakingForwarderStoragePath
+            )
+
+            isUpdated = true || isUpdated
+        }
+
+         // Unlink the existing receiver capability for flowReceiverPath
+        if childAcctRef.getCapability(flowReceiverPath).check<&{FungibleToken.Receiver}>() {
+            // link the forwarder to the public path
+            childAcctRef.unlink(flowReceiverPath)
+            // Link the new forwarding receiver capability
+            childAcctRef.link<&{FungibleToken.Receiver}>(flowReceiverPath, target: FRC20StakingForwarder.StakingForwarderStoragePath)
+            // link the FlowToken to the forwarder fallback path
+            let fallbackPath = FRC20StakingForwarder.getFallbackFlowTokenPublicPath()
+            childAcctRef.unlink(fallbackPath)
+            childAcctRef.link<&FlowToken.Vault{FungibleToken.Receiver, FungibleToken.Balance}>(fallbackPath, target: /storage/flowTokenVault)
+
+            isUpdated = true || isUpdated
+        }
         return isUpdated
     }
 

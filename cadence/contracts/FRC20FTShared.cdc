@@ -533,6 +533,24 @@ access(all) contract FRC20FTShared {
         )
     }
 
+    /// Create a new Change by some FungibleToken
+    ///
+    access(account)
+    fun wrapFungibleVaultChange(
+        ftVault: @FungibleToken.Vault,
+        from: Address,
+    ): @Change {
+        let tick = ftVault.isInstance(Type<@FlowToken.Vault>())
+            ? ""
+            : ftVault.getType().identifier
+        return <- self.createChange(
+            tick: tick,
+            from: from,
+            balance: nil,
+            ftVault: <- ftVault
+        )
+    }
+
     /// Deposit one Change to another Change
     /// Only the owner of the account can call this method
     ///
@@ -558,15 +576,13 @@ access(all) contract FRC20FTShared {
             } else {
                 // withdraw from the input Change
                 let extracted = change.extract()
-                // create a same source Change
-                let newChange <- self.createChange(
+                // create a same source Change and deposit to the receiver
+                receiver.merge(from: <- self.createChange(
                     tick: receiver.tick,
                     from: receiver.from,
                     balance: extracted,
                     ftVault: nil
-                )
-                // deposit to the receiver
-                receiver.merge(from: <- newChange)
+                ))
             }
             // destroy the input Change
             destroy change

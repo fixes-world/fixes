@@ -61,7 +61,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         let poolAddress: Address
         // The reward strategy name
         access(all)
-        let rewardStrategy: String
+        let rewardTick: String
         // The last claimed time
         access(all)
         var lastClaimedTime: UInt64
@@ -74,10 +74,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
         init (
             address: Address,
-            name: String,
+            rewardTick: String,
         ) {
             self.poolAddress = address
-            self.rewardStrategy = name
+            self.rewardTick = rewardTick
             self.lastClaimedTime = 0
             self.lastGlobalYieldRate = 0.0
             self.totalClaimedAmount = 0.0
@@ -337,7 +337,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                         // update claiming record
                         let recordRef = self._borrowOrCreateClaimingRecord(
                             poolAddress: otherRecordRef.poolAddress,
-                            rewardStrategy: otherRecordRef.rewardStrategy
+                            rewardTick: otherRecordRef.rewardTick
                         )
                         // calculate the new claiming record
                         var newGlobalYieldRate = 0.0
@@ -348,9 +348,9 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                         let newLastClaimedTime = recordRef.lastClaimedTime > otherRecordRef.lastClaimedTime ? recordRef.lastClaimedTime : otherRecordRef.lastClaimedTime
 
                         // update the record
-                        self.updateClaimingRecord(
+                        self._updateClaimingRecord(
                             poolAddress: otherRecordRef.poolAddress,
-                            rewardStrategy: otherRecordRef.rewardStrategy,
+                            rewardTick: otherRecordRef.rewardTick,
                             currentGlobalYieldRate: newGlobalYieldRate,
                             currentTime: newLastClaimedTime,
                             amount: otherRecordRef.totalClaimedAmount,
@@ -410,18 +410,18 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                     if let recordRef = self._borrowClaimingRecord(name) {
                         let splitAmount = recordRef.totalClaimedAmount * percent
                         // update the record for current NFT
-                        self.updateClaimingRecord(
+                        self._updateClaimingRecord(
                             poolAddress: recordRef.poolAddress,
-                            rewardStrategy: recordRef.rewardStrategy,
+                            rewardTick: recordRef.rewardTick,
                             currentGlobalYieldRate: recordRef.lastGlobalYieldRate,
                             currentTime: recordRef.lastClaimedTime,
                             amount: splitAmount,
                             isSubtract: true
                         )
                         // update the record for new NFT
-                        newNFT.updateClaimingRecord(
+                        newNFT._updateClaimingRecord(
                             poolAddress: recordRef.poolAddress,
-                            rewardStrategy: recordRef.rewardStrategy,
+                            rewardTick: recordRef.rewardTick,
                             currentGlobalYieldRate: recordRef.lastGlobalYieldRate,
                             currentTime: recordRef.lastClaimedTime,
                             amount: splitAmount,
@@ -458,13 +458,13 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(account)
         fun onClaimingReward(
             poolAddress: Address,
-            rewardStrategy: String,
+            rewardTick: String,
             amount: UFix64,
             currentGlobalYieldRate: UFix64
         ) {
-            self.updateClaimingRecord(
+            self._updateClaimingRecord(
                 poolAddress: poolAddress,
-                rewardStrategy: rewardStrategy,
+                rewardTick: rewardTick,
                 currentGlobalYieldRate: currentGlobalYieldRate,
                 currentTime: nil,
                 amount: amount,
@@ -472,12 +472,14 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             )
         }
 
+        /** Internal Method */
+
         /// Update the claiming record
         ///
-        access(account)
-        fun updateClaimingRecord(
+        access(contract)
+        fun _updateClaimingRecord(
             poolAddress: Address,
-            rewardStrategy: String,
+            rewardTick: String,
             currentGlobalYieldRate: UFix64,
             currentTime: UInt64?,
             amount: UFix64,
@@ -489,7 +491,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             // update claiming record
             let recordRef = self._borrowOrCreateClaimingRecord(
                 poolAddress: poolAddress,
-                rewardStrategy: rewardStrategy
+                rewardTick: rewardTick
             )
             recordRef.updateClaiming(currentGlobalYieldRate: currentGlobalYieldRate, time: currentTime)
 
@@ -504,14 +506,12 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 id: self.id,
                 tick: self.getOriginalTick(),
                 pool: poolAddress,
-                strategy: rewardStrategy,
+                strategy: rewardTick,
                 time: recordRef.lastClaimedTime,
                 globalYieldRate: recordRef.lastGlobalYieldRate,
                 totalClaimedAmount: recordRef.totalClaimedAmount
             )
         }
-
-        /** Internal Method */
 
         /// Borrow the wrapped FRC20FTShared.Change
         ///
@@ -525,13 +525,13 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(self)
         fun _borrowOrCreateClaimingRecord(
             poolAddress: Address,
-            rewardStrategy: String
+            rewardTick: String
         ): &RewardClaimRecord {
-            let uniqueName = self.buildUniqueName(poolAddress, rewardStrategy)
+            let uniqueName = self.buildUniqueName(poolAddress, rewardTick)
             if self.claimingRecords[uniqueName] == nil {
                 self.claimingRecords[uniqueName] = RewardClaimRecord(
                     address: self.wrappedChange.from,
-                    name: uniqueName,
+                    rewardTick: rewardTick,
                 )
             }
             return self._borrowClaimingRecord(uniqueName) ?? panic("Claiming record must exist")

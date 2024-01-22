@@ -1217,11 +1217,9 @@ access(all) contract FRC20Indexer {
                 message: "The amount should be equal to the balance of the vault"
             )
             // return the change
-            return <- FRC20FTShared.createChange(
-                tick: "", // empty tick means this change is a FLOW token change
+            return <- FRC20FTShared.wrapFungibleVaultChange(
+                ftVault: <- vault,
                 from: ins.owner!.address, // Pay $FLOW to the buyer and get the FRC20 token
-                balance: nil,
-                ftVault: <- vault
             )
         }
 

@@ -21,11 +21,11 @@ access(all) contract FRC20Staking {
     /// Event emitted when the staking pool is created
     access(all) event StakingInitialized(pool: Address, tick: String)
     /// Event emitted when the reward strategy is created
-    access(all) event RewardStrategyInitialized(pool: Address, name: String, tick: String, ftVaultType: String?)
+    access(all) event RewardStrategyInitialized(pool: Address, stakeTick: String, rewardTick: String, ftVaultType: String?)
     /// Event emitted when the reward strategy is added
-    access(all) event RewardStrategyAdded(pool: Address, strategyName: String, stakeTick: String, rewardTick: String)
+    access(all) event RewardStrategyAdded(pool: Address, stakeTick: String, rewardTick: String)
     /// Event emitted when the reward income is added
-    access(all) event RewardIncomeAdded(pool: Address, name: String, tick: String, amount: UFix64, from: Address)
+    access(all) event RewardIncomeAdded(pool: Address, tick: String, amount: UFix64, from: Address)
     /// Event emitted when the delegator record is added
     access(all) event DelegatorRecordAdded(pool: Address, tick: String, delegatorID: UInt32, delegatorAddress: Address)
     /// Event emitted when the delegator staked FRC20 token
@@ -37,7 +37,7 @@ access(all) contract FRC20Staking {
     /// Event emitted when the delegator unstaked FRC20 token
     access(all) event DelegatorUnStaked(pool: Address, tick: String, delegatorID: UInt32, delegatorAddress: Address, amount: UFix64)
     /// Event emitted when the delegator claim status is updated
-    access(all) event DelegatorClaimedReward(pool: Address, strategyName: String, stakeTick: String, rewardTick: String, amount: UFix64, yieldAdded: UFix64)
+    access(all) event DelegatorClaimedReward(pool: Address, stakeTick: String, rewardTick: String, amount: UFix64, yieldAdded: UFix64)
     /// Event emitted when the delegator received staked FRC20 token
     access(all) event DelegatorStakedTokenDeposited(tick: String, pool: Address, receiver: Address, amount: UFix64, semiNftId: UInt64)
 
@@ -100,13 +100,17 @@ access(all) contract FRC20Staking {
 
         /// Returns the reward details of the given name
         access(all) view
-        fun getRewardDetails(_ name: String): RewardDetails?
+        fun getRewardDetails(_ rewardTick: String): RewardDetails?
 
         /** -- Rewards: Account Level Methods -- */
 
         /// register reward strategy
         access(account)
-        fun registerRewardStrategy(name: String, rewardTick: String)
+        fun registerRewardStrategy(rewardTick: String)
+
+        /// Borrow the Reward Strategy
+        access(account)
+        fun borrowRewardStrategy(_ rewardTick: String): &RewardStrategy?
 
         /** -- Delegators: Account Level Methods -- */
 
@@ -219,13 +223,13 @@ access(all) contract FRC20Staking {
         }
 
         access(all) view
-        fun getRewardDetails(_ name: String): RewardDetails? {
-            if let reward = self.borrowRewardStrategy(name) {
+        fun getRewardDetails(_ rewardTick: String): RewardDetails? {
+            if let reward = self.borrowRewardStrategy(rewardTick) {
                 return RewardDetails(
-                    name: reward.name,
                     stakeTick: reward.stakeTick,
+                    totalReward: reward.totalReward.getBalance(),
+                    globalYieldRate: reward.globalYieldRate,
                     rewardTick: reward.rewardTick,
-                    totalReward: reward.totalReward.getBalance()
                 )
             }
             return nil
@@ -236,22 +240,20 @@ access(all) contract FRC20Staking {
         /// register reward strategy
         ///
         access(account)
-        fun registerRewardStrategy(name: String, rewardTick: String) {
+        fun registerRewardStrategy(rewardTick: String) {
             pre {
-                self.rewards[name] == nil: "Reward strategy name already exists"
+                self.rewards[rewardTick] == nil: "Reward strategy name already exists"
             }
             let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
             let strategy <- create RewardStrategy(
                 pool: FRC20Staking.getPoolCap(poolAddr),
-                name: name,
                 rewardTick: rewardTick
             )
-            self.rewards[name] <-! strategy
+            self.rewards[rewardTick] <-! strategy
 
             // emit event
             emit RewardStrategyAdded(
                 pool: self.owner?.address ?? panic("Reward owner must exist"),
-                strategyName: name,
                 stakeTick: self.tick,
                 rewardTick: rewardTick
             )
@@ -379,6 +381,13 @@ access(all) contract FRC20Staking {
             return nil
         }
 
+        /// Borrow Reward Strategy
+        ///
+        access(account)
+        fun borrowRewardStrategy(_ rewardTick: String): &RewardStrategy? {
+            return &self.rewards[rewardTick] as &RewardStrategy?
+        }
+
         /** ---- Contract Level Methods ----- */
 
         /// Borrow Delegator Record
@@ -386,13 +395,6 @@ access(all) contract FRC20Staking {
         access(contract)
         fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord? {
             return &self.delegators[addr] as &DelegatorRecord?
-        }
-
-        /// Borrow Reward Strategy
-        ///
-        access(contract)
-        fun borrowRewardStrategy(_ name: String): &RewardStrategy? {
-            return &self.rewards[name] as &RewardStrategy?
         }
 
         /// Borrow Staking Reference
@@ -669,33 +671,40 @@ access(all) contract FRC20Staking {
     ///
     access(all) struct RewardDetails {
         access(all)
-        let name: String
-        access(all)
         let stakeTick: String
+        access(all)
+        let totalReward: UFix64
+        access(all)
+        let globalYieldRate: UFix64
         access(all)
         let rewardTick: String
         access(all)
-        let totalReward: UFix64
+        let rewardVaultType: Type?
 
         init(
-            name: String,
             stakeTick: String,
+            totalReward: UFix64,
+            globalYieldRate: UFix64,
             rewardTick: String,
-            totalReward: UFix64
         ) {
-            self.name = name
             self.stakeTick = stakeTick
-            self.rewardTick = rewardTick
             self.totalReward = totalReward
+            self.globalYieldRate = globalYieldRate
+            self.rewardTick = rewardTick
+
+            if rewardTick == "" {
+                self.rewardVaultType = Type<@FlowToken.Vault>()
+            } else if rewardTick.slice(from: 0, upTo: 2) == "A." {
+                self.rewardVaultType = CompositeType(rewardTick)
+            } else {
+                self.rewardVaultType = nil
+            }
         }
     }
 
     /// Reward strategy Public Interface
     ///
     access(all) resource interface RewardStrategyPublic {
-        /// The name of the reward strategy
-        access(all)
-        let name: String
         /// The ticker name of staking pool
         access(all)
         let stakeTick: String
@@ -703,7 +712,7 @@ access(all) contract FRC20Staking {
         access(all)
         let rewardTick: String
         /// The global yield rate of the reward strategy
-        access(contract)
+        access(account)
         var globalYieldRate: UFix64
     }
 
@@ -712,60 +721,58 @@ access(all) contract FRC20Staking {
     access(all) resource RewardStrategy: RewardStrategyPublic {
         access(self)
         let poolCap: Capability<&Pool{PoolPublic}>
-        /// The name of the reward strategy
-        access(all)
-        let name: String
         /// The ticker name of staking pool
         access(all)
         let stakeTick: String
         /// The ticker name of reward
         access(all)
         let rewardTick: String
+        /// The global yield rate of the reward strategy
+        access(account)
+        var globalYieldRate: UFix64
         /// The reward change, can be any FRC20 token or Flow FT
         access(contract)
         let totalReward: @FRC20FTShared.Change
-        /// The global yield rate of the reward strategy
-        access(contract)
-        var globalYieldRate: UFix64
 
         init(
             pool: Capability<&Pool{PoolPublic}>,
-            name: String,
             rewardTick: String,
         ) {
             pre {
                 pool.check(): "Pool must be valid"
             }
-            // Singleton
-            let frc20Indexer = FRC20Indexer.getIndexer()
-            assert(
-                frc20Indexer.getTokenMeta(tick: rewardTick) != nil,
-                message: "Reward tick must be valid"
-            )
 
             self.poolCap = pool
             let poolRef = pool.borrow() ?? panic("Pool must exist")
 
-            self.name = name
             self.stakeTick = poolRef.tick
             self.rewardTick = rewardTick
             self.globalYieldRate = 0.0
 
             // current only support FlowToken
-            let isFtVault = rewardTick == ""
+            let isFtVault = rewardTick == "" || rewardTick.slice(from: 0, upTo: 2) == "A."
             /// create empty change
             if isFtVault {
-                // TODO: support other Flow FT
+                assert(
+                    rewardTick == "" || rewardTick == Type<@FlowToken.Vault>().identifier,
+                    message: "Currently only FlowToken.Vault is supported"
+                )
                 self.totalReward <- FRC20FTShared.createEmptyFlowChange(from: pool.address)
             } else {
+                // Singleton
+                let frc20Indexer = FRC20Indexer.getIndexer()
+                assert(
+                    frc20Indexer.getTokenMeta(tick: rewardTick) != nil,
+                    message: "Reward tick must be valid"
+                )
                 self.totalReward <- FRC20FTShared.createEmptyFRC20Change(tick: rewardTick, from: pool.address)
             }
 
             // emit event
             emit RewardStrategyInitialized(
                 pool: pool.address,
-                name: name,
-                tick: rewardTick,
+                stakeTick: poolRef.tick,
+                rewardTick: rewardTick,
                 ftVaultType: isFtVault ? self.totalReward.getVaultType()?.identifier! : nil
             )
         }
@@ -802,7 +809,6 @@ access(all) contract FRC20Staking {
                 // emit event
                 emit RewardIncomeAdded(
                     pool: pool.owner?.address!,
-                    name: self.name,
                     tick: self.rewardTick,
                     amount: incomeValue,
                     from: incomeFrom
@@ -835,7 +841,7 @@ access(all) contract FRC20Staking {
             // delegator info
             let delegatorRef = FRC20Staking.borrowDelegator(delegator)
                 ?? panic("Delegator must exist")
-            let strategyUniqueName = byNft.buildUniqueName(poolAddr, self.name)
+            let strategyUniqueName = byNft.buildUniqueName(poolAddr, self.rewardTick)
             let claimingRecord = byNft.getClaimingRecord(strategyUniqueName)
 
             // calculate reward
@@ -867,7 +873,6 @@ access(all) contract FRC20Staking {
             // emit event
             emit DelegatorClaimedReward(
                 pool: self.owner?.address ?? panic("Reward owner must exist"),
-                strategyName: self.name,
                 stakeTick: self.stakeTick,
                 rewardTick: self.rewardTick,
                 amount: yieldReward,
@@ -1003,7 +1008,6 @@ access(all) contract FRC20Staking {
             currentGlobalYieldRate: UFix64
         ) {
             let pool = reward.owner?.address ?? panic("Reward owner must exist")
-            let name = reward.name
 
             // borrow the nft from semiNFT collection
             let semiNFTCol = self.borrowSemiNFTCollection()
@@ -1013,7 +1017,7 @@ access(all) contract FRC20Staking {
             // update the claiming record
             stakedNFT.onClaimingReward(
                 poolAddress: pool,
-                rewardStrategy: name,
+                rewardTick: reward.rewardTick,
                 amount: amount,
                 currentGlobalYieldRate: currentGlobalYieldRate
             )
