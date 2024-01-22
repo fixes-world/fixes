@@ -55,13 +55,13 @@ access(all) contract FRC20AccountsPool {
         fun getFRC20Addresses(type: ChildAccountType): {String: Address}
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
+        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
+        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
         /// Returns the address of the FRC20 market for the given tick
         access(all)
-        fun borrowMarketSharedFlowTokenReceiver(): &FlowToken.Vault{FungibleToken.Receiver}?
+        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}?
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
@@ -147,7 +147,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}? {
+        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20MarketAddress(tick: tick) {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
@@ -156,7 +156,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}? {
+        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20StakingAddress(tick: tick) {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
@@ -165,7 +165,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the address of the FRC20 market for the given tick
         access(all)
-        fun borrowMarketSharedFlowTokenReceiver(): &FlowToken.Vault{FungibleToken.Receiver}? {
+        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}? {
             if let addr = self.getMarketSharedAddress() {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }

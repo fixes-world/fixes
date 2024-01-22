@@ -245,7 +245,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                     // Royalties for FRC20SemiNFT is 5% to Deployer account
                     let deployerAddr = FRC20SemiNFT.account.address
                     let flowCap = getAccount(deployerAddr)
-                        .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                        .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                     return MetadataViews.Royalties([
                         MetadataViews.Royalty(
                             receiver: flowCap,

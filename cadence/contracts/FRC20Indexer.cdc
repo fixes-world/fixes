@@ -384,7 +384,7 @@ access(all) contract FRC20Indexer {
         access(all)
         fun sponsorship(
             amount: UFix64,
-            to: Capability<&FlowToken.Vault{FungibleToken.Receiver}>,
+            to: Capability<&{FungibleToken.Receiver}>,
             forTick: String,
         ) {
             pre {
@@ -409,6 +409,11 @@ access(all) contract FRC20Indexer {
 
             let flowReceiver = to.borrow()
                 ?? panic("The receiver should be a valid capability")
+            let supportedTypes = flowReceiver.getSupportedVaultTypes()
+            assert(
+                supportedTypes[Type<@FlowToken.Vault>()] == true,
+                message: "The receiver should support the $FLOW vault"
+            )
 
             let flowExtracted <- platformPool.withdraw(amount: amount)
             let sponsorAmt = flowExtracted.balance
@@ -1078,6 +1083,11 @@ access(all) contract FRC20Indexer {
             // deposit the token change return to change's from address
             let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
                 ?? panic("The flow receiver no found")
+            let supportedTypes = flowReceiver.getSupportedVaultTypes()
+            assert(
+                supportedTypes[Type<@FlowToken.Vault>()] == true,
+                message: "The receiver should support the $FLOW vault"
+            )
             // extract inscription and return flow in the inscription to the owner
             flowReceiver.deposit(from: <- listedIns.extract())
 
@@ -1172,6 +1182,11 @@ access(all) contract FRC20Indexer {
                 // deposit the token change return to change's from address
                 let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
                     ?? panic("The flow receiver no found")
+                let supportedTypes = flowReceiver.getSupportedVaultTypes()
+                assert(
+                    supportedTypes[Type<@FlowToken.Vault>()] == true,
+                    message: "The receiver should support the $FLOW vault"
+                )
                 flowReceiver.deposit(from: <- (flowVault as! @FlowToken.Vault))
                 destroy change
             } else if !change.isBackedByVault() {
@@ -1272,7 +1287,7 @@ access(all) contract FRC20Indexer {
             if sellerAddress != nil {
                 // borrow the receiver reference
                 let flowTokenReceiver = getAccount(sellerAddress!)
-                    .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                    .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 assert(
                     flowTokenReceiver.check(),
                     message: "Could not borrow receiver reference to the seller's Vault"
@@ -1510,9 +1525,9 @@ access(all) contract FRC20Indexer {
     access(all)
     fun borrowFlowTokenReceiver(
         _ addr: Address
-    ): &FlowToken.Vault{FungibleToken.Receiver}? {
+    ): &{FungibleToken.Receiver}? {
         let cap = getAccount(addr)
-            .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
         return cap.borrow()
     }
 

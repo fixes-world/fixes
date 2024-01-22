@@ -837,7 +837,7 @@ access(all) contract FRC20Storefront {
         fun _payToSaleCuts(
             payment: @FlowToken.Vault,
             commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
-            paymentRecipient: &FlowToken.Vault{FungibleToken.Receiver}?,
+            paymentRecipient: &{FungibleToken.Receiver}?,
         ): UFix64 {
             // Some singleton resources
             let frc20Indexer = FRC20Indexer.getIndexer()
@@ -929,7 +929,7 @@ access(all) contract FRC20Storefront {
             // Rather than aborting the transaction if any receiver is absent when we try to pay it,
             // we send the cut to the token or platform treasury, and emit an event to let the
             // receiver know that they have unclaimed funds.
-            var residualReceiver: &FlowToken.Vault{FungibleToken.Receiver}? = nil
+            var residualReceiver: &{FungibleToken.Receiver}? = nil
 
             // The commission amount
             var commissionAmount = 0.0
