@@ -451,16 +451,39 @@ access(all) contract FRC20StakingManager {
         )
 
         let fromAddr = ins.owner?.address ?? panic("The inscription owner is not found")
-        let rewardTick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+        let insTick = meta["tick"]?.toLower()
+
+        var rewardStrategy: &FRC20Staking.RewardStrategy? = nil
+        if insTick == nil || insTick == "" {
+            rewardStrategy = stakingPool.borrowRewardStrategy("")
+        } else {
+            rewardStrategy = stakingPool.borrowRewardStrategy(insTick!)
+        }
         // Check if the reward strategy is registered
-        let rewardStrategy = stakingPool.borrowRewardStrategy(rewardTick)
-            ?? panic("The reward strategy is not registered")
+        assert(
+            rewardStrategy != nil,
+            message: "The reward strategy is not registered"
+        )
+        // the final reward tick
+        let rewardTick = rewardStrategy!.rewardTick
 
         // Withdraw the frc20 tokens, will validate the inscription
-        let changeToStake <- frc20Indexer.withdrawChange(ins: ins)
-        let amountToDonate = changeToStake.getBalance()
+        var changeToDonate: @FRC20FTShared.Change? <- nil
+        if rewardTick == "" {
+            changeToDonate <-! frc20Indexer.extractFlowVaultChangeFromInscription(
+                ins,
+                amount: ins.getInscriptionValue() - ins.getMinCost()
+            )
+        } else {
+            changeToDonate <-! frc20Indexer.withdrawChange(ins: ins)
+        }
+        let amountToDonate = changeToDonate?.getBalance() ?? 0.0
+        assert(
+            amountToDonate > 0.0,
+            message: "The amount to donate should be greater than zero"
+        )
         // Donate the tokens
-        rewardStrategy.addIncome(income: <- changeToStake)
+        rewardStrategy!.addIncome(income: <- (changeToDonate ?? panic("The change to donate is not found")))
 
         // emit the event
         emit StakingPoolDonated(
