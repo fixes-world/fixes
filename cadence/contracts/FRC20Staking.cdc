@@ -112,6 +112,10 @@ access(all) contract FRC20Staking {
         access(account)
         fun borrowRewardStrategy(_ rewardTick: String): &RewardStrategy?
 
+        /** ---- Delegators ---- */
+
+        // Add public methods
+
         /** -- Delegators: Account Level Methods -- */
 
         /// Stake FRC20 token
@@ -456,7 +460,7 @@ access(all) contract FRC20Staking {
 
     /// Unstaking Entry Resource, represents a unstaking entry for a FRC20 token
     ///
-    access(all) resource UnstakingEntry {
+    access(all) resource UnstakingEntry: UnstakingEntryPublic {
         access(all)
         let unlockTime: UInt64
         access(all)
@@ -702,23 +706,9 @@ access(all) contract FRC20Staking {
         }
     }
 
-    /// Reward strategy Public Interface
-    ///
-    access(all) resource interface RewardStrategyPublic {
-        /// The ticker name of staking pool
-        access(all)
-        let stakeTick: String
-        /// The ticker name of reward
-        access(all)
-        let rewardTick: String
-        /// The global yield rate of the reward strategy
-        access(account)
-        var globalYieldRate: UFix64
-    }
-
     /// Reward Strategy Resource, represents a reward strategy for a FRC20 token and store in pool's account
     ///
-    access(all) resource RewardStrategy: RewardStrategyPublic {
+    access(all) resource RewardStrategy {
         access(self)
         let poolCap: Capability<&Pool{PoolPublic}>
         /// The ticker name of staking pool
@@ -782,7 +772,7 @@ access(all) contract FRC20Staking {
             destroy self.totalReward
         }
 
-        access(contract)
+        access(account)
         fun addIncome(income: @FRC20FTShared.Change) {
             pre {
                 self.poolCap.check(): "Pool must be valid"
@@ -818,7 +808,9 @@ access(all) contract FRC20Staking {
             }
         }
 
-        access(contract)
+        /// Claim reward, the return valus's from is the delegator's address
+        ///
+        access(account)
         fun claim(
             byNft: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT},
         ): @FRC20FTShared.Change {
@@ -826,6 +818,9 @@ access(all) contract FRC20Staking {
                 self.poolCap.check(): "Pool must be valid"
                 self.owner?.address == self.poolCap.address: "Pool owner must match with reward strategy owner"
                 byNft.getOriginalTick() == self.stakeTick: "NFT tick must match with reward strategy tick"
+            }
+            post {
+                byNft.owner?.address == result.from: "Result from must match with NFT owner"
             }
             let pool = (self.poolCap.borrow() ?? panic("Pool must exist")).borrowSelf()
 
@@ -838,6 +833,12 @@ access(all) contract FRC20Staking {
             let poolAddr = pool.owner?.address ?? panic("Pool owner must exist")
             let delegator = byNft.owner?.address ?? panic("Delegator must exist")
 
+            // create an empty change for the reward
+            let delegatorRewardChange <- FRC20FTShared.createEmptyFRC20Change(
+                tick: self.rewardTick,
+                from: delegator
+            )
+
             // delegator info
             let delegatorRef = FRC20Staking.borrowDelegator(delegator)
                 ?? panic("Delegator must exist")
@@ -848,10 +849,12 @@ access(all) contract FRC20Staking {
             let delegatorLastGlobalYieldRate = claimingRecord?.lastGlobalYieldRate ?? 0.0
             let delegatorStakedToken = byNft.getBalance() // staked token's balance is the same as NFT's balance
 
-            assert(
-                self.globalYieldRate > delegatorLastGlobalYieldRate,
-                message: "You can only claim reward after global yield rate is updated"
-            )
+            // ensure delegator's global yield rate is less than current global yield rate
+            if self.globalYieldRate <= delegatorLastGlobalYieldRate {
+                // no reward to claim
+                return <- delegatorRewardChange
+            }
+
             // This is reward to distribute
             let yieldReward = (self.globalYieldRate - delegatorLastGlobalYieldRate) * delegatorStakedToken
             assert(
@@ -860,7 +863,7 @@ access(all) contract FRC20Staking {
             )
 
             // withdraw from totalReward
-            let ret: @FRC20FTShared.Change <- self.totalReward.withdrawAsChange(amount: yieldReward)
+            let withdrawnChange: @FRC20FTShared.Change <- self.totalReward.withdrawAsChange(amount: yieldReward)
 
             // update delegator claiming record
             delegatorRef.onClaimingReward(
@@ -879,8 +882,13 @@ access(all) contract FRC20Staking {
                 yieldAdded: self.globalYieldRate
             )
 
+            // Deposit the reward to delegatorRewardChange's change
+            FRC20FTShared.depositToChange(
+                receiver: &delegatorRewardChange as &FRC20FTShared.Change,
+                change: <- withdrawnChange
+            )
             // return the change
-            return <- ret
+            return <- delegatorRewardChange
         }
 
         /** ---- Internal Methods ---- */
@@ -920,7 +928,7 @@ access(all) contract FRC20Staking {
         /// Update the claiming record
         access(contract)
         fun onClaimingReward(
-            reward: &RewardStrategy{RewardStrategyPublic},
+            reward: &RewardStrategy,
             byNftId: UInt64,
             amount: UFix64,
             currentGlobalYieldRate: UFix64
@@ -1002,7 +1010,7 @@ access(all) contract FRC20Staking {
         ///
         access(contract)
         fun onClaimingReward(
-            reward: &RewardStrategy{RewardStrategyPublic},
+            reward: &RewardStrategy,
             byNftId: UInt64,
             amount: UFix64,
             currentGlobalYieldRate: UFix64

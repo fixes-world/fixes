@@ -450,6 +450,53 @@ access(all) contract FRC20StakingManager {
         )
     }
 
+    /// Claim rewards
+    ///
+    fun claimRewards(
+        _ semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>,
+        nftIds: [UInt64]
+    ) {
+        pre {
+            semiNFTColCap.check(): "The semiNFT collection is not valid"
+        }
+
+        // singleton resources
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        let ownerAddr = semiNFTColCap.address
+        let semiNFTCol = semiNFTColCap.borrow()
+            ?? panic("Could not borrow the semiNFT collection")
+
+        // loop through all nftIds
+        for nftId in nftIds {
+            let nft = semiNFTCol.borrowFRC20SemiNFT(id: nftId)
+                ?? panic("The semiNFT is not found")
+            let poolAddress = nft.getFromAddress()
+
+            // borrow the staking pool
+            let stakingPool = FRC20Staking.borrowPool(poolAddress)
+                ?? panic("The staking pool is not found")
+
+            // get the reward ticks
+            let rewardTicks = stakingPool.getRewardNames()
+            // loop through all reward ticks
+            for rewardTick in rewardTicks {
+                // get the reward strategy
+                let rewardStrategy = stakingPool.borrowRewardStrategy(rewardTick)
+                    ?? panic("The reward strategy is not registered")
+                // claim the reward, the from should be same as the nft owner
+                let rewardChange <- rewardStrategy.claim(byNft: nft)
+                if rewardChange.getBalance() > 0.0 {
+                    // The reward is not empty, return the change to the user
+                    frc20Indexer.returnChange(change: <- rewardChange)
+                } else {
+                    destroy rewardChange
+                }
+            } // end reward Ticks
+        } // end nftIds
+    }
+
     /// init method
     init() {
         let identifier = "FRC20Staking_".concat(self.account.address.toString())
