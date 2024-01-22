@@ -27,6 +27,10 @@ access(all) contract FRC20StakingManager {
     access(all) event StakingPoolEnabled(tick: String, address: Address, by: Address)
     /// Event emitted when a staking pool resources are updated
     access(all) event StakingPoolResourcesUpdated(tick: String, address: Address, by: Address)
+    /// Event emitted when a reward strategy is registered
+    access(all) event StakingPoolRewardStrategyRegistered(tick: String, rewardTick: String, by: Address)
+    /// Event emitted when a staking pool is donated
+    access(all) event StakingPoolDonated(tick: String, rewardTick: String, amount: UFix64, by: Address)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -163,6 +167,12 @@ access(all) contract FRC20StakingManager {
             )
 
             pool.registerRewardStrategy(rewardTick: rewardTick)
+
+            emit StakingPoolRewardStrategyRegistered(
+                tick: stakeTick,
+                rewardTick: rewardTick,
+                by: self.getControllerAddress()
+            )
         }
     }
 
@@ -316,7 +326,7 @@ access(all) contract FRC20StakingManager {
             ?? panic("The staking pool is not enabled")
         let stakingPool = FRC20Staking.borrowPool(stakingAddress)
             ?? panic("The staking pool is not found")
-        /// Withdraw the tokens, will validate the inscription
+        /// Withdraw the frc20 tokens, will validate the inscription
         let changeToStake <- frc20Indexer.withdrawChange(ins: ins)
         /// Stake the tokens
         stakingPool.stake(<- changeToStake)
@@ -388,6 +398,56 @@ access(all) contract FRC20StakingManager {
         } else {
             panic("No any unlocked staked FRC20 tokens can be claimed.")
         }
+    }
+
+    /// Donate FRC20 to the staking pool
+    ///
+    fun donateToStakingPool(
+        tick: String,
+        ins: &Fixes.Inscription
+    ) {
+        // singleton resources
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        /// Check if the staking is already enabled
+        let stakingAddress = acctsPool.getFRC20StakingAddress(tick: tick)
+            ?? panic("The staking pool is not enabled")
+        let stakingPool = FRC20Staking.borrowPool(stakingAddress)
+            ?? panic("The staking pool is not found")
+
+        // inscription data
+        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
+        assert(
+            op == "withdraw",
+            message: "The token operation should be withdraw."
+        )
+        let usage = meta["usage"]?.toLower() ?? panic("The token usage is not found")
+        assert(
+            usage == "donate",
+            message: "The token usage should be donate."
+        )
+
+        let fromAddr = ins.owner?.address ?? panic("The inscription owner is not found")
+        let rewardTick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+        // Check if the reward strategy is registered
+        let rewardStrategy = stakingPool.borrowRewardStrategy(rewardTick)
+            ?? panic("The reward strategy is not registered")
+
+        // Withdraw the frc20 tokens, will validate the inscription
+        let changeToStake <- frc20Indexer.withdrawChange(ins: ins)
+        let amountToDonate = changeToStake.getBalance()
+        // Donate the tokens
+        rewardStrategy.addIncome(income: <- changeToStake)
+
+        // emit the event
+        emit StakingPoolDonated(
+            tick: tick,
+            rewardTick: rewardTick,
+            amount: amountToDonate,
+            by: fromAddr
+        )
     }
 
     /// init method

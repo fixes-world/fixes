@@ -1113,10 +1113,10 @@ access(all) contract FRC20Indexer {
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
-            let usage = meta["usage"]! // usage can be "staking" or ?
+            let usage = meta["usage"]! // usage can be "staking" or "donate"
             assert(
-                usage == "staking",
-                message: "The usage should be 'staking'"
+                usage == "staking" || usage == "donate",
+                message: "The usage should be 'staking' or 'donate'"
             )
             let fromAddr = ins.owner!.address
 
