@@ -315,11 +315,9 @@ access(all) contract FRC20Staking {
             delegatorRecordRef.addUnstakingEntry(<- nft)
         }
 
-        /** ---- Contract Level Methods ----- */
-
         /// Claim all unlocked staked changes
         ///
-        access(contract)
+        access(account)
         fun claimUnlockedUnstakingChange(
             delegator: Address
         ): @FRC20FTShared.Change? {
@@ -351,6 +349,8 @@ access(all) contract FRC20Staking {
             }
             return nil
         }
+
+        /** ---- Contract Level Methods ----- */
 
         /// Borrow Delegator Record
         ///
@@ -888,17 +888,9 @@ access(all) contract FRC20Staking {
         )
     }
 
-    /// Delegator Private Interface
-    ///
-    access(all) resource interface DelegatorPriv {
-        /// Claim all unlocked staked changes
-        access(all)
-        fun claimUnlockedUnstakingChange(): Bool
-    }
-
     /// Delegator Resource, represents a delegator and store in user's account
     ///
-    access(all) resource Delegator: DelegatorPublic, DelegatorPriv {
+    access(all) resource Delegator: DelegatorPublic {
         access(self)
         let semiNFTcolCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
 
@@ -943,13 +935,6 @@ access(all) contract FRC20Staking {
         fun getStakedNFTIds(tick: String): [UInt64] {
             let colRef = self.borrowSemiNFTCollection()
             return colRef.getIDsByTick(tick: tick)
-        }
-
-        /** ----- Private Methods ----- */
-        /// Claim all unlocked staked changes
-        access(all)
-        fun claimUnlockedUnstakingChange(): Bool {
-
         }
 
         /** ----- Contract Methods ----- */
@@ -1029,6 +1014,15 @@ access(all) contract FRC20Staking {
         }
     }
 
+    /** ---- Account access methods ---- */
+
+    /// Create the Staking Pool resource
+    ///
+    access(account)
+    fun createPool(_ tick: String): @Pool {
+        return <- create Pool(tick)
+    }
+
     /** ---- public methods ---- */
 
     /// Get the lock time of unstaking
@@ -1055,6 +1049,18 @@ access(all) contract FRC20Staking {
         return getAccount(addr)
             .getCapability<&Delegator{DelegatorPublic}>(self.DelegatorPublicPath)
             .borrow()
+    }
+
+    /// Create the Delegator resource
+    ///
+    access(all)
+    fun createDelegator(
+        _ semiNFTCol: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+    ): @Delegator {
+        pre {
+            semiNFTCol.check(): "SemiNFT Collection must be valid"
+        }
+        return <- create Delegator(semiNFTCol)
     }
 
     init() {

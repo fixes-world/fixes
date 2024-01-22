@@ -62,10 +62,10 @@ access(all) contract FRC20MarketManager {
         }
     }
 
-    /* --- Account access methods  --- */
+    /* --- Contract access methods  --- */
 
-    access(account)
-    fun ensureMarketResourcesAvailable(tick: String) {
+    access(contract)
+    fun _ensureMarketResourcesAvailable(tick: String) {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // try to borrow the account to check if it was created
@@ -192,7 +192,7 @@ access(all) contract FRC20MarketManager {
             ?? panic("The market account was not created")
 
         // ensure all market resources are available
-        self.ensureMarketResourcesAvailable(tick: tick)
+        self._ensureMarketResourcesAvailable(tick: tick)
 
         // emit the event
         emit NewMarketEnabled(

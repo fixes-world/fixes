@@ -69,6 +69,9 @@ access(all) contract FRC20AccountsPool {
         /// Sets up a new child account for market
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
+        /// Sets up a new child account for staking
+        access(account)
+        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -201,6 +204,13 @@ access(all) contract FRC20AccountsPool {
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>) {
             self.setupNewChildByTick(type: ChildAccountType.Market, tick: tick, acctCap)
+        }
+
+        /// Sets up a new child account for staking
+        ///
+        access(account)
+        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByTick(type: ChildAccountType.Staking, tick: tick, acctCap)
         }
 
         /** ---- Admin Methods ---- */

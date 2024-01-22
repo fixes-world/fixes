@@ -772,7 +772,9 @@ access(all) contract FRC20FTShared {
             dealAmount: UFix64,
             dealPrice: UFix64,
             totalAmountInListing: UFix64,
-        )
+        ) {
+            log("Default Empty Transaction Hook")
+        }
     }
 
     access(account)
