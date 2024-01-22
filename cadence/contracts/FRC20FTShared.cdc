@@ -478,6 +478,61 @@ access(all) contract FRC20FTShared {
         )
     }
 
+    /// Create a new Change for staked tick
+    ///
+    access(account)
+    fun createStakedChange(
+        ref: &Change,
+        issuer: Address
+    ): @Change {
+        pre {
+            ref.isStakedTick() == false: "The input Change must not be a staked tick"
+            ref.isBackedByVault() == false: "The input Change must not be backed by a Vault"
+        }
+        post {
+            result.tick == "!".concat(ref.tick): "Tick must be equal to the provided tick"
+            result.getBalance() == ref.getBalance(): "Balance must be equal to the provided balance"
+            result.from == issuer: "The owner of the Change must be the same as the issuer"
+        }
+        return <- create Change(
+            tick: "!".concat(ref.tick), // staked tick is prefixed with "!"
+            from: issuer, // all staked changes are from issuer
+            balance: ref.getBalance(),
+            ftVault: nil
+        )
+    }
+
+    /// Create a new Change
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun createEmptyFRC20Change(
+        tick: String,
+        from: Address,
+    ): @Change {
+        return <- self.createChange(
+            tick: tick,
+            from: from,
+            balance: 0.0,
+            ftVault: nil
+        )
+    }
+
+    /// Create a new Change for FlowToken
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun createEmptyFlowChange(
+        from: Address,
+    ): @Change {
+        return <- self.createChange(
+            tick: "",
+            from: from,
+            balance: nil,
+            ftVault: <- FlowToken.createEmptyVault()
+        )
+    }
+
     /// Deposit one Change to another Change
     /// Only the owner of the account can call this method
     ///

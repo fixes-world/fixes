@@ -187,6 +187,9 @@ access(all) contract FRC20Indexer {
         /// Withdraw amount of a FRC20 token by a FRC20 inscription
         access(account)
         fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change
+        /// Deposit a FRC20 token change to indexer
+        access(account)
+        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change)
         /// Return the change of a FRC20 order back to the owner
         access(account)
         fun returnChange(change: @FRC20FTShared.Change)
@@ -1100,18 +1103,53 @@ access(all) contract FRC20Indexer {
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
-            let usage = meta["usage"]! // usage can be "staking"
+            let usage = meta["usage"]! // usage can be "staking" or ?
             assert(
                 usage == "staking",
                 message: "The usage should be 'staking'"
             )
             let fromAddr = ins.owner!.address
 
-            return <- self._withdrawToTokenChange(
+            let retChange <- self._withdrawToTokenChange(
                 tick: tick,
                 fromAddr: fromAddr,
                 amt: amt
             )
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: ins)
+
+            return <- retChange
+        }
+
+        /// Deposit a FRC20 token change to indexer
+        ///
+        access(account)
+        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+                change.isBackedByVault() == false: "The change should not be backed by a vault"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "deposit" && meta["tick"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for transfer"
+            )
+
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            assert(
+                tokenMeta.tick == change.tick,
+                message: "The token should be the same as the change"
+            )
+            let fromAddr = ins.owner!.address
+
+            self._depositFromTokenChange(change: <- change, to: fromAddr)
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: ins)
         }
 
         /// Return the change of a FRC20 order back to the owner

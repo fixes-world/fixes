@@ -6,21 +6,25 @@
 // Third Party Imports
 import "FungibleToken"
 import "FlowToken"
+import "NonFungibleToken"
+import "MetadataViews"
 // Fixes Imports
 import "Fixes"
 import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20Staking"
+import "FRC20SemiNFT"
 
 access(all) contract FRC20StakingManager {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
-
+    /// Event emitted when the whitelist is updated
     access(all) event StakingWhitelistUpdated(address: Address, isWhitelisted: Bool)
-
+    /// Event emitted when a staking pool is enabled
     access(all) event StakingPoolEnabled(tick: String, address: Address, by: Address)
+    /// Event emitted when a staking pool resources are updated
     access(all) event StakingPoolResourcesUpdated(tick: String, address: Address, by: Address)
 
     /* --- Variable, Enums and Structs --- */
@@ -192,7 +196,7 @@ access(all) contract FRC20StakingManager {
         return isUpdated
     }
 
-    /** ---- public methods ---- */
+    /** ---- Public Methods - Controller ---- */
 
     /// Check if the given address is whitelisted
     ///
@@ -215,6 +219,117 @@ access(all) contract FRC20StakingManager {
         return <- create StakingController()
     }
 
+    /** ---- Public Methods - User ---- */
+
+    /// Stake tokens
+    ///
+    access(all)
+    fun stake(ins: &Fixes.Inscription) {
+        // singletoken resources
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
+        assert(
+            op == "withdraw",
+            message: "The token operation should be withdraw."
+        )
+        let usage = meta["usage"]?.toLower() ?? panic("The token usage is not found")
+        assert(
+            usage == "staking",
+            message: "The token usage should be staking."
+        )
+
+        let fromAddr = ins.owner?.address ?? panic("The inscription owner is not found")
+        assert(
+            FRC20Staking.borrowDelegator(fromAddr) != nil,
+            message: "The inscription owner is not a delegator"
+        )
+
+        let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+
+        /// Check if the staking is already enabled
+        let stakingAddress = acctsPool.getFRC20StakingAddress(tick: tick)
+            ?? panic("The staking pool is not enabled")
+        let stakingPool = FRC20Staking.borrowPool(stakingAddress)
+            ?? panic("The staking pool is not found")
+        /// Withdraw the tokens, will validate the inscription
+        let changeToStake <- frc20Indexer.withdrawChange(ins: ins)
+        /// Stake the tokens
+        stakingPool.stake(<- changeToStake)
+    }
+
+    /// Unstake tokens
+    ///
+    fun unstake(
+        _ semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>,
+        nftId: UInt64
+    ) {
+        pre {
+            semiNFTColCap.check(): "The semiNFT collection is not valid"
+        }
+        let semiNFTCol = semiNFTColCap.borrow()
+            ?? panic("Could not borrow the semiNFT collection")
+        let nft = semiNFTCol.borrowFRC20SemiNFT(id: nftId)
+            ?? panic("The semiNFT is not found")
+        let poolAddress = nft.getFromAddress()
+
+        // singletoken resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        let stakingPool = FRC20Staking.borrowPool(poolAddress)
+            ?? panic("The staking pool is not found")
+        /// Unstake the tokens
+        stakingPool.unstake(semiNFTCol, nftId: nftId)
+    }
+
+    /// Claim all unlocked unstaking changes
+    ///
+    fun claimUnlockedUnstakingChange(
+        ins: &Fixes.Inscription
+    ) {
+        pre {
+            ins.isExtractable(): "The inscription is not extractable"
+        }
+        // singletoken resources
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        assert(
+            frc20Indexer.isValidFRC20Inscription(ins: ins),
+            message: "The inscription is not a valid FRC20 inscription"
+        )
+
+        // inscription data
+        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
+        assert(
+            op == "deposit",
+            message: "The token operation should be deposit."
+        )
+
+        let fromAddr = ins.owner?.address ?? panic("The inscription owner is not found")
+        assert(
+            FRC20Staking.borrowDelegator(fromAddr) != nil,
+            message: "The inscription owner is not a delegator"
+        )
+
+        let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+        let poolAddress = acctsPool.getFRC20StakingAddress(tick: tick)
+            ?? panic("The staking pool is not enabled")
+        let stakingPool = FRC20Staking.borrowPool(poolAddress)
+            ?? panic("The staking pool is not found")
+        if let unstakedChange <- stakingPool.claimUnlockedUnstakingChange(delegator: fromAddr) {
+            // deposit the unstaked change
+            frc20Indexer.depositChange(ins: ins, change: <- unstakedChange)
+        } else {
+            panic("No any unlocked staked FRC20 tokens can be claimed.")
+        }
+    }
+
+    /// init method
     init() {
         let identifier = "FRC20Staking_".concat(self.account.address.toString())
         self.StakingAdminStoragePath = StoragePath(identifier: identifier.concat("_admin"))!

@@ -102,19 +102,36 @@ access(all) contract FRC20Staking {
         access(all) view
         fun getRewardDetails(_ name: String): RewardDetails?
 
+        /** -- Rewards: Account Level Methods -- */
+
+        /// register reward strategy
+        access(account)
+        fun registerRewardStrategy(_ strategy: @RewardStrategy)
+
+        /** -- Delegators: Account Level Methods -- */
+
+        /// Stake FRC20 token
+        access(account)
+        fun stake(_ change: @FRC20FTShared.Change)
+
+        /// Unstake FRC20 token
+        access(account)
+        fun unstake(
+            _ semiNFTCol: &FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection},
+            nftId: UInt64
+        )
+
+        /// Claim all unlocked staked changes
+        access(account)
+        fun claimUnlockedUnstakingChange(
+            delegator: Address
+        ): @FRC20FTShared.Change?
+
         /** ---- Contract Level Methods ---- */
 
         /// Borrow the Pool reference
         access(contract)
         fun borrowSelf(): &Pool
-
-        /** -- Delegators -- */
-
-        /// Claim all unlocked staked changes
-        access(contract)
-        fun claimUnlockedUnstakingChange(
-            delegator: Address
-        ): @FRC20FTShared.Change?
 
         /// Borrow Delegator Record
         access(contract)
@@ -169,7 +186,7 @@ access(all) contract FRC20Staking {
                 self.totalStaked == nil: "Total staked must be nil"
             }
             let owner = self.owner?.address ?? panic("Pool owner must exist")
-            self.totalStaked <-! FRC20FTShared.createChange(tick: self.tick, from: owner, balance: 0.0, ftVault: nil)
+            self.totalStaked <-! FRC20FTShared.createEmptyFRC20Change(tick: self.tick, from: owner)
 
             // emit event
             emit StakingInitialized(pool: owner, tick: self.tick)
@@ -210,6 +227,7 @@ access(all) contract FRC20Staking {
         /** ---- Account Level Methods ----- */
 
         /// register reward strategy
+        ///
         access(account)
         fun registerRewardStrategy(_ strategy: @RewardStrategy) {
             pre {
@@ -251,24 +269,24 @@ access(all) contract FRC20Staking {
             let delegatorRecordRef = self.borrowDelegatorRecord(delegator)
                 ?? panic("Delegator record must exist")
 
+            let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
+
+            // create staked tick change
+            let stakedChange <- FRC20FTShared.createStakedChange(
+                ref: &change as &FRC20FTShared.Change,
+                issuer: poolAddr
+            )
+
             // update staked change
             FRC20FTShared.depositToChange(
                 receiver: self.borrowTotalStaked(),
                 change: <- change
             )
 
-            let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
             // update staked change for delegator
             let delegatorRef = delegatorRecordRef.borrowDelegatorRef()
             // call onFRC20Staked to save the staked change
-            delegatorRef.onFRC20Staked(
-                stakedChange: <- FRC20FTShared.createChange(
-                    tick: "!".concat(self.tick), // staked tick is prefixed with "!"
-                    from: poolAddr, // all staked changes are from pool
-                    balance: stakedAmount,
-                    ftVault: nil
-                )
-            )
+            delegatorRef.onFRC20Staked(stakedChange: <- stakedChange)
 
             // emit stake event
             emit DelegatorStaked(
@@ -335,7 +353,7 @@ access(all) contract FRC20Staking {
                 let unstakedChange <- totalStakedRef.withdrawAsChange(amount: amount)
 
                 // decrease totalUnstakingLocked
-                self.totalUnstakingLocked = self.totalUnstakingLocked - amount
+                self.totalUnstakingLocked = self.totalUnstakingLocked - unstakedChange.getBalance()
 
                 // emit event
                 emit DelegatorUnStaked(
@@ -573,11 +591,9 @@ access(all) contract FRC20Staking {
         fun refundAllUnlockedEnties(): @FRC20FTShared.Change? {
             if self.unstakingEntries.length > 0 {
                 // create new staked frc20 change
-                let ret: @FRC20FTShared.Change <- FRC20FTShared.createChange(
+                let ret: @FRC20FTShared.Change <- FRC20FTShared.createEmptyFRC20Change(
                     tick: "!".concat(self.stakeTick),
                     from: self.owner?.address ?? panic("Pool owner must exist"),
-                    balance: 0.0,
-                    ftVault: nil
                 )
                 let retRef = &ret as &FRC20FTShared.Change
 
@@ -722,9 +738,9 @@ access(all) contract FRC20Staking {
             /// create empty change
             if isFtVault {
                 // TODO: support other Flow FT
-                self.totalReward <- FRC20FTShared.createChange(tick: rewardTick, from: pool.address, balance: nil, ftVault: <- FlowToken.createEmptyVault())
+                self.totalReward <- FRC20FTShared.createEmptyFlowChange(from: pool.address)
             } else {
-                self.totalReward <- FRC20FTShared.createChange(tick: rewardTick, from: pool.address, balance: 0.0, ftVault: nil)
+                self.totalReward <- FRC20FTShared.createEmptyFRC20Change(tick: rewardTick, from: pool.address)
             }
 
             // emit event
@@ -1029,8 +1045,8 @@ access(all) contract FRC20Staking {
     ///
     access(all)
     fun getUnstakingLockTime(): UInt64 {
-        // 2 day = 172,800 seconds
-        return 172800
+        // 1 day = 86400 seconds
+        return 86400
     }
 
     /// Borrow Pool by address
