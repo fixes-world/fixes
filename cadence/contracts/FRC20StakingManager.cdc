@@ -140,14 +140,13 @@ access(all) contract FRC20StakingManager {
             }
         }
 
+        /// Register a reward strategy
+        ///
         access(all)
         fun registerRewardStrategy(
             stakeTick: String,
             rewardTick: String,
         ) {
-            pre {
-                FRC20StakingManager.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
-            }
             // singleton resources
             let acctPool = FRC20AccountsPool.borrowAccountsPool()
             let frc20Indexer = FRC20Indexer.getIndexer()
@@ -157,6 +156,12 @@ access(all) contract FRC20StakingManager {
             let pool = FRC20Staking.borrowPool(poolAddr)
                 ?? panic("The staking pool is not found")
 
+            // Check if the reward token is registered
+            assert(
+                frc20Indexer.getTokenMeta(tick: rewardTick) != nil,
+                message: "The reward token is not registered"
+            )
+            // Check if the reward strategy is already registered
             assert(
                 pool.getRewardDetails(rewardTick) == nil,
                 message: "The reward strategy is already registered"
@@ -164,6 +169,22 @@ access(all) contract FRC20StakingManager {
             assert(
                 pool.tick == stakeTick,
                 message: "The staking pool tick is not the same as the requested"
+            )
+
+            // Check if the controller is whitelisted or staked enough tokens
+            let controlleAddr = self.getControllerAddress()
+            var isValid = FRC20StakingManager.isWhitelisted(controlleAddr)
+            if !isValid {
+                let delegator = FRC20Staking.borrowDelegator(controlleAddr)
+                    ?? panic("The controller is not a delegator")
+                let totalStakedBalance = pool.getDetails().totalStaked
+                let controllerStakedBalance = delegator.getStakedBalance(tick: stakeTick)
+                // if the controller staked more than 10% of the total staked tokens, then it is valid
+                isValid = controllerStakedBalance >= totalStakedBalance * 0.1
+            }
+            assert(
+                isValid,
+                message: "The controller is not whitelisted or staked enough tokens"
             )
 
             pool.registerRewardStrategy(rewardTick: rewardTick)
