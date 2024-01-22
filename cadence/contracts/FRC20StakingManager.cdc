@@ -88,7 +88,7 @@ access(all) contract FRC20StakingManager {
                 FRC20StakingManager.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
             }
 
-            // singletoken resources
+            // singleton resources
             let frc20Indexer = FRC20Indexer.getIndexer()
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
@@ -124,7 +124,7 @@ access(all) contract FRC20StakingManager {
             let isUpdated = FRC20StakingManager._ensureStakingResourcesAvailable(tick: tick)
 
             if isUpdated {
-                // singletoken resources
+                // singleton resources
                 let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
                 emit StakingPoolResourcesUpdated(
@@ -133,6 +133,39 @@ access(all) contract FRC20StakingManager {
                     by: self.getControllerAddress()
                 )
             }
+        }
+
+        access(all)
+        fun registerRewardStrategy(
+            stakeTick: String,
+            strategyName: String,
+            rewardTick: String,
+        ) {
+            pre {
+                FRC20StakingManager.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
+            }
+            // singleton resources
+            let acctPool = FRC20AccountsPool.borrowAccountsPool()
+            let frc20Indexer = FRC20Indexer.getIndexer()
+
+            let poolAddr = acctPool.getFRC20StakingAddress(tick: stakeTick)
+                ?? panic("The staking pool is not enabled")
+            let pool = FRC20Staking.borrowPool(poolAddr)
+                ?? panic("The staking pool is not found")
+
+            assert(
+                pool.getRewardDetails(strategyName) == nil,
+                message: "The reward strategy is already registered"
+            )
+            assert(
+                pool.tick == stakeTick,
+                message: "The staking pool tick is not the same as the requested"
+            )
+
+            pool.registerRewardStrategy(
+                name: strategyName,
+                rewardTick: rewardTick
+            )
         }
     }
 
@@ -225,7 +258,7 @@ access(all) contract FRC20StakingManager {
     ///
     access(all)
     fun stake(ins: &Fixes.Inscription) {
-        // singletoken resources
+        // singleton resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
@@ -276,7 +309,7 @@ access(all) contract FRC20StakingManager {
             ?? panic("The semiNFT is not found")
         let poolAddress = nft.getFromAddress()
 
-        // singletoken resources
+        // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         let stakingPool = FRC20Staking.borrowPool(poolAddress)
@@ -293,7 +326,7 @@ access(all) contract FRC20StakingManager {
         pre {
             ins.isExtractable(): "The inscription is not extractable"
         }
-        // singletoken resources
+        // singleton resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 

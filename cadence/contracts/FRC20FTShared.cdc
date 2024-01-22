@@ -453,7 +453,7 @@ access(all) contract FRC20FTShared {
 
         /// Borrow the underlying Vault of this Change
         ///
-        access(self)
+        access(contract)
         fun borrowVault(): &FungibleToken.Vault {
             return &self.ftVault as &FungibleToken.Vault?
                 ?? panic("The Change is not backed by a Vault")

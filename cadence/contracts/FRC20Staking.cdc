@@ -106,7 +106,7 @@ access(all) contract FRC20Staking {
 
         /// register reward strategy
         access(account)
-        fun registerRewardStrategy(_ strategy: @RewardStrategy)
+        fun registerRewardStrategy(name: String, rewardTick: String)
 
         /** -- Delegators: Account Level Methods -- */
 
@@ -163,6 +163,13 @@ access(all) contract FRC20Staking {
         init(
             _ tick: String
         ) {
+            // Singleton
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            assert(
+                frc20Indexer.getTokenMeta(tick: tick) != nil,
+                message: "Reward tick must be valid"
+            )
+
             self.tick = tick
             self.totalStaked <- nil
             self.totalUnstakingLocked = 0.0
@@ -229,12 +236,16 @@ access(all) contract FRC20Staking {
         /// register reward strategy
         ///
         access(account)
-        fun registerRewardStrategy(_ strategy: @RewardStrategy) {
+        fun registerRewardStrategy(name: String, rewardTick: String) {
             pre {
-                self.rewards[strategy.name] == nil: "Reward strategy name already exists"
+                self.rewards[name] == nil: "Reward strategy name already exists"
             }
-            let name = strategy.name
-            let rewardTick = strategy.rewardTick
+            let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
+            let strategy <- create RewardStrategy(
+                pool: FRC20Staking.getPoolCap(poolAddr),
+                name: name,
+                rewardTick: rewardTick
+            )
             self.rewards[name] <-! strategy
 
             // emit event
@@ -725,6 +736,13 @@ access(all) contract FRC20Staking {
             pre {
                 pool.check(): "Pool must be valid"
             }
+            // Singleton
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            assert(
+                frc20Indexer.getTokenMeta(tick: rewardTick) != nil,
+                message: "Reward tick must be valid"
+            )
+
             self.poolCap = pool
             let poolRef = pool.borrow() ?? panic("Pool must exist")
 
@@ -1053,9 +1071,15 @@ access(all) contract FRC20Staking {
     ///
     access(all)
     fun borrowPool(_ addr: Address): &Pool{PoolPublic}? {
+        return self.getPoolCap(addr).borrow()
+    }
+
+    /// Borrow Pool Capability by address
+    ///
+    access(all)
+    fun getPoolCap(_ addr: Address): Capability<&Pool{PoolPublic}> {
         return getAccount(addr)
             .getCapability<&Pool{PoolPublic}>(self.StakingPoolPublicPath)
-            .borrow()
     }
 
     /// Borrow Delegate by address
