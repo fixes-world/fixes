@@ -166,6 +166,11 @@ access(all) contract FRC20StakingVesting {
             return self.getNextVestableTime() <= now
         }
 
+        access(all) view
+        fun isCompleted(): Bool {
+            return self.vestedBatchAmount >= self.totalBatches || self.remaining.isEmpty()
+        }
+
         /** ---- Contract level methods ---- */
         /// Vest the change
         ///
@@ -284,13 +289,16 @@ access(all) contract FRC20StakingVesting {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let poolAddr = acctsPool.getFRC20StakingAddress(tick: stakeTick)
                 ?? panic("The staking pool is not enabled")
-            // check if the pool exists
-            assert(
-                FRC20Staking.borrowPool(poolAddr) != nil,
-                message: "The staking pool is not found"
-            )
+            let stakingPool = FRC20Staking.borrowPool(poolAddr)
+                ?? panic("The staking pool is not found")
 
             let rewardTick = rewardChange.getOriginalTick()
+            // ensure reward strategy exists
+            assert(
+                stakingPool.borrowRewardStrategy(rewardTick) != nil,
+                message: "The reward strategy is not found"
+            )
+
             let vestingAmount = rewardChange.getBalance()
 
             let newEntry <- create VestingEntry(
@@ -316,7 +324,45 @@ access(all) contract FRC20StakingVesting {
         ///
         access(account)
         fun onHeartbeat(_ deltaTime: UFix64) {
-            // TODO
+            let len = self.entries.length
+            // if there is no entry, return
+            if len == 0 {
+                return
+            }
+
+            // singleton resource
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+            var i = 0
+            while i < len {
+                let current <- self.entries.removeFirst()
+                // check if vestable
+                if current.isVestable() {
+                    // ensure pool address exists
+                    if let poolAddr = acctsPool.getFRC20StakingAddress(tick: current.stakeTick) {
+                        // ensure pool exists
+                        if let stakingPool = FRC20Staking.borrowPool(poolAddr) {
+                            // ensure reward strategy exists
+                            if let rewardStrategy =  stakingPool.borrowRewardStrategy(current.getVestingTick()) {
+                                // vest the change
+                                if let vestedChange <- current.tryVesting() {
+                                    // add the vested change to the reward strategy
+                                    rewardStrategy.addIncome(income: <- vestedChange)
+                                }
+                            }
+                        }
+                    }
+                } // no panic!!!
+                // handle the entry after vesting
+                if !current.isCompleted() {
+                    // add the entry back to the list
+                    self.entries.append(<- current)
+                } else {
+                    // destroy the entry if completed
+                    destroy current
+                }
+                i = i + 1
+            }
         }
 
         //** ---- Internal Methods ---- */
