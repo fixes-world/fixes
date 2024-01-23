@@ -16,6 +16,7 @@ import "FRC20FTShared"
 import "FRC20SemiNFT"
 import "FRC20AccountsPool"
 import "FRC20Staking"
+import "FRC20StakingVesting"
 import "FRC20StakingForwarder"
 
 access(all) contract FRC20StakingManager {
@@ -273,11 +274,52 @@ access(all) contract FRC20StakingManager {
                 hookAddr: childAcctRef.address,
                 hookPath: FRC20FTShared.TransactionHookPublicPath
             )
+
+            isUpdated = true || isUpdated
         }
 
-        // TODO: Add more hooks
+        // Add hooks to the shared hooks reference
+
+        // borrow the hooks reference
+        let hooksRef = childAcctRef.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+            ?? panic("The hooks were not created")
+
+        // --- Vesting ---
+
+        if childAcctRef.borrow<&AnyResource>(from: FRC20StakingVesting.storagePath) == nil {
+            let vesting <- FRC20StakingVesting.createVestingVault()
+            childAcctRef.save(<- vesting, to: FRC20StakingVesting.storagePath)
+
+            isUpdated = true || isUpdated
+        }
+
+        if childAcctRef
+            .getCapability<&FRC20StakingVesting.Vault{FRC20StakingVesting.VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20StakingVesting.publicPath)
+            .borrow() == nil {
+            // link the vesting to the public path
+            childAcctRef.unlink(FRC20StakingVesting.publicPath)
+            childAcctRef.link<&FRC20StakingVesting.Vault{FRC20StakingVesting.VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
+                FRC20StakingVesting.publicPath,
+                target: FRC20StakingVesting.storagePath
+            )
+
+            isUpdated = true || isUpdated
+        }
+
+        // add vesting to hooks
+
+        let vestingHookCap = childAcctRef
+            .getCapability<&FRC20StakingVesting.Vault{FRC20StakingVesting.VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20StakingVesting.publicPath)
+        let vestingHookRef = vestingHookCap.borrow()
+            ?? panic("Could not borrow the vesting hook reference")
+        if !hooksRef.hasHook(vestingHookRef.getType()) {
+            hooksRef.addHook(vestingHookCap)
+
+            isUpdated = true || isUpdated
+        }
 
         // --- Forwarder ---
+
         // This is the standard receiver path of FlowToken
         let flowReceiverPath = /public/flowTokenReceiver
         // check if the forwarder is already created
