@@ -187,6 +187,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesHeartbeat": {
+			"source": "cadence/contracts/FixesHeartbeat.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FlowToken": {
 			"source": "cadence/deps/FlowToken.cdc",
 			"aliases": {
@@ -383,6 +391,7 @@
 				"CapabilityFactory",
 				"Fixes",
 				"FixesWrappedNFT",
+				"FixesHeartbeat",
 				"FRC20FTShared",
 				"FixesTraits",
 				"FixesAvatar",

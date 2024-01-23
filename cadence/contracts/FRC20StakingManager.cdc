@@ -10,6 +10,7 @@ import "NonFungibleToken"
 import "MetadataViews"
 // Fixes Imports
 import "Fixes"
+import "FixesHeartbeat"
 import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20SemiNFT"
@@ -246,9 +247,20 @@ access(all) contract FRC20StakingManager {
         if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
             childAcctRef.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+
+            isUpdated = true || isUpdated
+        }
+
+        // link the hooks to the public path
+        if childAcctRef
+            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .borrow() == nil {
             // link the hooks to the public path
             childAcctRef.unlink(FRC20FTShared.TransactionHookPublicPath)
-            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook}>(FRC20FTShared.TransactionHookPublicPath, target: FRC20FTShared.TransactionHookStoragePath)
+            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
+                FRC20FTShared.TransactionHookPublicPath,
+                target: FRC20FTShared.TransactionHookStoragePath
+            )
 
             isUpdated = true || isUpdated
         }

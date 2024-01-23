@@ -5,6 +5,8 @@
 */
 import "FlowToken"
 import "FungibleToken"
+// Fixes Imports
+import "FixesHeartbeat"
 
 access(all) contract FRC20FTShared {
     /* --- Events --- */
@@ -882,7 +884,7 @@ access(all) contract FRC20FTShared {
 
     /// It a general resource for the Transaction Hook
     ///
-    access(all) resource Hooks: TransactionHook {
+    access(all) resource Hooks: TransactionHook, FixesHeartbeat.IHeartbeatHook {
         access(self)
         let hooks: {Type: Capability<&AnyResource{TransactionHook}>}
 
@@ -1005,12 +1007,23 @@ access(all) contract FRC20FTShared {
         return <- create Hooks()
     }
 
+    /// Get the hooks resource reference
     /// Only the owner of the account can call this method
     ///
     access(account)
     fun borrowTransactionHook(_ address: Address): &AnyResource{TransactionHook}? {
         return getAccount(address)
             .getCapability<&AnyResource{TransactionHook}>(self.TransactionHookPublicPath)
+            .borrow()
+    }
+
+    /// Get the hooks resource reference
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun borrowTransactionHookWithHeartbeat(_ address: Address): &AnyResource{TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
+        return getAccount(address)
+            .getCapability<&AnyResource{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
