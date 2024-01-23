@@ -229,6 +229,7 @@ access(all) contract FRC20TradingRecord {
             self.sellerVolumes = {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.minutes
         }
@@ -428,6 +429,7 @@ access(all) contract FRC20TradingRecord {
             self.traders100xBenchmark = {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.dailyRecords
         }

@@ -192,6 +192,7 @@ access(all) contract FRC20NFTWrapper {
             emit WrapperCreated()
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.internalFlowVault
         }

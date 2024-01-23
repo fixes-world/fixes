@@ -43,9 +43,7 @@ access(all) contract FixesHeartbeat {
         /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
         ///
         access(account)
-        fun onHeartbeat(_ deltaTime: UFix64) {
-            log("Default Empty Transaction Hook")
-        }
+        fun onHeartbeat(_ deltaTime: UFix64)
     }
 
     /// Heartbeat resource, provides the heartbeat function
@@ -130,9 +128,21 @@ access(all) contract FixesHeartbeat {
 
     /* --- Public Functions --- */
 
+    /// Create a new Heartbeat resource
+    ///
     access(all)
     fun create(): @Heartbeat {
         return <-create Heartbeat()
+    }
+
+    /// Check if the hook is added to the specified scope
+    ///
+    access(all)
+    fun hasHook(scope: String, hookAddr: Address): Bool {
+        if let hooks = FixesHeartbeat.borrowHooksDictRef(scope: scope) {
+            return hooks[hookAddr] != nil
+        }
+        return false
     }
 
     init() {

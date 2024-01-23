@@ -71,6 +71,7 @@ access(all) contract FixesAvatar {
             self.enabledEntities = []
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.nfts
             destroy self.ownedEntities
@@ -219,7 +220,7 @@ access(all) contract FixesAvatar {
         return <-create Profile()
     }
 
-    /// Returns the `Profile` public interface reference for the given address
+    /// Returns the `Profile` public capability for the given address
     ///
     access(all)
     fun getProfileCap(

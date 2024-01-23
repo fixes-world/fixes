@@ -165,6 +165,7 @@ access(all) contract Fixes {
             self.value <- value
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.value
             emit InscriptionBurned(id: self.id)
@@ -428,6 +429,7 @@ access(all) contract Fixes {
             self.inscriptions <- {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.inscriptions
         }

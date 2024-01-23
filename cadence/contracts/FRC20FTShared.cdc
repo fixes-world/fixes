@@ -273,6 +273,7 @@ access(all) contract FRC20FTShared {
             )
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             // You can not destroy a Change with a non-zero balance
             pre {
@@ -631,6 +632,8 @@ access(all) contract FRC20FTShared {
             self.change <- change
             self.cuts = cuts
         }
+
+        /// @deprecated after Cadence 1.0
         destroy() {
             pre {
                 self.change == nil: "Change must be nil for destroy"

@@ -400,8 +400,7 @@ access(all) contract FRC20Storefront {
             destroy order
         }
 
-        /// destructor
-        ///
+        /// @deprecated after Cadence 1.0
         destroy() {
             pre {
                 self.details.status == ListingStatus.Completed || self.details.status == ListingStatus.Cancelled:
@@ -1084,8 +1083,7 @@ access(all) contract FRC20Storefront {
         access(contract)
         var listedTicks: {String: [UInt64]}
 
-        /// destructor
-        ///
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.inscriptions
             destroy self.listings

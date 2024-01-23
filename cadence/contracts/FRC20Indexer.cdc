@@ -231,6 +231,7 @@ access(all) contract FRC20Indexer {
             self.treasury <- FlowToken.createEmptyVault() as! @FlowToken.Vault
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.treasury
             destroy self.pool

@@ -293,6 +293,7 @@ access(all) contract FRC20Marketplace {
             self.adminWhitelist[meta.deployer] = true
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.collections
         }

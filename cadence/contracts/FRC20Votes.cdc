@@ -259,6 +259,7 @@ access(all) contract FRC20Votes {
             self.appliedInscriptions <- {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.pendingInscriptions
             destroy self.appliedInscriptions

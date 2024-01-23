@@ -206,7 +206,7 @@ access(all) contract FRC20StakingManager {
 
         // try to borrow the account to check if it was created
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Staking, tick: tick)
-            ?? panic("The market account was not created")
+            ?? panic("The staking account was not created")
 
         var isUpdated = false
         // The staking pool should have the following resources in the account:
@@ -263,6 +263,16 @@ access(all) contract FRC20StakingManager {
             )
 
             isUpdated = true || isUpdated
+        }
+
+        // Register to FixesHeartbeat
+        let heartbeatScope = "Staking:".concat(tick)
+        if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: childAcctRef.address) {
+            FixesHeartbeat.addHook(
+                scope: heartbeatScope,
+                hookAddr: childAcctRef.address,
+                hookPath: FRC20FTShared.TransactionHookPublicPath
+            )
         }
 
         // TODO: Add more hooks

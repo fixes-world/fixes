@@ -66,6 +66,7 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             self.wrappedInscription <- inscription
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.wrappedNFT
             destroy self.wrappedInscription
@@ -349,6 +350,7 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             return FixesWrappedNFT as &AnyResource{MetadataViews.Resolver}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.ownedNFTs
         }
