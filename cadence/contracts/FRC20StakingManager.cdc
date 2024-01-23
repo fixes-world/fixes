@@ -33,6 +33,8 @@ access(all) contract FRC20StakingManager {
     access(all) event StakingPoolRewardStrategyRegistered(tick: String, rewardTick: String, by: Address)
     /// Event emitted when a staking pool is donated
     access(all) event StakingPoolDonated(tick: String, rewardTick: String, amount: UFix64, by: Address)
+    /// Event emitted when a staking pool is donated as vesting
+    access(all) event StakingPoolDonatedAsVesting(tick: String, rewardTick: String, amount: UFix64, by: Address, batchAmount: UInt32, interval: UFix64)
 
     /* --- Variable, Enums and Structs --- */
     access(all)
@@ -140,6 +142,52 @@ access(all) contract FRC20StakingManager {
                     by: self.getControllerAddress()
                 )
             }
+        }
+
+        /// Donate FLOW in the child account to the vesting pool
+        ///
+        access(all)
+        fun donateFlowTokenToVesting(
+            tick: String,
+            amount: UFix64,
+            vestingBatchAmount: UInt32,
+            vestingInterval: UFix64,
+        ) {
+            pre {
+                FRC20StakingManager.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
+            }
+
+            // singleton resources
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            // try to borrow the account to check if it was created
+            let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Staking, tick: tick)
+                ?? panic("The staking account was not created")
+
+            let flowVaultRef = childAcctRef.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("The flow vault is not found")
+            let storageUsageBalance = UFix64(childAcctRef.storageUsed) / UFix64(childAcctRef.storageCapacity) * flowVaultRef.balance
+            // Keep the 2x of the storage usage balance
+            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0
+            // ensure the flow balance is enough
+            assert(
+                availbleBalance >= amount,
+                message: "The flow balance is not enough"
+            )
+
+            // withdraw the flow tokens
+            let tokenToDonate <- flowVaultRef.withdraw(amount: amount)
+            // convert to change
+            let changeToDonate <- FRC20FTShared.wrapFungibleVaultChange(
+                ftVault: <- tokenToDonate,
+                from: childAcctRef.address
+            )
+            // call the internal method to donate
+            FRC20StakingManager._donateToVesting(
+                changeToDonate: <- changeToDonate,
+                tick: tick,
+                vestingBatchAmount: vestingBatchAmount,
+                vestingInterval: vestingInterval
+            )
         }
 
         /// Register a reward strategy
@@ -419,6 +467,7 @@ access(all) contract FRC20StakingManager {
 
     /// Unstake tokens
     ///
+    access(all)
     fun unstake(
         _ semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>,
         nftId: UInt64
@@ -443,6 +492,7 @@ access(all) contract FRC20StakingManager {
 
     /// Claim all unlocked unstaking changes
     ///
+    access(all)
     fun claimUnlockedUnstakingChange(
         ins: &Fixes.Inscription
     ) {
@@ -487,10 +537,112 @@ access(all) contract FRC20StakingManager {
 
     /// Donate FRC20 to the staking pool
     ///
+    access(all)
     fun donateToStakingPool(
         tick: String,
         ins: &Fixes.Inscription
     ) {
+        // singleton resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        /// Check if the staking is already enabled
+        let stakingAddress = acctsPool.getFRC20StakingAddress(tick: tick)
+            ?? panic("The staking pool is not enabled")
+        let stakingPool = FRC20Staking.borrowPool(stakingAddress)
+            ?? panic("The staking pool is not found")
+
+        let changeToDonate <- self._withdrawDonateChange(tick: tick, ins: ins)
+
+        let rewardTick = changeToDonate.getOriginalTick()
+        let rewardStrategy = stakingPool.borrowRewardStrategy(rewardTick)
+            ?? panic("The reward strategy is not registered")
+
+        let amountToDonate = changeToDonate.getBalance()
+        assert(
+            amountToDonate > 0.0,
+            message: "The amount to donate should be greater than zero"
+        )
+        // Donate the tokens
+        rewardStrategy.addIncome(income: <- changeToDonate)
+
+        // emit the event
+        emit StakingPoolDonated(
+            tick: tick,
+            rewardTick: rewardTick,
+            amount: amountToDonate,
+            by: ins.owner?.address ?? panic("The inscription owner is not found")
+        )
+    }
+
+    /// Donate FRC20 to the vesting reward pool
+    ///
+    access(all)
+    fun donateToVesting(
+        tick: String,
+        ins: &Fixes.Inscription,
+        vestingBatchAmount: UInt32,
+        vestingInterval: UFix64,
+    ) {
+        // call the internal method
+        self._donateToVesting(
+            changeToDonate: <- self._withdrawDonateChange(tick: tick, ins: ins),
+            tick: tick,
+            vestingBatchAmount: vestingBatchAmount,
+            vestingInterval: vestingInterval
+        )
+    }
+
+    /// Donate Change to the staking's vesting pool
+    /// (Internal Method)
+    ///
+    access(contract)
+    fun _donateToVesting(
+        changeToDonate: @FRC20FTShared.Change,
+        tick: String,
+        vestingBatchAmount: UInt32,
+        vestingInterval: UFix64,
+    ) {
+        // singleton resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        let stakingAddress = acctsPool.getFRC20StakingAddress(tick: tick) ?? panic("The staking pool is not enabled")
+        let vestingVault = FRC20StakingVesting.borrowVaultRef(stakingAddress)
+            ?? panic("The vesting vault is not found")
+
+        let rewardTick = changeToDonate.getOriginalTick()
+        let amountToDonate = changeToDonate.getBalance()
+        let fromAddr = changeToDonate.from
+        assert(
+            amountToDonate > 0.0,
+            message: "The amount to donate should be greater than zero"
+        )
+
+        // Donate the tokens to the vesting vault
+        vestingVault.addVesting(
+            stakeTick: tick,
+            rewardChange: <- changeToDonate,
+            vestingBatchAmount: vestingBatchAmount,
+            vestingInterval: vestingInterval
+        )
+
+        emit StakingPoolDonatedAsVesting(
+            tick: tick,
+            rewardTick: rewardTick,
+            amount: amountToDonate,
+            by: fromAddr,
+            batchAmount: vestingBatchAmount,
+            interval: vestingInterval
+        )
+    }
+
+    /// Withdraw the donate change from FRC20 Indexer
+    /// (Internal Method)
+    ///
+    access(contract)
+    fun _withdrawDonateChange(
+        tick: String,
+        ins: &Fixes.Inscription,
+    ): @FRC20FTShared.Change {
         // singleton resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -541,25 +693,12 @@ access(all) contract FRC20StakingManager {
         } else {
             changeToDonate <-! frc20Indexer.withdrawChange(ins: ins)
         }
-        let amountToDonate = changeToDonate?.getBalance() ?? 0.0
-        assert(
-            amountToDonate > 0.0,
-            message: "The amount to donate should be greater than zero"
-        )
-        // Donate the tokens
-        rewardStrategy!.addIncome(income: <- (changeToDonate ?? panic("The change to donate is not found")))
-
-        // emit the event
-        emit StakingPoolDonated(
-            tick: tick,
-            rewardTick: rewardTick,
-            amount: amountToDonate,
-            by: fromAddr
-        )
+        return <- (changeToDonate ?? panic("The change to donate is not found"))
     }
 
     /// Claim rewards
     ///
+    access(all)
     fun claimRewards(
         _ semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>,
         nftIds: [UInt64]

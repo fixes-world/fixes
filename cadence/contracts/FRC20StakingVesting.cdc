@@ -22,6 +22,7 @@ access(all) contract FRC20StakingVesting {
         vestingAmount: UFix64,
         totalBatches: UInt32,
         interval: UFix64,
+        from: Address,
     )
     /// Event emitted when the `VestingEntry` is vested
     access(all) event VestingEntryVested(
@@ -29,6 +30,7 @@ access(all) contract FRC20StakingVesting {
         vestingTick: String,
         currentBatch: UInt32,
         vestedAmount: UFix64,
+        from: Address
     )
 
     /* --- Variable, Enums and Structs --- */
@@ -212,6 +214,7 @@ access(all) contract FRC20StakingVesting {
                 vestingTick: self.getVestingTick(),
                 currentBatch: self.vestedBatchAmount,
                 vestedAmount: nextVestableAmount,
+                from: vestableChange.from
             )
             // return the vestable change
             return <- vestableChange
@@ -298,8 +301,13 @@ access(all) contract FRC20StakingVesting {
                 stakingPool.borrowRewardStrategy(rewardTick) != nil,
                 message: "The reward strategy is not found"
             )
+            assert(
+                rewardChange.getOriginalTick() == rewardTick,
+                message: "The reward change is not matched with the reward tick"
+            )
 
             let vestingAmount = rewardChange.getBalance()
+            let fromAddr = rewardChange.from
 
             let newEntry <- create VestingEntry(
                 stakeTick: stakeTick,
@@ -316,6 +324,7 @@ access(all) contract FRC20StakingVesting {
                 vestingAmount: vestingAmount,
                 totalBatches: vestingBatchAmount,
                 interval: vestingInterval,
+                from: fromAddr
             )
         }
 
@@ -402,7 +411,7 @@ access(all) contract FRC20StakingVesting {
     access(all)
     fun borrowVaultRef(
         _ addr: Address
-    ): &Vault{VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
+    ): &Vault{VestingVaultPublic}? {
         return self.getVaultCap(addr).borrow()
     }
 
