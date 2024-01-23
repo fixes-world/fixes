@@ -265,6 +265,8 @@ access(all) contract FRC20StakingManager {
         // - FRC20Staking.Pool: Pool resource
         // - FRC20FTShared.SharedStore: Staking Pool configuration
         // - FRC20FTShared.Hooks: Hooks for the staking pool
+        // - FixesHeartbeat.IHeartbeatHook: Register to FixesHeartbeat with the scope of "Staking:<tick>"
+        // - FRC20StakingVesting.Vault: Vesting vault for the staking pool
         // - FRC20StakingForwarder.Forwarder: Forward $FLOW to the staking pool
 
         if let pool = childAcctRef.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath) {
