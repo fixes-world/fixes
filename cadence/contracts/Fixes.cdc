@@ -1,7 +1,10 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+> Author: FIXeS World <https://fixes.world/>
+
+# FIXeS Core Contract
+
+This is the basic contract of the FIXeS protocol. It contains the logic to create and manage inscriptions.
+
 */
 
 import "MetadataViews"

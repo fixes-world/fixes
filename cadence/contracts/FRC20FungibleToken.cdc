@@ -1,7 +1,11 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20FungibleToken
+
+TODO: Add description
+
 */
 
 import "FungibleToken"

@@ -1,7 +1,10 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20 Indexer
+
+This the main contract of FRC20, it is used to deploy and manage the FRC20 tokens.
+
 */
 // Third-party imports
 import "StringUtils"

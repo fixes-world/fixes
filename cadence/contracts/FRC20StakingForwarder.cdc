@@ -1,6 +1,9 @@
 /**
+> Author: FIXeS World <https://fixes.world/>
 
-# FRC20 Staking Forwarder Contract
+# FRC20StakingForwarder
+
+TODO: Add description
 
 */
 import "FungibleToken"

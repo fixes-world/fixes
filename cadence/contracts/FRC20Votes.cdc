@@ -1,7 +1,10 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20Votes
+
+TODO: Add description
+
 */
 import "Fixes"
 import "FRC20Indexer"

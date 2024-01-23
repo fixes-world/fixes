@@ -1,7 +1,10 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20 Staking Contract
+
+TODO: Add description
+
 */
 // Third Party Imports
 import "FungibleToken"

@@ -1,7 +1,10 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20 Accounts Pool
+
+TODO: Add description
+
 */
 
 // Third-party imports

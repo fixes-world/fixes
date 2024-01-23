@@ -1,7 +1,10 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20FTShared
+
+This contract is a shared library for FRC20 Fungible Token.
+
 */
 import "FlowToken"
 import "FungibleToken"

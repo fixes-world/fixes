@@ -1,7 +1,10 @@
 /**
-#
-# Author: FIXeS World <https://fixes.world/>
-#
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20StakingVesting
+
+TODO: Add description
+
 */
 import "FixesHeartbeat"
 import "FRC20FTShared"
