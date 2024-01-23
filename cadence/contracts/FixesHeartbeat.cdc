@@ -15,6 +15,8 @@ access(all) contract FixesHeartbeat {
     access(all) event ContractInitialized()
     /// Event emitted when a hook is added
     access(all) event HookAdded(scope: String, hookAddr: Address, hookType: Type)
+    /// Event emitted when a hook is removed
+    access(all) event HookRemoved(scope: String, hookAddr: Address)
     /// Event emitted when the heartbeat time is updated
     access(all) event HeartbeatExecuted(scope: String, lastHeartbeatTime: UFix64, deltaTime: UFix64)
 
@@ -126,6 +128,18 @@ access(all) contract FixesHeartbeat {
                 // Emit the event
                 emit HookAdded(scope: scope, hookAddr: hookAddr, hookType: hookRef.getType())
             }
+        }
+    }
+
+    /// Remove a hook from the specified scope
+    ///
+    access(account)
+    fun removeHook(scope: String, hookAddr: Address) {
+        if let hooks = FixesHeartbeat.borrowHooksDictRef(scope: scope) {
+            hooks.remove(key: hookAddr)
+
+            // Emit the event
+            emit HookRemoved(scope: scope, hookAddr: hookAddr)
         }
     }
 
