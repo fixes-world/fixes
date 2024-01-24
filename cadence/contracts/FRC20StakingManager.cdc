@@ -270,6 +270,11 @@ access(all) contract FRC20StakingManager {
             let pool <- FRC20Staking.createPool(tick)
             // save the market in the account
             childAcctRef.save(<- pool, to: FRC20Staking.StakingPoolStoragePath)
+            // reference of stake pool
+            let poolRef = childAcctRef.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath)
+                ?? panic("The staking pool is not found")
+            poolRef.initialize()
+
             // link the market to the public path
             childAcctRef.unlink(FRC20Staking.StakingPoolPublicPath)
             childAcctRef.link<&FRC20Staking.Pool{FRC20Staking.PoolPublic}>(FRC20Staking.StakingPoolPublicPath, target: FRC20Staking.StakingPoolStoragePath)
@@ -428,12 +433,12 @@ access(all) contract FRC20StakingManager {
         var isValid = self.isWhitelisted(addr)
         // Check if the controller is staked enough tokens
         if !isValid {
-            let delegator = FRC20Staking.borrowDelegator(addr)
-                ?? panic("The controller is not a delegator")
-            let totalStakedBalance = pool.getDetails().totalStaked
-            let controllerStakedBalance = delegator.getStakedBalance(tick: stakeTick)
-            // if the controller staked more than 10% of the total staked tokens, then it is valid
-            isValid = controllerStakedBalance >= totalStakedBalance * 0.1
+            if let delegator = FRC20Staking.borrowDelegator(addr) {
+                let totalStakedBalance = pool.getDetails().totalStaked
+                let controllerStakedBalance = delegator.getStakedBalance(tick: stakeTick)
+                // if the controller staked more than 10% of the total staked tokens, then it is valid
+                isValid = controllerStakedBalance >= totalStakedBalance * 0.1
+            }
         }
         return isValid
     }
