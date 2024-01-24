@@ -28,10 +28,15 @@ fun main():[TokenMarketInfo] {
             }
             let totalStatus = marketRecords!.getStatus()
 
+            // staking info
+            let stakingAddr = acctsPool.getFRC20StakingAddress(tick: tick)
+
             ret.append(TokenMarketInfo(
                 meta: tokenMeta,
                 holders: indexer.getHoldersAmount(tick: tick),
                 pool: indexer.getPoolBalance(tick: tick),
+                stakable: stakingAddr != nil,
+                stakingAddr: stakingAddr,
                 volume24h: todayStatus?.volume ?? 0.0,
                 sales24h: todayStatus?.sales ?? 0,
                 volumeTotal: totalStatus.volume,
@@ -47,9 +52,13 @@ fun main():[TokenMarketInfo] {
 
 access(all)
 struct TokenMarketInfo {
+    // Token Meta
     access(all) let meta: FRC20Indexer.FRC20Meta
     access(all) let holders: UInt64
     access(all) let pool: UFix64
+    access(all) let stakable: Bool
+    access(all) let stakingAddr: Address?
+    // Market status
     access(all) let volume24h: UFix64
     access(all) let sales24h: UInt64
     access(all) let volumeTotal: UFix64
@@ -62,6 +71,8 @@ struct TokenMarketInfo {
         meta: FRC20Indexer.FRC20Meta,
         holders: UInt64,
         pool: UFix64,
+        stakable: Bool,
+        stakingAddr: Address?,
         volume24h: UFix64,
         sales24h: UInt64,
         volumeTotal: UFix64,
@@ -73,6 +84,8 @@ struct TokenMarketInfo {
         self.meta = meta
         self.holders = holders
         self.pool = pool
+        self.stakable = stakable
+        self.stakingAddr = stakingAddr
         self.volume24h = volume24h
         self.sales24h = sales24h
         self.volumeTotal = volumeTotal

@@ -94,10 +94,15 @@ fun main(
     properties[FRC20FTShared.ConfigType.MarketFeeTokenSpecificRatio.rawValue] = (sharedSotre.getByEnum(FRC20FTShared.ConfigType.MarketFeeTokenSpecificRatio) as! UFix64? ?? 0.0).toString()
     properties[FRC20FTShared.ConfigType.MarketFeeDeployerRatio.rawValue] = (sharedSotre.getByEnum(FRC20FTShared.ConfigType.MarketFeeDeployerRatio) as! UFix64? ?? 0.0).toString()
 
+    // staking info
+    let stakingAddr = acctsPool.getFRC20StakingAddress(tick: tick)
+
     return TokenMarketDetailed(
         meta: tokenMeta,
         holders: indexer.getHoldersAmount(tick: tick),
         pool: indexer.getPoolBalance(tick: tick),
+        stakable: stakingAddr != nil,
+        stakingAddr: stakingAddr,
         volume24h: todayStatus?.volume ?? 0.0,
         sales24h: todayStatus?.sales ?? 0,
         volumeTotal: totalStatus.volume,
@@ -120,9 +125,13 @@ fun main(
 
 access(all)
 struct TokenMarketDetailed {
+    // TokenMeta
     access(all) let meta: FRC20Indexer.FRC20Meta
     access(all) let holders: UInt64
     access(all) let pool: UFix64
+    access(all) let stakable: Bool
+    access(all) let stakingAddr: Address?
+    // MarketStatus
     access(all) let volume24h: UFix64
     access(all) let sales24h: UInt64
     access(all) let volumeTotal: UFix64
@@ -144,6 +153,8 @@ struct TokenMarketDetailed {
         meta: FRC20Indexer.FRC20Meta,
         holders: UInt64,
         pool: UFix64,
+        stakable: Bool,
+        stakingAddr: Address?,
         volume24h: UFix64,
         sales24h: UInt64,
         volumeTotal: UFix64,
@@ -162,6 +173,8 @@ struct TokenMarketDetailed {
         self.meta = meta
         self.holders = holders
         self.pool = pool
+        self.stakable = stakable
+        self.stakingAddr = stakingAddr
         self.volume24h = volume24h
         self.sales24h = sales24h
         self.volumeTotal = volumeTotal
