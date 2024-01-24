@@ -37,6 +37,7 @@ fun main():[TokenMarketInfo] {
                 pool: indexer.getPoolBalance(tick: tick),
                 stakable: stakingAddr != nil,
                 stakingAddr: stakingAddr,
+                marketEnabled: acctsPool.getFRC20MarketAddress(tick: tick) != nil,
                 volume24h: todayStatus?.volume ?? 0.0,
                 sales24h: todayStatus?.sales ?? 0,
                 volumeTotal: totalStatus.volume,
@@ -58,6 +59,7 @@ struct TokenMarketInfo {
     access(all) let pool: UFix64
     access(all) let stakable: Bool
     access(all) let stakingAddr: Address?
+    access(all) let marketEnabled: Bool
     // Market status
     access(all) let volume24h: UFix64
     access(all) let sales24h: UInt64
@@ -73,6 +75,7 @@ struct TokenMarketInfo {
         pool: UFix64,
         stakable: Bool,
         stakingAddr: Address?,
+        marketEnabled: Bool,
         volume24h: UFix64,
         sales24h: UInt64,
         volumeTotal: UFix64,
@@ -86,6 +89,7 @@ struct TokenMarketInfo {
         self.pool = pool
         self.stakable = stakable
         self.stakingAddr = stakingAddr
+        self.marketEnabled = marketEnabled
         self.volume24h = volume24h
         self.sales24h = sales24h
         self.volumeTotal = volumeTotal

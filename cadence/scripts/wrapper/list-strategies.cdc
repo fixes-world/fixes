@@ -31,6 +31,7 @@ fun main(
                     pool: frc20Indexer.getPoolBalance(tick: info.tick),
                     stakable: stakingAddr != nil,
                     stakingAddr: stakingAddr,
+                    marketEnabled: acctsPool.getFRC20MarketAddress(tick: info.tick) != nil,
                     collectionDisplay: wrapperIndexer.getNFTCollectionDisplay(nftType: info.nftType)
                 ))
             }
@@ -49,6 +50,7 @@ access(all) struct Strategy {
     access(all) let pool: UFix64
     access(all) let stakable: Bool
     access(all) let stakingAddr: Address?
+    access(all) let marketEnabled: Bool
 
     init(
         host: Address,
@@ -58,6 +60,7 @@ access(all) struct Strategy {
         pool: UFix64,
         stakable: Bool,
         stakingAddr: Address?,
+        marketEnabled: Bool,
         collectionDisplay: MetadataViews.NFTCollectionDisplay
     ) {
         self.host = host
@@ -67,6 +70,7 @@ access(all) struct Strategy {
         self.pool = pool
         self.stakable = stakable
         self.stakingAddr = stakingAddr
+        self.marketEnabled = marketEnabled
         self.collectionDisplay = collectionDisplay
     }
 }

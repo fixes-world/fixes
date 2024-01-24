@@ -21,6 +21,7 @@ fun main(
                 pool: indexer.getPoolBalance(tick: tick),
                 stakable: stakingAddr != nil,
                 stakingAddr: stakingAddr,
+                marketEnabled: acctsPool.getFRC20MarketAddress(tick: tick) != nil,
             ))
         }
     }
@@ -35,6 +36,7 @@ access(all) struct BalanceInfo {
     access(all) let pool: UFix64
     access(all) let stakable: Bool
     access(all) let stakingAddr: Address?
+    access(all) let marketEnabled: Bool
 
     init(
         tick: String,
@@ -44,6 +46,7 @@ access(all) struct BalanceInfo {
         pool: UFix64,
         stakable: Bool,
         stakingAddr: Address?,
+        marketEnabled: Bool,
     ) {
         self.tick = tick
         self.balance = balance
@@ -52,5 +55,6 @@ access(all) struct BalanceInfo {
         self.pool = pool
         self.stakable = stakable
         self.stakingAddr = stakingAddr
+        self.marketEnabled = marketEnabled
     }
 }

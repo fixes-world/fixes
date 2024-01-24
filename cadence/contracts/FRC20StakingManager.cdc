@@ -226,17 +226,8 @@ access(all) contract FRC20StakingManager {
 
             // Check if the controller is whitelisted or staked enough tokens
             let controlleAddr = self.getControllerAddress()
-            var isValid = FRC20StakingManager.isWhitelisted(controlleAddr)
-            if !isValid {
-                let delegator = FRC20Staking.borrowDelegator(controlleAddr)
-                    ?? panic("The controller is not a delegator")
-                let totalStakedBalance = pool.getDetails().totalStaked
-                let controllerStakedBalance = delegator.getStakedBalance(tick: stakeTick)
-                // if the controller staked more than 10% of the total staked tokens, then it is valid
-                isValid = controllerStakedBalance >= totalStakedBalance * 0.1
-            }
             assert(
-                isValid,
+                FRC20StakingManager.isEligibleForRegistering(stakeTick: stakeTick, addr: controlleAddr),
                 message: "The controller is not whitelisted or staked enough tokens"
             )
 
@@ -419,6 +410,32 @@ access(all) contract FRC20StakingManager {
             .borrow()
             ?? panic("Could not borrow the admin reference")
         return admin.isWhitelisted(address: address)
+    }
+
+    /// Check if the given address is eligible for registering
+    ///
+    access(all) view
+    fun isEligibleForRegistering(stakeTick: String, addr: Address): Bool {
+        // singleton resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        // Get the staking pool address
+        let poolAddress = acctsPool.getFRC20StakingAddress(tick: stakeTick)
+            ?? panic("The staking pool is not enabled")
+        // borrow the staking pool
+        let pool = FRC20Staking.borrowPool(poolAddress)
+            ?? panic("The staking pool is not found")
+        // Check if the controller is whitelisted or staked enough tokens
+        var isValid = self.isWhitelisted(addr)
+        // Check if the controller is staked enough tokens
+        if !isValid {
+            let delegator = FRC20Staking.borrowDelegator(addr)
+                ?? panic("The controller is not a delegator")
+            let totalStakedBalance = pool.getDetails().totalStaked
+            let controllerStakedBalance = delegator.getStakedBalance(tick: stakeTick)
+            // if the controller staked more than 10% of the total staked tokens, then it is valid
+            isValid = controllerStakedBalance >= totalStakedBalance * 0.1
+        }
+        return isValid
     }
 
     /// Create a new staking controller

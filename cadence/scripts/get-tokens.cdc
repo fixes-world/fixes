@@ -25,6 +25,7 @@ fun main(
                 pool: indexer.getPoolBalance(tick: tick),
                 stakable: stakingAddr != nil,
                 stakingAddr: stakingAddr,
+                marketEnabled: acctsPool.getFRC20MarketAddress(tick: tick) != nil,
             ))
         }
     }
@@ -37,6 +38,7 @@ access(all) struct FRC20Info {
     access(all) let pool: UFix64
     access(all) let stakable: Bool
     access(all) let stakingAddr: Address?
+    access(all) let marketEnabled: Bool
 
     init(
         meta: FRC20Indexer.FRC20Meta,
@@ -44,11 +46,13 @@ access(all) struct FRC20Info {
         pool: UFix64,
         stakable: Bool,
         stakingAddr: Address?,
+        marketEnabled: Bool
     ) {
         self.holders = holders
         self.meta = meta
         self.pool = pool
         self.stakable = stakable
         self.stakingAddr = stakingAddr
+        self.marketEnabled = marketEnabled
     }
 }

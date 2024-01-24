@@ -237,6 +237,7 @@ access(all) contract FRC20Staking {
                     totalReward: reward.totalReward.getBalance(),
                     globalYieldRate: reward.globalYieldRate,
                     rewardTick: reward.rewardTick,
+                    registeredAt: reward.registeredAt
                 )
             }
             return nil
@@ -687,17 +688,21 @@ access(all) contract FRC20Staking {
         let rewardTick: String
         access(all)
         let rewardVaultType: Type?
+        access(all)
+        let registeredAt: UFix64
 
         init(
             stakeTick: String,
             totalReward: UFix64,
             globalYieldRate: UFix64,
             rewardTick: String,
+            registeredAt: UFix64
         ) {
             self.stakeTick = stakeTick
             self.totalReward = totalReward
             self.globalYieldRate = globalYieldRate
             self.rewardTick = rewardTick
+            self.registeredAt = registeredAt
 
             if rewardTick == "" {
                 self.rewardVaultType = Type<@FlowToken.Vault>()
@@ -712,8 +717,12 @@ access(all) contract FRC20Staking {
     /// Reward Strategy Resource, represents a reward strategy for a FRC20 token and store in pool's account
     ///
     access(all) resource RewardStrategy {
+        /// The pool capability
         access(self)
         let poolCap: Capability<&Pool{PoolPublic}>
+        /// The registered time of the reward strategy
+        access(self)
+        let registeredAt: UFix64
         /// The ticker name of staking pool
         access(all)
         let stakeTick: String
@@ -735,6 +744,7 @@ access(all) contract FRC20Staking {
                 pool.check(): "Pool must be valid"
             }
 
+            self.registeredAt = getCurrentBlock().timestamp
             self.poolCap = pool
             let poolRef = pool.borrow() ?? panic("Pool must exist")
 
