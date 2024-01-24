@@ -720,17 +720,17 @@ access(all) contract FRC20Staking {
         /// The pool capability
         access(self)
         let poolCap: Capability<&Pool{PoolPublic}>
-        /// The registered time of the reward strategy
-        access(self)
-        let registeredAt: UFix64
         /// The ticker name of staking pool
         access(all)
         let stakeTick: String
         /// The ticker name of reward
         access(all)
         let rewardTick: String
+        /// The registered time of the reward strategy
+        access(contract)
+        let registeredAt: UFix64
         /// The global yield rate of the reward strategy
-        access(account)
+        access(contract)
         var globalYieldRate: UFix64
         /// The reward change, can be any FRC20 token or Flow FT
         access(contract)
