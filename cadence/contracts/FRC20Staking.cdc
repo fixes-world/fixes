@@ -117,7 +117,9 @@ access(all) contract FRC20Staking {
 
         /** ---- Delegators ---- */
 
-        // Add public methods
+        /// Returns the delegator unstaking info
+        access(all) view
+        fun getDelegatorUnstakingInfo(_ delegator: Address): DelegatorUnstakingInfo?
 
         /** -- Delegators: Account Level Methods -- */
 
@@ -212,6 +214,8 @@ access(all) contract FRC20Staking {
 
         /** ---- Public Methods ---- */
 
+        /// Returns the details of the staking pool
+        ///
         access(all) view
         fun getDetails(): StakingInfo {
             let totalStakedRef = self.borrowTotalStaked()
@@ -224,11 +228,15 @@ access(all) contract FRC20Staking {
             )
         }
 
+        /// Returns the reward strategy names
+        ///
         access(all) view
         fun getRewardNames(): [String] {
             return self.rewards.keys
         }
 
+        /// Returns the reward details of the given tick name
+        ///
         access(all) view
         fun getRewardDetails(_ rewardTick: String): RewardDetails? {
             if let reward = self.borrowRewardStrategy(rewardTick) {
@@ -239,6 +247,16 @@ access(all) contract FRC20Staking {
                     rewardTick: reward.rewardTick,
                     registeredAt: reward.registeredAt
                 )
+            }
+            return nil
+        }
+
+        /// Returns the delegator unstaking info
+        ///
+        access(all) view
+        fun getDelegatorUnstakingInfo(_ delegator: Address): DelegatorUnstakingInfo? {
+            if let delegatorRecordRef = self.borrowDelegatorRecord(delegator) {
+                return delegatorRecordRef.getDetails()
             }
             return nil
         }
@@ -448,9 +466,40 @@ access(all) contract FRC20Staking {
         }
     }
 
+    /// Delegator Unstaking Info Struct, represents a delegator unstaking info for a FRC20 token
+    ///
+    access(all) struct DelegatorUnstakingInfo {
+        access(all) let delegator: Address
+        access(all) let delegatorId: UInt32
+        access(all) let stakeTick: String
+        access(all) let unstakingEntriesNFTIds: [UInt64]
+        access(all) let totalUnstakingBalance: UFix64
+        access(all) let totalUnlockedClaimableBalance: UFix64
+        init(
+            delegator: Address,
+            delegatorId: UInt32,
+            stakeTick: String,
+            unstakingEntriesNFTIds: [UInt64],
+            totalUnstakingBalance: UFix64,
+            totalUnlockedClaimableBalance: UFix64
+        ) {
+            self.delegator = delegator
+            self.delegatorId = delegatorId
+            self.stakeTick = stakeTick
+            self.unstakingEntriesNFTIds = unstakingEntriesNFTIds
+            self.totalUnstakingBalance = totalUnstakingBalance
+            self.totalUnlockedClaimableBalance = totalUnlockedClaimableBalance
+        }
+    }
+
+    /// Interface of Delegator Unstaking Entry
+    ///
     access(all) resource interface UnstakingEntryPublic {
         access(all)
         let unlockTime: UInt64
+
+        access(all)
+        fun getNFTId(): UInt64?
 
         access(all)
         fun isUnlocked(): Bool
@@ -480,6 +529,11 @@ access(all) contract FRC20Staking {
 
         destroy () {
             destroy self.unstakingNFT
+        }
+
+        access(all)
+        fun getNFTId(): UInt64? {
+            return self.unstakingNFT?.id
         }
 
         access(all)
@@ -563,19 +617,39 @@ access(all) contract FRC20Staking {
             return false
         }
 
+        /// Get all unlocked balance
+        ///
         access(all)
-        fun getAllUnlockedBalance(): UFix64 {
+        fun getDetails(): DelegatorUnstakingInfo {
+            var totalUnlockedBalance = 0.0
             var totalBalance = 0.0
+            var nftIds: [UInt64] = []
             let len = self.unstakingEntries.length
             var i = 0
             while i < len {
                 let entryRef = self.borrowEntry(i)
-                if entryRef.isUnlocked() {
-                    totalBalance = totalBalance + entryRef.unlockingBalance()
+                let unlockingBalance = entryRef.unlockingBalance()
+                // add to NFTIds
+                if let nftId = entryRef.getNFTId() {
+                    nftIds.append(nftId)
                 }
+                // add to unlocked balance
+                if entryRef.isUnlocked() {
+                    totalUnlockedBalance = totalUnlockedBalance + unlockingBalance
+                }
+                // add to total balance
+                totalBalance = totalBalance + unlockingBalance
+                // loop next
                 i = i + 1
             }
-            return totalBalance
+            return DelegatorUnstakingInfo(
+                delegator: self.delegator,
+                delegatorId: self.id,
+                stakeTick: self.stakeTick,
+                unstakingEntriesNFTIds: nftIds,
+                totalUnstakingBalance: totalBalance,
+                totalUnlockedClaimableBalance: totalUnlockedBalance
+            )
         }
 
         /// Locking unstaking FRC20 token
