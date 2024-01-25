@@ -114,6 +114,9 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         fun getOriginalTick(): String
 
         access(all) view
+        fun getTickerName(): String
+
+        access(all) view
         fun isStakedTick(): Bool
 
         access(all) view
@@ -280,6 +283,11 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(all) view
         fun getOriginalTick(): String {
             return self.wrappedChange.getOriginalTick()
+        }
+
+        access(all) view
+        fun getTickerName(): String {
+            return self.wrappedChange.tick
         }
 
         access(all) view

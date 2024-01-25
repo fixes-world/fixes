@@ -1,6 +1,6 @@
 import "NonFungibleToken"
 import "MetadataViews"
-import "StringUtils"
+// import "StringUtils"
 import "FixesWrappedNFT"
 
 access(all)
