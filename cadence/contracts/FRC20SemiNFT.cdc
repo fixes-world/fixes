@@ -155,7 +155,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         let claimingRecords: {String: RewardClaimRecord}
 
         init(
-            _ change: @FRC20FTShared.Change
+            _ change: @FRC20FTShared.Change,
+            initialYieldRates: {String: UFix64}
         ) {
             pre {
                 change.isBackedByVault() == false: "Cannot wrap a vault backed FRC20 change"
@@ -163,6 +164,19 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             self.id = self.uuid
             self.wrappedChange <- change
             self.claimingRecords = {}
+
+            // initialize the claiming records
+            if self.wrappedChange.isStakedTick() {
+                let strategies = initialYieldRates.keys
+                for name in strategies {
+                    let recordRef = self._borrowOrCreateClaimingRecord(
+                        poolAddress: self.wrappedChange.from,
+                        rewardTick: name
+                    )
+                    // update the initial record
+                    recordRef.updateClaiming(currentGlobalYieldRate: initialYieldRates[name]!, time: nil)
+                }
+            } // end if
 
             FRC20SemiNFT.totalSupply = FRC20SemiNFT.totalSupply + 1
 
@@ -397,7 +411,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             let splitChange <- self.wrappedChange.withdrawAsChange(amount: splitBalance)
 
             // create a new NFT
-            let newNFT <- create NFT(<- splitChange)
+            let newNFT <- create NFT(<- splitChange, initialYieldRates: {})
 
             // check balance of the new NFT and the old NFT
             assert(
@@ -749,10 +763,11 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// recipients collection using their collection reference
     /// -- recipient, the collection of FRC20SemiNFT
     ///
-    access(all)
+    access(account)
     fun wrap(
         recipient: &FRC20SemiNFT.Collection{NonFungibleToken.CollectionPublic},
         change: @FRC20FTShared.Change,
+        initialYieldRates: {String: UFix64}
     ): UInt64 {
         pre {
             change.isBackedByVault() == false: "Cannot wrap a vault backed FRC20 change"
@@ -760,8 +775,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         let poolAddress = change.from
         let tick = change.tick
         let balance = change.getBalance()
+
         // create a new NFT
-        var newNFT <- create NFT(<- change)
+        // Set the initial Global yield rate to the current one, so that users cannot obtain previous profits.
+        var newNFT <- create NFT(<- change, initialYieldRates: initialYieldRates)
         let nftId = newNFT.id
         // deposit it in the recipient's account using their reference
         recipient.deposit(token: <-newNFT)
@@ -771,7 +788,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// Unwraps an NFT and deposits it in the recipients collection
     /// using their collection reference
     ///
-    access(all)
+    access(account)
     fun unwrapFRC20(
         nftToUnwrap: @FRC20SemiNFT.NFT,
     ): @FRC20FTShared.Change {

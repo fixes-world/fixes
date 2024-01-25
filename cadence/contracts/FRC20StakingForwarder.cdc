@@ -103,10 +103,10 @@ access(all) contract FRC20StakingForwarder {
                 rewardStrategyRef = poolRef.borrowRewardStrategy("")
             }
 
-            if rewardStrategyRef == nil {
-                // Forward the tokens to fallback receiver
-                let fallbackReceiver = self.fallbackBorrow()
-                    ?? panic("No fallback receiver set in Staking Forwarder")
+            let fallbackReceiver = self.fallbackBorrow()
+                ?? panic("No fallback receiver set in Staking Forwarder")
+            // When the amount is less than 1, deposit directly to the fallback address.
+            if balance < 1.0 || rewardStrategyRef == nil {
                 fallbackReceiver.deposit(from: <- from)
             } else {
                 // Forward the tokens to staking pool
@@ -115,8 +115,8 @@ access(all) contract FRC20StakingForwarder {
                     from: forwarderAddr,
                 )
                 rewardStrategyRef!.addIncome(income: <- change)
+                emit ForwardedDeposit(amount: balance, from: forwarderAddr)
             }
-            emit ForwardedDeposit(amount: balance, from: forwarderAddr)
         }
     }
 

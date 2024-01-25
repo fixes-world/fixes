@@ -876,7 +876,9 @@ access(all) contract FRC20Staking {
                 // add to total reward and update global yield rate
                 let totalStakedToken = totalStakedRef.getBalance()
                 // update global yield rate
-                self.globalYieldRate = self.globalYieldRate + incomeValue / totalStakedToken
+                self.globalYieldRate = totalStakedToken > 0.0
+                    ? self.globalYieldRate + incomeValue / totalStakedToken
+                    : self.globalYieldRate
                 // add to total reward
                 FRC20FTShared.depositToChange(
                     receiver: self.borrowRewardRef(),
@@ -1125,9 +1127,25 @@ access(all) contract FRC20Staking {
             let tick = change.getOriginalTick()
             let semiNFTCol = self.borrowSemiNFTCollection()
 
+            let initialYieldRates: {String: UFix64} = {}
+            // update all reward strategies record
+            let pool = FRC20Staking.borrowPool(change.from)
+                ?? panic("Pool must exist")
             let fromPool = change.from
             let amount = change.getBalance()
-            let nftId = FRC20SemiNFT.wrap(recipient: semiNFTCol, change: <- change)
+            let strategies = pool.getRewardNames()
+            for rewardTick in strategies {
+                if let reward: &FRC20Staking.RewardStrategy = pool.borrowRewardStrategy(rewardTick) {
+                    // update the claiming record
+                    initialYieldRates[rewardTick] = reward.globalYieldRate
+                }
+            }
+            // wrap the change to semiNFT
+            let nftId = FRC20SemiNFT.wrap(
+                recipient: semiNFTCol,
+                change: <- change,
+                initialYieldRates: initialYieldRates
+            )
 
             // emit event
             emit DelegatorStakedTokenDeposited(
