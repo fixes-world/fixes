@@ -21,17 +21,23 @@ fun main(
         .borrow() {
 
         let nftIDs = collection.getIDs()
-        var endIdx = page * size + size
-        if endIdx > nftIDs.length {
-            endIdx = nftIDs.length
+        var startAt = page * size
+        if startAt >= nftIDs.length {
+            return []
         }
-        let sliced = nftIDs.slice(from: page * size, upTo: endIdx)
+        let sliced = nftIDs.slice(from: startAt, upTo: nftIDs.length)
         let ret: [StakedNFTInfo] = []
         for id in sliced {
             if let nft = collection.borrowFRC20SemiNFTPublic(id: id) {
+                // skip if not staked
                 if nft.isStakedTick() == false {
                     continue
                 }
+                // skip if not the tick we want
+                if tick != nil && nft.getOriginalTick() != tick! {
+                    continue
+                }
+                // get the NFT view
                 let nftView = MetadataViews.getNFTView(id: id, viewResolver: nft)
                 let balance = nft.getBalance()
                 let rewardNames = nft.getRewardStrategies()
@@ -46,6 +52,10 @@ fun main(
                     balance: nft.getBalance(),
                     claimingRecords: claimingRecords,
                 ))
+                // break if we have enough
+                if ret.length >= size {
+                    break
+                }
             }
         }
         return ret
