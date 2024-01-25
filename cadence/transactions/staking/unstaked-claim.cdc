@@ -13,7 +13,6 @@ import "FRC20StakingManager"
 
 transaction(
     tick: String,
-    amount: UFix64,
 ) {
     let ins: &Fixes.Inscription
 
