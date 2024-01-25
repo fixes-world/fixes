@@ -717,6 +717,11 @@ access(all) contract FRC20StakingManager {
                 ins,
                 amount: ins.getInscriptionValue() - ins.getMinCost()
             )
+            // extract the FLOW tokens
+            frc20Indexer.returnChange(change: <- FRC20FTShared.wrapFungibleVaultChange(
+                ftVault: <- ins.extract(),
+                from: ins.owner?.address ?? panic("The inscription owner is not found")
+            ))
         } else {
             changeToDonate <-! frc20Indexer.withdrawChange(ins: ins)
         }
