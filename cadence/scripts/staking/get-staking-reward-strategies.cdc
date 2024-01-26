@@ -45,6 +45,7 @@ fun main(
         let isFTReward = rewardTick == "" || CompositeType(rewardTick) != nil
         if let rewardStrategy = stakingPool.getRewardDetails(rewardTick) {
             let detail = RewardStrategyDetail(
+                name: rewardTick,
                 meta: !isFTReward ? indexer.getTokenMeta(tick: rewardTick) : nil,
                 holders: !isFTReward ? indexer.getHoldersAmount(tick: rewardTick) : nil,
                 pool: !isFTReward ? indexer.getPoolBalance(tick: rewardTick) : nil,
@@ -62,6 +63,7 @@ fun main(
 }
 
 access(all) struct RewardStrategyDetail {
+    access(all) let name: String
     // Reward TokenMeta
     access(all) let meta: FRC20Indexer.FRC20Meta?
     access(all) let holders: UInt64?
@@ -74,6 +76,7 @@ access(all) struct RewardStrategyDetail {
     access(all) let vestings: [FRC20StakingVesting.VestingInfo]
 
     init(
+        name: String,
         meta: FRC20Indexer.FRC20Meta?,
         holders: UInt64?,
         pool: UFix64?,
@@ -83,6 +86,7 @@ access(all) struct RewardStrategyDetail {
         details: FRC20Staking.RewardDetails,
         vestings: [FRC20StakingVesting.VestingInfo]
     ) {
+        self.name = name
         self.meta = meta
         self.holders = holders
         self.pool = pool
