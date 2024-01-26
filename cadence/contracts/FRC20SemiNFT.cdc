@@ -848,6 +848,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         let nftId = nftToUnwrap.id
 
         let changeRef = nftToUnwrap.borrowChange()
+        let poolAddr = changeRef.from
+        let tick = changeRef.tick
         let allBalance = changeRef.getBalance()
         // withdraw all balance from the wrapped change
         let newChange <- changeRef.withdrawAsChange(amount: allBalance)
@@ -861,8 +863,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         // emit the event
         emit Unwrapped(
             id: nftId,
-            pool: changeRef.from,
-            tick: changeRef.tick,
+            pool: poolAddr,
+            tick: tick,
             balance: allBalance
         )
         // return the inscription
