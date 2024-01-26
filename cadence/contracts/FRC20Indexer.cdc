@@ -266,12 +266,12 @@ access(all) contract FRC20Indexer {
             }
             let tickNameSize = 80 + (10 - ticker.length > 0 ? 10 - ticker.length : 0) * 12
             let svgStr = "data:image/svg+xml;utf8,"
-                .concat("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-256 -256 512 512\" width=\"512\" height=\"512\">")
-                .concat("<defs><linearGradient gradientUnits=\"userSpaceOnUse\" x1=\"0\" y1=\"-240\" x2=\"0\" y2=\"240\" id=\"gradient-0\" gradientTransform=\"matrix(0.908427, -0.41805, 0.320369, 0.696163, -69.267567, -90.441103)\"><stop offset=\"0\" style=\"stop-color: rgb(244, 246, 246);\"></stop><stop offset=\"1\" style=\"stop-color: rgb(35, 133, 91);\"></stop></linearGradient></defs>")
-                .concat("<ellipse style=\"fill: rgb(149, 225, 192); stroke-width: 1rem; paint-order: fill; stroke: url(#gradient-0);\" ry=\"240\" rx=\"240\"></ellipse>")
-                .concat("<text style=\"dominant-baseline: middle; fill: rgb(80, 213, 155); font-family: system-ui, sans-serif; text-anchor: middle;\" fill-opacity=\"0.2\" y=\"-12\" font-size=\"420\">𝔉</text>")
-                .concat("<text style=\"dominant-baseline: middle; fill: rgb(244, 246, 246); font-family: system-ui, sans-serif; text-anchor: middle; font-style: italic; font-weight: 700;\" y=\"12\" font-size=\"").concat(tickNameSize.toString()).concat("\">")
-                .concat(ticker).concat("</text></svg>")
+                .concat("%3Csvg%20xmlns%3D%5C%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%5C%22%20viewBox%3D%5C%22-256%20-256%20512%20512%5C%22%20width%3D%5C%22512%5C%22%20height%3D%5C%22512%5C%22%3E")
+                .concat("%3Cdefs%3E%3ClinearGradient%20gradientUnits%3D%5C%22userSpaceOnUse%5C%22%20x1%3D%5C%220%5C%22%20y1%3D%5C%22-240%5C%22%20x2%3D%5C%220%5C%22%20y2%3D%5C%22240%5C%22%20id%3D%5C%22gradient-0%5C%22%20gradientTransform%3D%5C%22matrix(0.908427%2C%20-0.41805%2C%200.320369%2C%200.696163%2C%20-69.267567%2C%20-90.441103)%5C%22%3E%3Cstop%20offset%3D%5C%220%5C%22%20style%3D%5C%22stop-color%3A%20rgb(244%2C%20246%2C%20246)%3B%5C%22%3E%3C%2Fstop%3E%3Cstop%20offset%3D%5C%221%5C%22%20style%3D%5C%22stop-color%3A%20rgb(35%2C%20133%2C%2091)%3B%5C%22%3E%3C%2Fstop%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E")
+                .concat("%3Cellipse%20style%3D%5C%22fill%3A%20rgb(149%2C%20225%2C%20192)%3B%20stroke-width%3A%201rem%3B%20paint-order%3A%20fill%3B%20stroke%3A%20url(%23gradient-0)%3B%5C%22%20ry%3D%5C%22240%5C%22%20rx%3D%5C%22240%5C%22%3E%3C%2Fellipse%3E")
+                .concat("%3Ctext%20style%3D%5C%22dominant-baseline%3A%20middle%3B%20fill%3A%20rgb(80%2C%20213%2C%20155)%3B%20font-family%3A%20system-ui%2C%20sans-serif%3B%20text-anchor%3A%20middle%3B%5C%22%20fill-opacity%3D%5C%220.2%5C%22%20y%3D%5C%22-12%5C%22%20font-size%3D%5C%22420%5C%22%3E%F0%9D%94%89%3C%2Ftext%3E")
+                .concat("%3Ctext%20style%3D%5C%22dominant-baseline%3A%20middle%3B%20fill%3A%20rgb(244%2C%20246%2C%20246)%3B%20font-family%3A%20system-ui%2C%20sans-serif%3B%20text-anchor%3A%20middle%3B%20font-style%3A%20italic%3B%20font-weight%3A%20700%3B%5C%22%20y%3D%5C%2212%5C%22%20font-size%3D%5C%22").concat(tickNameSize.toString()).concat("%5C%22%3E")
+                .concat(ticker).concat("%3C%2Ftext%3E%3C%2Fsvg%3E")
             let medias = MetadataViews.Medias([MetadataViews.Media(
                 file: MetadataViews.HTTPFile(url: svgStr),
                 mediaType: "image/svg+xml"
