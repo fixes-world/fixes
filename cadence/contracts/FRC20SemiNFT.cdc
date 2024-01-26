@@ -257,7 +257,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                         .concat("<text style='dominant-baseline: middle; fill: rgb(244, 246, 246); font-family: system-ui, sans-serif; font-style: italic; font-weight: 700; paint-order: fill; text-anchor: middle; white-space: pre;' x='1024' y='1500' font-size='360'>").concat(balanceStr).concat("</text>")
                     // add staked tag
                     if isStaked {
-                        svgStr = svgStr.concat("<g transform='matrix(1, 0, 0, 1, 128, 192)'><text style='dominant-baseline: middle; fill: rgb(244, 246, 246); font-family: system-ui, sans-serif; font-size: 160px; font-style: italic; font-weight: 700; letter-spacing: 4px; paint-order: fill; white-space: pre;' x='0' y='0'>Staked 𝔉rc20</text><text style='dominant-baseline: middle; fill: rgb(242, 201, 125); font-family: system-ui, sans-serif; font-size: 160px; font-style: italic; font-weight: 700; letter-spacing: 4px; paint-order: fill; white-space: pre;' x='-4' y='-6'>Staked 𝔉rc20</text></g>")
+                        svgStr = svgStr.concat("<g transform='matrix(1, 0, 0, 1, 128, 192)'><text style='dominant-baseline: middle; fill: rgb(244, 246, 246); font-family: system-ui, sans-serif; font-size: 160px; font-style: italic; font-weight: 700; letter-spacing: 4px; paint-order: fill; white-space: pre;' x='0' y='0'>Staked 𝔉rc20</text><text style='dominant-baseline: middle; fill: rgb(242, 201, 125); font-family: system-ui, sans-serif; font-size: 160px; font-style: italic; font-weight: 700; letter-spacing: 4px; paint-order: fill; white-space: pre;' x='-2' y='-4'>Staked 𝔉rc20</text></g>")
                     }
                     // end of svg
                     svgStr = svgStr.concat("</svg>")
