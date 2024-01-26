@@ -210,8 +210,9 @@ access(all) contract FRC20StakingManager {
                 ?? panic("The staking pool is not found")
 
             // Check if the reward token is registered
+            let isFlowFT = rewardTick == "" || CompositeType(rewardTick) != nil
             assert(
-                frc20Indexer.getTokenMeta(tick: rewardTick) != nil,
+                isFlowFT || frc20Indexer.getTokenMeta(tick: rewardTick) != nil,
                 message: "The reward token is not registered"
             )
             // Check if the reward strategy is already registered
