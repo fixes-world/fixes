@@ -50,30 +50,36 @@ access(all) contract FRC20StakingVesting {
     access(all) struct VestingInfo {
         access(all) let stakeTick: String
         access(all) let rewardTick: String
+        access(all) let by: Address
         access(all) let totalAmount: UFix64
         access(all) let vestedAmount: UFix64
         access(all) let totalBatches: UInt32
         access(all) let vestedBatchAmount: UInt32
         access(all) let vestingInterval: UFix64
         access(all) let lastVestedAt: UFix64
+        access(all) let startedAt: UFix64
         init(
             stakeTick: String,
             rewardTick: String,
+            by: Address,
             totalAmount: UFix64,
             vestedAmount: UFix64,
             totalBatches: UInt32,
             vestedBatchAmount: UInt32,
             vestingInterval: UFix64,
             lastVestedAt: UFix64,
+            startedAt: UFix64,
         ) {
             self.stakeTick = stakeTick
             self.rewardTick = rewardTick
+            self.by = by
             self.totalAmount = totalAmount
             self.vestedAmount = vestedAmount
             self.totalBatches = totalBatches
             self.vestedBatchAmount = vestedBatchAmount
             self.vestingInterval = vestingInterval
             self.lastVestedAt = lastVestedAt
+            self.startedAt = startedAt
         }
     }
 
@@ -95,6 +101,9 @@ access(all) contract FRC20StakingVesting {
         /// The initial amount of the change
         access(all)
         let initialAmount: UFix64
+        /// The time when the vesting is started
+        access(all)
+        let startedAt: UFix64
         // ---- Varibles ----
         /// The batch amount that is vested
         access(all)
@@ -116,6 +125,7 @@ access(all) contract FRC20StakingVesting {
             self.interval = interval
             self.vestedBatchAmount = 0
             self.lastVestedAt = 0.0
+            self.startedAt = getCurrentBlock().timestamp
         }
 
         /// @deprecated after Cadence 1.0
@@ -139,12 +149,14 @@ access(all) contract FRC20StakingVesting {
             return VestingInfo(
                 stakeTick: self.stakeTick,
                 rewardTick: self.getVestingTick(),
+                by: self.remaining.from,
                 totalAmount: self.initialAmount,
                 vestedAmount: self.getVestedAmount(),
                 totalBatches: self.totalBatches,
                 vestedBatchAmount: self.vestedBatchAmount,
                 vestingInterval: self.interval,
                 lastVestedAt: self.lastVestedAt,
+                startedAt: self.startedAt,
             )
         }
 
