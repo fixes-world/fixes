@@ -12,7 +12,8 @@ import "FRC20Staking"
 import "FRC20StakingManager"
 
 transaction(
-    tick: String,
+    stakeTick: String,
+    rewardTick: String,
     amount: UFix64,
 ) {
     let ins: &Fixes.Inscription
@@ -66,9 +67,9 @@ transaction(
         let mimeType = "text/plain"
         let metaProtocol = "frc20"
         var dataStr = "op=withdraw,usage=donate"
-        if tick != "" {
+        if rewardTick != "" {
             dataStr = dataStr
-                .concat(",tick=").concat(tick)
+                .concat(",tick=").concat(rewardTick)
                 .concat(",amt=").concat(amount.toString())
         }
         let metadata = dataStr.utf8
@@ -85,7 +86,7 @@ transaction(
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
-        var withdrawAmount = tick == "" ? estimatedReqValue + amount : estimatedReqValue
+        var withdrawAmount = rewardTick == "" ? estimatedReqValue + amount : estimatedReqValue
         // Withdraw tokens from the signer's stored vault
         let flowToReserve <- vaultRef.withdraw(amount: withdrawAmount)
 
@@ -115,7 +116,7 @@ transaction(
     }
 
     execute {
-        FRC20StakingManager.donateToStakingPool(tick: tick, ins: self.ins)
+        FRC20StakingManager.donateToStakingPool(tick: stakeTick, ins: self.ins)
         log("Donate to staking pool successfully!")
     }
 }
