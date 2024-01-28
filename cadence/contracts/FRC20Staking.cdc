@@ -887,6 +887,14 @@ access(all) contract FRC20Staking {
                         receiver: self.borrowRewardRef(),
                         change: <- income
                     )
+
+                    // emit event
+                    emit RewardIncomeAdded(
+                        pool: pool.owner?.address!,
+                        tick: self.rewardTick,
+                        amount: incomeValue,
+                        from: incomeFrom
+                    )
                 } else {
                     // if the income is not enough to update the global yield rate
                     // deposit the income to pool's address
@@ -905,14 +913,6 @@ access(all) contract FRC20Staking {
                     // deposit change to indexer
                     indexer.returnChange(change: <- newChange)
                 }
-
-                // emit event
-                emit RewardIncomeAdded(
-                    pool: pool.owner?.address!,
-                    tick: self.rewardTick,
-                    amount: incomeValue,
-                    from: incomeFrom
-                )
             } else {
                 destroy income
             }
