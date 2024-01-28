@@ -98,6 +98,9 @@ access(all) contract FRC20StakingForwarder {
             let balance = from.balance
             let rewardType = from.getType()
 
+            let poolDetails = poolRef.getDetails()
+            let totalStakedAmount = poolDetails.totalStaked
+
             var rewardStrategyRef: &FRC20Staking.RewardStrategy? = poolRef.borrowRewardStrategy(rewardType.identifier)
             if rewardStrategyRef == nil && from.isInstance(Type<@FlowToken.Vault>()) {
                 rewardStrategyRef = poolRef.borrowRewardStrategy("")
@@ -105,8 +108,10 @@ access(all) contract FRC20StakingForwarder {
 
             let fallbackReceiver = self.fallbackBorrow()
                 ?? panic("No fallback receiver set in Staking Forwarder")
-            // When the amount is less than 1, deposit directly to the fallback address.
-            if balance < 1.0 || rewardStrategyRef == nil {
+
+            let yieldValue = balance / totalStakedAmount
+            // If the yield value is 0 or the reward strategy is not found
+            if yieldValue == 0.0 || rewardStrategyRef == nil {
                 fallbackReceiver.deposit(from: <- from)
             } else {
                 // Forward the tokens to staking pool
