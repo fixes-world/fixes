@@ -875,15 +875,36 @@ access(all) contract FRC20Staking {
                 let totalStakedRef = pool.borrowTotalStaked()
                 // add to total reward and update global yield rate
                 let totalStakedToken = totalStakedRef.getBalance()
+                let newAddedYieldRate = totalStakedToken > 0.0
+                    ? incomeValue / totalStakedToken
+                    : 0.0
                 // update global yield rate
-                self.globalYieldRate = totalStakedToken > 0.0
-                    ? self.globalYieldRate + incomeValue / totalStakedToken
-                    : self.globalYieldRate
-                // add to total reward
-                FRC20FTShared.depositToChange(
-                    receiver: self.borrowRewardRef(),
-                    change: <- income
-                )
+                self.globalYieldRate = self.globalYieldRate + newAddedYieldRate
+
+                if newAddedYieldRate > 0.0 {
+                    // add to total reward
+                    FRC20FTShared.depositToChange(
+                        receiver: self.borrowRewardRef(),
+                        change: <- income
+                    )
+                } else {
+                    // if the income is not enough to update the global yield rate
+                    // deposit the income to pool's address
+                    let poolAddr = pool.owner?.address ?? panic("Pool owner must exist")
+                    // create an empty change for the reward
+                    let newChange <- FRC20FTShared.createEmptyChange(
+                        tick: self.rewardTick,
+                        from: poolAddr
+                    )
+                    // Deposit pool address for accumulating enough values
+                    FRC20FTShared.depositToChange(
+                        receiver: &newChange as &FRC20FTShared.Change,
+                        change: <- income
+                    )
+                    let indexer = FRC20Indexer.getIndexer()
+                    // deposit change to indexer
+                    indexer.returnChange(<- newChange)
+                }
 
                 // emit event
                 emit RewardIncomeAdded(
