@@ -421,6 +421,7 @@
 			"mainnet-admin": [
 				"Fixes",
 				"FixesWrappedNFT",
+				"FixesHeartbeat",
 				"FRC20FTShared",
 				"FixesTraits",
 				"FixesAvatar",
@@ -430,13 +431,19 @@
 				"FRC20AccountsPool",
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
-				"FRC20MarketManager"
+				"FRC20MarketManager",
+				"FRC20SemiNFT",
+				"FRC20Staking",
+				"FRC20StakingManager",
+				"FRC20StakingForwarder",
+				"FRC20StakingVesting"
 			]
 		},
 		"testnet": {
 			"testnet-admin": [
 				"Fixes",
 				"FixesWrappedNFT",
+				"FixesHeartbeat",
 				"FRC20FTShared",
 				"FixesTraits",
 				"FixesAvatar",
@@ -446,7 +453,12 @@
 				"FRC20AccountsPool",
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
-				"FRC20MarketManager"
+				"FRC20MarketManager",
+				"FRC20SemiNFT",
+				"FRC20Staking",
+				"FRC20StakingManager",
+				"FRC20StakingForwarder",
+				"FRC20StakingVesting"
 			]
 		}
 	}
