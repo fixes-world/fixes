@@ -903,7 +903,7 @@ access(all) contract FRC20Staking {
                     )
                     let indexer = FRC20Indexer.getIndexer()
                     // deposit change to indexer
-                    indexer.returnChange(<- newChange)
+                    indexer.returnChange(change: <- newChange)
                 }
 
                 // emit event
