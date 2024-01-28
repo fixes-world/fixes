@@ -118,6 +118,10 @@ access(all) contract FRC20StakingVesting {
             totalBatches: UInt32,
             interval: UFix64,
         ) {
+            pre {
+                totalBatches > 0: "The total batches must be greater than 0"
+                interval > 0.0: "The interval must be greater than 0"
+            }
             self.stakeTick = stakeTick
             self.initialAmount = change.getBalance()
             self.remaining <- change

@@ -109,7 +109,7 @@ access(all) contract FRC20StakingForwarder {
             let fallbackReceiver = self.fallbackBorrow()
                 ?? panic("No fallback receiver set in Staking Forwarder")
 
-            let yieldValue = balance / totalStakedAmount
+            let yieldValue = totalStakedAmount > 0.0 ? balance / totalStakedAmount : 0.0
             // If the yield value is 0 or the reward strategy is not found
             if yieldValue == 0.0 || rewardStrategyRef == nil {
                 fallbackReceiver.deposit(from: <- from)
