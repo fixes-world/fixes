@@ -176,8 +176,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                         poolAddress: self.wrappedChange.from,
                         rewardTick: name
                     )
+                    let yieldRate = initialYieldRates[name]!
                     // update the initial record
-                    recordRef.updateClaiming(currentGlobalYieldRate: initialYieldRates[name]!, time: nil)
+                    recordRef.updateClaiming(currentGlobalYieldRate: yieldRate, time: nil)
+                    log("Updated the initial claiming record for ".concat(name).concat(" with yield rate ").concat(yieldRate.toString()))
                 }
             } // end if
 

@@ -255,7 +255,7 @@ access(all) contract FRC20FTShared {
             if tick == "" {
                 assert(
                     ftVault != nil && balance == nil,
-                    message: "FT Vault must not be nil for tick = \"\""
+                    message: "FT Vault must not be nil for tick = ''"
                 )
                 assert(
                     ftVault.isInstance(OptionalType(Type<@FlowToken.Vault>())),
@@ -514,20 +514,26 @@ access(all) contract FRC20FTShared {
         )
     }
 
-    /// Create a new Change
-    /// Only the owner of the account can call this method
-    ///
     access(account)
-    fun createEmptyFRC20Change(
+    fun createEmptyChange(
         tick: String,
         from: Address,
     ): @Change {
-        return <- self.createChange(
-            tick: tick,
-            from: from,
-            balance: 0.0,
-            ftVault: nil
-        )
+        if tick == "" {
+            return <- self.createChange(
+                tick: "",
+                from: from,
+                balance: nil,
+                ftVault: <- FlowToken.createEmptyVault()
+            )
+        } else {
+            return <- self.createChange(
+                tick: tick,
+                from: from,
+                balance: 0.0,
+                ftVault: nil
+            )
+        }
     }
 
     /// Create a new Change for FlowToken
@@ -537,11 +543,9 @@ access(all) contract FRC20FTShared {
     fun createEmptyFlowChange(
         from: Address,
     ): @Change {
-        return <- self.createChange(
+        return <- self.createEmptyChange(
             tick: "",
             from: from,
-            balance: nil,
-            ftVault: <- FlowToken.createEmptyVault()
         )
     }
 

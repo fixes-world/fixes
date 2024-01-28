@@ -206,7 +206,7 @@ access(all) contract FRC20Staking {
                 self.totalStaked == nil: "Total staked must be nil"
             }
             let owner = self.owner?.address ?? panic("Pool owner must exist")
-            self.totalStaked <-! FRC20FTShared.createEmptyFRC20Change(tick: self.tick, from: owner)
+            self.totalStaked <-! FRC20FTShared.createEmptyChange(tick: self.tick, from: owner)
 
             // emit event
             emit StakingInitialized(pool: owner, tick: self.tick)
@@ -686,7 +686,7 @@ access(all) contract FRC20Staking {
         fun refundAllUnlockedEnties(): @FRC20FTShared.Change? {
             if self.unstakingEntries.length > 0 {
                 // create new staked frc20 change
-                let ret: @FRC20FTShared.Change <- FRC20FTShared.createEmptyFRC20Change(
+                let ret: @FRC20FTShared.Change <- FRC20FTShared.createEmptyChange(
                     tick: "!".concat(self.stakeTick),
                     from: self.owner?.address ?? panic("Pool owner must exist"),
                 )
@@ -842,7 +842,7 @@ access(all) contract FRC20Staking {
                     frc20Indexer.getTokenMeta(tick: rewardTick) != nil,
                     message: "Reward tick must be valid"
                 )
-                self.totalReward <- FRC20FTShared.createEmptyFRC20Change(tick: rewardTick, from: pool.address)
+                self.totalReward <- FRC20FTShared.createEmptyChange(tick: rewardTick, from: pool.address)
             }
 
             // emit event
@@ -923,7 +923,7 @@ access(all) contract FRC20Staking {
             let delegator = byNft.owner?.address ?? panic("Delegator must exist")
 
             // create an empty change for the reward
-            let delegatorRewardChange <- FRC20FTShared.createEmptyFRC20Change(
+            let delegatorRewardChange <- FRC20FTShared.createEmptyChange(
                 tick: self.rewardTick,
                 from: delegator
             )
@@ -1134,11 +1134,13 @@ access(all) contract FRC20Staking {
             let fromPool = change.from
             let amount = change.getBalance()
             let strategies = pool.getRewardNames()
+            log("Init SemiNFT with balance: ".concat(amount.toString()))
             for rewardTick in strategies {
                 if let reward: &FRC20Staking.RewardStrategy = pool.borrowRewardStrategy(rewardTick) {
                     // update the claiming record
                     initialYieldRates[rewardTick] = reward.globalYieldRate
                 }
+                log("Reward tick: ".concat(rewardTick).concat(" initial yield rate:").concat(initialYieldRates[rewardTick]!.toString()))
             }
             // wrap the change to semiNFT
             let nftId = FRC20SemiNFT.wrap(
