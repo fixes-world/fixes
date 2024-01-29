@@ -117,6 +117,10 @@ access(all) contract FRC20Staking {
 
         /** ---- Delegators ---- */
 
+        /// Returns the delegators of this staking pool
+        access(all) view
+        fun getDelegators(): [Address]
+
         /// Returns the delegator unstaking info
         access(all) view
         fun getDelegatorUnstakingInfo(_ delegator: Address): DelegatorUnstakingInfo?
@@ -249,6 +253,13 @@ access(all) contract FRC20Staking {
                 )
             }
             return nil
+        }
+
+        /// Returns the delegators of this staking pool
+        ///
+        access(all) view
+        fun getDelegators(): [Address] {
+            return self.delegators.keys
         }
 
         /// Returns the delegator unstaking info
