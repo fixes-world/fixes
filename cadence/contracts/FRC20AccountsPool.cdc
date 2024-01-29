@@ -1,3 +1,12 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20 Accounts Pool
+
+TODO: Add description
+
+*/
+
 // Third-party imports
 import "MetadataViews"
 import "FungibleToken"
@@ -49,13 +58,13 @@ access(all) contract FRC20AccountsPool {
         fun getFRC20Addresses(type: ChildAccountType): {String: Address}
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
+        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}?
+        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
         /// Returns the address of the FRC20 market for the given tick
         access(all)
-        fun borrowMarketSharedFlowTokenReceiver(): &FlowToken.Vault{FungibleToken.Receiver}?
+        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}?
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
@@ -63,6 +72,9 @@ access(all) contract FRC20AccountsPool {
         /// Sets up a new child account for market
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
+        /// Sets up a new child account for staking
+        access(account)
+        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -138,7 +150,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}? {
+        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20MarketAddress(tick: tick) {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
@@ -147,7 +159,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}? {
+        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20StakingAddress(tick: tick) {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
@@ -156,7 +168,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the address of the FRC20 market for the given tick
         access(all)
-        fun borrowMarketSharedFlowTokenReceiver(): &FlowToken.Vault{FungibleToken.Receiver}? {
+        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}? {
             if let addr = self.getMarketSharedAddress() {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
@@ -195,6 +207,13 @@ access(all) contract FRC20AccountsPool {
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>) {
             self.setupNewChildByTick(type: ChildAccountType.Market, tick: tick, acctCap)
+        }
+
+        /// Sets up a new child account for staking
+        ///
+        access(account)
+        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByTick(type: ChildAccountType.Staking, tick: tick, acctCap)
         }
 
         /** ---- Admin Methods ---- */

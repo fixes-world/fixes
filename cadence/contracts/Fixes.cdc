@@ -1,3 +1,12 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FIXeS Core Contract
+
+This is the basic contract of the FIXeS protocol. It contains the logic to create and manage inscriptions.
+
+*/
+
 import "MetadataViews"
 import "FlowToken"
 
@@ -159,6 +168,7 @@ access(all) contract Fixes {
             self.value <- value
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.value
             emit InscriptionBurned(id: self.id)
@@ -422,6 +432,7 @@ access(all) contract Fixes {
             self.inscriptions <- {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.inscriptions
         }

@@ -1,3 +1,11 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20TradingRecord
+
+TODO: Add description
+
+*/
 import "Fixes"
 import "FRC20Indexer"
 import "FRC20FTShared"
@@ -224,6 +232,7 @@ access(all) contract FRC20TradingRecord {
             self.sellerVolumes = {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.minutes
         }
@@ -423,6 +432,7 @@ access(all) contract FRC20TradingRecord {
             self.traders100xBenchmark = {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.dailyRecords
         }

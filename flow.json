@@ -115,12 +115,44 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20SemiNFT": {
+			"source": "cadence/contracts/FRC20SemiNFT.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20Staking": {
 			"source": "cadence/contracts/FRC20Staking.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "43f16acb483bbee0"
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20StakingManager": {
+			"source": "cadence/contracts/FRC20StakingManager.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20StakingForwarder": {
+			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20StakingVesting": {
+			"source": "cadence/contracts/FRC20StakingVesting.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
 			}
 		},
 		"FRC20Votes": {
@@ -128,7 +160,7 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "43f16acb483bbee0"
+				"testnet": "74ad08095d92192a"
 			}
 		},
 		"Fixes": {
@@ -157,6 +189,14 @@
 		},
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FixesHeartbeat": {
+			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -359,6 +399,7 @@
 				"CapabilityFactory",
 				"Fixes",
 				"FixesWrappedNFT",
+				"FixesHeartbeat",
 				"FRC20FTShared",
 				"FixesTraits",
 				"FixesAvatar",
@@ -369,13 +410,18 @@
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
 				"FRC20MarketManager",
-				"FRC20FungibleToken"
+				"FRC20SemiNFT",
+				"FRC20Staking",
+				"FRC20StakingManager",
+				"FRC20StakingForwarder",
+				"FRC20StakingVesting"
 			]
 		},
 		"mainnet": {
 			"mainnet-admin": [
 				"Fixes",
 				"FixesWrappedNFT",
+				"FixesHeartbeat",
 				"FRC20FTShared",
 				"FixesTraits",
 				"FixesAvatar",
@@ -385,13 +431,19 @@
 				"FRC20AccountsPool",
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
-				"FRC20MarketManager"
+				"FRC20MarketManager",
+				"FRC20SemiNFT",
+				"FRC20Staking",
+				"FRC20StakingManager",
+				"FRC20StakingForwarder",
+				"FRC20StakingVesting"
 			]
 		},
 		"testnet": {
 			"testnet-admin": [
 				"Fixes",
 				"FixesWrappedNFT",
+				"FixesHeartbeat",
 				"FRC20FTShared",
 				"FixesTraits",
 				"FixesAvatar",
@@ -401,7 +453,12 @@
 				"FRC20AccountsPool",
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
-				"FRC20MarketManager"
+				"FRC20MarketManager",
+				"FRC20SemiNFT",
+				"FRC20Staking",
+				"FRC20StakingManager",
+				"FRC20StakingForwarder",
+				"FRC20StakingVesting"
 			]
 		}
 	}

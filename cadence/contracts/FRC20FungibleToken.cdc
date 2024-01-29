@@ -1,3 +1,13 @@
+/**
+
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20FungibleToken
+
+TODO: Add description
+
+*/
+
 import "FungibleToken"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
@@ -62,6 +72,7 @@ access(all) contract FRC20FungibleToken: FungibleToken {
             self.balance = balance
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             // You can not destroy a Change with a non-zero balance
             pre {

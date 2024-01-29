@@ -1,4 +1,13 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20MarketManager
+
+TODO: Add description
+
+*/
 import "Fixes"
+import "FixesHeartbeat"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
@@ -57,10 +66,10 @@ access(all) contract FRC20MarketManager {
         }
     }
 
-    /* --- Account access methods  --- */
+    /* --- Contract access methods  --- */
 
-    access(account)
-    fun ensureMarketResourcesAvailable(tick: String) {
+    access(contract)
+    fun _ensureMarketResourcesAvailable(tick: String) {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // try to borrow the account to check if it was created
@@ -102,10 +111,19 @@ access(all) contract FRC20MarketManager {
         if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
             childAcctRef.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+        }
+        // link the hooks to the public path
+        if childAcctRef
+            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .borrow() == nil {
             // link the hooks to the public path
             childAcctRef.unlink(FRC20FTShared.TransactionHookPublicPath)
-            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook}>(FRC20FTShared.TransactionHookPublicPath, target: FRC20FTShared.TransactionHookStoragePath)
+            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
+                FRC20FTShared.TransactionHookPublicPath,
+                target: FRC20FTShared.TransactionHookStoragePath
+            )
         }
+
         // borrow the hooks reference
         let hooksRef = childAcctRef.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
@@ -187,7 +205,7 @@ access(all) contract FRC20MarketManager {
             ?? panic("The market account was not created")
 
         // ensure all market resources are available
-        self.ensureMarketResourcesAvailable(tick: tick)
+        self._ensureMarketResourcesAvailable(tick: tick)
 
         // emit the event
         emit NewMarketEnabled(

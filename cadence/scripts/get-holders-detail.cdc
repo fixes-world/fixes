@@ -12,7 +12,9 @@ fun main(
     while i < addrs.length {
         let addr = addrs[i]
         let amount = indexer.getBalance(tick: tick, addr: addr)
-        ret.append(BalanceInfo(address: addr, amount: amount))
+        if amount > 0.0 {
+            ret.append(BalanceInfo(address: addr, amount: amount))
+        }
         i = i + 1
     }
     return ret

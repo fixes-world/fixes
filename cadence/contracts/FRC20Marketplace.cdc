@@ -1,3 +1,11 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20Marketplace
+
+TODO: Add description
+
+*/
 // Third-party imports
 import "StringUtils"
 import "MetadataViews"
@@ -288,6 +296,7 @@ access(all) contract FRC20Marketplace {
             self.adminWhitelist[meta.deployer] = true
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.collections
         }

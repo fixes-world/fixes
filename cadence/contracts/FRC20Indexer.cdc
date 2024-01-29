@@ -1,3 +1,11 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20 Indexer
+
+This the main contract of FRC20, it is used to deploy and manage the FRC20 tokens.
+
+*/
 // Third-party imports
 import "StringUtils"
 import "MetadataViews"
@@ -179,6 +187,12 @@ access(all) contract FRC20Indexer {
         /// Cancel a listed order
         access(account)
         fun cancelListing(listedIns: &Fixes.Inscription, change: @FRC20FTShared.Change)
+        /// Withdraw amount of a FRC20 token by a FRC20 inscription
+        access(account)
+        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change
+        /// Deposit a FRC20 token change to indexer
+        access(account)
+        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change)
         /// Return the change of a FRC20 order back to the owner
         access(account)
         fun returnChange(change: @FRC20FTShared.Change)
@@ -220,6 +234,7 @@ access(all) contract FRC20Indexer {
             self.treasury <- FlowToken.createEmptyVault() as! @FlowToken.Vault
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.treasury
             destroy self.pool
@@ -251,12 +266,12 @@ access(all) contract FRC20Indexer {
             }
             let tickNameSize = 80 + (10 - ticker.length > 0 ? 10 - ticker.length : 0) * 12
             let svgStr = "data:image/svg+xml;utf8,"
-                .concat("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-256 -256 512 512\" width=\"512\" height=\"512\">")
-                .concat("<defs><linearGradient gradientUnits=\"userSpaceOnUse\" x1=\"0\" y1=\"-240\" x2=\"0\" y2=\"240\" id=\"gradient-0\" gradientTransform=\"matrix(0.908427, -0.41805, 0.320369, 0.696163, -69.267567, -90.441103)\"><stop offset=\"0\" style=\"stop-color: rgb(244, 246, 246);\"></stop><stop offset=\"1\" style=\"stop-color: rgb(35, 133, 91);\"></stop></linearGradient></defs>")
-                .concat("<ellipse style=\"fill: rgb(149, 225, 192); stroke-width: 1rem; paint-order: fill; stroke: url(#gradient-0);\" ry=\"240\" rx=\"240\"></ellipse>")
-                .concat("<text style=\"dominant-baseline: middle; fill: rgb(80, 213, 155); font-family: system-ui, sans-serif; text-anchor: middle;\" fill-opacity=\"0.2\" y=\"-12\" font-size=\"420\">𝔉</text>")
-                .concat("<text style=\"dominant-baseline: middle; fill: rgb(244, 246, 246); font-family: system-ui, sans-serif; text-anchor: middle; font-style: italic; font-weight: 700;\" y=\"12\" font-size=\"").concat(tickNameSize.toString()).concat("\">")
-                .concat(ticker).concat("</text></svg>")
+                .concat("%3Csvg%20xmlns%3D%5C%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%5C%22%20viewBox%3D%5C%22-256%20-256%20512%20512%5C%22%20width%3D%5C%22512%5C%22%20height%3D%5C%22512%5C%22%3E")
+                .concat("%3Cdefs%3E%3ClinearGradient%20gradientUnits%3D%5C%22userSpaceOnUse%5C%22%20x1%3D%5C%220%5C%22%20y1%3D%5C%22-240%5C%22%20x2%3D%5C%220%5C%22%20y2%3D%5C%22240%5C%22%20id%3D%5C%22gradient-0%5C%22%20gradientTransform%3D%5C%22matrix(0.908427%2C%20-0.41805%2C%200.320369%2C%200.696163%2C%20-69.267567%2C%20-90.441103)%5C%22%3E%3Cstop%20offset%3D%5C%220%5C%22%20style%3D%5C%22stop-color%3A%20rgb(244%2C%20246%2C%20246)%3B%5C%22%3E%3C%2Fstop%3E%3Cstop%20offset%3D%5C%221%5C%22%20style%3D%5C%22stop-color%3A%20rgb(35%2C%20133%2C%2091)%3B%5C%22%3E%3C%2Fstop%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E")
+                .concat("%3Cellipse%20style%3D%5C%22fill%3A%20rgb(149%2C%20225%2C%20192)%3B%20stroke-width%3A%201rem%3B%20paint-order%3A%20fill%3B%20stroke%3A%20url(%23gradient-0)%3B%5C%22%20ry%3D%5C%22240%5C%22%20rx%3D%5C%22240%5C%22%3E%3C%2Fellipse%3E")
+                .concat("%3Ctext%20style%3D%5C%22dominant-baseline%3A%20middle%3B%20fill%3A%20rgb(80%2C%20213%2C%20155)%3B%20font-family%3A%20system-ui%2C%20sans-serif%3B%20text-anchor%3A%20middle%3B%5C%22%20fill-opacity%3D%5C%220.2%5C%22%20y%3D%5C%22-12%5C%22%20font-size%3D%5C%22420%5C%22%3E%F0%9D%94%89%3C%2Ftext%3E")
+                .concat("%3Ctext%20style%3D%5C%22dominant-baseline%3A%20middle%3B%20fill%3A%20rgb(244%2C%20246%2C%20246)%3B%20font-family%3A%20system-ui%2C%20sans-serif%3B%20text-anchor%3A%20middle%3B%20font-style%3A%20italic%3B%20font-weight%3A%20700%3B%5C%22%20y%3D%5C%2212%5C%22%20font-size%3D%5C%22").concat(tickNameSize.toString()).concat("%5C%22%3E")
+                .concat(ticker).concat("%3C%2Ftext%3E%3C%2Fsvg%3E")
             let medias = MetadataViews.Medias([MetadataViews.Media(
                 file: MetadataViews.HTTPFile(url: svgStr),
                 mediaType: "image/svg+xml"
@@ -373,7 +388,7 @@ access(all) contract FRC20Indexer {
         access(all)
         fun sponsorship(
             amount: UFix64,
-            to: Capability<&FlowToken.Vault{FungibleToken.Receiver}>,
+            to: Capability<&{FungibleToken.Receiver}>,
             forTick: String,
         ) {
             pre {
@@ -398,6 +413,11 @@ access(all) contract FRC20Indexer {
 
             let flowReceiver = to.borrow()
                 ?? panic("The receiver should be a valid capability")
+            let supportedTypes = flowReceiver.getSupportedVaultTypes()
+            assert(
+                supportedTypes[Type<@FlowToken.Vault>()] == true,
+                message: "The receiver should support the $FLOW vault"
+            )
 
             let flowExtracted <- platformPool.withdraw(amount: amount)
             let sponsorAmt = flowExtracted.balance
@@ -1067,11 +1087,83 @@ access(all) contract FRC20Indexer {
             // deposit the token change return to change's from address
             let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
                 ?? panic("The flow receiver no found")
+            let supportedTypes = flowReceiver.getSupportedVaultTypes()
+            assert(
+                supportedTypes[Type<@FlowToken.Vault>()] == true,
+                message: "The receiver should support the $FLOW vault"
+            )
             // extract inscription and return flow in the inscription to the owner
             flowReceiver.deposit(from: <- listedIns.extract())
 
             // call the return change method
             self.returnChange(change: <- change)
+        }
+
+        /// Withdraw amount of a FRC20 token by a FRC20 inscription
+        ///
+        access(account)
+        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "withdraw" && meta["tick"] != nil && meta["amt"] != nil && meta["usage"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for transfer"
+            )
+
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let usage = meta["usage"]! // usage can be "staking" or "donate"
+            assert(
+                usage == "staking" || usage == "donate",
+                message: "The usage should be 'staking' or 'donate'"
+            )
+            let fromAddr = ins.owner!.address
+
+            let retChange <- self._withdrawToTokenChange(
+                tick: tick,
+                fromAddr: fromAddr,
+                amt: amt
+            )
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: ins)
+
+            return <- retChange
+        }
+
+        /// Deposit a FRC20 token change to indexer
+        ///
+        access(account)
+        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+                change.isBackedByVault() == false: "The change should not be backed by a vault"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "deposit" && meta["tick"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for transfer"
+            )
+
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            assert(
+                tokenMeta.tick == change.tick,
+                message: "The token should be the same as the change"
+            )
+            let fromAddr = ins.owner!.address
+
+            self._depositFromTokenChange(change: <- change, to: fromAddr)
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: ins)
         }
 
         /// Return the change of a FRC20 order back to the owner
@@ -1094,6 +1186,11 @@ access(all) contract FRC20Indexer {
                 // deposit the token change return to change's from address
                 let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
                     ?? panic("The flow receiver no found")
+                let supportedTypes = flowReceiver.getSupportedVaultTypes()
+                assert(
+                    supportedTypes[Type<@FlowToken.Vault>()] == true,
+                    message: "The receiver should support the $FLOW vault"
+                )
                 flowReceiver.deposit(from: <- (flowVault as! @FlowToken.Vault))
                 destroy change
             } else if !change.isBackedByVault() {
@@ -1124,11 +1221,9 @@ access(all) contract FRC20Indexer {
                 message: "The amount should be equal to the balance of the vault"
             )
             // return the change
-            return <- FRC20FTShared.createChange(
-                tick: "", // empty tick means this change is a FLOW token change
+            return <- FRC20FTShared.wrapFungibleVaultChange(
+                ftVault: <- vault,
                 from: ins.owner!.address, // Pay $FLOW to the buyer and get the FRC20 token
-                balance: nil,
-                ftVault: <- vault
             )
         }
 
@@ -1194,7 +1289,7 @@ access(all) contract FRC20Indexer {
             if sellerAddress != nil {
                 // borrow the receiver reference
                 let flowTokenReceiver = getAccount(sellerAddress!)
-                    .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                    .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                 assert(
                     flowTokenReceiver.check(),
                     message: "Could not borrow receiver reference to the seller's Vault"
@@ -1432,9 +1527,9 @@ access(all) contract FRC20Indexer {
     access(all)
     fun borrowFlowTokenReceiver(
         _ addr: Address
-    ): &FlowToken.Vault{FungibleToken.Receiver}? {
+    ): &{FungibleToken.Receiver}? {
         let cap = getAccount(addr)
-            .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
         return cap.borrow()
     }
 

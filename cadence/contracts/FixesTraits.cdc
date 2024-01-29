@@ -1,3 +1,12 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FixesTraits
+
+TODO: Add description
+
+*/
+
 // Thirdparty Imports
 import "MetadataViews"
 

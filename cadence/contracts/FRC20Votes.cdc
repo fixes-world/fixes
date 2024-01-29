@@ -1,3 +1,11 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20Votes
+
+TODO: Add description
+
+*/
 import "Fixes"
 import "FRC20Indexer"
 
@@ -254,6 +262,7 @@ access(all) contract FRC20Votes {
             self.appliedInscriptions <- {}
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             destroy self.pendingInscriptions
             destroy self.appliedInscriptions

@@ -5,6 +5,7 @@ import "FlowToken"
 // Fixes imports
 import "Fixes"
 import "FixesAvatar"
+import "FixesHeartbeat"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20TradingRecord"
@@ -40,10 +41,20 @@ transaction(
         if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
             acct.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+        }
+
+        // link the hooks to the public path
+        if acct
+            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .borrow() == nil {
             // link the hooks to the public path
             acct.unlink(FRC20FTShared.TransactionHookPublicPath)
-            acct.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook}>(FRC20FTShared.TransactionHookPublicPath, target: FRC20FTShared.TransactionHookStoragePath)
+            acct.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
+                FRC20FTShared.TransactionHookPublicPath,
+                target: FRC20FTShared.TransactionHookStoragePath
+            )
         }
+
         // borrow the hooks reference
         let hooksRef = acct.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")

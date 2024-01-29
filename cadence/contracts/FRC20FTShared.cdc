@@ -1,5 +1,15 @@
+/**
+> Author: FIXeS World <https://fixes.world/>
+
+# FRC20FTShared
+
+This contract is a shared library for FRC20 Fungible Token.
+
+*/
 import "FlowToken"
 import "FungibleToken"
+// Fixes Imports
+import "FixesHeartbeat"
 
 access(all) contract FRC20FTShared {
     /* --- Events --- */
@@ -27,6 +37,12 @@ access(all) contract FRC20FTShared {
         executedHookType: Type,
         storefront: Address,
         listingId: UInt64,
+    )
+    /// The event that is emitted when a heartbeat is occurred
+    access(all) event TransactionHooksOnHeartbeat(
+        hooksOwner: Address,
+        executedHookType: Type,
+        deltaTime: UFix64,
     )
 
     /* --- Variable, Enums and Structs --- */
@@ -106,6 +122,23 @@ access(all) contract FRC20FTShared {
             balance: UFix64?,
             ftVault: @FungibleToken.Vault?
         )
+
+        /// Check if this Change is a staked tick's change
+        ///
+        access(all) view
+        fun isStakedTick(): Bool {
+            return self.isBackedByVault() == false && self.tick[0] == "!"
+        }
+
+        access(all) view
+        fun getOriginalTick(): String {
+            // if the tick is a staked tick, remove the first character
+            if self.isStakedTick() {
+                return self.tick.slice(from: 1, upTo: self.tick.length)
+            }
+            // otherwise, return the tick
+            return self.tick
+        }
 
         /// Get the balance of this Change
         ///
@@ -222,7 +255,7 @@ access(all) contract FRC20FTShared {
             if tick == "" {
                 assert(
                     ftVault != nil && balance == nil,
-                    message: "FT Vault must not be nil for tick = \"\""
+                    message: "FT Vault must not be nil for tick = ''"
                 )
                 assert(
                     ftVault.isInstance(OptionalType(Type<@FlowToken.Vault>())),
@@ -243,6 +276,7 @@ access(all) contract FRC20FTShared {
             )
         }
 
+        /// @deprecated after Cadence 1.0
         destroy() {
             // You can not destroy a Change with a non-zero balance
             pre {
@@ -363,31 +397,44 @@ access(all) contract FRC20FTShared {
         access(account)
         fun withdrawAsChange(amount: UFix64): @Change {
             pre {
-                self.isBackedByVault() == false: "The Change must not be backed by a Vault"
-                self.balance != nil: "Balance must not be nil for withdrawAsChange"
-                self.balance! >= amount:
+                self.getBalance() >= amount:
                     "Amount withdrawn must be less than or equal than the balance of the Vault"
             }
             post {
                 // result's type must be the same as the type of the original Change
                 result.tick == self.tick: "Tick must be equal to the provided tick"
                 // use the special function `before` to get the value of the `balance` field
-                self.balance == before(self.balance)! - amount:
+                self.getBalance() == before(self.getBalance()) - amount:
                     "New Change balance must be the difference of the previous balance and the withdrawn Change"
             }
-            self.balance = self.balance! - amount
-            emit TokenChangeWithdrawn(
-                tick: self.tick,
-                amount: amount,
-                from: self.from,
-                changeUuid: self.uuid
-            )
-            return <- create Change(
-                tick: self.tick,
-                from: self.from,
-                balance: amount,
-                ftVault: nil
-            )
+            var newChange: @Change? <- nil
+            if self.isBackedByVault() {
+                // withdraw from the input Change, the TokenChangeWithdrawn event will be emitted inside
+                let extracted <- self.withdrawAsVault(amount: amount)
+                // create a same source Change
+                newChange <-! create Change(
+                    tick: self.tick,
+                    from: self.from,
+                    balance: nil,
+                    ftVault: <- extracted
+                )
+            } else {
+                self.balance = self.balance! - amount
+                newChange <-! create Change(
+                    tick: self.tick,
+                    from: self.from,
+                    balance: amount,
+                    ftVault: nil
+                )
+                // emit TokenChangeWithdrawn event
+                emit TokenChangeWithdrawn(
+                    tick: self.tick,
+                    amount: amount,
+                    from: self.from,
+                    changeUuid: self.uuid
+                )
+            }
+            return <- (newChange ?? panic("The new Change must not be nil"))
         }
 
         /// Extract all balance of this Change, this method is only available for the contracts in the same account
@@ -418,13 +465,14 @@ access(all) contract FRC20FTShared {
 
         /// Borrow the underlying Vault of this Change
         ///
-        access(self)
+        access(contract)
         fun borrowVault(): &FungibleToken.Vault {
             return &self.ftVault as &FungibleToken.Vault?
                 ?? panic("The Change is not backed by a Vault")
         }
     }
 
+    /// Create a new Change
     /// Only the owner of the account can call this method
     ///
     access(account)
@@ -440,6 +488,121 @@ access(all) contract FRC20FTShared {
             balance: balance,
             ftVault: <-ftVault
         )
+    }
+
+    /// Create a new Change for staked tick
+    ///
+    access(account)
+    fun createStakedChange(
+        ref: &Change,
+        issuer: Address
+    ): @Change {
+        pre {
+            ref.isStakedTick() == false: "The input Change must not be a staked tick"
+            ref.isBackedByVault() == false: "The input Change must not be backed by a Vault"
+        }
+        post {
+            result.tick == "!".concat(ref.tick): "Tick must be equal to the provided tick"
+            result.getBalance() == ref.getBalance(): "Balance must be equal to the provided balance"
+            result.from == issuer: "The owner of the Change must be the same as the issuer"
+        }
+        return <- create Change(
+            tick: "!".concat(ref.tick), // staked tick is prefixed with "!"
+            from: issuer, // all staked changes are from issuer
+            balance: ref.getBalance(),
+            ftVault: nil
+        )
+    }
+
+    access(account)
+    fun createEmptyChange(
+        tick: String,
+        from: Address,
+    ): @Change {
+        if tick == "" {
+            return <- self.createChange(
+                tick: "",
+                from: from,
+                balance: nil,
+                ftVault: <- FlowToken.createEmptyVault()
+            )
+        } else {
+            return <- self.createChange(
+                tick: tick,
+                from: from,
+                balance: 0.0,
+                ftVault: nil
+            )
+        }
+    }
+
+    /// Create a new Change for FlowToken
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun createEmptyFlowChange(
+        from: Address,
+    ): @Change {
+        return <- self.createEmptyChange(
+            tick: "",
+            from: from,
+        )
+    }
+
+    /// Create a new Change by some FungibleToken
+    ///
+    access(account)
+    fun wrapFungibleVaultChange(
+        ftVault: @FungibleToken.Vault,
+        from: Address,
+    ): @Change {
+        let tick = ftVault.isInstance(Type<@FlowToken.Vault>())
+            ? ""
+            : ftVault.getType().identifier
+        return <- self.createChange(
+            tick: tick,
+            from: from,
+            balance: nil,
+            ftVault: <- ftVault
+        )
+    }
+
+    /// Deposit one Change to another Change
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun depositToChange(
+        receiver: &Change,
+        change: @Change
+    ) {
+        pre {
+            change.isBackedByVault() == receiver.isBackedByVault():
+                "The Change must be backed by a Vault if and only if the input Change is backed by a Vault"
+            change.tick == receiver.tick: "Tick must be equal to the provided tick"
+        }
+        if change.from == receiver.from {
+            receiver.merge(from: <- change)
+        } else {
+            if change.isBackedByVault() {
+                // withdraw from the input Change
+                let extracted <- change.extractAsVault()
+                // deposit to the receiver
+                let vaultRef = receiver.borrowVault()
+                vaultRef.deposit(from: <- extracted)
+            } else {
+                // withdraw from the input Change
+                let extracted = change.extract()
+                // create a same source Change and deposit to the receiver
+                receiver.merge(from: <- self.createChange(
+                    tick: receiver.tick,
+                    from: receiver.from,
+                    balance: extracted,
+                    ftVault: nil
+                ))
+            }
+            // destroy the input Change
+            destroy change
+        }
     }
 
     /** --- Temporary order resources --- */
@@ -476,6 +639,8 @@ access(all) contract FRC20FTShared {
             self.change <- change
             self.cuts = cuts
         }
+
+        /// @deprecated after Cadence 1.0
         destroy() {
             pre {
                 self.change == nil: "Change must be nil for destroy"
@@ -696,7 +861,17 @@ access(all) contract FRC20FTShared {
             dealAmount: UFix64,
             dealPrice: UFix64,
             totalAmountInListing: UFix64,
-        )
+        ) {
+            log("Default Empty Transaction Hook")
+        }
+
+        /// The methods that is invoked when the heartbeat is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            log("Default Empty Transaction Hook")
+        }
     }
 
     access(account)
@@ -719,7 +894,7 @@ access(all) contract FRC20FTShared {
 
     /// It a general resource for the Transaction Hook
     ///
-    access(all) resource Hooks: TransactionHook {
+    access(all) resource Hooks: TransactionHook, FixesHeartbeat.IHeartbeatHook {
         access(self)
         let hooks: {Type: Capability<&AnyResource{TransactionHook}>}
 
@@ -774,7 +949,47 @@ access(all) contract FRC20FTShared {
             if hooksOwnerAddr == nil {
                 return
             }
+            // iterate all hooks
+            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+                // call hook
+                ref.onDeal(storefront: storefront, listingId: listingId, seller: seller, buyer: buyer, tick: tick, dealAmount: dealAmount, dealPrice: dealPrice, totalAmountInListing: totalAmountInListing)
 
+                // emit event
+                emit TransactionHooksOnDeal(
+                    hooksOwner: hooksOwnerAddr!,
+                    executedHookType: type,
+                    storefront: storefront,
+                    listingId: listingId,
+                )
+            })
+        }
+
+        /// The methods that is invoked when the heartbeat is executed
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            let hooksOwnerAddr = self.owner?.address
+            if hooksOwnerAddr == nil {
+                return
+            }
+            // iterate all hooks
+            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+                // call hook
+                ref.onHeartbeat(deltaTime)
+
+                // emit event
+                emit TransactionHooksOnHeartbeat(
+                    hooksOwner: hooksOwnerAddr!,
+                    executedHookType: type,
+                    deltaTime: deltaTime,
+                )
+            })
+        }
+
+        /// Iterate all hooks
+        ///
+        access(self)
+        fun _iterateHooks(_ func: ((Type, &AnyResource{FRC20FTShared.TransactionHook}): Void)) {
             // call all hooks
             for type in self.hooks.keys {
                 // check if the hook type is validated
@@ -787,20 +1002,11 @@ access(all) contract FRC20FTShared {
                     if !valid {
                         continue
                     }
-                    if let ref = hookCap.borrow() {
-                        // call hook
-                        ref.onDeal(storefront: storefront, listingId: listingId, seller: seller, buyer: buyer, tick: tick, dealAmount: dealAmount, dealPrice: dealPrice, totalAmountInListing: totalAmountInListing)
-
-                        // emit event
-                        emit TransactionHooksOnDeal(
-                            hooksOwner: hooksOwnerAddr!,
-                            executedHookType: type,
-                            storefront: storefront,
-                            listingId: listingId,
-                        )
+                    if let ref: &AnyResource{FRC20FTShared.TransactionHook} = hookCap.borrow() {
+                        func(type, ref)
                     }
                 }
-            }
+            } // end for
         }
     }
 
@@ -811,12 +1017,23 @@ access(all) contract FRC20FTShared {
         return <- create Hooks()
     }
 
+    /// Get the hooks resource reference
     /// Only the owner of the account can call this method
     ///
     access(account)
     fun borrowTransactionHook(_ address: Address): &AnyResource{TransactionHook}? {
         return getAccount(address)
             .getCapability<&AnyResource{TransactionHook}>(self.TransactionHookPublicPath)
+            .borrow()
+    }
+
+    /// Get the hooks resource reference
+    /// Only the owner of the account can call this method
+    ///
+    access(account)
+    fun borrowTransactionHookWithHeartbeat(_ address: Address): &AnyResource{TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
+        return getAccount(address)
+            .getCapability<&AnyResource{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
