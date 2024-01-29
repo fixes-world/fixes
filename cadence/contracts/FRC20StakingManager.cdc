@@ -179,10 +179,11 @@ access(all) contract FRC20StakingManager {
 
             // withdraw the flow tokens
             let tokenToDonate <- flowVaultRef.withdraw(amount: amount)
+            let systemAddr = FRC20StakingManager.account.address
             // convert to change
             let changeToDonate <- FRC20FTShared.wrapFungibleVaultChange(
                 ftVault: <- tokenToDonate,
-                from: childAcctRef.address
+                from: systemAddr
             )
             // call the internal method to donate
             FRC20StakingManager._donateToVesting(
