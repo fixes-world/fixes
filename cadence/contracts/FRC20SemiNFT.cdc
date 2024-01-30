@@ -910,7 +910,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                     mediaType: "image/png"
                 )
                 return MetadataViews.NFTCollectionDisplay(
-                    name: "The Fixes 𝔉rc20 Semi-NFT Collection",
+                    name: "FIXeS 𝔉rc20 Semi-NFT",
                     description: "This collection is used to wrap 𝔉rc20 token as semi-NFTs.",
                     externalURL: MetadataViews.ExternalURL("https://fixes.world/"),
                     squareImage: squareMedia,
