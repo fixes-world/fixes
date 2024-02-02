@@ -43,6 +43,14 @@
 				"mainnet": "d8a7e05a7ac670c0"
 			}
 		},
+		"ETHUtils": {
+			"source": "cadence/deps/ETHUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
@@ -397,6 +405,7 @@
 				"CapabilityDelegator",
 				"CapabilityFilter",
 				"CapabilityFactory",
+				"ETHUtils",
 				"Fixes",
 				"FixesWrappedNFT",
 				"FixesHeartbeat",
