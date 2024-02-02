@@ -17,7 +17,6 @@ transaction(
     tick: String,
     // RankedId => BuyAmount
     batchBuyItems: {String: UFix64},
-    commissionAddr: Address,
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
 
@@ -97,10 +96,6 @@ transaction(
         }
         /** ------------- End -----------------------------------------------------------------  */
 
-        let commissionFlowRecipient = getAccount(commissionAddr)
-            .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-        assert(commissionFlowRecipient.check(), message: "Invalid commission recipient")
-
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
@@ -134,6 +129,14 @@ transaction(
                 continue
             }
             /** ------------- End --------------------------------------------------  */
+
+            var commissionFlowRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>? = nil
+            if let receivers = listing!.getAllowedCommissionReceivers() {
+                if receivers.length > 0 {
+                    commissionFlowRecipient = receivers[0]
+                    assert(commissionFlowRecipient!.check(), message: "Invalid commission recipient")
+                }
+            }
 
             let buyAmount = batchBuyItems[rankedId]!
             // calculate the buy price
