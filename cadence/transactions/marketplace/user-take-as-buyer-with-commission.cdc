@@ -195,7 +195,7 @@ transaction(
     }
 
     execute {
-        log("Done: user take as buyer")
+        log("Done: user take as buyer with commission")
     }
 }
 

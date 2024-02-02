@@ -192,7 +192,7 @@ transaction(
     }
 
     execute {
-        log("Done: user take as seller")
+        log("Done: user take as seller with commission")
     }
 }
 

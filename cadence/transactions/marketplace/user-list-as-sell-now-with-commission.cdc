@@ -18,7 +18,7 @@ transaction(
     buyAmount: UFix64,
     buyPrice: UFix64,
     commissionAddr: Address,
-    customID: String?
+    customID: String
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
     let storefront: &FRC20Storefront.Storefront
@@ -164,7 +164,7 @@ transaction(
             listingId: listingId
         )
 
-        log("Done: list as sell now")
+        log("Done: list as sell now with commission")
     }
 }
 

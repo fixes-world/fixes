@@ -977,6 +977,7 @@ access(all) contract FRC20Storefront {
                     // If the commission recipient is not set, pay to the marketplace shared pool
                     // Otherwise, pay to the commission recipient
                     if commissionRecipient != nil {
+                        commissionAmount = paymentAmt
                         payCommissionFunc(<- partialPayment)
                     } else if let store = marketSharedStore {
                         // Load config from market shared store
