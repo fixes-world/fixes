@@ -585,7 +585,10 @@ access(all) contract FRC20TradingRecord {
                 return // DO NOT PANIC
             }
 
-            let benchmarkValue = frcIndexer.getBenchmarkValue(tick: record.tick)
+            var benchmarkValue = frcIndexer.getBenchmarkValue(tick: record.tick)
+            if benchmarkValue == 0.0 {
+                benchmarkValue = 0.00000001
+            }
             let benchmarkPrice = benchmarkValue * record.dealAmount
             let mintAmount = record.dealAmount / tokenMeta!.limit
             // Check if buyer / seller are an 2x traders
