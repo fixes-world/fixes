@@ -974,9 +974,13 @@ access(all) contract FRC20Storefront {
                     break
                 case FRC20FTShared.SaleCutType.MarketplacePortion:
                     let partialPayment <- payment.withdraw(amount: paymentAmt)
-                    // Load config from market shared store
-                    if let store = marketSharedStore {
-                        // load from the market shared store
+                    // If the commission recipient is not set, pay to the marketplace shared pool
+                    // Otherwise, pay to the commission recipient
+                    if commissionRecipient != nil {
+                        commissionAmount = paymentAmt
+                        payCommissionFunc(<- partialPayment)
+                    } else if let store = marketSharedStore {
+                        // Load config from market shared store
                         let sharedRatio = store.getByEnum(FRC20FTShared.ConfigType.MarketFeeSharedRatio) as! UFix64? ?? 1.0
                         let specificRatio = store.getByEnum(FRC20FTShared.ConfigType.MarketFeeTokenSpecificRatio) as! UFix64? ?? 0.0
                         let deployerRatio = store.getByEnum(FRC20FTShared.ConfigType.MarketFeeDeployerRatio) as! UFix64? ?? 0.0

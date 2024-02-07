@@ -168,7 +168,7 @@ access(all) contract FRC20StakingVesting {
         ///
         access(all) view
         fun getVestedAmount(): UFix64 {
-            return self.initialAmount * UFix64(self.vestedBatchAmount) / UFix64(self.totalBatches)
+            return self.initialAmount / UFix64(self.totalBatches) * UFix64(self.vestedBatchAmount)
         }
 
         access(all) view
