@@ -44,7 +44,15 @@
 			}
 		},
 		"ETHUtils": {
-			"source": "cadence/deps/ETHUtils.cdc",
+			"source": "cadence/contracts/ETHUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"EVMAgent": {
+			"source": "cadence/contracts/EVMAgent.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
