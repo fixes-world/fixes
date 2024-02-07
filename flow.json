@@ -442,6 +442,7 @@
 		},
 		"mainnet": {
 			"mainnet-admin": [
+				"ETHUtils",
 				"Fixes",
 				"FixesWrappedNFT",
 				"FixesHeartbeat",
