@@ -53,7 +53,7 @@ access(all) contract FRC20AccountsPool {
         fun getFRC20MarketAddress(tick: String): Address?
         /// Returns the address of the EVM agent for the given eth address
         access(all) view
-        fun getEVMAgentAddress(ethAddress: String): Address?
+        fun getEVMAgentAddress(_ evmAddress: String): Address?
         /// Returns the address of the FRC20 market for the given tick
         access(all) view
         fun getMarketSharedAddress(): Address?
@@ -68,7 +68,7 @@ access(all) contract FRC20AccountsPool {
         fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowEVMAgentFlowTokenReceiver(ethAddress: String): &{FungibleToken.Receiver}?
+        fun borrowEVMAgentFlowTokenReceiver(_ evmAddress: String): &{FungibleToken.Receiver}?
         /// Returns the address of the FRC20 market for the given tick
         access(all)
         fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}?
@@ -84,7 +84,7 @@ access(all) contract FRC20AccountsPool {
         fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>)
         /// Sets up a new child account for EVM agent
         access(account)
-        fun setupNewChildForEVMAgent(ethAddress: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForEVMAgent(evmAddress: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -145,9 +145,9 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the address of the EVM agent for the given eth address
         access(all) view
-        fun getEVMAgentAddress(ethAddress: String): Address? {
+        fun getEVMAgentAddress(_ evmAddress: String): Address? {
             if let tickDict = self.borrowDict(type: ChildAccountType.EVMAgent) {
-                return tickDict[ethAddress]
+                return tickDict[evmAddress]
             }
             return nil
         }
@@ -187,8 +187,8 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowEVMAgentFlowTokenReceiver(ethAddress: String): &{FungibleToken.Receiver}? {
-            if let addr = self.getEVMAgentAddress(ethAddress: ethAddress) {
+        fun borrowEVMAgentFlowTokenReceiver(_ evmAddress: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getEVMAgentAddress(evmAddress) {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
             return nil
@@ -246,8 +246,8 @@ access(all) contract FRC20AccountsPool {
 
         /// Sets up a new child account for EVM agent
         access(account)
-        fun setupNewChildForEVMAgent(ethAddress: String, _ acctCap: Capability<&AuthAccount>) {
-            self.setupNewChildByKey(type: ChildAccountType.EVMAgent, key: ethAddress, acctCap)
+        fun setupNewChildForEVMAgent(evmAddress: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByKey(type: ChildAccountType.EVMAgent, key: evmAddress, acctCap)
         }
 
         /** ---- Admin Methods ---- */
