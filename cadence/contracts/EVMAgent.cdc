@@ -179,6 +179,10 @@ access(all) contract EVMAgent {
         /// Create a new agency manager
         access(all)
         fun createAgencyManager(): @AgencyManager
+
+        /// Withdraw the flow from the agency
+        access(all)
+        fun withdraw(amt: UFix64): @FlowToken.Vault
     }
 
     /// Agency resource
@@ -243,6 +247,8 @@ access(all) contract EVMAgent {
             emit NewAgencySetup(agency: authAcct.address)
         }
 
+        /** ---- Private method ---- */
+
         access(all)
         fun createAgencyManager(): @AgencyManager {
             let cap = self._getSelfPrivCap()
@@ -250,6 +256,23 @@ access(all) contract EVMAgent {
             emit NewAgencyManagerCreated(forAgency: self.getOwnerAddress())
 
             return <- create AgencyManager(cap)
+        }
+
+
+        /// Withdraw the flow from the agency
+        ///
+        access(all)
+        fun withdraw(amt: UFix64): @FlowToken.Vault {
+            let flowVaultRef = self._borrowAgencyAccount()
+                .getCapability(/public/flowTokenVault)
+                .borrow<&FlowToken.Vault>()
+                ?? panic("The flow vault is not found")
+            assert(
+                flowVaultRef.balance >= amt,
+                message: "Insufficient balance"
+            )
+            let vault <- flowVaultRef.withdraw(amount: amt)
+            return <- (vault as! @FlowToken.Vault)
         }
 
         /* --- Public methods  --- */
@@ -279,6 +302,10 @@ access(all) contract EVMAgent {
                 acctCap.check(): "Invalid account capability"
             }
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
+            assert(
+                self.managedEntrustedAccounts[evmAddress] == nil,
+                message: "EVM address already registered for an agent account"
+            )
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // Ensure the evmAddress is not already registered
             let existingAddr = acctsPool.getEVMEntrustedAccountAddress(evmAddress)
@@ -359,6 +386,10 @@ access(all) contract EVMAgent {
             timestamp: UInt64
         ): &AuthAccount {
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
+            assert(
+                self.managedEntrustedAccounts[evmAddress] != nil,
+                message: "EVM address not registered for an agent account"
+            )
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // Ensure the evmAddress is not already registered
             let entrustedAddr = acctsPool.getEVMEntrustedAccountAddress(evmAddress)
