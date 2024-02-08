@@ -12,6 +12,8 @@ import "FlowToken"
 // Fixes Imports
 import "ETHUtils"
 import "Fixes"
+import "FRC20Indexer"
+import "FRC20Staking"
 import "FRC20AccountsPool"
 
 access(all) contract EVMAgent {
@@ -242,8 +244,7 @@ access(all) contract EVMAgent {
                 authAcct.link<&Agency{AgencyPublic, AgencyPrivate}>(privPath, target: EVMAgent.evmAgencyStoragePath)
             }
 
-            // TODO: add to agency center
-
+            // emit event
             emit NewAgencySetup(agency: authAcct.address)
         }
 
@@ -507,12 +508,117 @@ access(all) contract EVMAgent {
     }
 
     access(all) resource interface AgencyCenterPublic {
-
+        /// Create a new agency
+        access(all)
+        fun createAgency(ins: &Fixes.Inscription, _ acctCap: Capability<&AuthAccount>): @AgencyManager
+        /// Get the agency by evm address
+        access(all) view
+        fun getAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}?
+        /// Get the agency by address
+        access(all)
+        fun pickValidAgency(): &Agency{AgencyPublic}?
     }
 
     access(all) resource AgencyCenter: AgencyCenterPublic {
+        access(self)
+        let agencies: {Address: Bool}
 
         init() {
+            self.agencies = {}
+        }
+
+        /// Create a new agency
+        access(all)
+        fun createAgency(
+            ins: &Fixes.Inscription,
+            _ acctCap: Capability<&AuthAccount>
+        ): @AgencyManager {
+            // singleton resources
+            let acctPool = FRC20AccountsPool.borrowAccountsPool()
+            let frc20Indexer = FRC20Indexer.getIndexer()
+
+            // inscription data
+            let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
+            assert(
+                op == "create-evm-agency",
+                message: "Invalid operation"
+            )
+            let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+            let fromAddr = ins.owner?.address ?? panic("The owner address is not found")
+
+            let delegator = FRC20Staking.borrowDelegator(fromAddr)
+                ?? panic("The delegator is not found")
+            let stakedBalance = delegator.getStakedBalance(tick: tick)
+            // only the delegator with enough staked balance can create the agency
+            assert(
+                stakedBalance > 10000.0,
+                message: "The delegator should have staked enough balance"
+            )
+
+            // ensure the inscription owner is valid delegator in the FRC20StakingPool
+            let agency <- create Agency(ins)
+
+            // setup the agency
+            let acct = acctCap.borrow() ?? panic("Invalid account capability")
+            let addr = acct.address
+
+            // extract the flow from the inscriptions and deposit to the agency
+            let flowReceiverRef = FRC20Indexer.borrowFlowTokenReceiver(addr)
+                ?? panic("Could not borrow receiver reference to the recipient's Vault")
+            flowReceiverRef.deposit(from: <- ins.extract())
+
+            // save the agency
+            acct.save(<- agency, to: EVMAgent.evmAgencyStoragePath)
+
+            let agencyRef = acct.borrow<&Agency>(from: EVMAgent.evmAgencyStoragePath)
+                ?? panic("Agency not found")
+            agencyRef.setup(acctCap)
+            // agency registered
+            self.agencies[addr] = true
+
+            // create a new agency manager
+            return <- agencyRef.createAgencyManager()
+        }
+
+        /// Get the agency by evm address
+        access(all) view
+        fun getAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}? {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            if let addr = acctsPool.getEVMEntrustedAccountAddress(evmAddress) {
+                if let entrustStatus = EVMAgent.borrowEntrustStatus(addr) {
+                    return entrustStatus.borrowAgency()
+                }
+            }
+            return nil
+        }
+
+        /// Get the agency by address
+        access(all)
+        fun pickValidAgency(): &Agency{AgencyPublic}? {
+            let keys = self.agencies.keys
+            if keys.length == 0 {
+                return nil
+            }
+
+            let filteredAddrs: [Address] = []
+            for addr in keys {
+                // get flow balance of the agency
+                if let flowVaultRef = getAccount(addr)
+                    .getCapability(/public/flowTokenBalance)
+                    .borrow<&FlowToken.Vault{FungibleToken.Balance}>() {
+                    if flowVaultRef.balance >= 0.1 {
+                        filteredAddrs.append(addr)
+                    }
+                }
+            }
+            if filteredAddrs.length == 0 {
+                return nil
+            }
+
+            let rand = revertibleRandom()
+            let index = rand % UInt64(filteredAddrs.length)
+            return EVMAgent.borrowAgency(filteredAddrs[index])
         }
     }
 
