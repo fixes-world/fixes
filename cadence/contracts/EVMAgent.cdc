@@ -25,7 +25,20 @@ access(all) contract EVMAgent {
     /// Event emitted when a new agency manager is created
     access(all) event NewAgencyManagerCreated(forAgency: Address)
     /// Event emitted when a new entrusted account is created.
-    access(all) event NewEntrustedAccountCreated(evmAddress: String, entrustedAccount: Address, byAgency: Address)
+    access(all) event NewEntrustedAccountCreated(
+        evmAddress: String,
+        entrustedAccount: Address,
+        byAgency: Address,
+        initialFunding: UFix64,
+    )
+    /// Event emitted when the entrusted account is verified
+    access(all) event EntrustedAccountVerified(
+        evmAddress: String,
+        entrustedAccount: Address,
+        byAgency: Address,
+        message: String,
+        fee: UFix64,
+    )
 
     /* --- Variable, Enums and Structs --- */
 
@@ -132,6 +145,10 @@ access(all) contract EVMAgent {
             return self.owner?.address ?? panic("Agency should have an owner")
         }
 
+        // Check if the EVM address is managed by the agency
+        access(all) view
+        fun isEVMAccountManaged(_ evmAddress: String): Bool
+
         /// Get the agency account
         access(all) view
         fun getStatus(): AgencyStatus
@@ -144,6 +161,16 @@ access(all) contract EVMAgent {
             timestamp: UInt64,
             _ acctCap: Capability<&AuthAccount>
         ): @FlowToken.Vault
+
+        /// Verify the evm signature, if valid, borrow the reference of the entrusted account
+        ///
+        access(all)
+        fun verifyAndBorrowEntrustedAccount(
+            message: String,
+            hexPublicKey: String,
+            hexSignature: String,
+            timestamp: UInt64,
+        ): &AuthAccount
     }
 
     /// Private interface to the agency
@@ -227,6 +254,12 @@ access(all) contract EVMAgent {
 
         /* --- Public methods  --- */
 
+        // Check if the EVM address is managed by the agency
+        access(all) view
+        fun isEVMAccountManaged(_ evmAddress: String): Bool {
+            return self.managedEntrustedAccounts[evmAddress] != nil
+        }
+
         /// Get the agency account
         access(all) view
         fun getStatus(): AgencyStatus {
@@ -269,6 +302,7 @@ access(all) contract EVMAgent {
 
             // Get the entrusted account
             let entrustedAcct = acctCap.borrow() ?? panic("Entrusted account not found")
+            let entrustedAddress = entrustedAcct.address
             // Reference to the flow vault of the entrusted account
             let entrustedAcctFlowBalanceRef = entrustedAcct
                 .getCapability(/public/flowTokenBalance)
@@ -283,8 +317,9 @@ access(all) contract EVMAgent {
             // Get the flow vault from the agency account
             let flowVaultRef = agencyAcct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("The flow vault is not found")
+            let spentFlowAmt = EVMAgent.getAgencyFlowFee()
             // Withdraw 0.01 $FLOW from agency and deposit to the new account
-            let initFlow <- flowVaultRef.withdraw(amount: 0.01)
+            let initFlow <- flowVaultRef.withdraw(amount: spentFlowAmt)
             // Subtract the original amount from the entrusted account, to ensure the account is not overfunded
             let refundBalance <- initFlow.withdraw(amount: entrustedAcctFlowBalanceRef.balance)
 
@@ -296,16 +331,86 @@ access(all) contract EVMAgent {
 
             // Ensure all resources in initialized to the entrusted account
             self._ensureEntrustedAcctResources(evmAddress)
+            self.status.addManagingEntrustedAccounts(1)
+            self.status.addSpentFlowAmount(spentFlowAmt)
+
+            /// Save the entrusted account address
+            self.managedEntrustedAccounts[evmAddress] = entrustedAddress
 
             // emit event
             emit NewEntrustedAccountCreated(
                 evmAddress: evmAddress,
                 entrustedAccount: entrustedAcct.address,
-                byAgency: agencyAcct.address
+                byAgency: agencyAcct.address,
+                initialFunding: spentFlowAmt
             )
 
             // return the refund balance
             return <- (refundBalance as! @FlowToken.Vault)
+        }
+
+        /// Verify the evm signature, if valid, borrow the reference of the entrusted account
+        ///
+        access(all)
+        fun verifyAndBorrowEntrustedAccount(
+            message: String,
+            hexPublicKey: String,
+            hexSignature: String,
+            timestamp: UInt64
+        ): &AuthAccount {
+            let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            // Ensure the evmAddress is not already registered
+            let entrustedAddr = acctsPool.getEVMEntrustedAccountAddress(evmAddress)
+            assert(
+                entrustedAddr != nil,
+                message: "EVM address not registered for an agent account"
+            )
+
+            let msgToVerify = message
+                .concat(",address=").concat(evmAddress)
+                .concat(",timestamp=").concat(timestamp.toString())
+
+            let isValid = ETHUtils.verifySignature(
+                hexPublicKey: hexPublicKey,
+                hexSignature: hexSignature,
+                message: msgToVerify
+            )
+            assert(isValid, message: "Invalid signature")
+
+            // Since the signature is valid, we think the transaction is valid
+            // and we can borrow the reference to the entrusted account
+            let entrustedAcct = acctsPool.borrowChildAccount(
+                type: FRC20AccountsPool.ChildAccountType.EVMEntrustedAccount,
+                evmAddress
+            ) ?? panic("The staking account was not created")
+
+            // The entrusted account need to pay a fee to the agency
+            let entrustedAcctFlowVauleRef = entrustedAcct
+                .borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("The flow vault is not found")
+
+            let agencyFlowReceiptRef = self._borrowAgencyAccount()
+                .getCapability(/public/flowTokenReceiver)
+                .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+                ?? panic("Could not borrow receiver reference to the recipient's Vault")
+
+            let fee = EVMAgent.getAgencyFlowFee()
+            agencyFlowReceiptRef.deposit(from: <- entrustedAcctFlowVauleRef.withdraw(amount: fee))
+
+            // update the status
+            self.status.addEarnedFlowAmount(fee)
+
+            // emit event
+            emit EntrustedAccountVerified(
+                evmAddress: evmAddress,
+                entrustedAccount: entrustedAcct.address,
+                byAgency: self.getOwnerAddress(),
+                message: message,
+                fee: fee
+            )
+
+            return entrustedAcct
         }
 
         /* --- Contract access methods  --- */
@@ -382,9 +487,16 @@ access(all) contract EVMAgent {
 
     /* --- Public methods  --- */
 
-    access(all)
+    access(all) view
     fun getIdentifierPrefix(): String {
         return "EVMAgency_".concat(self.account.address.toString())
+    }
+
+    /// Get the fee for any operation by the agency
+    ///
+    access(all) view
+    fun getAgencyFlowFee(): UFix64 {
+        return 0.01
     }
 
     /// Get the capability to the entrusted status
