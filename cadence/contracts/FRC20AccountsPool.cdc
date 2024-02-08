@@ -88,7 +88,7 @@ access(all) contract FRC20AccountsPool {
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount?
+        fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount?
         /// Sets up a new child account for market
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
@@ -242,15 +242,15 @@ access(all) contract FRC20AccountsPool {
         /// Borrow child's AuthAccount
         ///
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount? {
+        fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount? {
             let hcManagerRef = self.hcManagerCap.borrow()
                 ?? panic("Failed to borrow hcManager")
-            if let tickSpecified = tick {
-                let tickDict = self.borrowDict(type: type)
-                if tickDict == nil {
+            if let specified = key {
+                let dict = self.borrowDict(type: type)
+                if dict == nil {
                     return nil
                 }
-                if let childAddr = tickDict![tickSpecified] {
+                if let childAddr = dict![specified] {
                     if let ownedChild = hcManagerRef.borrowOwnedAccount(addr: childAddr) {
                         return ownedChild.borrowAccount()
                     }

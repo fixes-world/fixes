@@ -73,7 +73,7 @@ access(all) contract FRC20MarketManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // try to borrow the account to check if it was created
-        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Market, tick: tick)
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Market, tick)
             ?? panic("The market account was not created")
 
         // The market should have the following resources in the account:

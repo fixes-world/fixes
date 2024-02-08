@@ -163,7 +163,7 @@ access(all) contract FRC20StakingManager {
             // singleton resources
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // try to borrow the account to check if it was created
-            let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Staking, tick: tick)
+            let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Staking, tick)
                 ?? panic("The staking account was not created")
 
             let flowVaultRef = childAcctRef.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
@@ -250,7 +250,7 @@ access(all) contract FRC20StakingManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // try to borrow the account to check if it was created
-        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Staking, tick: tick)
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Staking, tick)
             ?? panic("The staking account was not created")
 
         var isUpdated = false
