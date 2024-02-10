@@ -607,6 +607,7 @@ access(all) contract EVMAgent {
                 if let flowVaultRef = getAccount(addr)
                     .getCapability(/public/flowTokenBalance)
                     .borrow<&FlowToken.Vault{FungibleToken.Balance}>() {
+                    // only the agency with enough balance can be picked
                     if flowVaultRef.balance >= 0.1 {
                         filteredAddrs.append(addr)
                     }
@@ -618,6 +619,7 @@ access(all) contract EVMAgent {
 
             let rand = revertibleRandom()
             let index = rand % UInt64(filteredAddrs.length)
+            // borrow the agency
             return EVMAgent.borrowAgency(filteredAddrs[index])
         }
     }
