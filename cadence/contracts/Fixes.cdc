@@ -417,6 +417,9 @@ access(all) contract Fixes {
         // returns the ids of the archived inscriptions
         access(all) view
         fun getIDs(): [UInt64]
+        // returns the amount of the archived inscriptions
+        access(all) view
+        fun getLength(): Int
         // returns the inscription with the given id
         access(all) view
         fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
@@ -447,6 +450,11 @@ access(all) contract Fixes {
         access(all) view
         fun getIDs(): [UInt64] {
             return self.inscriptions.keys
+        }
+
+        access(all) view
+        fun getLength(): Int {
+            return self.inscriptions.keys.length
         }
 
         access(all) view
