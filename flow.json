@@ -1,15 +1,15 @@
 {
 	"contracts": {
-		"ArrayUtils": {
-			"source": "cadence/deps/ArrayUtils.cdc",
+		"AddressUtils": {
+			"source": "cadence/deps/AddressUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
-		"AddressUtils": {
-			"source": "cadence/deps/AddressUtils.cdc",
+		"ArrayUtils": {
+			"source": "cadence/deps/ArrayUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
@@ -20,27 +20,34 @@
 			"source": "./cadence/deps/CapabilityDelegator.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
 			}
 		},
 		"CapabilityFactory": {
 			"source": "./cadence/deps/CapabilityFactory.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
 			}
 		},
 		"CapabilityFilter": {
 			"source": "./cadence/deps/CapabilityFilter.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"Domains": {
+			"source": "",
+			"aliases": {
+				"mainnet": "233eb012d34b0070",
+				"testnet": "b05b2abb42335e88"
 			}
 		},
 		"ETHUtils": {
@@ -59,8 +66,15 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20Indexer": {
-			"source": "cadence/contracts/FRC20Indexer.cdc",
+		"FIND": {
+			"source": "",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FRC20AccountsPool": {
+			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -83,32 +97,8 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20NFTWrapper": {
-			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FRC20Storefront": {
-			"source": "cadence/contracts/FRC20Storefront.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FRC20AccountsPool": {
-			"source": "cadence/contracts/FRC20AccountsPool.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FRC20Marketplace": {
-			"source": "cadence/contracts/FRC20Marketplace.cdc",
+		"FRC20Indexer": {
+			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -123,8 +113,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20TradingRecord": {
-			"source": "cadence/contracts/FRC20TradingRecord.cdc",
+		"FRC20Marketplace": {
+			"source": "cadence/contracts/FRC20Marketplace.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20NFTWrapper": {
+			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -147,16 +145,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20StakingManager": {
-			"source": "cadence/contracts/FRC20StakingManager.cdc",
+		"FRC20StakingForwarder": {
+			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20StakingForwarder": {
-			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
+		"FRC20StakingManager": {
+			"source": "cadence/contracts/FRC20StakingManager.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -171,12 +169,35 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20Storefront": {
+			"source": "cadence/contracts/FRC20Storefront.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20TradingRecord": {
+			"source": "cadence/contracts/FRC20TradingRecord.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FindViews": {
+			"source": "cadence/deps/FindViews.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
 			}
 		},
 		"Fixes": {
@@ -195,6 +216,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesHeartbeat": {
+			"source": "cadence/contracts/FixesHeartbeat.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FixesTraits": {
 			"source": "cadence/contracts/FixesTraits.cdc",
 			"aliases": {
@@ -205,14 +234,6 @@
 		},
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FixesHeartbeat": {
-			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -247,37 +268,20 @@
 			"source": "cadence/deps/HybridCustody.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"InscriptionMetadata": {
+			"source": "cadence/deps/InscriptionMetadata.cdc",
+			"aliases": {
+				"mainnet": "88dd257fcf26d3cc",
+				"testnet": "564b229bd8380848"
 			}
 		},
 		"MetadataViews": {
 			"source": "cadence/deps/MetadataViews.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
-		},
-		"NonFungibleToken": {
-			"source": "cadence/deps/NonFungibleToken.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
-		},
-		"StringUtils": {
-			"source": "cadence/deps/StringUtils.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
-		},
-		"ViewResolver": {
-			"source": "cadence/deps/ViewResolver.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
@@ -300,43 +304,23 @@
 				"testnet": "324c34e1c517e4db"
 			}
 		},
-		"InscriptionMetadata": {
-			"source": "cadence/deps/InscriptionMetadata.cdc",
+		"NonFungibleToken": {
+			"source": "cadence/deps/NonFungibleToken.cdc",
 			"aliases": {
-				"mainnet": "88dd257fcf26d3cc",
-				"testnet": "564b229bd8380848"
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
 			}
 		},
-		"FIND": {
-			"source": "",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
-		},
-		"FindViews": {
-			"source": "cadence/deps/FindViews.cdc",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
-		},
-		"Domains": {
-			"source": "",
-			"aliases": {
-				"mainnet": "233eb012d34b0070",
-				"testnet": "b05b2abb42335e88"
-			}
-		},
-		"OracleInterface": {
-			"source": "cadence/deps/OracleInterface.cdc",
+		"OracleConfig": {
+			"source": "cadence/deps/OracleConfig.cdc",
 			"aliases": {
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
 			}
 		},
-		"OracleConfig": {
-			"source": "cadence/deps/OracleConfig.cdc",
+		"OracleInterface": {
+			"source": "cadence/deps/OracleInterface.cdc",
 			"aliases": {
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
@@ -348,24 +332,33 @@
 				"mainnet": "ec67451f8a58216a",
 				"testnet": "866a9f1e81898147"
 			}
+		},
+		"StringUtils": {
+			"source": "cadence/deps/StringUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"ViewResolver": {
+			"source": "cadence/deps/ViewResolver.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
 		}
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
-		"testing": "127.0.0.1:3569",
 		"mainnet": "access.mainnet.nodes.onflow.org:9000",
+		"testing": "127.0.0.1:3569",
 		"testnet": "access.devnet.nodes.onflow.org:9000"
 	},
 	"accounts": {
 		"default": {
 			"address": "01cf0e2f2f715450",
-			"key": {
-				"type": "file",
-				"location": "./emulator.key"
-			}
-		},
-		"emulator-account": {
-			"address": "f8d6e0586b0a20c7",
 			"key": {
 				"type": "file",
 				"location": "./emulator.key"
@@ -380,6 +373,13 @@
 		},
 		"emulator-2": {
 			"address": "e03daebed8ca0615",
+			"key": {
+				"type": "file",
+				"location": "./emulator.key"
+			}
+		},
+		"emulator-account": {
+			"address": "f8d6e0586b0a20c7",
 			"key": {
 				"type": "file",
 				"location": "./emulator.key"
