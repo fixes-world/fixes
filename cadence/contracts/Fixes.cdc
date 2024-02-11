@@ -549,11 +549,23 @@ access(all) contract Fixes {
         )!
     }
 
+    /// Get the storage path of the archived inscriptions
+    ///
     access(all) view
     fun getArchivedFixesStoragePath(_ index: UInt64?): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
             identifier: prefix.concat(index == nil ? "_archived" : "_archived_".concat(index!.toString()))
+        )!
+    }
+
+    /// Get the storage path of the archived inscriptions max index
+    ///
+    access(all) view
+    fun getArchivedFixesMaxIndexStoragePath(): StoragePath {
+        let prefix = "Fixes_".concat(self.account.address.toString())
+        return StoragePath(
+            identifier: prefix.concat("_archived_max_index")
         )!
     }
 
