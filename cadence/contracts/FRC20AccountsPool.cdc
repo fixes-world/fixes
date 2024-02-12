@@ -24,7 +24,7 @@ access(all) contract FRC20AccountsPool {
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
     /// Event emitted when a new child account is added, if tick is nil, it means the child account is not a shared account
-    access(all) event NewChildAccountAdded(type: UInt8, address: Address, tick: String?)
+    access(all) event NewChildAccountAdded(type: UInt8, address: Address, tick: String?, key: String?)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -38,43 +38,69 @@ access(all) contract FRC20AccountsPool {
     access(all) enum ChildAccountType: UInt8 {
         access(all) case Market
         access(all) case Staking
+        access(all) case EVMAgency
+        access(all) case EVMEntrustedAccount
     }
 
     /// The public interface can be accessed by anyone
     ///
     access(all) resource interface PoolPublic {
         /// ---- Getters ----
-        /// Returns the address of the FRC20 staking for the given tick
-        access(all) view
-        fun getFRC20StakingAddress(tick: String): Address?
-        /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getFRC20MarketAddress(tick: String): Address?
-        /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getMarketSharedAddress(): Address?
         /// Returns the addresses of the FRC20 with the given type
         access(all) view
         fun getFRC20Addresses(type: ChildAccountType): {String: Address}
-        /// Returns the flow token receiver for the given tick
-        access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
+
+        /// Returns the address of the FRC20 staking for the given tick
+        access(all) view
+        fun getFRC20StakingAddress(tick: String): Address?
         /// Returns the flow token receiver for the given tick
         access(all)
         fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
+
+        /// Returns the address of the FRC20 market for the given tick
+        access(all) view
+        fun getFRC20MarketAddress(tick: String): Address?
+        /// Returns the flow token receiver for the given tick
+        access(all)
+        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
+
+        /// Returns the address of the FRC20 market for the given tick
+        access(all) view
+        fun getMarketSharedAddress(): Address?
         /// Returns the address of the FRC20 market for the given tick
         access(all)
         fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}?
+
+        /// Returns the address of the EVM agent for the given owner address
+        access(all) view
+        fun getEVMAgencyAddress(_ owner: String): Address?
+        /// Returns the flow token receiver for the given owner address
+        access(all)
+        fun borrowEVMAgencyFlowTokenReceiver(_ owner: String): &{FungibleToken.Receiver}?
+
+        /// Returns the address of the EVM entrusted account for the given evm address
+        access(all) view
+        fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address?
+        /// Returns the flow token receiver for the given evm address
+        access(all)
+        fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}?
+
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount?
+        fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount?
         /// Sets up a new child account for market
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
         /// Sets up a new child account for staking
         access(account)
         fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>)
+        /// Sets up a new child account for EVM agent
+        access(account)
+        fun setupNewChildForEVMAgency(owner: String, _ acctCap: Capability<&AuthAccount>)
+        /// Sets up a new child account for EVM entrusted account
+        access(account)
+        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -88,9 +114,9 @@ access(all) contract FRC20AccountsPool {
         )
         /// Sets up a new child account
         access(all)
-        fun setupNewChildByTick(
+        fun setupNewChildByKey(
             type: ChildAccountType,
-            tick: String,
+            key: String,
             _ acctCap: Capability<&AuthAccount>,
         )
     }
@@ -115,11 +141,44 @@ access(all) contract FRC20AccountsPool {
 
         /** ---- Public Methods ---- */
 
+        /// Returns the addresses of the FRC20 with the given type
+        access(all) view
+        fun getFRC20Addresses(type: ChildAccountType): {String: Address} {
+            if let tickDict = self.addressMapping[type] {
+                return tickDict
+            }
+            return {}
+        }
+
         /// Returns the address of the FRC20 market for the given tick
         access(all) view
         fun getFRC20MarketAddress(tick: String): Address? {
             if let tickDict = self.borrowDict(type: ChildAccountType.Market) {
                 return tickDict[tick]
+            }
+            return nil
+        }
+
+        /// Returns the flow token receiver for the given tick
+        access(all)
+        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getFRC20MarketAddress(tick: tick) {
+                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+            }
+            return nil
+        }
+
+        /// Returns the address of the FRC20 market for the given tick
+        access(all) view
+        fun getMarketSharedAddress(): Address? {
+            return self.sharedAddressMappping[ChildAccountType.Market]
+        }
+
+        /// Returns the address of the FRC20 market for the given tick
+        access(all)
+        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}? {
+            if let addr = self.getMarketSharedAddress() {
+                return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -133,30 +192,6 @@ access(all) contract FRC20AccountsPool {
             return nil
         }
 
-        /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getMarketSharedAddress(): Address? {
-            return self.sharedAddressMappping[ChildAccountType.Market]
-        }
-
-        /// Returns the addresses of the FRC20 with the given type
-        access(all) view
-        fun getFRC20Addresses(type: ChildAccountType): {String: Address} {
-            if let tickDict = self.addressMapping[type] {
-                return tickDict
-            }
-            return {}
-        }
-
-        /// Returns the flow token receiver for the given tick
-        access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
-            if let addr = self.getFRC20MarketAddress(tick: tick) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
-            }
-            return nil
-        }
-
         /// Returns the flow token receiver for the given tick
         access(all)
         fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
@@ -166,10 +201,38 @@ access(all) contract FRC20AccountsPool {
             return nil
         }
 
-        /// Returns the address of the FRC20 market for the given tick
+        /// Returns the address of the EVM agent for the given eth address
+        access(all) view
+        fun getEVMAgencyAddress(_ owner: String): Address? {
+            if let tickDict = self.borrowDict(type: ChildAccountType.EVMAgency) {
+                return tickDict[owner]
+            }
+            return nil
+        }
+
+        /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}? {
-            if let addr = self.getMarketSharedAddress() {
+        fun borrowEVMAgencyFlowTokenReceiver(_ evmAddress: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getEVMAgencyAddress(evmAddress) {
+                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+            }
+            return nil
+        }
+
+
+        /// Returns the address of the EVM entrusted account for the given evm address
+        access(all) view
+        fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address? {
+            if let tickDict = self.borrowDict(type: ChildAccountType.EVMEntrustedAccount) {
+                return tickDict[evmAddr]
+            }
+            return nil
+        }
+
+        /// Returns the flow token receiver for the given evm address
+        access(all)
+        fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getEVMEntrustedAccountAddress(evmAddr) {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
             return nil
@@ -179,15 +242,15 @@ access(all) contract FRC20AccountsPool {
         /// Borrow child's AuthAccount
         ///
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, tick: String?): &AuthAccount? {
+        fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount? {
             let hcManagerRef = self.hcManagerCap.borrow()
                 ?? panic("Failed to borrow hcManager")
-            if let tickSpecified = tick {
-                let tickDict = self.borrowDict(type: type)
-                if tickDict == nil {
+            if let specified = key {
+                let dict = self.borrowDict(type: type)
+                if dict == nil {
                     return nil
                 }
-                if let childAddr = tickDict![tickSpecified] {
+                if let childAddr = dict![specified] {
                     if let ownedChild = hcManagerRef.borrowOwnedAccount(addr: childAddr) {
                         return ownedChild.borrowAccount()
                     }
@@ -206,14 +269,26 @@ access(all) contract FRC20AccountsPool {
         ///
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>) {
-            self.setupNewChildByTick(type: ChildAccountType.Market, tick: tick, acctCap)
+            self.setupNewChildByKey(type: ChildAccountType.Market, key: tick, acctCap)
         }
 
         /// Sets up a new child account for staking
         ///
         access(account)
         fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>) {
-            self.setupNewChildByTick(type: ChildAccountType.Staking, tick: tick, acctCap)
+            self.setupNewChildByKey(type: ChildAccountType.Staking, key: tick, acctCap)
+        }
+
+        /// Sets up a new child account for EVM agency
+        access(account)
+        fun setupNewChildForEVMAgency(owner: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByKey(type: ChildAccountType.EVMAgency, key: owner, acctCap)
+        }
+
+        /// Sets up a new child account for EVM entrusted account
+        access(account)
+        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByKey(type: ChildAccountType.EVMEntrustedAccount, key: evmAddr, acctCap)
         }
 
         /** ---- Admin Methods ---- */
@@ -240,15 +315,16 @@ access(all) contract FRC20AccountsPool {
                 type: type.rawValue,
                 address: childAcctCap.address,
                 tick: nil,
+                key: nil,
             )
         }
 
         /// Sets up a new child account
         ///
         access(all)
-        fun setupNewChildByTick(
+        fun setupNewChildByKey(
             type: ChildAccountType,
-            tick: String,
+            key: String,
             _ childAcctCap: Capability<&AuthAccount>,
         ) {
             pre {
@@ -256,22 +332,27 @@ access(all) contract FRC20AccountsPool {
             }
             self._ensureDictExists(type)
 
-            let tickDict = self.borrowDict(type: type) ?? panic("Failed to borrow tick ")
+            let dict = self.borrowDict(type: type) ?? panic("Failed to borrow tick ")
             // no need to setup if already exists
-            if tickDict[tick] != nil {
+            if dict[key] != nil {
                 return
             }
 
-            let frc20Indexer = FRC20Indexer.getIndexer()
-            // ensure token meta exists
-            let tokenMeta = frc20Indexer.getTokenMeta(tick: tick)
-            assert(
-                tokenMeta != nil,
-                message: "Token meta does not exist"
-            )
+            var tick: String? = nil
+            // For Market and Staking, we need to ensure the token meta exists
+            if type == ChildAccountType.Market || type == ChildAccountType.Staking {
+                let frc20Indexer = FRC20Indexer.getIndexer()
+                // ensure token meta exists
+                let tokenMeta = frc20Indexer.getTokenMeta(tick: key)
+                assert(
+                    tokenMeta != nil,
+                    message: "Token meta does not exist"
+                )
+                tick = key
+            }
 
             // record new child account address
-            tickDict[tick] = childAcctCap.address
+            dict[key] = childAcctCap.address
 
             // setup new child account
             self._setupChildAccount(childAcctCap)
@@ -281,6 +362,7 @@ access(all) contract FRC20AccountsPool {
                 type: type.rawValue,
                 address: childAcctCap.address,
                 tick: tick,
+                key: key,
             )
         }
 
