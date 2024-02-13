@@ -556,6 +556,13 @@ access(all) contract Fixes {
         return bytes * 0.0002
     }
 
+    /// Estimate the value of a string
+    ///
+    access(all) view
+    fun estimateStringValue(_ str: String): UFix64 {
+        return UFix64(str.utf8.length) * 0.0002
+    }
+
     /// Get the storage path of a inscription
     ///
     access(all) view
