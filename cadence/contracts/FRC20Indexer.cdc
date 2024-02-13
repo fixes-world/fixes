@@ -1213,9 +1213,9 @@ access(all) contract FRC20Indexer {
             }
             // extract payment from the buyer's inscription, the payment should be a FLOW token
             // the payment should be equal to the total price and the payer should be the buyer
-            // in the partialExtract method, the inscription will be extracted if the payment is enough
+            // in the partialSafeExtract method, the inscription will be extracted if the payment is enough
             // and the inscription will be still extractable.
-            let vault <- ins.partialExtract(amount)
+            let vault <- ins.partialSafeExtract(amount)
             assert(
                 vault.balance == amount,
                 message: "The amount should be equal to the balance of the vault"

@@ -237,12 +237,22 @@ access(all) contract Fixes {
         /// Extract a part of the inscription value, but keep the inscription be not extracted
         ///
         access(all)
+        fun partialSafeExtract(_ amount: UFix64): @FlowToken.Vault {
+            post {
+                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
+            }
+            return <- self.partialExtract(amount)
+        }
+
+
+        /// Extract a part of the inscription value, but keep the inscription be not extracted
+        ///
+        access(all)
         fun partialExtract(_ amount: UFix64): @FlowToken.Vault {
             pre {
                 !self.isExtracted(): "Inscription already extracted"
             }
             post {
-                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
                 !self.isExtracted(): "Inscription should not be extracted"
             }
             let ret <- self.value?.withdraw(amount: amount) ?? panic("No value")
