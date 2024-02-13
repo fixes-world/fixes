@@ -509,6 +509,8 @@ access(all) contract EVMAgent {
         }
     }
 
+    /// Agency center public interface
+    ///
     access(all) resource interface AgencyCenterPublic {
         /// Create a new agency
         access(all)
@@ -521,6 +523,8 @@ access(all) contract EVMAgent {
         fun pickValidAgency(): &Agency{AgencyPublic}?
     }
 
+    /// Agency center resource
+    ///
     access(all) resource AgencyCenter: AgencyCenterPublic {
         access(self)
         let agencies: {Address: Bool}

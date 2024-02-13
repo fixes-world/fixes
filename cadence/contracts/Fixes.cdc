@@ -425,9 +425,18 @@ access(all) contract Fixes {
         fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
     }
 
+    access(all) resource interface Archivor {
+        // archive the inscription
+        access(all)
+        fun archive(_ ins: @Fixes.Inscription)
+        // returns the inscription with the given id
+        access(all)
+        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription?
+    }
+
     /// The resource that stores the archived inscriptions
     ///
-    access(all) resource ArchivedInscriptions: ArchivedInscriptionsPublic {
+    access(all) resource ArchivedInscriptions: ArchivedInscriptionsPublic, Archivor {
         access(self)
         let inscriptions: @{UInt64: Fixes.Inscription}
 
