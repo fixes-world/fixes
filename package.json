@@ -4,6 +4,7 @@
   "exports": {
     "./contracts/*": "./cadence/contracts/*",
     "./transactions/*": "./cadence/transactions/*",
+		"./transactions-for-evm/*": "./cadence/transactions-for-evm/*",
     "./scripts/*": "./cadence/scripts/*",
     "./flow.json": "./flow.json"
   },
