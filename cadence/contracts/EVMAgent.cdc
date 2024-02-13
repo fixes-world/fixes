@@ -49,6 +49,8 @@ access(all) contract EVMAgent {
     access(all)
     let entrustedStatusPublicPath: PublicPath
     access(all)
+    let evmAgencyManagerStoragePath: StoragePath
+    access(all)
     let evmAgencyStoragePath: StoragePath
     access(all)
     let evmAgencyPublicPath: PublicPath
@@ -675,10 +677,20 @@ access(all) contract EVMAgent {
         let prefix = EVMAgent.getIdentifierPrefix()
         self.entrustedStatusStoragePath = StoragePath(identifier: prefix.concat("_entrusted_status"))!
         self.entrustedStatusPublicPath = PublicPath(identifier: prefix.concat("_entrusted_status"))!
+
+        self.evmAgencyManagerStoragePath = StoragePath(identifier: prefix.concat("_agency_manager"))!
+
         self.evmAgencyStoragePath = StoragePath(identifier: prefix.concat("_agency"))!
         self.evmAgencyPublicPath = PublicPath(identifier: prefix.concat("_agency"))!
+
         self.evmAgencyCenterStoragePath = StoragePath(identifier: prefix.concat("_center"))!
         self.evmAgencyCenterPublicPath = PublicPath(identifier: prefix.concat("_center"))!
+
+        // Save the agency center resource
+        let center <- create AgencyCenter()
+        self.account.save(<- center, to: self.evmAgencyCenterStoragePath)
+        // link the public path
+        self.account.link<&AgencyCenter{AgencyCenterPublic}>(self.evmAgencyCenterPublicPath, target: self.evmAgencyCenterStoragePath)
 
         emit ContractInitialized()
     }
