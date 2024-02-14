@@ -1,6 +1,8 @@
+import "FlowToken"
+
 import "Fixes"
 import "FRC20Indexer"
-import "FlowToken"
+import "FixesInscriptionFactory"
 
 transaction(
     tick: String,
@@ -10,22 +12,11 @@ transaction(
     let ins: &Fixes.Inscription
 
     prepare(acct: AuthAccount) {
-        // basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
-        let dataStr = "op=transfer,tick=".concat(tick)
-            .concat(",amt=").concat(amt.toString())
-            .concat(",to=").concat(to.toString())
-        let metadata = dataStr.utf8
+        // The Inscription's metadata
+        let dataStr = FixesInscriptionFactory.buildTransferFRC20(tick: tick, to: to, amt: amt)
 
         // estimate the required storage
-        let estimatedReqValue = Fixes.estimateValue(
-            index: Fixes.totalInscriptions,
-            mimeType: mimeType,
-            data: metadata,
-            protocol: metaProtocol,
-            encoding: nil
-        )
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
@@ -34,14 +25,9 @@ transaction(
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first
-        let newIns <- Fixes.createInscription(
-            // Withdraw tokens from the signer's stored vault
-            value: <- (flowToReserve as! @FlowToken.Vault),
-            mimeType: mimeType,
-            metadata: metadata,
-            metaProtocol: metaProtocol,
-            encoding: nil,
-            parentId: nil
+        let newIns <- FixesInscriptionFactory.createFrc20Inscription(
+            dataStr,
+            <- (flowToReserve as! @FlowToken.Vault)
         )
         // save the new Inscription to storage
         let newInsId = newIns.getId()

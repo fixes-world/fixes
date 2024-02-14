@@ -4,6 +4,7 @@ import "MetadataViews"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
@@ -62,22 +63,11 @@ transaction(
         /** ------------- End ---------------------------------------------------------- */
 
         /** ------------- Start -- Inscription Initialization -------------  */
-        // basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
-        let dataStr = "op=withdraw,tick=".concat(tick)
-            .concat(",amt=").concat(amount.toString())
-            .concat(",usage=staking")
-        let metadata = dataStr.utf8
+        // create the metadata
+        let dataStr = FixesInscriptionFactory.buildStakeWithdraw(tick: tick, amount: amount)
 
         // estimate the required storage
-        let estimatedReqValue = Fixes.estimateValue(
-            index: Fixes.totalInscriptions,
-            mimeType: mimeType,
-            data: metadata,
-            protocol: metaProtocol,
-            encoding: nil
-        )
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
@@ -86,14 +76,9 @@ transaction(
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first
-        let newIns <- Fixes.createInscription(
-            // Withdraw tokens from the signer's stored vault
-            value: <- (flowToReserve as! @FlowToken.Vault),
-            mimeType: mimeType,
-            metadata: metadata,
-            metaProtocol: metaProtocol,
-            encoding: nil,
-            parentId: nil
+        let newIns <- FixesInscriptionFactory.createFrc20Inscription(
+            dataStr,
+            <- (flowToReserve as! @FlowToken.Vault)
         )
         // save the new Inscription to storage
         let newInsId = newIns.getId()
