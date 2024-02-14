@@ -140,4 +140,37 @@ access(all) contract FixesInscriptionFactory {
         return "op=list-take-sellnow,tick=".concat(tick)
             .concat(",amt=").concat(amount.toString())
     }
+
+    // Staking FRC20 Inscription
+
+    access(all)
+    fun buildStakeDonate(
+        tick: String?,
+        amount: UFix64?,
+    ): String {
+        var dataStr = "op=withdraw,usage=donate"
+        if tick != nil && amount != nil {
+            dataStr = dataStr
+                .concat(",tick=").concat(tick!)
+                .concat(",amt=").concat(amount!.toString())
+        }
+        return dataStr
+    }
+
+    access(all)
+    fun buildStakeWithdraw(
+        tick: String,
+        amount: UFix64,
+    ): String {
+        return "op=withdraw,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+            .concat(",usage=staking")
+    }
+
+    access(all)
+    fun buildStakeDeposit(
+        tick: String,
+    ): String {
+        return "op=deposit,tick=".concat(tick)
+    }
 }
