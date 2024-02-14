@@ -4,6 +4,7 @@ import "FungibleToken"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesAvatar"
 import "FixesHeartbeat"
 import "FRC20FTShared"
@@ -99,9 +100,6 @@ transaction(
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
-        // frc20 basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
 
         // For each buy item, check the listing
         for rankedId in batchSellItems.keys {
@@ -141,33 +139,20 @@ transaction(
             let sellAmount = batchSellItems[rankedId]!
 
             /** ------------- Start -- Inscription Initialization -------------  */
-            // basic attributes
-            let dataStr = "op=list-take-sellnow,tick=".concat(tick)
-                .concat(",amt=").concat(sellAmount.toString())
-            let metadata = dataStr.utf8
+            // create the metadata
+            let dataStr = FixesInscriptionFactory.buildMarketTakeSellNow(tick: tick, amount: sellAmount)
 
             // estimate the required storage
-            let estimatedReqValue = Fixes.estimateValue(
-                index: Fixes.totalInscriptions,
-                mimeType: mimeType,
-                data: metadata,
-                protocol: metaProtocol,
-                encoding: nil
-            )
+            let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
             // Withdraw tokens from the signer's stored vault
             // Total amount to withdraw is the estimated required value + the buy price
             let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
             // Create the Inscription first
-            let newIns <- Fixes.createInscription(
-                // Withdraw tokens from the signer's stored vault
-                value: <- (flowToReserve as! @FlowToken.Vault),
-                mimeType: mimeType,
-                metadata: metadata,
-                metaProtocol: metaProtocol,
-                encoding: nil,
-                parentId: nil
+            let newIns <- FixesInscriptionFactory.createFrc20Inscription(
+                dataStr,
+                <- (flowToReserve as! @FlowToken.Vault)
             )
             // save the new Inscription to storage
             let newInsId = newIns.getId()

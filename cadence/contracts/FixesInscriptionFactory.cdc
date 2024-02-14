@@ -50,6 +50,8 @@ access(all) contract FixesInscriptionFactory {
 
     /* --- Public Methods --- */
 
+    // Basic FRC20 Inscription
+
     access(all)
     fun buildMintFRC20(
         tick: String,
@@ -88,5 +90,54 @@ access(all) contract FixesInscriptionFactory {
         return "op=transfer,tick=".concat(tick)
             .concat(",amt=").concat(amt.toString())
             .concat(",to=").concat(to.toString())
+    }
+
+    // Market FRC20 Inscription
+
+    access(all)
+    fun buildMarketEnable(
+        tick: String,
+    ): String {
+        return "op=enable-market,tick=".concat(tick)
+    }
+
+    access(all)
+    fun buildMarketListBuyNow(
+        tick: String,
+        amount: UFix64,
+        price: UFix64,
+    ): String {
+        return "op=list-buynow,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+            .concat(",price=").concat(price.toString())
+    }
+
+    access(all)
+    fun buildMarketListSellNow(
+        tick: String,
+        amount: UFix64,
+        price: UFix64,
+    ): String {
+        return "op=list-sellnow,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+            .concat(",price=").concat(price.toString())
+    }
+
+    access(all)
+    fun buildMarketTakeBuyNow(
+        tick: String,
+        amount: UFix64,
+    ): String {
+        return "op=list-take-buynow,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+    }
+
+    access(all)
+    fun buildMarketTakeSellNow(
+        tick: String,
+        amount: UFix64,
+    ): String {
+        return "op=list-take-sellnow,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
     }
 }
