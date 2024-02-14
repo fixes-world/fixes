@@ -50,13 +50,43 @@ access(all) contract FixesInscriptionFactory {
 
     /* --- Public Methods --- */
 
-    /// create a standard mint frc20 inscription
-    ///
     access(all)
     fun buildMintFRC20(
         tick: String,
         amt: UFix64,
     ): String {
         return "op=mint,tick=".concat(tick).concat(",amt=").concat(amt.toString())
+    }
+
+    access(all)
+    fun buildBurnFRC20(
+        tick: String,
+        amt: UFix64,
+    ): String {
+        return "op=burn,tick=".concat(tick).concat(",amt=").concat(amt.toString())
+    }
+
+    access(all)
+    fun buildDeployFRC20(
+        tick: String,
+        max: UFix64,
+        limit: UFix64,
+        burnable: Bool,
+    ): String {
+        return "op=deploy,tick=".concat(tick)
+            .concat(",max=").concat(max.toString())
+            .concat(",lim=").concat(limit.toString())
+            .concat(",burnable=").concat(burnable ? "1" : "0")
+    }
+
+    access(all)
+    fun buildTransferFRC20(
+        tick: String,
+        to: Address,
+        amt: UFix64,
+    ): String {
+        return "op=transfer,tick=".concat(tick)
+            .concat(",amt=").concat(amt.toString())
+            .concat(",to=").concat(to.toString())
     }
 }

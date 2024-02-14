@@ -1,7 +1,9 @@
-import "Fixes"
-import "FRC20Indexer"
 import "FlowToken"
 import "FungibleToken"
+
+import "Fixes"
+import "FRC20Indexer"
+import "FixesInscriptionFactory"
 
 transaction(
     tick: String,
@@ -11,37 +13,21 @@ transaction(
     let recipient: &FlowToken.Vault{FungibleToken.Receiver}
 
     prepare(acct: AuthAccount) {
-        // basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
-        let dataStr = "op=burn,tick=".concat(tick).concat(",amt=").concat(amt.toString())
-        let metadata = dataStr.utf8
-
-        // estimate the required storage
-        let estimatedReqValue = Fixes.estimateValue(
-            index: Fixes.totalInscriptions,
-            mimeType: mimeType,
-            data: metadata,
-            protocol: metaProtocol,
-            encoding: nil
-        )
-
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
+
+        let dataStr = FixesInscriptionFactory.buildBurnFRC20(tick: tick, amt: amt)
+
+        // estimate the required storage
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+
         // Withdraw tokens from the signer's stored vault
-        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
+        let flowToReserve <- (vaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
 
         // Create the Inscription first
-        let newIns <- Fixes.createInscription(
-            // Withdraw tokens from the signer's stored vault
-            value: <- (flowToReserve as! @FlowToken.Vault),
-            mimeType: mimeType,
-            metadata: metadata,
-            metaProtocol: metaProtocol,
-            encoding: nil,
-            parentId: nil
-        )
+        let newIns <- FixesInscriptionFactory.createFrc20Inscription(dataStr, <- flowToReserve)
+
         // save the new Inscription to storage
         let newInsId = newIns.getId()
         let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
