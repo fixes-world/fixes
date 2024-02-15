@@ -10,8 +10,10 @@ The lottery is drawn every epoch. The winner is selected randomly from the parti
 // Fixes Imports
 import "Fixes"
 import "FixesHeartbeat"
+import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20Staking"
+import "FRC20AccountsPool"
 
 access(all) contract FGameLottery {
     /* --- Events --- */
@@ -46,19 +48,15 @@ access(all) contract FGameLottery {
 
     /* --- Variable, Enums and Structs --- */
 
-    access(all)
-    let userCollectionStoragePath: StoragePath
-    access(all)
-    let userCollectionPublicPath: PublicPath
-    access(all)
-    let registryStoragePath: StoragePath
-    access(all)
-    let registryPublicPath: PublicPath
+    access(all) let userCollectionStoragePath: StoragePath
+    access(all) let userCollectionPublicPath: PublicPath
+    access(all) let lotteryPoolStoragePath: StoragePath
+    access(all) let lotteryPoolPublicPath: PublicPath
+    access(all) let registryStoragePath: StoragePath
+    access(all) let registryPublicPath: PublicPath
 
-    access(all)
-    var MAX_WHITE_NUMBER: UInt8
-    access(all)
-    var MAX_RED_NUMBER: UInt8
+    access(all) var MAX_WHITE_NUMBER: UInt8
+    access(all) var MAX_RED_NUMBER: UInt8
 
     /* --- Interfaces & Resources --- */
 
@@ -108,11 +106,11 @@ access(all) contract FGameLottery {
         access(all) let lotteryId: UInt64
         access(all) let numbers: TicketNumber
         // view functions
+        access(all) view fun getStatus(): TicketStatus
         access(all) view fun getTicketId(): UInt64
         access(all) view fun getTicketOwner(): Address
         access(all) view fun getNumbers(): [UInt8;6]
         access(all) view fun getPowerup(): UInt64
-        access(all) view fun getStatus(): TicketStatus
     }
 
     /// Resource for the ticket entry
@@ -266,6 +264,7 @@ access(all) contract FGameLottery {
     /// User's ticket collection resource interface
     ///
     access(all) resource interface TicketCollectionPublic {
+        // --- read methods ---
         access(all) view
         fun getIDs(): [UInt64]
 
@@ -274,6 +273,10 @@ access(all) contract FGameLottery {
 
         access(all)
         fun borrowTicket(ticketId: UInt64): &TicketEntry{TicketEntryPublic}?
+
+        // --- write methods ---
+        access(all)
+        fun addTicket(ticket: @TicketEntry)
     }
 
     /// User's ticket collection
@@ -350,21 +353,178 @@ access(all) contract FGameLottery {
         }
     }
 
+    /// Enum for the lottery status
+    ///
+    access(all) enum LotteryStatus: UInt8 {
+        case ACTIVE
+        case READY_TO_DRAW
+        case DRAWN
+    }
+
+    /// Lottery public resource interface
+    ///
+    access(all) resource interface LotteryPublic {
+        /// Lottery status
+        access(all) view fun getStatus(): LotteryStatus
+    }
+
     /// Lottery resource
     ///
-    access(all) resource Lottery {
+    access(all) resource Lottery: LotteryPublic {
+        /// Lottery epoch index
+        access(all)
+        let epochIndex: UInt64
+        /// Lottery epoch start time
+        access(all)
+        let epochStartAt: UFix64
+        /// Participants tickets: [Address: [TicketID]]
         access(self)
-        let participants: {Address: UInt32}
+        let participants: {Address: [UInt64]}
+        /// Lottery final status
+        var drawnNumbers: TicketNumber?
+        /// Jackpot information
+        var jackpotAmount: UFix64?
+        var jackpotWinner: Address?
 
-        init() {
+        init(
+            epochIndex: UInt64
+        ) {
+            self.epochIndex = epochIndex
+            self.epochStartAt = getCurrentBlock().timestamp
             self.participants = {}
+            self.drawnNumbers = nil
+            self.jackpotAmount = nil
+            self.jackpotWinner = nil
         }
+
+        /** ---- Public Methods ---- */
+
+        access(all) view
+        fun getStatus(): LotteryStatus {
+            let now = getCurrentBlock().timestamp
+            let poolRef = self.borrowLotteryPool()
+            let interval = poolRef.getEpochInterval()
+            let epochCloseTime = self.epochStartAt + interval
+            if now < epochCloseTime {
+                return LotteryStatus.ACTIVE
+            } else if self.drawnNumbers == nil {
+                return LotteryStatus.READY_TO_DRAW
+            } else {
+                return LotteryStatus.DRAWN
+            }
+        }
+
+        /** ---- Contract level Methods ----- */
+
+        /** ---- Internal Methods ----- */
+
+        access(self)
+        fun borrowLotteryPool(): &LotteryPool {
+            let ownerAddr = self.owner?.address ?? panic("Owner is missing")
+            let ref = FGameLottery.borrowLotteryPool(ownerAddr)
+                ?? panic("Lottery pool not found")
+            return ref.borrowSelf()
+        }
+    }
+
+    access(all) resource interface LotteryPoolPublic {
+        // --- read methods ---
+        access(all) view
+        fun getCurrentEpochIndex(): UInt64
+        access(all) view
+        fun getEpochInterval(): UFix64
+        // --- write methods ---
+
+        // --- borrow methods ---
+        // Public usage
+        access(all)
+        fun borrowCurrentLottery(): &Lottery{LotteryPublic}?
+        // Internal usage
+        access(contract)
+        fun borrowSelf(): &LotteryPool
     }
 
     /// Lottery pool resource
     ///
-    access(all) resource LotteryPool {
+    access(all) resource LotteryPool: LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook {
+        /// Lottery pool constants
+        access(self)
+        let epochInterval: UFix64
+        access(self)
+        let ticketPrice: UFix64
+        // Lottery pool variables
+        access(self)
+        var currentEpochIndex: UInt64
+        access(self)
+        let rewardPool: @FRC20FTShared.Change
+        access(self)
+        let lotteries: @{UInt64: Lottery}
 
+        init(
+            rewardTick: String,
+            ticketPrice: UFix64,
+            epochInterval: UFix64
+        ) {
+            pre {
+                ticketPrice > 0.0: "Ticket price must be greater than 0"
+                epochInterval > 0.0: "Epoch interval must be greater than 0"
+            }
+            let accountAddr = FGameLottery.account.address
+            if rewardTick != "" {
+                self.rewardPool <- FRC20FTShared.createEmptyChange(tick: rewardTick, from: accountAddr)
+            } else {
+                self.rewardPool <- FRC20FTShared.createEmptyFlowChange(from: accountAddr)
+            }
+            self.ticketPrice = ticketPrice
+            self.epochInterval = epochInterval
+            self.currentEpochIndex = 0
+            self.lotteries <- {}
+        }
+
+        /// @deprecated after Cadence 1.0
+        destroy() {
+            destroy self.rewardPool
+            destroy self.lotteries
+        }
+
+        /** ---- Public Methods ---- */
+
+        access(all) view
+        fun getCurrentEpochIndex(): UInt64 {
+            return self.currentEpochIndex
+        }
+
+        access(all) view
+        fun getEpochInterval(): UFix64 {
+            return self.epochInterval
+        }
+
+        access(all)
+        fun borrowCurrentLottery(): &Lottery{LotteryPublic}? {
+            return self.borrowCurrentLotteryRef()
+        }
+
+        /** ---- Heartbeat Implementation Methods ----- */
+
+        /// The methods that is invoked when the heartbeat is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            // TODO
+        }
+
+        // --- Internal Methods ---
+
+        access(contract)
+        fun borrowSelf(): &LotteryPool {
+            return &self as &LotteryPool
+        }
+
+        access(self)
+        fun borrowCurrentLotteryRef(): &Lottery? {
+            return &self.lotteries[self.currentEpochIndex] as &Lottery?
+        }
     }
 
     /// Resource inferface for the Lottery registry
@@ -381,6 +541,25 @@ access(all) contract FGameLottery {
 
     /* --- Public methods  --- */
 
+    /// Borrow Lottery Pool
+    ///
+    access(all)
+    fun borrowLotteryPool(_ addr: Address): &LotteryPool{LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook}? {
+        return getAccount(addr)
+            .getCapability<&LotteryPool{LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook}>(FGameLottery.lotteryPoolPublicPath)
+            .borrow()
+    }
+
+    /// Borrow Lottery Pool Registry
+    ///
+    access(all)
+    fun borrowRegistry(): &Registry{RegistryPublic} {
+        return getAccount(self.account.address)
+            .getCapability<&Registry{RegistryPublic}>(FGameLottery.registryPublicPath)
+            .borrow()
+            ?? panic("Registry not found")
+    }
+
     init() {
         // Set the maximum white and red numbers
         self.MAX_WHITE_NUMBER = 33
@@ -390,6 +569,9 @@ access(all) contract FGameLottery {
         let identifier = "FGameLottery_".concat(self.account.address.toString())
         self.userCollectionStoragePath = StoragePath(identifier: identifier.concat("_UserCollection"))!
         self.userCollectionPublicPath = PublicPath(identifier: identifier.concat("_UserCollection"))!
+
+        self.lotteryPoolStoragePath = StoragePath(identifier: identifier.concat("_LotteryPool"))!
+        self.lotteryPoolPublicPath = PublicPath(identifier: identifier.concat("_LotteryPool"))!
 
         self.registryStoragePath = StoragePath(identifier: identifier.concat("_Registry"))!
         self.registryPublicPath = PublicPath(identifier: identifier.concat("_Registry"))!
