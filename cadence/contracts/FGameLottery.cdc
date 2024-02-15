@@ -22,7 +22,7 @@ access(all) contract FGameLottery {
 
     /// Event emitted when a new lottery ticket is created
     access(all) event TicketAdded(
-        poolId: UInt64,
+        poolAddr: Address,
         lotteryId: UInt64,
         address: Address,
         ticketId: UInt64,
@@ -30,20 +30,36 @@ access(all) contract FGameLottery {
     )
     /// Event emitted when a ticket's powerup is updated
     access(all) event TicketPowerupChanged(
-        poolId: UInt64,
+        poolAddr: Address,
         lotteryId: UInt64,
         address: Address,
         ticketId: UInt64,
-        powerup: UInt64
+        powerup: UFix64
     )
     /// Event emitted when a ticket status is updated
     access(all) event TicketStatusChanged(
-        poolId: UInt64,
+        poolAddr: Address,
         lotteryId: UInt64,
         address: Address,
         ticketId: UInt64,
         fromStatus: UInt8,
         toStatus: UInt8,
+    )
+    /// Event emitted when tickets is purchased
+    access(all) event TicketPurchased(
+        poolAddr: Address,
+        lotteryId: UInt64,
+        address: Address,
+        ticketIds: [UInt64],
+        costTick: String,
+        costAmount: UFix64
+    )
+    /// Event emitted when a new lottery is started
+    access(all) event LotteryStarted(
+        poolAddr: Address,
+        lotteryId: UInt64,
+        epochIndex: UInt64,
+        startTime: UFix64
     )
 
     /* --- Variable, Enums and Structs --- */
@@ -102,7 +118,7 @@ access(all) contract FGameLottery {
     ///
     access(all) resource interface TicketEntryPublic {
         // variables
-        access(all) let poolId: UInt64
+        access(all) let pool: Address
         access(all) let lotteryId: UInt64
         access(all) let numbers: TicketNumber
         // view functions
@@ -110,31 +126,33 @@ access(all) contract FGameLottery {
         access(all) view fun getTicketId(): UInt64
         access(all) view fun getTicketOwner(): Address
         access(all) view fun getNumbers(): [UInt8;6]
-        access(all) view fun getPowerup(): UInt64
+        access(all) view fun getPowerup(): UFix64
+        // borrow methods
+        access(all) fun borrowLottery(): &Lottery{LotteryPublic}
     }
 
     /// Resource for the ticket entry
     ///
     access(all) resource TicketEntry: TicketEntryPublic {
-        /// Lottery Pool ID for the ticket
-        access(all) let poolId: UInt64
+        /// Lottery Pool Address for the ticket
+        access(all) let pool: Address
         /// Lottery ID for the ticket
         access(all) let lotteryId: UInt64
         /// Ticket numbers
         access(all) let numbers: TicketNumber
         /// Ticket powerup, default is 1, you can increase the powerup to increase the winning amount
-        access(self) var powerup: UInt64
+        access(self) var powerup: UFix64
         /// Ticket status
         access(self) var status: TicketStatus
 
         init(
-            poolId: UInt64,
+            pool: Address,
             lotteryId: UInt64,
         ) {
-            self.poolId = poolId
+            self.pool = pool
             self.lotteryId = lotteryId
             // Set the default powerup to 1
-            self.powerup = 1
+            self.powerup = 1.0
             // Generate random numbers for the ticket
             var whiteNumbers: [UInt8;5] = [0, 0, 0, 0, 0]
             // generate the random white numbers, the numbers are between 1 and MAX_WHITE_NUMBER
@@ -188,7 +206,7 @@ access(all) contract FGameLottery {
         /// Get the ticket powerup
         ///
         access(all) view
-        fun getPowerup(): UInt64 {
+        fun getPowerup(): UFix64 {
             return self.powerup
         }
 
@@ -199,19 +217,29 @@ access(all) contract FGameLottery {
             return self.status
         }
 
+        /// Borrow the lottery
+        ///
+        access(all)
+        fun borrowLottery(): &Lottery{LotteryPublic} {
+            let lotteryPool = FGameLottery.borrowLotteryPool(self.pool)
+                ?? panic("Lottery pool not found")
+            return lotteryPool.borrowLottery(self.lotteryId)
+                ?? panic("Lottery not found")
+        }
+
         /** Update Ticket Data */
 
         access(contract)
-        fun setPowerup(powerup: UInt64) {
+        fun setPowerup(powerup: UFix64) {
             pre {
-                powerup > 0: "Powerup must be greater than 0"
-                powerup <= 10: "Powerup must be less than or equal to 10"
+                powerup > 0.0: "Powerup must be greater than 0"
+                powerup <= 10.0: "Powerup must be less than or equal to 10"
                 powerup > self.powerup: "New powerup must be greater than the current powerup"
             }
             self.powerup = powerup
 
             emit TicketPowerupChanged(
-                poolId: self.poolId,
+                poolAddr: self.pool,
                 lotteryId: self.lotteryId,
                 address: self.getTicketOwner(),
                 ticketId: self.getTicketId(),
@@ -251,7 +279,7 @@ access(all) contract FGameLottery {
             self.status = toStatus
 
             emit TicketStatusChanged(
-                poolId: self.poolId,
+                poolAddr: self.pool,
                 lotteryId: self.lotteryId,
                 address: self.getTicketOwner(),
                 ticketId: self.getTicketId(),
@@ -276,7 +304,7 @@ access(all) contract FGameLottery {
 
         // --- write methods ---
         access(all)
-        fun addTicket(ticket: @TicketEntry)
+        fun addTicket(_ ticket: @TicketEntry)
     }
 
     /// User's ticket collection
@@ -322,7 +350,7 @@ access(all) contract FGameLottery {
         /// Add a new ticket to the collection
         ///
         access(all)
-        fun addTicket(ticket: @TicketEntry) {
+        fun addTicket(_ ticket: @TicketEntry) {
             pre {
                 self.owner != nil: "Only the collection with an owner can add a ticket"
                 self.tickets[ticket.getTicketId()] == nil: "Ticket already exists"
@@ -335,7 +363,7 @@ access(all) contract FGameLottery {
             let ref = self.borrowTicketRef(ticketId: ticketId)
 
             emit TicketAdded(
-                poolId: ref.poolId,
+                poolAddr: ref.pool,
                 lotteryId: ref.lotteryId,
                 address: self.owner!.address,
                 ticketId: ticketId,
@@ -430,13 +458,27 @@ access(all) contract FGameLottery {
     access(all) resource interface LotteryPoolPublic {
         // --- read methods ---
         access(all) view
+        fun getAddress(): Address
+        access(all) view
         fun getCurrentEpochIndex(): UInt64
         access(all) view
         fun getEpochInterval(): UFix64
+        access(all) view
+        fun getTicketPrice(): UFix64
+
         // --- write methods ---
 
+        /// Buy lottery tickets
+        access(all)
+        fun buyTickets(
+            payment: @FRC20FTShared.Change,
+            amount: UInt8,
+            recipient: Capability<&TicketCollection{TicketCollectionPublic}>
+        ): @FRC20FTShared.Change
+
         // --- borrow methods ---
-        // Public usage
+        access(all)
+        fun borrowLottery(_ epochIndex: UInt64): &Lottery{LotteryPublic}?
         access(all)
         fun borrowCurrentLottery(): &Lottery{LotteryPublic}?
         // Internal usage
@@ -444,14 +486,20 @@ access(all) contract FGameLottery {
         fun borrowSelf(): &LotteryPool
     }
 
+    access(all) resource interface LotteryPoolAdmin {
+        // --- write methods ---
+        access(all)
+        fun startNewEpoch()
+    }
+
     /// Lottery pool resource
     ///
-    access(all) resource LotteryPool: LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook {
+    access(all) resource LotteryPool: LotteryPoolPublic, LotteryPoolAdmin, FixesHeartbeat.IHeartbeatHook {
         /// Lottery pool constants
         access(self)
-        let epochInterval: UFix64
+        let initEpochInterval: UFix64
         access(self)
-        let ticketPrice: UFix64
+        let initTicketPrice: UFix64
         // Lottery pool variables
         access(self)
         var currentEpochIndex: UInt64
@@ -475,8 +523,8 @@ access(all) contract FGameLottery {
             } else {
                 self.rewardPool <- FRC20FTShared.createEmptyFlowChange(from: accountAddr)
             }
-            self.ticketPrice = ticketPrice
-            self.epochInterval = epochInterval
+            self.initTicketPrice = ticketPrice
+            self.initEpochInterval = epochInterval
             self.currentEpochIndex = 0
             self.lotteries <- {}
         }
@@ -490,18 +538,133 @@ access(all) contract FGameLottery {
         /** ---- Public Methods ---- */
 
         access(all) view
+        fun getAddress(): Address {
+            return self.owner?.address ?? panic("Owner is missing")
+        }
+
+        access(all) view
         fun getCurrentEpochIndex(): UInt64 {
             return self.currentEpochIndex
         }
 
         access(all) view
         fun getEpochInterval(): UFix64 {
-            return self.epochInterval
+            let store = self.borrowConfigStore()
+            let interval = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryEpochInterval) as! UFix64?
+            return interval ?? self.initEpochInterval
+        }
+
+        access(all) view
+        fun getTicketPrice(): UFix64 {
+            let store = self.borrowConfigStore()
+            let price = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryTicketPrice) as! UFix64?
+            return price ?? self.initTicketPrice
+        }
+
+        access(all)
+        fun borrowLottery(_ epochIndex: UInt64): &Lottery{LotteryPublic}? {
+            return self.borrowLotteryRef(epochIndex)
         }
 
         access(all)
         fun borrowCurrentLottery(): &Lottery{LotteryPublic}? {
-            return self.borrowCurrentLotteryRef()
+            return self.borrowLotteryRef(self.currentEpochIndex)
+        }
+
+        /** ---- Public Methods: write ----- */
+
+        /// Buy lottery tickets
+        access(all)
+        fun buyTickets(
+            payment: @FRC20FTShared.Change,
+            amount: UInt8,
+            recipient: Capability<&TicketCollection{TicketCollectionPublic}>
+        ): @FRC20FTShared.Change {
+            pre {
+                amount > 0: "Amount must be greater than 0"
+                payment.getOriginalTick() == self.rewardPool.getOriginalTick(): "Invalid payment token"
+            }
+
+            // Ensure the lottery is active
+            let currentLotteryRef = self.borrowLotteryRef(self.currentEpochIndex)
+                ?? panic("There is no active lottery")
+            assert(
+                currentLotteryRef.getStatus() == LotteryStatus.ACTIVE,
+                message: "The lottery is not active"
+            )
+
+            // Ensure the payment is enough
+            let price = self.getTicketPrice()
+            let totalCost = price * UFix64(amount)
+            assert(
+                payment.getBalance() >= totalCost,
+                message: "Insufficient balance"
+            )
+            // Withdraw the payment
+            let totalPaid <- payment.withdrawAsChange(amount: totalCost)
+            FRC20FTShared.depositToChange(
+                receiver: self.borrowRewardPool(),
+                change: <- totalPaid
+            )
+
+            // Create tickets
+            let collection = recipient.borrow() ?? panic("Recipient not found")
+            let purchasedIds: [UInt64] = []
+            var i: UInt8 = 0
+            while i < amount {
+                let ticket <- create TicketEntry(
+                    pool: self.getAddress(),
+                    lotteryId: currentLotteryRef.epochIndex
+                )
+                purchasedIds.append(ticket.getTicketId())
+                collection.addTicket(<- ticket)
+                i = i + 1
+            }
+
+            // emit event
+            emit TicketPurchased(
+                poolAddr: self.getAddress(),
+                lotteryId: currentLotteryRef.epochIndex,
+                address: collection.owner!.address,
+                ticketIds: purchasedIds,
+                costTick: payment.getOriginalTick(),
+                costAmount: totalCost
+            )
+
+            // return the remaining payment
+            return <- payment
+        }
+
+        /** ---- Admin Methods ----- */
+
+        /// Start a new epoch
+        ///
+        access(all)
+        fun startNewEpoch() {
+            // Ensure the lottery is drawn or nil
+            let currentLotteryRef = self.borrowLotteryRef(self.currentEpochIndex)
+            assert(
+                currentLotteryRef == nil || currentLotteryRef!.getStatus() == LotteryStatus.DRAWN,
+                message: "The current lottery should be null or drawn"
+            )
+
+            // Create a new lottery
+            let newEpochIndex = self.currentEpochIndex + 1
+            let newLottery <- create Lottery(epochIndex: newEpochIndex)
+
+            let startedAt = newLottery.epochStartAt
+
+            // Save the new lottery
+            self.lotteries[newEpochIndex] <-! newLottery
+            self.currentEpochIndex = newEpochIndex
+
+            // emit event
+            emit LotteryStarted(
+                poolAddr: self.getAddress(),
+                lotteryId: newEpochIndex,
+                epochIndex: newEpochIndex,
+                startTime: startedAt
+            )
         }
 
         /** ---- Heartbeat Implementation Methods ----- */
@@ -522,8 +685,19 @@ access(all) contract FGameLottery {
         }
 
         access(self)
-        fun borrowCurrentLotteryRef(): &Lottery? {
-            return &self.lotteries[self.currentEpochIndex] as &Lottery?
+        fun borrowConfigStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
+            return FRC20FTShared.borrowStoreRef(self.owner!.address)
+                ?? panic("Config store not found")
+        }
+
+        access(self)
+        fun borrowRewardPool(): &FRC20FTShared.Change {
+            return &self.rewardPool as &FRC20FTShared.Change
+        }
+
+        access(self)
+        fun borrowLotteryRef(_ epochIndex: UInt64): &Lottery? {
+            return &self.lotteries[epochIndex] as &Lottery?
         }
     }
 
