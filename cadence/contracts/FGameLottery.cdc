@@ -34,6 +34,15 @@ access(all) contract FGameLottery {
         ticketId: UInt64,
         powerup: UInt64
     )
+    /// Event emitted when a ticket status is updated
+    access(all) event TicketStatusChanged(
+        poolId: UInt64,
+        lotteryId: UInt64,
+        address: Address,
+        ticketId: UInt64,
+        fromStatus: UInt8,
+        toStatus: UInt8,
+    )
 
     /* --- Variable, Enums and Structs --- */
 
@@ -191,11 +200,78 @@ access(all) contract FGameLottery {
         fun getStatus(): TicketStatus {
             return self.status
         }
+
+        /** Update Ticket Data */
+
+        access(contract)
+        fun setPowerup(powerup: UInt64) {
+            pre {
+                powerup > 0: "Powerup must be greater than 0"
+                powerup <= 10: "Powerup must be less than or equal to 10"
+                powerup > self.powerup: "New powerup must be greater than the current powerup"
+            }
+            self.powerup = powerup
+
+            emit TicketPowerupChanged(
+                poolId: self.poolId,
+                lotteryId: self.lotteryId,
+                address: self.getTicketOwner(),
+                ticketId: self.getTicketId(),
+                powerup: powerup
+            )
+        }
+
+        access(contract)
+        fun setLose() {
+            pre {
+                self.status == TicketStatus.ACTIVE: "Ticket status must be ACTIVE"
+            }
+            self._setStatus(toStatus: TicketStatus.LOSE)
+        }
+
+        access(contract)
+        fun setWin() {
+            pre {
+                self.status == TicketStatus.ACTIVE: "Ticket status must be ACTIVE"
+            }
+            self._setStatus(toStatus: TicketStatus.WIN)
+        }
+
+        access(contract)
+        fun setWinClaimed() {
+            pre {
+                self.status == TicketStatus.WIN: "Ticket status must be WIN"
+            }
+            self._setStatus(toStatus: TicketStatus.WIN_CLAIMED)
+        }
+
+        /** --- Internal Methods --- */
+
+        access(self)
+        fun _setStatus(toStatus: TicketStatus) {
+            let oldStatus = self.status
+            self.status = toStatus
+
+            emit TicketStatusChanged(
+                poolId: self.poolId,
+                lotteryId: self.lotteryId,
+                address: self.getTicketOwner(),
+                ticketId: self.getTicketId(),
+                fromStatus: oldStatus.rawValue,
+                toStatus: toStatus.rawValue
+            )
+        }
     }
 
     /// User's ticket collection resource interface
     ///
     access(all) resource interface TicketCollectionPublic {
+        access(all) view
+        fun getIDs(): [UInt64]
+
+        access(all) view
+        fun getTicketAmount(): Int
+
         access(all)
         fun borrowTicket(ticketId: UInt64): &TicketEntry{TicketEntryPublic}?
     }
@@ -216,6 +292,20 @@ access(all) contract FGameLottery {
         }
 
         /** ---- Public Methods ---- */
+
+        /// Get the ticket IDs
+        ///
+        access(all) view
+        fun getIDs(): [UInt64] {
+            return self.tickets.keys
+        }
+
+        /// Get the ticket amount
+        ///
+        access(all) view
+        fun getTicketAmount(): Int {
+            return self.tickets.keys.length
+        }
 
         /// Borrow a ticket from the collection
         ///
