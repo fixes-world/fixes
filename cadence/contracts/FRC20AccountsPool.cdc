@@ -40,6 +40,7 @@ access(all) contract FRC20AccountsPool {
         access(all) case Staking
         access(all) case EVMAgency
         access(all) case EVMEntrustedAccount
+        access(all) case GameWorld
     }
 
     /// The public interface can be accessed by anyone
@@ -85,6 +86,13 @@ access(all) contract FRC20AccountsPool {
         access(all)
         fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}?
 
+        /// Returns the address of the GameWorld for the given key
+        access(all) view
+        fun getGameWorldAddress(_ key: String): Address?
+        /// Returns the flow token receiver for the given key
+        access(all)
+        fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}?
+
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
@@ -101,6 +109,9 @@ access(all) contract FRC20AccountsPool {
         /// Sets up a new child account for EVM entrusted account
         access(account)
         fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<&AuthAccount>)
+        /// Sets up a new child account for some Game World
+        access(account)
+        fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -238,6 +249,24 @@ access(all) contract FRC20AccountsPool {
             return nil
         }
 
+        /// Returns the address of the GameWorld for the given key
+        access(all) view
+        fun getGameWorldAddress(_ key: String): Address? {
+            if let tickDict = self.borrowDict(type: ChildAccountType.GameWorld) {
+                return tickDict[key]
+            }
+            return nil
+        }
+
+        /// Returns the flow token receiver for the given key
+        access(all)
+        fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getGameWorldAddress(key) {
+                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+            }
+            return nil
+        }
+
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         ///
@@ -289,6 +318,12 @@ access(all) contract FRC20AccountsPool {
         access(account)
         fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<&AuthAccount>) {
             self.setupNewChildByKey(type: ChildAccountType.EVMEntrustedAccount, key: evmAddr, acctCap)
+        }
+
+        /// Sets up a new child account for some Game World
+        access(account)
+        fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByKey(type: ChildAccountType.GameWorld, key: key, acctCap)
         }
 
         /** ---- Admin Methods ---- */
