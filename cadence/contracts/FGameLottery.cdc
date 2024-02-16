@@ -389,11 +389,56 @@ access(all) contract FGameLottery {
         case DRAWN
     }
 
+    /// Struct for the lottery result
+    ///
+    access(all) struct LotteryResult {
+        access(all) let numbers: TicketNumber
+        access(all) let jackpotAmount: UFix64
+        access(all) let participantAmount: UInt64
+        access(all) var distributionProgress: UFix64
+        access(all) var jackpotWinner: Address?
+
+        init(
+            numbers: TicketNumber,
+            jackpotAmount: UFix64,
+            participantAmount: UInt64
+        ) {
+            self.numbers = numbers
+            self.jackpotAmount = jackpotAmount
+            self.participantAmount = participantAmount
+            self.jackpotWinner = nil
+            self.distributionProgress = 0.0
+        }
+
+        /// Set the jackpot winner
+        ///
+        access(contract)
+        fun setJackpotWinner(winner: Address) {
+            pre {
+                self.jackpotWinner == nil: "Jackpot winner is already set"
+            }
+            self.jackpotWinner = winner
+        }
+
+        /// Set the distribution progress
+        ///
+        access(contract)
+        fun setDistributionProgress(progress: UFix64) {
+            pre {
+                progress >= 0.0: "Progress must be greater than or equal to 0"
+                progress <= 1.0: "Progress must be less than or equal to 1"
+            }
+            self.distributionProgress = progress
+        }
+    }
+
     /// Lottery public resource interface
     ///
     access(all) resource interface LotteryPublic {
         /// Lottery status
         access(all) view fun getStatus(): LotteryStatus
+        /// Lotter result
+        access(all) view fun getResult(): LotteryResult?
     }
 
     /// Lottery resource
@@ -409,10 +454,11 @@ access(all) contract FGameLottery {
         access(self)
         let participants: {Address: [UInt64]}
         /// Lottery final status
-        var drawnNumbers: TicketNumber?
-        /// Jackpot information
-        var jackpotAmount: UFix64?
-        var jackpotWinner: Address?
+        access(self)
+        var drawnResult: LotteryResult?
+        /// Lottery draw checker
+        access(self)
+        let participantsChecked: {Address: Bool}
 
         init(
             epochIndex: UInt64
@@ -420,13 +466,14 @@ access(all) contract FGameLottery {
             self.epochIndex = epochIndex
             self.epochStartAt = getCurrentBlock().timestamp
             self.participants = {}
-            self.drawnNumbers = nil
-            self.jackpotAmount = nil
-            self.jackpotWinner = nil
+            self.drawnResult = nil
+            self.participantsChecked = {}
         }
 
         /** ---- Public Methods ---- */
 
+        /// Get the lottery status
+        ///
         access(all) view
         fun getStatus(): LotteryStatus {
             let now = getCurrentBlock().timestamp
@@ -435,14 +482,58 @@ access(all) contract FGameLottery {
             let epochCloseTime = self.epochStartAt + interval
             if now < epochCloseTime {
                 return LotteryStatus.ACTIVE
-            } else if self.drawnNumbers == nil {
+            } else if self.drawnResult == nil {
                 return LotteryStatus.READY_TO_DRAW
             } else {
                 return LotteryStatus.DRAWN
             }
         }
 
+        /// Lotter result
+        ///
+        access(all) view fun getResult(): LotteryResult? {
+            return self.drawnResult
+        }
+
         /** ---- Contract level Methods ----- */
+
+        /// Create a new ticket and add it to user's collection
+        ///
+        access(contract)
+        fun createNewTicket(
+            recipient: Capability<&TicketCollection{TicketCollectionPublic}>
+        ): UInt64 {
+            pre {
+                self.getStatus() == LotteryStatus.ACTIVE: "The lottery is not active"
+            }
+            let collection = recipient.borrow() ?? panic("Recipient not found")
+            let ticket <- create TicketEntry(
+                pool: self.borrowLotteryPool().getAddress(),
+                lotteryId: self.epochIndex
+            )
+            let ticketId = ticket.getTicketId()
+            // Add the ticket to the collection
+            collection.addTicket(<- ticket)
+
+            // Add the ticket to the participants
+            if self.participants[recipient.address] == nil {
+                self.participants[recipient.address] = [ticketId]
+            } else {
+                self.participants[recipient.address]?.append(ticketId)
+            }
+
+            return ticketId
+        }
+
+        /// Generate random number to draw the lottery
+        ///
+        access(contract)
+        fun drawLottery() {
+            pre {
+                self.getStatus() == LotteryStatus.READY_TO_DRAW: "The lottery is not ready to draw"
+            }
+            // TODO
+        }
 
         /** ---- Internal Methods ----- */
 
@@ -634,17 +725,16 @@ access(all) contract FGameLottery {
                 change: <- totalPaid
             )
 
+            // Get the current lottery
+            let lotteryRef = self.borrowLotteryRef(self.currentEpochIndex)
+                ?? panic("Lottery not found")
+
             // Create tickets
-            let collection = recipient.borrow() ?? panic("Recipient not found")
             let purchasedIds: [UInt64] = []
             var i: UInt8 = 0
             while i < amount {
-                let ticket <- create TicketEntry(
-                    pool: self.getAddress(),
-                    lotteryId: self.currentEpochIndex
-                )
-                purchasedIds.append(ticket.getTicketId())
-                collection.addTicket(<- ticket)
+                let newTicketId = lotteryRef.createNewTicket(recipient: recipient)
+                purchasedIds.append(newTicketId)
                 i = i + 1
             }
 
@@ -652,7 +742,7 @@ access(all) contract FGameLottery {
             emit TicketPurchased(
                 poolAddr: self.getAddress(),
                 lotteryId: self.currentEpochIndex,
-                address: collection.owner!.address,
+                address: recipient.address,
                 ticketIds: purchasedIds,
                 costTick: payment.getOriginalTick(),
                 costAmount: totalCost
