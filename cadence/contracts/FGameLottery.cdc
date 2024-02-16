@@ -465,6 +465,31 @@ access(all) contract FGameLottery {
         fun getEpochInterval(): UFix64
         access(all) view
         fun getTicketPrice(): UFix64
+        access(all) view
+        fun isEpochAutoStart(): Bool
+
+        // --- read methods: default implement ---
+
+        /// Check if the current lottery is active
+        access(all) view
+        fun isCurrentLotteryActive(): Bool {
+            let currentLotteryRef = self.borrowCurrentLottery()
+            return currentLotteryRef != nil && currentLotteryRef!.getStatus() == LotteryStatus.ACTIVE
+        }
+
+        /// Check if the current lottery is ready to draw
+        access(all) view
+        fun isCurrentLotteryReadyToDraw(): Bool {
+            let currentLotteryRef = self.borrowCurrentLottery()
+            return currentLotteryRef != nil && currentLotteryRef!.getStatus() == LotteryStatus.READY_TO_DRAW
+        }
+
+        /// Check if the current lottery is finished
+        access(all) view
+        fun isCurrentLotteryFinished(): Bool {
+            let currentLotteryRef = self.borrowCurrentLottery()
+            return currentLotteryRef == nil || currentLotteryRef!.getStatus() == LotteryStatus.DRAWN
+        }
 
         // --- write methods ---
 
@@ -477,10 +502,12 @@ access(all) contract FGameLottery {
         ): @FRC20FTShared.Change
 
         // --- borrow methods ---
+
         access(all)
         fun borrowLottery(_ epochIndex: UInt64): &Lottery{LotteryPublic}?
         access(all)
         fun borrowCurrentLottery(): &Lottery{LotteryPublic}?
+
         // Internal usage
         access(contract)
         fun borrowSelf(): &LotteryPool
@@ -561,6 +588,13 @@ access(all) contract FGameLottery {
             return price ?? self.initTicketPrice
         }
 
+        access(all) view
+        fun isEpochAutoStart(): Bool {
+            let store = self.borrowConfigStore()
+            let autoStart = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryAutoStart) as! Bool?
+            return autoStart ?? true
+        }
+
         access(all)
         fun borrowLottery(_ epochIndex: UInt64): &Lottery{LotteryPublic}? {
             return self.borrowLotteryRef(epochIndex)
@@ -583,15 +617,8 @@ access(all) contract FGameLottery {
             pre {
                 amount > 0: "Amount must be greater than 0"
                 payment.getOriginalTick() == self.rewardPool.getOriginalTick(): "Invalid payment token"
+                self.isCurrentLotteryActive(): "The current lottery is not active"
             }
-
-            // Ensure the lottery is active
-            let currentLotteryRef = self.borrowLotteryRef(self.currentEpochIndex)
-                ?? panic("There is no active lottery")
-            assert(
-                currentLotteryRef.getStatus() == LotteryStatus.ACTIVE,
-                message: "The lottery is not active"
-            )
 
             // Ensure the payment is enough
             let price = self.getTicketPrice()
@@ -614,7 +641,7 @@ access(all) contract FGameLottery {
             while i < amount {
                 let ticket <- create TicketEntry(
                     pool: self.getAddress(),
-                    lotteryId: currentLotteryRef.epochIndex
+                    lotteryId: self.currentEpochIndex
                 )
                 purchasedIds.append(ticket.getTicketId())
                 collection.addTicket(<- ticket)
@@ -624,7 +651,7 @@ access(all) contract FGameLottery {
             // emit event
             emit TicketPurchased(
                 poolAddr: self.getAddress(),
-                lotteryId: currentLotteryRef.epochIndex,
+                lotteryId: self.currentEpochIndex,
                 address: collection.owner!.address,
                 ticketIds: purchasedIds,
                 costTick: payment.getOriginalTick(),
