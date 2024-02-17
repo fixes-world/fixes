@@ -272,14 +272,6 @@
 				"testnet": "9a0766d93b6608b7"
 			}
 		},
-		"FungibleTokenMetadataViews": {
-			"source": "./imports/f233dcee88fe0abe/FungibleTokenMetadataViews.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "f233dcee88fe0abe",
-				"testnet": "9a0766d93b6608b7"
-			}
-		},
 		"HybridCustody": {
 			"source": "./imports/d8a7e05a7ac670c0/HybridCustody.cdc",
 			"aliases": {
