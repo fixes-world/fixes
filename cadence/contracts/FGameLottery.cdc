@@ -108,10 +108,10 @@ access(all) contract FGameLottery {
     /// Enum for the ticket status
     ///
     access(all) enum TicketStatus: UInt8 {
-        case ACTIVE
-        case LOSE
-        case WIN
-        case WIN_CLAIMED
+        access(all) case ACTIVE
+        access(all) case LOSE
+        access(all) case WIN
+        access(all) case WIN_CLAIMED
     }
 
     /// Ticket entry resource interface
@@ -384,9 +384,9 @@ access(all) contract FGameLottery {
     /// Enum for the lottery status
     ///
     access(all) enum LotteryStatus: UInt8 {
-        case ACTIVE
-        case READY_TO_DRAW
-        case DRAWN
+        access(all) case ACTIVE
+        access(all) case READY_TO_DRAW
+        access(all) case DRAWN
     }
 
     /// Struct for the lottery result

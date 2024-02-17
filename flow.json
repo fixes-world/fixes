@@ -1,7 +1,7 @@
 {
 	"contracts": {
 		"AddressUtils": {
-			"source": "",
+			"source": "./imports/a340dc0a4ec828ab/AddressUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
@@ -9,7 +9,7 @@
 			}
 		},
 		"ArrayUtils": {
-			"source": "",
+			"source": "./imports/a340dc0a4ec828ab/ArrayUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
@@ -17,7 +17,7 @@
 			}
 		},
 		"CapabilityDelegator": {
-			"source": "",
+			"source": "./imports/d8a7e05a7ac670c0/CapabilityDelegator.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
@@ -26,7 +26,7 @@
 			}
 		},
 		"CapabilityFactory": {
-			"source": "",
+			"source": "./imports/d8a7e05a7ac670c0/CapabilityFactory.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
@@ -35,7 +35,7 @@
 			}
 		},
 		"CapabilityFilter": {
-			"source": "",
+			"source": "./imports/d8a7e05a7ac670c0/CapabilityFilter.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
@@ -44,7 +44,7 @@
 			}
 		},
 		"Domains": {
-			"source": "",
+			"source": "./imports/233eb012d34b0070/Domains.cdc",
 			"aliases": {
 				"mainnet": "233eb012d34b0070",
 				"testnet": "b05b2abb42335e88"
@@ -67,7 +67,7 @@
 			}
 		},
 		"FIND": {
-			"source": "",
+			"source": "./imports/097bafa4e0b48eef/FIND.cdc",
 			"aliases": {
 				"mainnet": "097bafa4e0b48eef",
 				"testnet": "35717efbbce11c74"
@@ -202,7 +202,7 @@
 			}
 		},
 		"FindViews": {
-			"source": "",
+			"source": "./imports/097bafa4e0b48eef/FindViews.cdc",
 			"aliases": {
 				"mainnet": "097bafa4e0b48eef",
 				"testnet": "35717efbbce11c74"
@@ -257,7 +257,7 @@
 			}
 		},
 		"FlowToken": {
-			"source": "",
+			"source": "./imports/1654653399040a61/FlowToken.cdc",
 			"aliases": {
 				"emulator": "0ae53cb6e3f42a79",
 				"mainnet": "1654653399040a61",
@@ -265,7 +265,7 @@
 			}
 		},
 		"FungibleToken": {
-			"source": "",
+			"source": "./imports/f233dcee88fe0abe/FungibleToken.cdc",
 			"aliases": {
 				"emulator": "ee82856bf20e2aa6",
 				"mainnet": "f233dcee88fe0abe",
@@ -273,7 +273,7 @@
 			}
 		},
 		"FungibleTokenMetadataViews": {
-			"source": "",
+			"source": "./imports/f233dcee88fe0abe/FungibleTokenMetadataViews.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "f233dcee88fe0abe",
@@ -281,7 +281,7 @@
 			}
 		},
 		"HybridCustody": {
-			"source": "",
+			"source": "./imports/d8a7e05a7ac670c0/HybridCustody.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
@@ -290,14 +290,14 @@
 			}
 		},
 		"InscriptionMetadata": {
-			"source": "",
+			"source": "./imports/88dd257fcf26d3cc/InscriptionMetadata.cdc",
 			"aliases": {
 				"mainnet": "88dd257fcf26d3cc",
 				"testnet": "564b229bd8380848"
 			}
 		},
 		"MetadataViews": {
-			"source": "",
+			"source": "./imports/1d7e57aa55817448/MetadataViews.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
@@ -305,7 +305,7 @@
 			}
 		},
 		"NFTCatalog": {
-			"source": "",
+			"source": "./imports/49a7cda3a1eecc29/NFTCatalog.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "49a7cda3a1eecc29",
@@ -313,7 +313,7 @@
 			}
 		},
 		"NFTRetrieval": {
-			"source": "",
+			"source": "./imports/49a7cda3a1eecc29/NFTRetrieval.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "49a7cda3a1eecc29",
@@ -321,7 +321,7 @@
 			}
 		},
 		"NonFungibleToken": {
-			"source": "",
+			"source": "./imports/1d7e57aa55817448/NonFungibleToken.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
@@ -329,28 +329,28 @@
 			}
 		},
 		"OracleConfig": {
-			"source": "",
+			"source": "./imports/cec15c814971c1dc/OracleConfig.cdc",
 			"aliases": {
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
 			}
 		},
 		"OracleInterface": {
-			"source": "",
+			"source": "./imports/cec15c814971c1dc/OracleInterface.cdc",
 			"aliases": {
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
 			}
 		},
 		"PublicPriceOracle": {
-			"source": "",
+			"source": "./imports/cec15c814971c1dc/PublicPriceOracle.cdc",
 			"aliases": {
 				"mainnet": "ec67451f8a58216a",
 				"testnet": "866a9f1e81898147"
 			}
 		},
 		"StringUtils": {
-			"source": "",
+			"source": "./imports/a340dc0a4ec828ab/StringUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
@@ -358,7 +358,7 @@
 			}
 		},
 		"ViewResolver": {
-			"source": "",
+			"source": "./imports/1d7e57aa55817448/ViewResolver.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
