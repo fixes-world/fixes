@@ -230,13 +230,14 @@ access(all) contract FGameLottery {
         init(
             pool: Address,
             lotteryId: UInt64,
+            powerup: UFix64?
         ) {
             self.pool = pool
             self.lotteryId = lotteryId
             // Create a new random ticket number
             self.numbers = FGameLottery.createRandomTicketNumber()
             // Set the default powerup to 1
-            self.powerup = 1.0
+            self.powerup = powerup ?? 1.0
             // Set the default status to ACTIVE
             self.status = TicketStatus.ACTIVE
             // Set the default win prize rank to nil
@@ -647,7 +648,8 @@ access(all) contract FGameLottery {
         access(contract)
         fun createNewTicket(
             payment: @FRC20FTShared.Change,
-            recipient: Capability<&TicketCollection{TicketCollectionPublic}>
+            recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
+            powerup: UFix64? // default is 1.0, you can increase the powerup to increase the winning amount
         ): UInt64 {
             pre {
                 self.getStatus() == LotteryStatus.ACTIVE: "The lottery is not active"
@@ -663,7 +665,8 @@ access(all) contract FGameLottery {
             let collection = recipient.borrow() ?? panic("Recipient not found")
             let ticket <- create TicketEntry(
                 pool: self.borrowLotteryPool().getAddress(),
-                lotteryId: self.epochIndex
+                lotteryId: self.epochIndex,
+                powerup: powerup
             )
             let ticketId = ticket.getTicketId()
             // Add the ticket to the collection
@@ -937,7 +940,8 @@ access(all) contract FGameLottery {
         fun buyTickets(
             payment: @FRC20FTShared.Change,
             amount: UInt8,
-            recipient: Capability<&TicketCollection{TicketCollectionPublic}>
+            powerup: UFix64?,
+            recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
         ): @FRC20FTShared.Change
 
         // --- borrow methods ---
@@ -1088,7 +1092,8 @@ access(all) contract FGameLottery {
         fun buyTickets(
             payment: @FRC20FTShared.Change,
             amount: UInt8,
-            recipient: Capability<&TicketCollection{TicketCollectionPublic}>
+            powerup: UFix64?,
+            recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
         ): @FRC20FTShared.Change {
             pre {
                 amount > 0: "Amount must be greater than 0"
@@ -1098,7 +1103,8 @@ access(all) contract FGameLottery {
 
             // Ensure the payment is enough
             let price = self.getTicketPrice()
-            let totalCost = price * UFix64(amount)
+            let oneTicketCost = price * (powerup ?? 1.0)
+            let totalCost = oneTicketCost * UFix64(amount)
             assert(
                 payment.getBalance() >= totalCost,
                 message: "Insufficient balance"
@@ -1113,11 +1119,12 @@ access(all) contract FGameLottery {
             var i: UInt8 = 0
             while i < amount {
                 // Withdraw the payment
-                let one <- payment.withdrawAsChange(amount: price)
+                let one <- payment.withdrawAsChange(amount: oneTicketCost)
                 // Create a new ticket
                 let newTicketId = lotteryRef.createNewTicket(
                     payment: <- one,
-                    recipient: recipient
+                    recipient: recipient,
+                    powerup: powerup,
                 )
                 purchasedIds.append(newTicketId)
                 i = i + 1
