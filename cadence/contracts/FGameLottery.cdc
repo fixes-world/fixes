@@ -783,6 +783,15 @@ access(all) contract FGameLottery {
             let progress = UFix64(totalParticipants - remainingUnChecked) / UFix64(totalParticipants)
             self.drawnResult?.setDistributionProgress(progress)
 
+            // emit event
+            emit LotteryParticipantsVerified(
+                poolAddr: pool.getAddress(),
+                lotteryId: self.epochIndex,
+                participants: participants,
+                winners: winnersCnt,
+                nonJackpotTotal: nonJackpotAmount
+            )
+
             // if the checking queue is empty, finalize the jackpot
             if remainingUnChecked == 0 {
                 let nonJackpotTotal = self.drawnResult?.nonJackpotTotal ?? 0.0
@@ -863,15 +872,6 @@ access(all) contract FGameLottery {
                     nonJackpotDowngradeRatio: ratio
                 )
             }
-
-            // emit event
-            emit LotteryParticipantsVerified(
-                poolAddr: pool.getAddress(),
-                lotteryId: self.epochIndex,
-                participants: participants,
-                winners: winnersCnt,
-                nonJackpotTotal: nonJackpotAmount
-            )
         }
 
         /** ---- Internal Methods ----- */
