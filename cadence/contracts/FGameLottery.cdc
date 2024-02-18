@@ -566,6 +566,29 @@ access(all) contract FGameLottery {
         }
     }
 
+    /// Ticket identifier struct
+    ///
+    access(all) struct TicketIdentifier {
+        access(all) let address: Address
+        access(all) let ticketId: UInt64
+
+        init(_ address: Address, _ ticketId: UInt64) {
+            self.address = address
+            self.ticketId = ticketId
+        }
+
+        /// Borrow the ticket entry
+        ///
+        access(all)
+        fun borrowTicket(): &TicketEntry{TicketEntryPublic}? {
+            let userCol = FGameLottery.getUserTicketCollection(self.address)
+            if let colRef = userCol.borrow() {
+                return colRef.borrowTicket(ticketId: self.ticketId)
+            }
+            return nil
+        }
+    }
+
     /// Enum for the lottery status
     ///
     access(all) enum LotteryStatus: UInt8 {
@@ -665,6 +688,9 @@ access(all) contract FGameLottery {
         /// Get the total bought balance
         access(all) view
         fun getCurrentLotteryBalance(): UFix64
+        /// Check if the lottery is disbursing prizes
+        access(all) view
+        fun isDisbursing(): Bool
     }
 
     /// Lottery resource
@@ -685,12 +711,12 @@ access(all) contract FGameLottery {
         /// Lottery final status
         access(self)
         var drawnResult: LotteryResult?
-        /// Lottery draw checker
-        access(self)
-        let participantsChecked: {Address: Bool}
         /// Lottery draw checker queue
         access(self)
         var checkingQueue: [Address]?
+        /// Lottery winners
+        access(self)
+        let disbursingQueque: [TicketIdentifier]
 
         init(
             epochIndex: UInt64,
@@ -699,8 +725,8 @@ access(all) contract FGameLottery {
             self.epochIndex = epochIndex
             self.epochStartAt = getCurrentBlock().timestamp
             self.participants = {}
+            self.disbursingQueque = []
             self.drawnResult = nil
-            self.participantsChecked = {}
             self.checkingQueue = nil
             // Set the current pool
             let tick = jackpotPoolRef.getOriginalTick()
@@ -763,6 +789,14 @@ access(all) contract FGameLottery {
         access(all) view
         fun getCurrentLotteryBalance(): UFix64 {
             return self.current.getBalance()
+        }
+
+        /// Check if the lottery is disbursing prizes
+        ///
+        access(all) view
+        fun isDisbursing(): Bool {
+            let status = self.getStatus()
+            return status == LotteryStatus.DRAWN_AND_VERIFIED && self.disbursingQueque.length > 0
         }
 
         /** ---- Contract level Methods ----- */
@@ -880,7 +914,11 @@ access(all) contract FGameLottery {
                             ticketRef.onPrizeVerify()
                             // if the ticket is a winner, update prize amount by rank
                             if let prizeRank = ticketRef.getWinPrizeRank() {
+                                // update the winner count
                                 winnersCnt = winnersCnt + 1
+                                // add the ticket to the disbursing queue
+                                self.disbursingQueque.append(TicketIdentifier(addr, ticketId))
+                                // update result data
                                 if prizeRank == PrizeRank.JACKPOT {
                                     self.drawnResult?.addJackpotWinner(addr)
                                     // emit event
@@ -902,8 +940,6 @@ access(all) contract FGameLottery {
                         checkedEntries = checkedEntries + 1
                     } // end for
                 } // end if userColRef
-                // set the participant as checked
-                self.participantsChecked[addr] = true
                 i = i + checkedEntries
             }
 
@@ -1005,10 +1041,32 @@ access(all) contract FGameLottery {
             }
         }
 
-        /// Disburse the prize to the winners
+        /// Disburse the prizes to the winners
         ///
         access(contract)
-        fun disbursePrize(ticket: &TicketEntry{TicketEntryPublic}) {
+        fun disbursePrizes(_ maxEntries: Int) {
+            // This method is used to disburse the prizes to the winners
+            if !self.isDisbursing() {
+                return
+            }
+
+            // variables
+            var i = 0
+            while i < maxEntries && self.disbursingQueque.length > 0 {
+                let ticketIdentifier = self.disbursingQueque.removeFirst()
+                if let ticketRef = ticketIdentifier.borrowTicket() {
+                    self._disbursePrize(ticket: ticketRef)
+                }
+                i = i + 1
+            }
+        }
+
+        /** ---- Internal Methods ----- */
+
+        /// Disburse the prize to the winners
+        ///
+        access(self)
+        fun _disbursePrize(ticket: &TicketEntry{TicketEntryPublic}) {
             // Only status is DRAWN_AND_VERIFIED and the ticket status is WIN can withdraw the prize
             if self.getStatus() != LotteryStatus.DRAWN_AND_VERIFIED {
                 return
@@ -1029,42 +1087,61 @@ access(all) contract FGameLottery {
             // Disburse the prize to the ticket owner
             let ticketOwner = ticket.getTicketOwner()
 
-            // Get the base prize amount
-            let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
-            // Disburse the prize amount
-            let prizeAmountWithPowerup = basePrize * ticket.getPowerup()
-            let prizeDowngradeRatio = self.drawnResult!.nonJackpotDowngradeRatio
-            let prizeChange <- self.current.withdrawAsChange(amount: prizeAmountWithPowerup * prizeDowngradeRatio)
-            // Get the prize amount
-            let prizeAmount = prizeChange.getBalance()
+            // Initialize the reward change
+            let rewardChange <- FRC20FTShared.createEmptyChange(
+                tick: self.current.getOriginalTick(),
+                from: ticketOwner
+            )
+            // ref to the reward change
+            let rewardChangeRef = &rewardChange as &FRC20FTShared.Change
 
-            // Disburse the prize to the ticket owner
-            var rewardChange: @FRC20FTShared.Change? <- nil
-            let isFlowToken = prizeChange.isBackedByFlowTokenVault()
-            if isFlowToken {
-                rewardChange <-! FRC20FTShared.createEmptyFlowChange(
-                    from: ticketOwner
+            // Get the prize amount
+            if prizeRank! == PrizeRank.JACKPOT {
+                // Disburse the jackpot prize
+                let jackpotPoolRef = pool.borrowJackpotPool()
+                let winners = self.drawnResult!.jackpotWinners
+                if winners == nil || winners!.length == 0 || !winners!.contains(ticketOwner) {
+                    destroy rewardChange
+                    return
+                }
+                let jackpotAmount = self.drawnResult!.jackpotAmount
+                let jackpotWinnerAmt = winners?.length!
+                let withdrawAmount = jackpotAmount / UFix64(jackpotWinnerAmt)
+                if jackpotPoolRef.getBalance() < withdrawAmount {
+                    destroy rewardChange
+                    return
+                }
+                let prizeChange <- jackpotPoolRef.withdrawAsChange(amount: withdrawAmount)
+
+                // Deposit the prize to the ticket owner
+                FRC20FTShared.depositToChange(
+                    receiver: rewardChangeRef,
+                    change: <- prizeChange
                 )
             } else {
-                rewardChange <-! FRC20FTShared.createEmptyChange(
-                    tick: prizeChange.getOriginalTick(),
-                    from: ticketOwner
+                // Get the base prize amount
+                let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
+
+                // Disburse the prize amount
+                let prizeAmountWithPowerup = basePrize * ticket.getPowerup()
+                let prizeDowngradeRatio = self.drawnResult!.nonJackpotDowngradeRatio
+                let prizeChange <- self.current.withdrawAsChange(amount: prizeAmountWithPowerup * prizeDowngradeRatio)
+
+                // Deposit the prize to the ticket owner
+                FRC20FTShared.depositToChange(
+                    receiver: rewardChangeRef,
+                    change: <- prizeChange
                 )
             }
 
-            // Deposit the prize to the ticket owner
-            let rewardChangeRef = &rewardChange as &FRC20FTShared.Change?
-            FRC20FTShared.depositToChange(
-                receiver: rewardChangeRef!,
-                change: <- prizeChange
-            )
-            frc20Indexer.returnChange(change: <- rewardChange!)
+            // Get the prize amount
+            let prizeAmount = rewardChange.getBalance()
+            // deposit the prize to the ticket owner
+            frc20Indexer.returnChange(change: <- rewardChange)
 
             // Update the ticket status to WIN_DISBURSED and emit event
             ticket.onPrizeDisburse(prizeAmount)
         }
-
-        /** ---- Internal Methods ----- */
 
         access(self)
         fun borrowCurrentLotteryChange(): &FRC20FTShared.Change {
@@ -1167,7 +1244,7 @@ access(all) contract FGameLottery {
         access(self)
         var currentEpochIndex: UInt64
         access(self)
-        var lastVerifiedEpochIndex: UInt64?
+        var lastSealedEpochIndex: UInt64?
 
         init(
             rewardTick: String,
@@ -1187,7 +1264,7 @@ access(all) contract FGameLottery {
             self.initTicketPrice = ticketPrice
             self.initEpochInterval = epochInterval
             self.currentEpochIndex = 0
-            self.lastVerifiedEpochIndex = nil
+            self.lastSealedEpochIndex = nil
             self.lotteries <- {}
         }
 
