@@ -64,6 +64,14 @@ access(all) contract FGameLottery {
         status: UInt8,
         prizeRank: UInt8
     )
+    /// Event emitted when a ticket is disbursed
+    access(all) event TicketPrizeDisbursed(
+        poolAddr: Address,
+        lotteryId: UInt64,
+        address: Address,
+        ticketId: UInt64,
+        prizeAmount: UFix64
+    )
     /// Event emitted when a new lottery is started
     access(all) event LotteryStarted(
         poolAddr: Address,
@@ -202,7 +210,7 @@ access(all) contract FGameLottery {
         access(all) case ACTIVE
         access(all) case LOSE
         access(all) case WIN
-        access(all) case WIN_CLAIMED
+        access(all) case WIN_DISBURSED
     }
 
     /// Enum for the prize rank
@@ -234,6 +242,7 @@ access(all) contract FGameLottery {
         access(all) fun borrowLottery(): &Lottery{LotteryPublic}
         // write methods - only the contract can call these methods
         access(contract) fun onPrizeVerify()
+        access(contract) fun onPrizeDisburse(_ prizeAmount: UFix64)
     }
 
     /// Resource for the ticket entry
@@ -257,6 +266,12 @@ access(all) contract FGameLottery {
             lotteryId: UInt64,
             powerup: UFix64?
         ) {
+            pre {
+                powerup == nil || powerup! >= 1.0: "Powerup must be greater than 0"
+                powerup == nil || powerup! <= 10.0: "Powerup must be less than or equal to 10"
+                FGameLottery.borrowLotteryPool(pool) != nil: "Lottery pool not found"
+            }
+
             self.pool = pool
             self.lotteryId = lotteryId
             // Create a new random ticket number
@@ -267,6 +282,13 @@ access(all) contract FGameLottery {
             self.status = TicketStatus.ACTIVE
             // Set the default win prize rank to nil
             self.winPrizeRank = nil
+
+            // ensure lottery is active
+            let lotteryRef = self.borrowLottery()
+            assert(
+                lotteryRef.getStatus() == LotteryStatus.ACTIVE,
+                message: "Lottery is not active"
+            )
         }
 
         /// Get the ticket ID
@@ -315,10 +337,8 @@ access(all) contract FGameLottery {
         ///
         access(all)
         fun borrowLottery(): &Lottery{LotteryPublic} {
-            let lotteryPool = FGameLottery.borrowLotteryPool(self.pool)
-                ?? panic("Lottery pool not found")
-            return lotteryPool.borrowLottery(self.lotteryId)
-                ?? panic("Lottery not found")
+            let lotteryPool = self._borrowLotteryPool()
+            return lotteryPool.borrowLottery(self.lotteryId) ?? panic("Lottery not found")
         }
 
         /** Update Ticket Data */
@@ -326,7 +346,7 @@ access(all) contract FGameLottery {
         access(contract)
         fun setPowerup(powerup: UFix64) {
             pre {
-                powerup > 0.0: "Powerup must be greater than 0"
+                powerup >= 1.0: "Powerup must be greater than 0"
                 powerup <= 10.0: "Powerup must be less than or equal to 10"
                 powerup > self.powerup: "New powerup must be greater than the current powerup"
             }
@@ -408,14 +428,35 @@ access(all) contract FGameLottery {
         }
 
         access(contract)
-        fun setWinClaimed() {
-            pre {
-                self.status == TicketStatus.WIN: "Ticket status must be WIN"
+        fun onPrizeDisburse(_ prizeAmount: UFix64) {
+            // Only the ticket with WIN status and the prize rank can be disbursed
+            if self.status != TicketStatus.WIN {
+                return
             }
-            self._setStatus(toStatus: TicketStatus.WIN_CLAIMED)
+            if self.winPrizeRank == nil {
+                return
+            }
+
+            // Set the ticket status to WIN_DISBURSED
+            self._setStatus(toStatus: TicketStatus.WIN_DISBURSED)
+
+            // emit event
+            emit TicketPrizeDisbursed(
+                poolAddr: self.pool,
+                lotteryId: self.lotteryId,
+                address: self.getTicketOwner(),
+                ticketId: self.getTicketId(),
+                prizeAmount: prizeAmount
+            )
         }
 
         /** --- Internal Methods --- */
+
+        access(self)
+        fun _borrowLotteryPool(): &LotteryPool{LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook} {
+            return FGameLottery.borrowLotteryPool(self.pool)
+                ?? panic("Lottery pool not found")
+        }
 
         access(self)
         fun _setStatus(toStatus: TicketStatus) {
@@ -964,7 +1005,71 @@ access(all) contract FGameLottery {
             }
         }
 
+        /// Disburse the prize to the winners
+        ///
+        access(contract)
+        fun disbursePrize(ticket: &TicketEntry{TicketEntryPublic}) {
+            // Only status is DRAWN_AND_VERIFIED and the ticket status is WIN can withdraw the prize
+            if self.getStatus() != LotteryStatus.DRAWN_AND_VERIFIED {
+                return
+            }
+            let ticketStatus = ticket.getStatus()
+            if ticketStatus != TicketStatus.WIN {
+                return
+            }
+            let prizeRank = ticket.getWinPrizeRank()
+            if prizeRank == nil {
+                return
+            }
+            // Borrow the FRC20 indexer
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            // Borrow the lottery pool
+            let pool = self.borrowLotteryPool()
+
+            // Disburse the prize to the ticket owner
+            let ticketOwner = ticket.getTicketOwner()
+
+            // Get the base prize amount
+            let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
+            // Disburse the prize amount
+            let prizeAmountWithPowerup = basePrize * ticket.getPowerup()
+            let prizeDowngradeRatio = self.drawnResult!.nonJackpotDowngradeRatio
+            let prizeChange <- self.current.withdrawAsChange(amount: prizeAmountWithPowerup * prizeDowngradeRatio)
+            // Get the prize amount
+            let prizeAmount = prizeChange.getBalance()
+
+            // Disburse the prize to the ticket owner
+            var rewardChange: @FRC20FTShared.Change? <- nil
+            let isFlowToken = prizeChange.isBackedByFlowTokenVault()
+            if isFlowToken {
+                rewardChange <-! FRC20FTShared.createEmptyFlowChange(
+                    from: ticketOwner
+                )
+            } else {
+                rewardChange <-! FRC20FTShared.createEmptyChange(
+                    tick: prizeChange.getOriginalTick(),
+                    from: ticketOwner
+                )
+            }
+
+            // Deposit the prize to the ticket owner
+            let rewardChangeRef = &rewardChange as &FRC20FTShared.Change?
+            FRC20FTShared.depositToChange(
+                receiver: rewardChangeRef!,
+                change: <- prizeChange
+            )
+            frc20Indexer.returnChange(change: <- rewardChange!)
+
+            // Update the ticket status to WIN_DISBURSED and emit event
+            ticket.onPrizeDisburse(prizeAmount)
+        }
+
         /** ---- Internal Methods ----- */
+
+        access(self)
+        fun borrowCurrentLotteryChange(): &FRC20FTShared.Change {
+            return &self.current as &FRC20FTShared.Change
+        }
 
         access(self)
         fun borrowLotteryPool(): &LotteryPool {
@@ -972,11 +1077,6 @@ access(all) contract FGameLottery {
             let ref = FGameLottery.borrowLotteryPool(ownerAddr)
                 ?? panic("Lottery pool not found")
             return ref.borrowSelf()
-        }
-
-        access(self)
-        fun borrowCurrentLotteryChange(): &FRC20FTShared.Change {
-            return &self.current as &FRC20FTShared.Change
         }
     }
 
@@ -994,6 +1094,8 @@ access(all) contract FGameLottery {
         fun isEpochAutoStart(): Bool
         access(all) view
         fun getJackpotPoolBalance(): UFix64
+        access(all) view
+        fun getWinnerPrizeByRank(_ rank: PrizeRank): UFix64
 
         // --- read methods: default implement ---
 
