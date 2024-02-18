@@ -4,7 +4,7 @@
 # FGameLottery
 
 This contract is a lottery game contract. It allows users to buy tickets and participate in the lottery.
-The lottery is drawn every epoch. The winner is selected randomly from the participants.
+The lottery is drawn every epoch. The lottery result is generated randomly and verified with the participants' tickets.
 
 */
 // Fixes Imports
@@ -12,8 +12,6 @@ import "Fixes"
 import "FixesHeartbeat"
 import "FRC20FTShared"
 import "FRC20Indexer"
-import "FRC20Staking"
-import "FRC20AccountsPool"
 
 access(all) contract FGameLottery {
     /* --- Events --- */
@@ -121,8 +119,6 @@ access(all) contract FGameLottery {
     access(all) let userCollectionPublicPath: PublicPath
     access(all) let lotteryPoolStoragePath: StoragePath
     access(all) let lotteryPoolPublicPath: PublicPath
-    access(all) let registryStoragePath: StoragePath
-    access(all) let registryPublicPath: PublicPath
 
     access(all) var MAX_WHITE_NUMBER: UInt8
     access(all) var MAX_RED_NUMBER: UInt8
@@ -1489,7 +1485,7 @@ access(all) contract FGameLottery {
                 let lotteryRef = self.borrowLotteryRef(firstFinsihedEpochIndex)!
 
                 // max entries to compute in one heartbeat
-                let heartbeatComputeEntries = 50
+                let heartbeatComputeEntries = 100
 
                 // verify the participants' tickets
                 var status = lotteryRef.getStatus()
@@ -1535,18 +1531,6 @@ access(all) contract FGameLottery {
         }
     }
 
-    /// Resource inferface for the Lottery registry
-    ///
-    access(all) resource interface RegistryPublic {
-
-    }
-
-    /// Resource for the Lottery registry
-    ///
-    access(all) resource Registry: RegistryPublic {
-
-    }
-
     /* --- Public methods  --- */
 
     /// Get the user's ticket collection capability
@@ -1568,16 +1552,6 @@ access(all) contract FGameLottery {
             .borrow()
     }
 
-    /// Borrow Lottery Pool Registry
-    ///
-    access(all)
-    fun borrowRegistry(): &Registry{RegistryPublic} {
-        return getAccount(self.account.address)
-            .getCapability<&Registry{RegistryPublic}>(FGameLottery.registryPublicPath)
-            .borrow()
-            ?? panic("Registry not found")
-    }
-
     init() {
         // Set the maximum white and red numbers
         self.MAX_WHITE_NUMBER = 33
@@ -1590,16 +1564,6 @@ access(all) contract FGameLottery {
 
         self.lotteryPoolStoragePath = StoragePath(identifier: identifier.concat("_LotteryPool"))!
         self.lotteryPoolPublicPath = PublicPath(identifier: identifier.concat("_LotteryPool"))!
-
-        self.registryStoragePath = StoragePath(identifier: identifier.concat("_Registry"))!
-        self.registryPublicPath = PublicPath(identifier: identifier.concat("_Registry"))!
-
-        // save registry
-        let registry <- create Registry()
-        self.account.save(<- registry, to: self.registryStoragePath)
-
-        // @deprecated in Cadence 1.0
-        self.account.link<&Registry{RegistryPublic}>(self.registryPublicPath, target: self.registryStoragePath)
 
         // Emit the ContractInitialized event
         emit ContractInitialized()
