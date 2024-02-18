@@ -109,6 +109,11 @@ access(all) contract FGameLottery {
         nonJackpotTotal: UFix64,
         nonJackpotDowngradeRatio: UFix64
     )
+    /// Event emitted when a lottery is disbursing prizes
+    access(all) event LotteryPrizesDisbursed(
+        poolAddr: Address,
+        lotteryId: UInt64,
+    )
 
     /* --- Variable, Enums and Structs --- */
 
@@ -604,7 +609,7 @@ access(all) contract FGameLottery {
         access(all) let numbers: TicketNumber
         access(all) let participantAmount: UInt64
         access(all) let totalBought: UFix64
-        access(all) var distributionProgress: UFix64
+        access(all) var verifyingProgress: UFix64
         access(all) var nonJackpotTotal: UFix64
         access(all) var nonJackpotDowngradeRatio: UFix64
         access(all) var jackpotAmount: UFix64
@@ -621,7 +626,7 @@ access(all) contract FGameLottery {
             self.totalBought = totalBought
             self.jackpotAmount = jackpotAmount
             self.jackpotWinners = nil
-            self.distributionProgress = 0.0
+            self.verifyingProgress = 0.0
             self.nonJackpotTotal = 0.0
             self.nonJackpotDowngradeRatio = 1.0
         }
@@ -647,9 +652,9 @@ access(all) contract FGameLottery {
         /// Set the distribution progress
         ///
         access(contract)
-        fun setDistributionProgress(_ progress: UFix64) {
+        fun setVerifyingProgress(_ progress: UFix64) {
             if progress >= 0.0 && progress <= 1.0 {
-                self.distributionProgress = progress
+                self.verifyingProgress = progress
             }
         }
 
@@ -947,7 +952,7 @@ access(all) contract FGameLottery {
             let totalParticipants = self.getParticipantAmount()
             let remainingUnChecked = UInt64(self.checkingQueue!.length)
             let progress = UFix64(totalParticipants - remainingUnChecked) / UFix64(totalParticipants)
-            self.drawnResult?.setDistributionProgress(progress)
+            self.drawnResult?.setVerifyingProgress(progress)
 
             // emit event
             emit LotteryParticipantsVerified(
@@ -1058,6 +1063,15 @@ access(all) contract FGameLottery {
                     self._disbursePrize(ticket: ticketRef)
                 }
                 i = i + 1
+            }
+
+            // emit event
+            if self.disbursingQueque.length == 0 {
+                let pool = self.borrowLotteryPool()
+                emit LotteryPrizesDisbursed(
+                    poolAddr: pool.getAddress(),
+                    lotteryId: self.epochIndex
+                )
             }
         }
 
@@ -1244,6 +1258,8 @@ access(all) contract FGameLottery {
         access(self)
         var currentEpochIndex: UInt64
         access(self)
+        var finishedEpoches: [UInt64]
+        access(self)
         var lastSealedEpochIndex: UInt64?
 
         init(
@@ -1264,6 +1280,7 @@ access(all) contract FGameLottery {
             self.initTicketPrice = ticketPrice
             self.initEpochInterval = epochInterval
             self.currentEpochIndex = 0
+            self.finishedEpoches = []
             self.lastSealedEpochIndex = nil
             self.lotteries <- {}
         }
@@ -1448,7 +1465,50 @@ access(all) contract FGameLottery {
         ///
         access(account)
         fun onHeartbeat(_ deltaTime: UFix64) {
-            // TODO
+            // Step 0. Handle the current lottery
+            if self.isCurrentLotteryActive() {
+                // DO NOTHING if the current lottery is active
+            } else if self.isCurrentLotteryReadyToDraw() {
+                // Draw the current lottery if it is ready
+                let lotteryRef = self.borrowLotteryRef(self.currentEpochIndex)!
+                // draw the lottery
+                lotteryRef.drawLottery()
+                // append the current epoch index to the finished epoches
+                self.finishedEpoches.append(self.currentEpochIndex)
+            } else if self.isCurrentLotteryFinished() {
+                // if the current lottery is finished
+                // Start a new epoch if the auto start is enabled
+                if self.isEpochAutoStart() {
+                    self.startNewEpoch()
+                }
+            }
+
+            // Step 1. Handle the finished epoches
+            if self.finishedEpoches.length > 0 {
+                let firstFinsihedEpochIndex = self.finishedEpoches[0]
+                let lotteryRef = self.borrowLotteryRef(firstFinsihedEpochIndex)!
+
+                // max entries to compute in one heartbeat
+                let heartbeatComputeEntries = 50
+
+                // verify the participants' tickets
+                var status = lotteryRef.getStatus()
+                // we need to verify the participants' tickets if the lottery is drawn
+                if status == LotteryStatus.DRAWN {
+                    // verify the participants' tickets
+                    lotteryRef.verifyParticipantsTickets(heartbeatComputeEntries)
+                } else if status == LotteryStatus.DRAWN_AND_VERIFIED && lotteryRef.isDisbursing() {
+                    // disburse the prizes to the winners
+                    lotteryRef.disbursePrizes(heartbeatComputeEntries)
+                }
+
+                // check if the lottery is finished
+                status = lotteryRef.getStatus()
+                if status == LotteryStatus.DRAWN_AND_VERIFIED && !lotteryRef.isDisbursing() {
+                    // remove the first finished epoch index and set the last sealed epoch index
+                    self.lastSealedEpochIndex = self.finishedEpoches.removeFirst()
+                }
+            }
         }
 
         // --- Internal Methods ---
