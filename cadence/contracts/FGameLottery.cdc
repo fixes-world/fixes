@@ -54,6 +54,16 @@ access(all) contract FGameLottery {
         costTick: String,
         costAmount: UFix64
     )
+    /// Event emitted when a ticket is verified
+    access(all) event TicketVerified(
+        poolAddr: Address,
+        lotteryId: UInt64,
+        address: Address,
+        ticketId: UInt64,
+        numbers: [UInt8;6],
+        status: UInt8,
+        prizeRank: UInt8
+    )
     /// Event emitted when a new lottery is started
     access(all) event LotteryStarted(
         poolAddr: Address,
@@ -164,6 +174,21 @@ access(all) contract FGameLottery {
                 whiteNumbers[i] = newNum
                 i = i + 1
             }
+        }
+        // sort the white numbers in ascending order
+        // there is no sort method for array, so we use fast sort algorithm to sort the array
+        i = 0
+        while i < 4 {
+            var j = i + 1
+            while j < 5 {
+                if whiteNumbers[i] > whiteNumbers[j] {
+                    let temp = whiteNumbers[i]
+                    whiteNumbers[i] = whiteNumbers[j]
+                    whiteNumbers[j] = temp
+                }
+                j = j + 1
+            }
+            i = i + 1
         }
         // generate the random red number, the number is between 1 and MAX_RED_NUMBER
         let rndUInt8 = UInt8(revertibleRandom() % UInt64(UInt8.max))
@@ -318,10 +343,68 @@ access(all) contract FGameLottery {
 
         access(contract)
         fun onPrizeVerify() {
+            if self.status != TicketStatus.ACTIVE {
+                return
+            }
             // Verify the ticket numbers with the lottery result
+            let lotteryRef = self.borrowLottery()
+            let lotteryResult = lotteryRef.getResult()
+            if lotteryResult == nil {
+                return
+            }
+            // --- check the ticket numbers and set the status ---
+            let resultNumbers = lotteryResult!.numbers
+            // get all the matched white numbers
+            let matchedWhiteNumbers: [UInt8] = []
+            // Check the white numbers
+            for number in resultNumbers.white {
+                if self.numbers.white.contains(number) {
+                    matchedWhiteNumbers.append(number)
+                }
+            }
+            // check if the red number is matched
+            let isRedMatched = self.numbers.red == resultNumbers.red
 
-            // If the ticket is a winner, set the status to WIN
-            // Set the ticket status to WIN
+            // Set the ticket status based on the matched numbers
+            if matchedWhiteNumbers.length == 5 && isRedMatched {
+                // Jackpot: 5 white numbers and 1 red number are matched
+                self._setStatus(toStatus: TicketStatus.WIN)
+                self.winPrizeRank = PrizeRank.JACKPOT
+            } else if matchedWhiteNumbers.length == 5 {
+                // Second: 5 white numbers are matched
+                self._setStatus(toStatus: TicketStatus.WIN)
+                self.winPrizeRank = PrizeRank.SECOND
+            } else if matchedWhiteNumbers.length == 4 && isRedMatched {
+                // Third: 4 white numbers and 1 red number are matched
+                self._setStatus(toStatus: TicketStatus.WIN)
+                self.winPrizeRank = PrizeRank.THIRD
+            } else if matchedWhiteNumbers.length == 4 || (matchedWhiteNumbers.length == 3 && isRedMatched) {
+                // Fourth: 4 white numbers are matched or 3 white numbers and 1 red number are matched
+                self._setStatus(toStatus: TicketStatus.WIN)
+                self.winPrizeRank = PrizeRank.FOURTH
+            } else if matchedWhiteNumbers.length == 3 || (matchedWhiteNumbers.length == 2 && isRedMatched) {
+                // Fifth: 3 white numbers or 2 white numbers and 1 red number are matched
+                self._setStatus(toStatus: TicketStatus.WIN)
+                self.winPrizeRank = PrizeRank.FIFTH
+            } else if isRedMatched {
+                // Sixth: at least 1 red number is matched
+                self._setStatus(toStatus: TicketStatus.WIN)
+                self.winPrizeRank = PrizeRank.SIXTH
+            } else {
+                // Lose: no number is matched
+                self._setStatus(toStatus: TicketStatus.LOSE)
+            }
+
+            // emit event
+            emit TicketVerified(
+                poolAddr: self.pool,
+                lotteryId: self.lotteryId,
+                address: self.getTicketOwner(),
+                ticketId: self.getTicketId(),
+                numbers: self.getNumbers(),
+                status: self.status.rawValue,
+                prizeRank: self.winPrizeRank?.rawValue ?? 0
+            )
         }
 
         access(contract)
@@ -646,7 +729,7 @@ access(all) contract FGameLottery {
         /// Create a new ticket and add it to user's collection
         ///
         access(contract)
-        fun createNewTicket(
+        fun buyNewTicket(
             payment: @FRC20FTShared.Change,
             recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
             powerup: UFix64? // default is 1.0, you can increase the powerup to increase the winning amount
@@ -657,7 +740,7 @@ access(all) contract FGameLottery {
 
             // deposit the payment to the total bought
             FRC20FTShared.depositToChange(
-                receiver: self.borrowCurrentLotteryBalance(),
+                receiver: self.borrowCurrentLotteryChange(),
                 change: <- payment
             )
 
@@ -719,7 +802,7 @@ access(all) contract FGameLottery {
         /// Claim the winning amount
         ///
         access(contract)
-        fun verifyParticipantsTickets(_ maxSize: Int) {
+        fun verifyParticipantsTickets(_ maxEntries: Int) {
             // This method is used to verify the participants' tickets
             // only execute the method if the lottery is drawn and the checking queue is not empty
             if self.getStatus() != LotteryStatus.DRAWN {
@@ -740,16 +823,15 @@ access(all) contract FGameLottery {
             var winnersCnt: UInt64 = 0
             var nonJackpotAmount = 0.0
             // get the checking addresses
-            let len = self.checkingQueue!.length
-            let upTo = len > maxSize ? maxSize : len
             var i = 0
-            while i < upTo {
+            while i < maxEntries && self.checkingQueue!.length > 0 {
                 // remove the first address from the queue
                 let addr = self.checkingQueue!.removeFirst()
                 participants.append(addr)
                 // retrieve the participant tickets
                 let tickets = self.participants[addr]!
                 let userColCap = FGameLottery.getUserTicketCollection(addr)
+                var checkedEntries = 1
                 if let userColRef = userColCap.borrow() {
                     for ticketId in tickets {
                         if let ticketRef = userColRef.borrowTicket(ticketId: ticketId) {
@@ -767,17 +849,21 @@ access(all) contract FGameLottery {
                                         winner: addr
                                     )
                                 } else {
-                                    let prize = pool.getWinnerPrizeByRank(prizeRank)
+                                    let basePrize = pool.getWinnerPrizeByRank(prizeRank)
+                                    let powerup = ticketRef.getPowerup()
+                                    let prize = basePrize * powerup
                                     nonJackpotAmount = nonJackpotAmount + prize
                                     self.drawnResult?.incrementNonJackpotTotal(prize)
                                 }
                             } // end if prizeRank
                         } // end if ticketRef
+                        // one entry is checked
+                        checkedEntries = checkedEntries + 1
                     } // end for
                 } // end if userColRef
                 // set the participant as checked
                 self.participantsChecked[addr] = true
-                i = i + 1
+                i = i + checkedEntries
             }
 
             // update the distribution progress
@@ -832,10 +918,11 @@ access(all) contract FGameLottery {
                     let change <- jackpotRef.withdrawAsChange(amount: requiredAmount)
                     // deposit the required amount to the total bought
                     FRC20FTShared.depositToChange(
-                        receiver: self.borrowCurrentLotteryBalance(),
+                        receiver: self.borrowCurrentLotteryChange(),
                         change: <- change
                     )
                 } else {
+                    // ensure the jackpot amount is at least 50% of the total bought
                     if minNewJackpotAmount > oldJackpotAmount {
                         let jackpotRequired = minNewJackpotAmount - oldJackpotAmount
                         // withdraw the required amount from the current pool to ensure the jackpot
@@ -845,13 +932,13 @@ access(all) contract FGameLottery {
                             receiver: jackpotRef,
                             change: <- change
                         )
-                    } else {
+                    } else if minNewJackpotAmount < oldJackpotAmount {
                         let jackpotRest = oldJackpotAmount - minNewJackpotAmount
                         // withdraw the rest amount from the jackpot pool
                         let change <- jackpotRef.withdrawAsChange(amount: jackpotRest)
                         // deposit the rest amount to the current pool
                         FRC20FTShared.depositToChange(
-                            receiver: self.borrowCurrentLotteryBalance(),
+                            receiver: self.borrowCurrentLotteryChange(),
                             change: <- change
                         )
                     }
@@ -888,7 +975,7 @@ access(all) contract FGameLottery {
         }
 
         access(self)
-        fun borrowCurrentLotteryBalance(): &FRC20FTShared.Change {
+        fun borrowCurrentLotteryChange(): &FRC20FTShared.Change {
             return &self.current as &FRC20FTShared.Change
         }
     }
@@ -1048,9 +1135,9 @@ access(all) contract FGameLottery {
 
         access(all) view
         fun getWinnerPrizeByRank(_ rank: PrizeRank): UFix64 {
-            // TODO using config store for the prize
+            // Get the ticket price
             let ticketPrice = self.getTicketPrice()
-
+            // Calculate the winner prize
             var prize: UFix64 = 0.0
             switch rank {
             case PrizeRank.JACKPOT:
@@ -1121,7 +1208,7 @@ access(all) contract FGameLottery {
                 // Withdraw the payment
                 let one <- payment.withdrawAsChange(amount: oneTicketCost)
                 // Create a new ticket
-                let newTicketId = lotteryRef.createNewTicket(
+                let newTicketId = lotteryRef.buyNewTicket(
                     payment: <- one,
                     recipient: recipient,
                     powerup: powerup,
