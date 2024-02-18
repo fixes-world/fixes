@@ -20,27 +20,211 @@ access(all) contract FGameLotteryRegistry {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
+    /// Event emitted when the whitelist is updated
+    access(all) event RegistryWhitelistUpdated(address: Address, isWhitelisted: Bool)
+    /// Event emitted when a lottery pool is enabled
+    access(all) event LotteryPoolEnabled(name: String, tick: String, ticketPrice: UFix64, epochInterval: UFix64, address: Address, by: Address)
+    /// Event emitted when a lottery pool resources are updated
+    access(all) event LotteryPoolResourcesUpdated(me: String, address: Address, by: Address)
 
     /* --- Variable, Enums and Structs --- */
 
     access(all) let registryStoragePath: StoragePath
     access(all) let registryPublicPath: PublicPath
+    access(all) let registryControllerStoragePath: StoragePath
 
     /* --- Interfaces & Resources --- */
 
     /// Resource inferface for the Lottery registry
     ///
     access(all) resource interface RegistryPublic {
-
+        access(all) view
+        fun isWhitelisted(address: Address): Bool
+        access(all) view
+        fun getLotteryPoolNames(): [String]
+        access(all) view
+        fun getGameWorldKey(_ name: String): String
+        access(all) view
+        fun getLotteryPoolAddress(_ name: String): Address?
+        // --- Write methods ---
+        access(contract)
+        fun onRegisterLotteryPool(_ name: String)
     }
 
     /// Resource for the Lottery registry
     ///
     access(all) resource Registry: RegistryPublic {
+        access(self)
+        let registered: [String]
+        access(self)
+        let whitelist: {Address: Bool}
 
+        init() {
+            self.whitelist = {}
+            self.registered = []
+        }
+
+        // --- Public methods ---
+
+        access(all) view
+        fun isWhitelisted(address: Address): Bool {
+            return self.whitelist[address] ?? false
+        }
+
+        access(all) view
+        fun getLotteryPoolNames(): [String] {
+            return self.registered
+        }
+
+        access(all) view
+        fun getGameWorldKey(_ name: String): String {
+            return "Lottery_".concat(name)
+        }
+
+        access(all) view
+        fun getLotteryPoolAddress(_ name: String): Address? {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let key = self.getGameWorldKey(name)
+            return acctsPool.getGameWorldAddress(key)
+        }
+
+        // --- Write methods ---
+
+        access(contract)
+        fun onRegisterLotteryPool(_ name: String) {
+            pre {
+                !self.registered.contains(name): "The lottery pool is already registered"
+            }
+            self.registered.append(name)
+        }
+
+        // --- Private methods ---
+
+        access(all)
+        fun updateWhitelist(address: Address, isWhitelisted: Bool) {
+            self.whitelist[address] = isWhitelisted
+
+            emit RegistryWhitelistUpdated(address: address, isWhitelisted: isWhitelisted)
+        }
     }
 
-    /* --- Public methods  --- */
+    /// Staking Controller Resource, represents a staking controller
+    ///
+    access(all) resource RegistryController {
+        /// Returns the address of the controller
+        ///
+        access(all)
+        fun getControllerAddress(): Address {
+            return self.owner?.address ?? panic("The controller is not stored in the account")
+        }
+
+        /// Create a new staking pool
+        ///
+        access(all)
+        fun createLotteryPool(
+            name: String,
+            rewardTick: String,
+            ticketPrice: UFix64,
+            epochInterval: UFix64,
+            newAccount: Capability<&AuthAccount>,
+        ){
+            pre {
+                FGameLotteryRegistry.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
+            }
+
+            // singleton resources
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let registry = FGameLotteryRegistry.borrowRegistry()
+
+            // Check if the token is already registered
+            if rewardTick != "" {
+                let meta = frc20Indexer.getTokenMeta(tick: rewardTick.toLower())
+                assert(
+                    meta != nil,
+                    message: "The token is not registered"
+                )
+            }
+
+            // get the game world key
+            let key = registry.getGameWorldKey(name)
+
+            // create the account for the lottery at the accounts pool
+            acctsPool.setupNewChildForGameWorld(key: key, newAccount)
+
+            // ensure all lottery resources are available
+            self.ensureResourcesAvailable(
+                name: name,
+                rewardTick: rewardTick,
+                ticketPrice: ticketPrice,
+                epochInterval: epochInterval
+            )
+
+            // register the lottery pool
+            registry.onRegisterLotteryPool(name)
+
+            // emit the event
+            emit LotteryPoolEnabled(
+                name: name,
+                tick: rewardTick,
+                ticketPrice: ticketPrice,
+                epochInterval: epochInterval,
+                address: acctsPool.getGameWorldAddress(key) ?? panic("The game world account was not created"),
+                by: self.getControllerAddress()
+            )
+        }
+
+        /// Ensure all staking resources are available
+        ///
+        access(all)
+        fun ensureResourcesAvailable(
+            name: String,
+            rewardTick: String,
+            ticketPrice: UFix64,
+            epochInterval: UFix64,
+        ) {
+            pre {
+                FGameLotteryRegistry.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
+            }
+
+            // singleton resources
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let registry = FGameLotteryRegistry.borrowRegistry()
+
+            let key = registry.getGameWorldKey(name)
+
+            let isUpdated = false
+            // TODO: Implement the method to ensure all resources are available
+
+            if isUpdated {
+                emit LotteryPoolResourcesUpdated(
+                    me: name,
+                    address: acctsPool.getGameWorldAddress(key) ?? panic("The game world account was not created"),
+                    by: self.getControllerAddress()
+                )
+            }
+        }
+    }
+
+    /** ---- Public Methods - Controller ---- */
+
+    /// Create a new staking controller
+    ///
+    access(all)
+    fun createController(): @RegistryController {
+        return <- create RegistryController()
+    }
+
+    /// Check if the given address is whitelisted
+    ///
+    access(all) view
+    fun isWhitelisted(_ address: Address): Bool {
+        if address == self.account.address {
+            return true
+        }
+        let reg = self.borrowRegistry()
+        return reg.isWhitelisted(address: address)
+    }
 
     /// Borrow Lottery Pool Registry
     ///
@@ -52,18 +236,25 @@ access(all) contract FGameLotteryRegistry {
             ?? panic("Registry not found")
     }
 
+    /* --- Public methods - User --- */
+
     init() {
         // Identifiers
         let identifier = "FGameLottery_".concat(self.account.address.toString())
         self.registryStoragePath = StoragePath(identifier: identifier.concat("_Registry"))!
         self.registryPublicPath = PublicPath(identifier: identifier.concat("_Registry"))!
 
+        self.registryControllerStoragePath = StoragePath(identifier: identifier.concat("_RegistryController"))!
+
         // save registry
         let registry <- create Registry()
         self.account.save(<- registry, to: self.registryStoragePath)
-
         // @deprecated in Cadence 1.0
         self.account.link<&Registry{RegistryPublic}>(self.registryPublicPath, target: self.registryStoragePath)
+
+        // create the controller
+        let controller <- create RegistryController()
+        self.account.save(<-controller, to: self.registryControllerStoragePath)
 
         // Emit the ContractInitialized event
         emit ContractInitialized()
