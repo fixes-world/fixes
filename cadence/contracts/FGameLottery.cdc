@@ -845,9 +845,11 @@ access(all) contract FGameLottery {
         ///
         access(contract)
         fun drawLottery() {
-            pre {
-                self.getStatus() == LotteryStatus.READY_TO_DRAW: "The lottery is not ready to draw"
+            // Only execute the method if the lottery is ready to draw
+            if self.getStatus() != LotteryStatus.READY_TO_DRAW {
+                return
             }
+            // borrow the lottery pool
             let pool = self.borrowLotteryPool()
 
             // Generate the random numbers
@@ -1025,10 +1027,12 @@ access(all) contract FGameLottery {
                     self.drawnResult?.updateJackpot(minNewJackpotAmount)
 
                     // calculate the non-jackpot downgrade ratio
-                    let currentPoolBalance = self.current.getBalance()
-                    ratio = currentPoolBalance / nonJackpotTotal
-                    // finalize the non-jackpot prize
-                    self.drawnResult?.setNonJackpotDowngradeRatio(ratio)
+                    if nonJackpotTotal > 0.0 {
+                        let currentPoolBalance = self.current.getBalance()
+                        ratio = currentPoolBalance / nonJackpotTotal
+                        // finalize the non-jackpot prize
+                        self.drawnResult?.setNonJackpotDowngradeRatio(ratio)
+                    }
                 }
 
                 // emit event

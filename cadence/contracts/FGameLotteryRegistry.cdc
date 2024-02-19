@@ -201,7 +201,7 @@ access(all) contract FGameLotteryRegistry {
             // The lottery pool should have the following resources in the account:
             // - FGameLottery.LotteryPool: Lottery Pool resource
             // - FRC20FTShared.SharedStore: Configuration
-            // - FixesHeartbeat.IHeartbeatHook: Register to FixesHeartbeat with the scope of "FGameLottery:<name>"
+            // - FixesHeartbeat.IHeartbeatHook: Register to FixesHeartbeat with the scope of "FGameLottery"
 
             if let pool = childAcctRef.borrow<&FGameLottery.LotteryPool>(from: FGameLottery.lotteryPoolStoragePath) {
                 assert(
@@ -254,7 +254,7 @@ access(all) contract FGameLotteryRegistry {
             }
 
             // Register to FixesHeartbeat
-            let heartbeatScope = "FGameLottery:".concat(name)
+            let heartbeatScope = "FGameLottery"
             if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: childAcctRef.address) {
                 FixesHeartbeat.addHook(
                     scope: heartbeatScope,
