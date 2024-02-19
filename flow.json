@@ -289,7 +289,7 @@
 			}
 		},
 		"FungibleTokenMetadataViews": {
-			"source": "./imports/f233dcee88fe0abe.FungibleTokenMetadataViews.cdc",
+			"source": "./imports/f233dcee88fe0abe/FungibleTokenMetadataViews.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "f233dcee88fe0abe",
