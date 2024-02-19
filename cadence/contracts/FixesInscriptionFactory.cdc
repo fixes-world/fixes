@@ -17,7 +17,7 @@ access(all) contract FixesInscriptionFactory {
 
     /// This is the general factory method to create a fixes inscription
     ///
-    access(all)
+    access(all) view
     fun createFrc20Inscription(
         _ dataStr: String,
         _ costReserve: @FlowToken.Vault
@@ -34,7 +34,7 @@ access(all) contract FixesInscriptionFactory {
 
     /// Estimate inscribing cost
     ///
-    access(all)
+    access(all) view
     fun estimateFrc20InsribeCost(
         _ dataStr: String
     ): UFix64 {
@@ -52,7 +52,7 @@ access(all) contract FixesInscriptionFactory {
 
     // Basic FRC20 Inscription
 
-    access(all)
+    access(all) view
     fun buildMintFRC20(
         tick: String,
         amt: UFix64,
@@ -60,7 +60,7 @@ access(all) contract FixesInscriptionFactory {
         return "op=mint,tick=".concat(tick).concat(",amt=").concat(amt.toString())
     }
 
-    access(all)
+    access(all) view
     fun buildBurnFRC20(
         tick: String,
         amt: UFix64,
@@ -68,7 +68,7 @@ access(all) contract FixesInscriptionFactory {
         return "op=burn,tick=".concat(tick).concat(",amt=").concat(amt.toString())
     }
 
-    access(all)
+    access(all) view
     fun buildDeployFRC20(
         tick: String,
         max: UFix64,
@@ -81,7 +81,7 @@ access(all) contract FixesInscriptionFactory {
             .concat(",burnable=").concat(burnable ? "1" : "0")
     }
 
-    access(all)
+    access(all) view
     fun buildTransferFRC20(
         tick: String,
         to: Address,
@@ -94,14 +94,14 @@ access(all) contract FixesInscriptionFactory {
 
     // Market FRC20 Inscription
 
-    access(all)
+    access(all) view
     fun buildMarketEnable(
         tick: String,
     ): String {
         return "op=enable-market,tick=".concat(tick)
     }
 
-    access(all)
+    access(all) view
     fun buildMarketListBuyNow(
         tick: String,
         amount: UFix64,
@@ -112,7 +112,7 @@ access(all) contract FixesInscriptionFactory {
             .concat(",price=").concat(price.toString())
     }
 
-    access(all)
+    access(all) view
     fun buildMarketListSellNow(
         tick: String,
         amount: UFix64,
@@ -123,7 +123,7 @@ access(all) contract FixesInscriptionFactory {
             .concat(",price=").concat(price.toString())
     }
 
-    access(all)
+    access(all) view
     fun buildMarketTakeBuyNow(
         tick: String,
         amount: UFix64,
@@ -132,7 +132,7 @@ access(all) contract FixesInscriptionFactory {
             .concat(",amt=").concat(amount.toString())
     }
 
-    access(all)
+    access(all) view
     fun buildMarketTakeSellNow(
         tick: String,
         amount: UFix64,
@@ -143,7 +143,7 @@ access(all) contract FixesInscriptionFactory {
 
     // Staking FRC20 Inscription
 
-    access(all)
+    access(all) view
     fun buildStakeDonate(
         tick: String?,
         amount: UFix64?,
@@ -157,7 +157,7 @@ access(all) contract FixesInscriptionFactory {
         return dataStr
     }
 
-    access(all)
+    access(all) view
     fun buildStakeWithdraw(
         tick: String,
         amount: UFix64,
@@ -167,10 +167,54 @@ access(all) contract FixesInscriptionFactory {
             .concat(",usage=staking")
     }
 
-    access(all)
+    access(all) view
     fun buildStakeDeposit(
         tick: String,
     ): String {
         return "op=deposit,tick=".concat(tick)
+    }
+
+    // FGame Lottery Inscription
+
+    /// The cost of this lottery pool is $FIXES
+    ///
+    access(all) view
+    fun estimateLotteryFIXESTicketsCost(
+        _ ticketAmount: UInt64,
+        _ powerup: UFix64?
+    ): UFix64 {
+        pre {
+            ticketAmount > 0: "Ticket amount must be greater than 0"
+            powerup == nil || (powerup! >= 1.0 && powerup! <= 10.0): "Powerup must be between 1.0 and 10.0"
+        }
+        let base = 2000.0
+        return base * UFix64(ticketAmount) * (powerup ?? 1.0)
+    }
+
+    /// The cost of this lottery pool is $FLOW
+    ///
+    access(all) view
+    fun estimateLotteryFIXESMintingTicketsCost(
+        _ ticketAmount: UInt64,
+        _ powerup: UFix64?
+    ): UFix64 {
+        pre {
+            ticketAmount > 0: "Ticket amount must be greater than 0"
+            powerup == nil || (powerup! >= 1.0 && powerup! <= 10.0): "Powerup must be between 1.0 and 10.0"
+        }
+        let base = 1.0
+        return base * UFix64(ticketAmount) * (powerup ?? 1.0)
+    }
+
+    access(all) view
+    fun buildLotteryBuyFIXESTickets(
+        _ ticketAmount: UInt64,
+        _ powerup: UFix64?
+    ): String {
+        let amount = self.estimateLotteryFIXESTicketsCost(ticketAmount, powerup)
+        return "op=withdraw,tick=fixes"
+            .concat(",amt=").concat(amount.toString())
+            .concat(",usage=lottery,tickets=").concat(ticketAmount.toString())
+            .concat(",powerup=").concat(powerup != nil ? powerup!.toString() : "1.0")
     }
 }
