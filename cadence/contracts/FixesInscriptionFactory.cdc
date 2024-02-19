@@ -206,6 +206,8 @@ access(all) contract FixesInscriptionFactory {
         return base * UFix64(ticketAmount) * (powerup ?? 1.0)
     }
 
+    /// Build the inscription for lottery $FIXES tickets buying
+    ///
     access(all) view
     fun buildLotteryBuyFIXESTickets(
         _ ticketAmount: UInt64,

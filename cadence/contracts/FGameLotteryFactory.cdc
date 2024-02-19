@@ -6,6 +6,7 @@
 This contract contains the factory for creating new Lottery Pool.
 
 */
+import "FlowToken"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -104,4 +105,28 @@ access(all) contract FGameLotteryFactory {
     }
 
     /* --- Public methods - User --- */
+
+    /// Use $FLOW to buy FIXES Minting Lottery Tickets
+    /// Return the inscriptions of FIXES minting
+    ///
+    access(all)
+    fun buyFIXESMintingLottery(
+        flowVault: @FlowToken.Vault,
+        ticketAmount: UInt64,
+        recipient: Capability<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>,
+        inscriptionStore: &Fixes.InscriptionsStore,
+    ) {
+        // TODO
+    }
+
+    /// Use $FIXES to buy FIXES Lottery Tickets
+    ///
+    access(all)
+    fun buyFIXESLottery(
+        ticketAmount: UInt64,
+        recipient: Capability<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>,
+        inscriptionStore: &Fixes.InscriptionsStore,
+    ) {
+        // TODO
+    }
 }

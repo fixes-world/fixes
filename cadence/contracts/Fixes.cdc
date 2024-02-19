@@ -410,10 +410,9 @@ access(all) contract Fixes {
         }
     }
 
-    access(all) resource interface ArchivedInscriptionsPublic {
-        // returns true if the archived inscriptions reached the 10000 amount
-        access(all) view
-        fun isFull(): Bool
+    /// The public interface to the inscriptions collection
+    ///
+    access(all) resource interface InscriptionsPublic {
         // returns the ids of the archived inscriptions
         access(all) view
         fun getIDs(): [UInt64]
@@ -425,18 +424,36 @@ access(all) contract Fixes {
         fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
     }
 
-    access(all) resource interface Archivor {
-        // archive the inscription
-        access(all)
-        fun archive(_ ins: @Fixes.Inscription)
+    /// The private interface to the inscriptions collection
+    ///
+    access(all) resource interface InscriptionsPrivate {
         // returns the inscription with the given id
         access(all)
         fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription?
     }
 
+    /// The public interface to the archived inscriptions
+    ///
+    access(all) resource interface ArchivedInscriptionsPublic {
+        // returns true if the archived inscriptions reached the 10000 amount
+        access(all) view
+        fun isFull(): Bool
+        // archive the inscription
+        access(contract)
+        fun archive(_ ins: @Fixes.Inscription)
+    }
+
+    /// The public interface to the archivor
+    ///
+    access(all) resource interface Archivor {
+        // archive the inscription
+        access(all)
+        fun archive(_ ins: @Fixes.Inscription)
+    }
+
     /// The resource that stores the archived inscriptions
     ///
-    access(all) resource ArchivedInscriptions: ArchivedInscriptionsPublic, Archivor {
+    access(all) resource ArchivedInscriptions: ArchivedInscriptionsPublic, Archivor, InscriptionsPublic, InscriptionsPrivate {
         access(self)
         let inscriptions: @{UInt64: Fixes.Inscription}
 
@@ -474,6 +491,11 @@ access(all) contract Fixes {
         // --- Private Methods ---
 
         access(all)
+        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription? {
+            return &self.inscriptions[id] as &Fixes.Inscription?
+        }
+
+        access(all)
         fun archive(_ ins: @Fixes.Inscription) {
             pre {
                 ins.isExtracted(): "Inscription should be extracted"
@@ -487,10 +509,94 @@ access(all) contract Fixes {
 
             destroy old
         }
+    }
+
+    /// The private interface to the executable archivor
+    ///
+    access(all) resource interface InscriptionsStorePrivate {
+        /// Store executable inscription
+        ///
+        access(all)
+        fun store(_ ins: @Fixes.Inscription)
+
+        /// Archive extracted inscription
+        ///
+        access(all)
+        fun archive(
+            id: UInt64,
+            archiveRef: &ArchivedInscriptions{ArchivedInscriptionsPublic}
+        )
+    }
+
+    /// The resource that stores the executable inscriptions
+    ///
+    access(all) resource InscriptionsStore: InscriptionsStorePrivate, InscriptionsPublic, InscriptionsPrivate {
+        access(self)
+        let inscriptions: @{UInt64: Fixes.Inscription}
+
+        init() {
+            self.inscriptions <- {}
+        }
+
+        /// @deprecated after Cadence 1.0
+        destroy() {
+            destroy self.inscriptions
+        }
+
+        // --- Public Methods ---
+
+        access(all) view
+        fun getIDs(): [UInt64] {
+            return self.inscriptions.keys
+        }
+
+        access(all) view
+        fun getLength(): Int {
+            return self.inscriptions.keys.length
+        }
+
+        access(all) view
+        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+            return self.borrowInscriptionWritableRef(id)
+        }
+
+        // --- Private Methods ---
 
         access(all)
         fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription? {
             return &self.inscriptions[id] as &Fixes.Inscription?
+        }
+
+        /// Store executable inscription
+        ///
+        access(all)
+        fun store(_ ins: @Fixes.Inscription) {
+            pre {
+                !ins.isExtracted(): "Inscription should be not extracted"
+            }
+            // inscription id should be unique
+            let id = ins.getId()
+            let old <- self.inscriptions.insert(key: id, <- ins)
+            destroy old
+        }
+
+        /// Archive extracted inscription
+        ///
+        access(all)
+        fun archive(
+            id: UInt64,
+            archiveRef: &ArchivedInscriptions{ArchivedInscriptionsPublic}
+        ) {
+            pre {
+                !archiveRef.isFull(): "This archived inscriptions resource is full"
+            }
+            let insRef = self.borrowInscriptionWritableRef(id)
+                ?? panic("Inscription not found")
+            // ensure inscription is extracted
+            assert(insRef.isExtracted(), message: "Inscription should be extracted")
+            let ins <- self.inscriptions.remove(key: id)
+                ?? panic("Inscription not found")
+            archiveRef.archive(<- ins)
         }
     }
 
@@ -590,6 +696,16 @@ access(all) contract Fixes {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
             identifier: prefix.concat("_archived_max_index")
+        )!
+    }
+
+    /// Get the storage path of the inscriptions store
+    ///
+    access(all) view
+    fun getFixesStoreStoragePath(): StoragePath {
+        let prefix = "Fixes_".concat(self.account.address.toString())
+        return StoragePath(
+            identifier: prefix.concat("_collection_store")
         )!
     }
 
