@@ -1224,7 +1224,7 @@ access(all) contract FGameLottery {
             amount: UInt8,
             powerup: UFix64?,
             recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
-        ): @FRC20FTShared.Change
+        )
 
         // --- borrow methods ---
 
@@ -1388,7 +1388,7 @@ access(all) contract FGameLottery {
             amount: UInt8,
             powerup: UFix64?,
             recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
-        ): @FRC20FTShared.Change {
+        ) {
             pre {
                 amount > 0: "Amount must be greater than 0"
                 payment.getOriginalTick() == self.jackpotPool.getOriginalTick(): "Invalid payment token"
@@ -1400,8 +1400,8 @@ access(all) contract FGameLottery {
             let oneTicketCost = price * (powerup ?? 1.0)
             let totalCost = oneTicketCost * UFix64(amount)
             assert(
-                payment.getBalance() >= totalCost,
-                message: "Insufficient balance"
+                payment.getBalance() == totalCost,
+                message: "Payment balance should be equal to the total cost"
             )
 
             // Get the current lottery
@@ -1424,18 +1424,21 @@ access(all) contract FGameLottery {
                 i = i + 1
             }
 
+            assert(
+                payment.getBalance() == 0.0,
+                message: "The payment balance should be 0 after the purchase"
+            )
+            destroy payment
+
             // emit event
             emit TicketPurchased(
                 poolAddr: self.getAddress(),
                 lotteryId: self.currentEpochIndex,
                 address: recipient.address,
                 ticketIds: purchasedIds,
-                costTick: payment.getOriginalTick(),
+                costTick: self.jackpotPool.getOriginalTick(),
                 costAmount: totalCost
             )
-
-            // return the remaining payment
-            return <- payment
         }
 
         /** ---- Admin Methods ----- */

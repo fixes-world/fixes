@@ -15,6 +15,22 @@ access(all) contract FixesInscriptionFactory {
 
     /* --- General Private Methods --- */
 
+    /// Estimate inscribing cost
+    ///
+    access(all) view
+    fun estimateFrc20InsribeCost(
+        _ dataStr: String
+    ): UFix64 {
+        // estimate the required storage
+        return Fixes.estimateValue(
+            index: Fixes.totalInscriptions,
+            mimeType: "text/plain",
+            data: dataStr.utf8,
+            protocol: "frc20",
+            encoding: nil
+        )
+    }
+
     /// This is the general factory method to create a fixes inscription
     ///
     access(all) view
@@ -32,20 +48,32 @@ access(all) contract FixesInscriptionFactory {
         )
     }
 
-    /// Estimate inscribing cost
+    /// This is the general factory method to create and store a fixes inscription
     ///
-    access(all) view
-    fun estimateFrc20InsribeCost(
-        _ dataStr: String
-    ): UFix64 {
+    access(all)
+    fun createAndStoreFrc20Inscription(
+        _ dataStr: String,
+        _ costReserve: @FlowToken.Vault,
+        _ store: &Fixes.InscriptionsStore
+    ): UInt64 {
+        pre {
+            store.owner?.address != nil: "Inscriptions store must be stored in a valid account."
+        }
+        post {
+            store.getLength() == before(store.getLength()) + 1: "Inscription was not stored."
+        }
         // estimate the required storage
-        return Fixes.estimateValue(
-            index: Fixes.totalInscriptions,
-            mimeType: "text/plain",
-            data: dataStr.utf8,
-            protocol: "frc20",
-            encoding: nil
+        let estimatedReqValue = self.estimateFrc20InsribeCost(dataStr)
+        assert(
+            costReserve.balance >= estimatedReqValue,
+            message: "Insufficient balance to create the inscription."
         )
+        let inscription <- self.createFrc20Inscription(dataStr, <- costReserve)
+        let insId = inscription.getId()
+        // store the inscription (now it will have an owner address)
+        store.store(<- inscription)
+        // return the new inscription id
+        return insId
     }
 
     /* --- Public Methods --- */
