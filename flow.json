@@ -89,6 +89,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FGameLotteryFactory": {
+			"source": "cadence/contracts/FGameLotteryFactory.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
@@ -752,7 +760,8 @@
 				"FRC20StakingForwarder",
 				"FRC20StakingVesting",
 				"FGameLottery",
-				"FGameLotteryRegistry"
+				"FGameLotteryRegistry",
+				"FGameLotteryFactory"
 			]
 		},
 		"mainnet": {

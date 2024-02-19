@@ -1,10 +1,10 @@
 /**
 > Author: FIXeS World <https://fixes.world/>
 
-# FGameLottery
+# FGameLotteryRegistry
 
-This contract is a lottery game contract. It allows users to buy tickets and participate in the lottery.
-The lottery is drawn every epoch. The winner is selected randomly from the participants.
+This contract is the lottery registry contract.
+It is responsible for managing the lottery pools and the whitelist of the controllers.
 
 */
 // Fixes Imports
@@ -136,6 +136,11 @@ access(all) contract FGameLotteryRegistry {
             let frc20Indexer = FRC20Indexer.getIndexer()
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let registry = FGameLotteryRegistry.borrowRegistry()
+
+            assert(
+                registry.getLotteryPoolAddress(name) == nil,
+                message: "The lottery pool is already registered"
+            )
 
             // Check if the token is already registered
             if rewardTick != "" {

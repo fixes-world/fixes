@@ -9,7 +9,6 @@ TODO: Add description
 // Third-party imports
 import "StringUtils"
 import "MetadataViews"
-import "FungibleTokenMetadataViews"
 import "FlowToken"
 // Fixes imports
 import "FRC20FTShared"

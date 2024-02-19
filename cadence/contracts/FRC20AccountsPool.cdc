@@ -10,7 +10,6 @@ TODO: Add description
 // Third-party imports
 import "MetadataViews"
 import "FungibleToken"
-import "FungibleTokenMetadataViews"
 import "FlowToken"
 import "HybridCustody"
 // Fixes imports
