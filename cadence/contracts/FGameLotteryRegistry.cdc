@@ -188,13 +188,82 @@ access(all) contract FGameLotteryRegistry {
             }
 
             // singleton resources
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let registry = FGameLotteryRegistry.borrowRegistry()
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
+            // try to borrow the account to check if it was created
             let key = registry.getGameWorldKey(name)
+            let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.GameWorld, key)
+                ?? panic("The staking account was not created")
 
-            let isUpdated = false
-            // TODO: Implement the method to ensure all resources are available
+            var isUpdated = false
+
+            // The lottery pool should have the following resources in the account:
+            // - FGameLottery.LotteryPool: Lottery Pool resource
+            // - FRC20FTShared.SharedStore: Configuration
+            // - FixesHeartbeat.IHeartbeatHook: Register to FixesHeartbeat with the scope of "FGameLottery:<name>"
+
+            if let pool = childAcctRef.borrow<&FGameLottery.LotteryPool>(from: FGameLottery.lotteryPoolStoragePath) {
+                assert(
+                    pool.name == name,
+                    message: "The staking pool tick is not the same as the requested"
+                )
+            } else {
+                // create the resource and save it in the account
+                let pool <- FGameLottery.createLotteryPool(
+                    name: name,
+                    rewardTick: rewardTick,
+                    ticketPrice: ticketPrice,
+                    epochInterval: epochInterval
+                )
+                // save the resource in the account
+                childAcctRef.save(<- pool, to: FGameLottery.lotteryPoolStoragePath)
+
+                isUpdated = true || isUpdated
+            }
+            // link the resource to the public path
+            // @deprecated after Cadence 1.0
+            if childAcctRef
+                .getCapability<&FGameLottery.LotteryPool{FGameLottery.LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook}>(FGameLottery.lotteryPoolPublicPath)
+                .borrow() == nil {
+                childAcctRef.unlink(FGameLottery.lotteryPoolPublicPath)
+                childAcctRef.link<&FGameLottery.LotteryPool{FGameLottery.LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook}>(
+                    FGameLottery.lotteryPoolPublicPath,
+                    target: FGameLottery.lotteryPoolStoragePath
+                )
+
+                isUpdated = true || isUpdated
+            }
+
+            // create the shared store and save it in the account
+            if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+                let sharedStore <- FRC20FTShared.createSharedStore()
+                childAcctRef.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+
+                isUpdated = true || isUpdated
+            }
+            // link the resource to the public path
+            // @deprecated after Cadence 1.0
+            if childAcctRef
+                .getCapability<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath)
+                .borrow() == nil {
+                childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
+                childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+
+                isUpdated = true || isUpdated
+            }
+
+            // Register to FixesHeartbeat
+            let heartbeatScope = "FGameLottery:".concat(name)
+            if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: childAcctRef.address) {
+                FixesHeartbeat.addHook(
+                    scope: heartbeatScope,
+                    hookAddr: childAcctRef.address,
+                    hookPath: FGameLottery.lotteryPoolPublicPath
+                )
+
+                isUpdated = true || isUpdated
+            }
 
             if isUpdated {
                 emit LotteryPoolResourcesUpdated(

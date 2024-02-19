@@ -1170,6 +1170,8 @@ access(all) contract FGameLottery {
     access(all) resource interface LotteryPoolPublic {
         // --- read methods ---
         access(all) view
+        fun getName(): String
+        access(all) view
         fun getAddress(): Address
         access(all) view
         fun getCurrentEpochIndex(): UInt64
@@ -1242,6 +1244,8 @@ access(all) contract FGameLottery {
     ///
     access(all) resource LotteryPool: LotteryPoolPublic, LotteryPoolAdmin, FixesHeartbeat.IHeartbeatHook {
         /// Lottery pool constants
+        access(all)
+        let name: String
         access(self)
         let initEpochInterval: UFix64
         access(self)
@@ -1259,6 +1263,7 @@ access(all) contract FGameLottery {
         var lastSealedEpochIndex: UInt64?
 
         init(
+            name: String,
             rewardTick: String,
             ticketPrice: UFix64,
             epochInterval: UFix64
@@ -1267,6 +1272,7 @@ access(all) contract FGameLottery {
                 ticketPrice > 0.0: "Ticket price must be greater than 0"
                 epochInterval > 0.0: "Epoch interval must be greater than 0"
             }
+            self.name = name
             let accountAddr = FGameLottery.account.address
             if rewardTick != "" {
                 self.jackpotPool <- FRC20FTShared.createEmptyChange(tick: rewardTick, from: accountAddr)
@@ -1288,6 +1294,11 @@ access(all) contract FGameLottery {
         }
 
         /** ---- Public Methods ---- */
+
+        access(all) view
+        fun getName(): String {
+            return self.name
+        }
 
         access(all) view
         fun getAddress(): Address {
@@ -1531,7 +1542,33 @@ access(all) contract FGameLottery {
         }
     }
 
+    /* --- Account Access Methods --- */
+
+    /// Create a new lottery pool
+    ///
+    access(account)
+    fun createLotteryPool(
+        name: String,
+        rewardTick: String,
+        ticketPrice: UFix64,
+        epochInterval: UFix64
+    ): @LotteryPool {
+        return <-create LotteryPool(
+            name: name,
+            rewardTick: rewardTick,
+            ticketPrice: ticketPrice,
+            epochInterval: epochInterval
+        )
+    }
+
     /* --- Public methods  --- */
+
+    /// Create a ticket collection
+    ///
+    access(all)
+    fun createTicketCollection(): @TicketCollection {
+        return <-create TicketCollection()
+    }
 
     /// Get the user's ticket collection capability
     ///
