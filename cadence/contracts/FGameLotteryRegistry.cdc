@@ -153,6 +153,8 @@ access(all) contract FGameLotteryRegistry {
 
             // get the game world key
             let key = registry.getGameWorldKey(name)
+            let addr = acctsPool.getGameWorldAddress(key)
+            assert(addr == nil, message: "The game world account is already created")
 
             // create the account for the lottery at the accounts pool
             acctsPool.setupNewChildForGameWorld(key: key, newAccount)
@@ -174,7 +176,7 @@ access(all) contract FGameLotteryRegistry {
                 tick: rewardTick,
                 ticketPrice: ticketPrice,
                 epochInterval: epochInterval,
-                address: acctsPool.getGameWorldAddress(key) ?? panic("The game world account was not created"),
+                address: addr ?? panic("The game world account was not created"),
                 by: self.getControllerAddress()
             )
         }
