@@ -642,6 +642,13 @@ access(all) contract Fixes {
         return <- create ArchivedInscriptions()
     }
 
+    /// Create a new InscriptionsStore
+    ///
+    access(all)
+    fun createInscriptionsStore(): @InscriptionsStore {
+        return <- create InscriptionsStore()
+    }
+
     /// Estimate the value of an inscription
     ///
     access(all) view

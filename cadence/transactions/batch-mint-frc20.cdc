@@ -9,6 +9,16 @@ transaction(
     repeats: UInt64
 ) {
     prepare(acct: AuthAccount) {
+        /** ------------- Prepare the Inscription Store - Start ---------------- */
+        let storePath = Fixes.getFixesStoreStoragePath()
+        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        }
+
+        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+            ?? panic("Could not borrow a reference to the Inscriptions Store!")
+        /** ------------- End -------------------------------------------------- */
+
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
         ?? panic("Could not borrow reference to the owner's Vault!")
@@ -36,20 +46,15 @@ transaction(
             let flowToReserve <- (vaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
 
             // Create the Inscription first
-            let newIns <- FixesInscriptionFactory.createFrc20Inscription(insDataStr, <- flowToReserve)
-
-            // save the new Inscription to storage
-            let newInsId = newIns.getId()
-            let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
-            assert(
-                acct.borrow<&AnyResource>(from: newInsPath) == nil,
-                message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
+            let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+                insDataStr,
+                <- flowToReserve,
+                store
             )
-            acct.save(<- newIns, to: newInsPath)
 
             // borrow a reference to the new Inscription
-            let insRef = acct.borrow<&Fixes.Inscription>(from: newInsPath)
-                ?? panic("Could not borrow reference to the new Inscription!")
+            let insRef = store.borrowInscriptionWritableRef(newInsId)
+                ?? panic("Could not borrow a reference to the newly created Inscription!")
 
             /// Mint the FRC20 token
             indexer.mint(ins: insRef)

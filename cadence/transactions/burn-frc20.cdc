@@ -13,6 +13,16 @@ transaction(
     let recipient: &FlowToken.Vault{FungibleToken.Receiver}
 
     prepare(acct: AuthAccount) {
+        /** ------------- Prepare the Inscription Store - Start ---------------- */
+        let storePath = Fixes.getFixesStoreStoragePath()
+        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        }
+
+        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+            ?? panic("Could not borrow a reference to the Inscriptions Store!")
+        /** ------------- End -------------------------------------------------- */
+
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
@@ -26,25 +36,16 @@ transaction(
         let flowToReserve <- (vaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
 
         // Create the Inscription first
-        let newIns <- FixesInscriptionFactory.createFrc20Inscription(dataStr, <- flowToReserve)
-
-        // save the new Inscription to storage
-        let newInsId = newIns.getId()
-        let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
-        assert(
-            acct.borrow<&AnyResource>(from: newInsPath) == nil,
-            message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
-        )
-        acct.save(<- newIns, to: newInsPath)
+        let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(dataStr, <- flowToReserve, store)
 
         // borrow a reference to the new Inscription
-        self.ins = acct.borrow<&Fixes.Inscription>(from: newInsPath)
+        self.ins = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow reference to the new Inscription!")
 
         // reference to the recipient's receiver
         self.recipient = acct.getCapability(/public/flowTokenReceiver)
             .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
-			?? panic("Could not borrow receiver reference to the recipient's Vault")
+            ?? panic("Could not borrow receiver reference to the recipient's Vault")
     }
 
     execute {

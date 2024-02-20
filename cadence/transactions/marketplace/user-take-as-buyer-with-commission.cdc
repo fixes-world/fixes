@@ -22,6 +22,16 @@ transaction(
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
 
     prepare(acct: AuthAccount) {
+        /** ------------- Prepare the Inscription Store - Start ---------------- */
+        let storePath = Fixes.getFixesStoreStoragePath()
+        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        }
+
+        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+            ?? panic("Could not borrow a reference to the Inscriptions Store!")
+        /** ------------- End -------------------------------------------------- */
+
         /** ------------- Start -- FRC20 Marketplace -------------  */
         // Borrow a reference to the FRC20Marketplace contract
         self.market = FRC20MarketManager.borrowMarket(tick)
@@ -152,21 +162,14 @@ transaction(
             let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
 
             // Create the Inscription first
-            let newIns <- FixesInscriptionFactory.createFrc20Inscription(
+            let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
                 dataStr,
-                <- (flowToReserve as! @FlowToken.Vault)
+                <- (flowToReserve as! @FlowToken.Vault),
+                store
             )
-            // save the new Inscription to storage
-            let newInsId = newIns.getId()
-            let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
-            assert(
-                acct.borrow<&AnyResource>(from: newInsPath) == nil,
-                message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
-            )
-            acct.save(<- newIns, to: newInsPath)
 
             // borrow a reference to the new Inscription
-            let insRef = acct.borrow<&Fixes.Inscription>(from: newInsPath)
+            let insRef = store.borrowInscriptionWritableRef(newInsId)
                 ?? panic("Could not borrow reference to the new Inscription!")
             /** ------------- End ---------------------------------------------  */
 

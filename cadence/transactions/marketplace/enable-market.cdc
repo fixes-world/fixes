@@ -22,6 +22,16 @@ transaction(
     let manager: &FRC20MarketManager.Manager
 
     prepare(acct: AuthAccount) {
+        /** ------------- Prepare the Inscription Store - Start ---------------- */
+        let storePath = Fixes.getFixesStoreStoragePath()
+        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        }
+
+        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+            ?? panic("Could not borrow a reference to the Inscriptions Store!")
+        /** ------------- End -------------------------------------------------- */
+
         // ----------- Prepare the pool -----------
 
         self.pool = FRC20AccountsPool.borrowAccountsPool()
@@ -40,22 +50,14 @@ transaction(
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first
-        let newIns <- FixesInscriptionFactory.createFrc20Inscription(
+        let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
             dataStr,
-            <- (flowToReserve as! @FlowToken.Vault)
+            <- (flowToReserve as! @FlowToken.Vault),
+            store
         )
-
-        // save the new Inscription to storage
-        let newInsId = newIns.getId()
-        let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
-        assert(
-            acct.borrow<&AnyResource>(from: newInsPath) == nil,
-            message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
-        )
-        acct.save(<- newIns, to: newInsPath)
 
         // borrow a reference to the new Inscription
-        self.ins = acct.borrow<&Fixes.Inscription>(from: newInsPath)
+        self.ins = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow reference to the new Inscription!")
 
         // ---- create market account ----
