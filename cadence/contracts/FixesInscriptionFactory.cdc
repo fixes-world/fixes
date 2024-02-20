@@ -244,7 +244,6 @@ access(all) contract FixesInscriptionFactory {
         let amount = self.estimateLotteryFIXESTicketsCost(ticketAmount, powerup)
         return "op=withdraw,tick=fixes"
             .concat(",amt=").concat(amount.toString())
-            .concat(",usage=lottery,tickets=").concat(ticketAmount.toString())
-            .concat(",powerup=").concat(powerup != nil ? powerup!.toString() : "1.0")
+            .concat(",usage=lottery")
     }
 }
