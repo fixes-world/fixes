@@ -603,8 +603,8 @@ access(all) contract FGameLottery {
     ///
     access(all) struct LotteryResult {
         access(all) let numbers: TicketNumber
-        access(all) let participantAmount: UInt64
         access(all) let totalBought: UFix64
+        access(all) let winners: [Address]
         access(all) var verifyingProgress: UFix64
         access(all) var nonJackpotTotal: UFix64
         access(all) var nonJackpotDowngradeRatio: UFix64
@@ -613,18 +613,24 @@ access(all) contract FGameLottery {
 
         init(
             numbers: TicketNumber,
-            participantAmount: UInt64,
             totalBought: UFix64,
             jackpotAmount: UFix64,
         ) {
             self.numbers = numbers
-            self.participantAmount = participantAmount
             self.totalBought = totalBought
+            self.winners = []
             self.jackpotAmount = jackpotAmount
             self.jackpotWinners = nil
             self.verifyingProgress = 0.0
             self.nonJackpotTotal = 0.0
             self.nonJackpotDowngradeRatio = 1.0
+        }
+
+        /// Add a winner
+        ///
+        access(contract)
+        fun addWinner(_ address: Address) {
+            self.winners.append(address)
         }
 
         /// Set the jackpot info
@@ -671,9 +677,36 @@ access(all) contract FGameLottery {
         }
     }
 
+    /// Struct for the lottery info
+    ///
+    access(all) struct LotteryBasicInfo {
+        access(all) let epochIndex: UInt64
+        access(all) let epochStartAt: UFix64
+        access(all) let status: LotteryStatus
+        access(all) let currentPool: UFix64
+        access(all) let participantsAmount: UInt64
+
+        init(
+            epochIndex: UInt64,
+            epochStartAt: UFix64,
+            status: LotteryStatus,
+            currentPool: UFix64,
+            participantsAmt: UInt64
+        ) {
+            self.epochIndex = epochIndex
+            self.epochStartAt = epochStartAt
+            self.status = status
+            self.currentPool = currentPool
+            self.participantsAmount = participantsAmt
+        }
+    }
+
     /// Lottery public resource interface
     ///
     access(all) resource interface LotteryPublic {
+        /// Lottery info - public view
+        access(all) view
+        fun getInfo(): LotteryBasicInfo
         /// Lottery status
         access(all) view
         fun getStatus(): LotteryStatus
@@ -744,6 +777,19 @@ access(all) contract FGameLottery {
         }
 
         /** ---- Public Methods ---- */
+
+        /// Lottery info - public view
+        ///
+        access(all) view
+        fun getInfo(): LotteryBasicInfo {
+            return LotteryBasicInfo(
+                epochIndex: self.epochIndex,
+                epochStartAt: self.epochStartAt,
+                status: self.getStatus(),
+                currentPool: self.getCurrentLotteryBalance(),
+                participantsAmt: self.getParticipantAmount()
+            )
+        }
 
         /// Get the lottery status
         ///
@@ -860,7 +906,6 @@ access(all) contract FGameLottery {
 
             self.drawnResult = LotteryResult(
                 numbers: lotteryNumbers,
-                participantAmount: participantAmount,
                 totalBought: totalBought,
                 jackpotAmount: jackpotAmount,
             )
@@ -919,6 +964,8 @@ access(all) contract FGameLottery {
                             if let prizeRank = ticketRef.getWinPrizeRank() {
                                 // update the winner count
                                 winnersCnt = winnersCnt + 1
+                                // add the winner to the result
+                                self.drawnResult?.addWinner(addr)
                                 // add the ticket to the disbursing queue
                                 self.disbursingQueque.append(TicketIdentifier(addr, ticketId))
                                 // update result data

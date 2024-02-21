@@ -5,7 +5,6 @@ import "FlowToken"
 import "Fixes"
 import "FRC20Indexer"
 import "FGameLottery"
-import "FGameLotteryRegistry"
 import "FGameLotteryFactory"
 
 transaction(
