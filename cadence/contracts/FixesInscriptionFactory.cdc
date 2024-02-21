@@ -208,7 +208,7 @@ access(all) contract FixesInscriptionFactory {
     ///
     access(all) view
     fun estimateLotteryFIXESTicketsCost(
-        _ ticketAmount: UInt64,
+        _ ticketAmount: UInt8,
         _ powerup: UFix64?
     ): UFix64 {
         pre {
@@ -223,7 +223,7 @@ access(all) contract FixesInscriptionFactory {
     ///
     access(all) view
     fun estimateLotteryFIXESMintingTicketsCost(
-        _ ticketAmount: UInt64,
+        _ ticketAmount: UInt8,
         _ powerup: UFix64?
     ): UFix64 {
         pre {
@@ -238,7 +238,7 @@ access(all) contract FixesInscriptionFactory {
     ///
     access(all) view
     fun buildLotteryBuyFIXESTickets(
-        _ ticketAmount: UInt64,
+        _ ticketAmount: UInt8,
         _ powerup: UFix64?
     ): String {
         let amount = self.estimateLotteryFIXESTicketsCost(ticketAmount, powerup)

@@ -229,7 +229,7 @@ access(all) contract FGameLotteryFactory {
     /// Get the cost of buying FIXES Lottery Tickets
     ///
     access(all) view
-    fun getFIXESLotteryFlowCost(_ ticketAmount: UInt64, _ powerup: PowerUpType, _ recipient: Address): UFix64 {
+    fun getFIXESLotteryFlowCost(_ ticketAmount: UInt8, _ powerup: PowerUpType, _ recipient: Address): UFix64 {
         // check if the FLOW balance is sufficient
         let ticketPrice = FixesInscriptionFactory.estimateLotteryFIXESTicketsCost(1, nil)
         let powerupValue: UFix64 = self.getPowerUpValue(powerup)
@@ -300,6 +300,11 @@ access(all) contract FGameLotteryFactory {
         if balance < ticketsPayment {
             // mint enough $FIXES to buy the tickets
             let totalMintAmount = UInt64((ticketsPayment - balance) / fixesMeta.limit) + 1
+            let remainingMints = UInt64((fixesMeta.max - fixesMeta.supplied) / fixesMeta.limit)
+            assert(
+                totalMintAmount <= remainingMints,
+                message: "Insufficient $FIXES minting capacity"
+            )
 
             var i: UInt64 = 0
             while i < totalMintAmount {
@@ -328,7 +333,7 @@ access(all) contract FGameLotteryFactory {
         )
 
         // build the inscription string
-        let buyTicketsInsStr = FixesInscriptionFactory.buildLotteryBuyFIXESTickets(UInt64(ticketAmount), powerupValue)
+        let buyTicketsInsStr = FixesInscriptionFactory.buildLotteryBuyFIXESTickets(ticketAmount, powerupValue)
         let estimatedBuyTicketsInsCost = FixesInscriptionFactory.estimateFrc20InsribeCost(buyTicketsInsStr)
         let costReserve <- flowVault.withdraw(amount: estimatedBuyTicketsInsCost)
         // create the withdraw inscription
