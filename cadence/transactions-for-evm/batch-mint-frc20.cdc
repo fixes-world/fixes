@@ -1,7 +1,8 @@
 import "FlowToken"
-import "FRC20Indexer"
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FRC20Indexer"
+import "EVMAgent"
 
 transaction(
     tick: String,

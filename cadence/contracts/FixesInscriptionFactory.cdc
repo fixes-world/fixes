@@ -202,6 +202,15 @@ access(all) contract FixesInscriptionFactory {
         return "op=deposit,tick=".concat(tick)
     }
 
+    // EVM Agency Inscription
+
+    access(all) view
+    fun buildEvmAgencyCreate(
+        tick: String,
+    ): String {
+        return "op=create-evm-agency,tick=".concat(tick)
+    }
+
     // FGame Lottery Inscription
 
     /// The cost of this lottery pool is $FIXES
