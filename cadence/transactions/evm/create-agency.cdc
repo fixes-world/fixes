@@ -70,5 +70,9 @@ transaction(
         // Create agency account
         let agencyMgr <- agencyCenter.createAgency(ins: insRef, cap)
         acct.save(<- agencyMgr, to: EVMAgent.evmAgencyManagerStoragePath)
+
+        // Refund the balance in the inscription
+        let rufund <- insRef.extract()
+        vaultRef.deposit(from: <- rufund)
     }
 }
