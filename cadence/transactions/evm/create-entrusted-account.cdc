@@ -1,10 +1,7 @@
 #allowAccountLinking
 import "FlowToken"
-import "FungibleToken"
 import "HybridCustody"
 // Import the Fixes contract
-import "Fixes"
-import "FixesInscriptionFactory"
 import "EVMAgent"
 
 transaction(
