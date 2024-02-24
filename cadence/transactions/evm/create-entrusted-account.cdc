@@ -28,7 +28,13 @@ transaction(
         let cap = newAccount.linkAccount(HybridCustody.LinkedAccountPrivatePath)
             ?? panic("problem linking account Capability for new account")
         /** ------------- End --------------------------------------- */
-        let refundCreationFee <- agency.createEntrustedAccount(hexPublicKey: hexPublicKey, hexSignature: hexSignature, timestamp: timestamp, cap)
+
+        let refundCreationFee <- agency.createEntrustedAccount(
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp,
+            cap
+        )
 
         vaultRef.deposit(from: <- refundCreationFee)
     }
