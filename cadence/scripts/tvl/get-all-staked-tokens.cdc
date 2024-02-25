@@ -46,9 +46,9 @@ fun main(): UFix64 {
         } // end if
 
         var details = stakingPool!.getDetails()
-        let totalStaked = details.totalStaked
+        let validStaked = details.totalStaked - details.totalUnstakingLocked
 
-        totalTVL = totalTVL + (totalStaked * floorPrice)
+        totalTVL = totalTVL + (validStaked * floorPrice)
     }
     return totalTVL
 }
