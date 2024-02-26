@@ -9,6 +9,7 @@ This contract is used to fetch the child account by verifying the signature of t
 // Third-party Imports
 import "FungibleToken"
 import "FlowToken"
+import "StringUtils"
 // Fixes Imports
 import "ETHUtils"
 import "Fixes"
@@ -186,7 +187,8 @@ access(all) contract EVMAgent {
         ///
         access(all)
         fun verifyAndBorrowEntrustedAccount(
-            message: String,
+            methodFingerprint: String,
+            params: [String],
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
@@ -407,9 +409,31 @@ access(all) contract EVMAgent {
         }
 
         /// Verify the evm signature, if valid, borrow the reference of the entrusted account
+        /// - parameter methodFingerprint: The method fingerprint
+        /// - parameter params: The parameters for the method
         ///
         access(all)
         fun verifyAndBorrowEntrustedAccount(
+            methodFingerprint: String,
+            params: [String],
+            hexPublicKey: String,
+            hexSignature: String,
+            timestamp: UInt64
+        ): &AuthAccount {
+            let message = "op=".concat(methodFingerprint)
+                .concat(",params=").concat(StringUtils.join(params, "|"))
+            return self._verifyAndBorrowEntrustedAccount(
+                message: message,
+                hexPublicKey: hexPublicKey,
+                hexSignature: hexSignature,
+                timestamp: timestamp
+            )
+        }
+
+        /// Verify the evm signature, if valid, borrow the reference of the entrusted account
+        ///
+        access(self)
+        fun _verifyAndBorrowEntrustedAccount(
             message: String,
             hexPublicKey: String,
             hexSignature: String,
@@ -707,6 +731,15 @@ access(all) contract EVMAgent {
     access(all)
     fun borrowAgency(_ addr: Address): &Agency{AgencyPublic}? {
         return self.getAgencyPublicCap(addr).borrow()
+    }
+
+    /// Borrow the reference to agency public
+    ///
+    access(all)
+    fun borrowAgencyByEVMPublicKey(_ hexPubKey: String): &Agency{AgencyPublic}? {
+        let center = self.borrowAgencyCenter()
+        let evmAddr = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPubKey)
+        return center.borrowAgencyByEVMAddress(evmAddr)
     }
 
     /// Borrow the reference to agency center

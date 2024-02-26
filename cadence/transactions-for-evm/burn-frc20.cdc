@@ -1,18 +1,34 @@
 import "FlowToken"
 import "FungibleToken"
-
 import "Fixes"
-import "FRC20Indexer"
 import "FixesInscriptionFactory"
+import "FRC20Indexer"
+import "EVMAgent"
 
 transaction(
     tick: String,
     amt: UFix64,
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let ins: &Fixes.Inscription
     let recipient: &FlowToken.Vault{FungibleToken.Receiver}
 
-    prepare(acct: AuthAccount) {
+    prepare(signer: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "burn-frc20(String|UFix64)",
+            params: [tick, amt.toString()],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
+
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
         if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {

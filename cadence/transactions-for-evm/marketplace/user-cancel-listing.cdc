@@ -12,14 +12,31 @@ import "FRC20TradingRecord"
 import "FRC20Storefront"
 import "FRC20Marketplace"
 import "FRC20MarketManager"
+import "EVMAgent"
 
 transaction(
-    listingId: UInt64
+    listingId: UInt64,
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let storefront: &FRC20Storefront.Storefront
     let listing: &FRC20Storefront.Listing{FRC20Storefront.ListingPublic}
 
-    prepare(acct: AuthAccount) {
+    prepare(signer: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "user-cancel-listing(UInt64)",
+            params: [listingId.toString()],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
+
         /** ------------- Start -- FRC20 Storefront Initialization -------------  */
         // Create Storefront if it doesn't exist
         if acct.borrow<&AnyResource>(from: FRC20Storefront.StorefrontStoragePath) == nil {

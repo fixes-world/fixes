@@ -11,14 +11,31 @@ import "FRC20AccountsPool"
 import "FRC20SemiNFT"
 import "FRC20Staking"
 import "FRC20StakingManager"
+import "EVMAgent"
 
 transaction(
     tick: String,
     amount: UFix64,
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let ins: &Fixes.Inscription
 
-    prepare(acct: AuthAccount) {
+    prepare(signer: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "stake(String|UFix64)",
+            params: [tick, amount.toString()],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
+
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
         if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {

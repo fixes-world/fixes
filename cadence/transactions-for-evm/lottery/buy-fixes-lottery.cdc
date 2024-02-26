@@ -6,17 +6,34 @@ import "Fixes"
 import "FRC20Indexer"
 import "FGameLottery"
 import "FGameLotteryFactory"
+import "EVMAgent"
 
 transaction(
     ticketAmt: UInt8,
     powerupLv: UInt8,
-    forMinting: Bool
+    forMinting: Bool,
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let address: Address
     let store: &Fixes.InscriptionsStore
     let flowCost: @FlowToken.Vault
 
-    prepare(acct: AuthAccount) {
+    prepare(signer: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "buy-fixes-lottery(UInt8|UInt8|Bool)",
+            params: [ticketAmt.toString(), powerupLv.toString(), forMinting ? "true" : "false"],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
+
         self.address = acct.address
 
         /** ------------- Prepare the Inscription Store - Start ---------------- */

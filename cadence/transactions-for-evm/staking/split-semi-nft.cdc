@@ -10,14 +10,30 @@ import "FRC20AccountsPool"
 import "FRC20SemiNFT"
 import "FRC20Staking"
 import "FRC20StakingManager"
+import "EVMAgent"
 
 transaction(
     nftId: UInt64,
-    percent: UFix64
+    percent: UFix64,
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let semiNFTCol: &FRC20SemiNFT.Collection
 
-    prepare(acct: AuthAccount) {
+    prepare(signer: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "split-semi-nft(UInt64|UFix64)",
+            params: [nftId.toString(), percent.toString()],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
 
         /** ------------- Start -- FRC20 Semi NFT Collection Initialization ------------  */
         // ensure resource

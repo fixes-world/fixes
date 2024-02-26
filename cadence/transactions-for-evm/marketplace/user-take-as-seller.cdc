@@ -13,15 +13,36 @@ import "FRC20TradingRecord"
 import "FRC20Storefront"
 import "FRC20Marketplace"
 import "FRC20MarketManager"
+import "EVMAgent"
+import "StringUtils"
 
 transaction(
     tick: String,
     // RankedId => SellAmount
     batchSellItems: {String: UFix64},
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
 
-    prepare(acct: AuthAccount) {
+    prepare(signer: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+        var dicParams: [String] = []
+        for rankedId in batchSellItems.keys {
+            dicParams.append(rankedId.concat(":").concat(batchSellItems[rankedId]!.toString()))
+        }
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "user-take-as-seller(String|{String:UFix64})",
+            params: [tick, StringUtils.join(dicParams, "&")],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
+
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
         if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {

@@ -13,18 +13,35 @@ import "FRC20TradingRecord"
 import "FRC20Storefront"
 import "FRC20Marketplace"
 import "FRC20MarketManager"
+import "EVMAgent"
 
 transaction(
     tick: String,
     sellAmount: UFix64,
-    sellPrice: UFix64
+    sellPrice: UFix64,
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
     let storefront: &FRC20Storefront.Storefront
     let flowTokenReceiver: Capability<&FlowToken.Vault{FungibleToken.Receiver}>
     let ins: @Fixes.Inscription
 
-    prepare(acct: AuthAccount) {
+    prepare(signer: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "user-list-as-buy-now(String|UFix64|UFix64)",
+            params: [tick, sellAmount.toString(), sellPrice.toString()],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
+
         /** ------------- Start -- FRC20 Marketing Account General Initialization -------------  */
         // Ensure hooks are initialized
         if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
