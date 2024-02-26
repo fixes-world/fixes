@@ -155,7 +155,11 @@ access(all) contract EVMAgent {
 
         /// Get the agency account
         access(all) view
-        fun getStatus(): AgencyStatus
+        fun getDetails(): AgencyStatus
+
+        /// Get the balance of the flow for the agency
+        access(all) view
+        fun getFlowBalance(): UFix64
 
         /// Create a new entrusted account by the agency
         access(all)
@@ -288,8 +292,19 @@ access(all) contract EVMAgent {
 
         /// Get the agency account
         access(all) view
-        fun getStatus(): AgencyStatus {
+        fun getDetails(): AgencyStatus {
             return self.status
+        }
+
+        /// Get the balance of the flow for the agency
+        access(all) view
+        fun getFlowBalance(): UFix64 {
+            if let ref = getAccount(self.getOwnerAddress())
+                .getCapability(/public/flowTokenBalance)
+                .borrow<&FlowToken.Vault{FungibleToken.Balance}>() {
+                return ref.balance
+            }
+            return 0.0
         }
 
         /// The agency will fund the new created entrusted account with 0.01 $FLOW
@@ -512,12 +527,17 @@ access(all) contract EVMAgent {
     /// Agency center public interface
     ///
     access(all) resource interface AgencyCenterPublic {
+        /// Get the agencies
+        access(all) view
+        fun getAgencies(): [Address]
+
         /// Create a new agency
         access(all)
         fun createAgency(ins: &Fixes.Inscription, _ acctCap: Capability<&AuthAccount>): @AgencyManager
+
         /// Get the agency by evm address
-        access(all) view
-        fun getAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}?
+        access(all)
+        fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}?
         /// Get the agency by address
         access(all)
         fun pickValidAgency(): &Agency{AgencyPublic}?
@@ -533,7 +553,15 @@ access(all) contract EVMAgent {
             self.agencies = {}
         }
 
+        /// Get the agencies
+        ///
+        access(all) view
+        fun getAgencies(): [Address] {
+            return self.agencies.keys
+        }
+
         /// Create a new agency
+        ///
         access(all)
         fun createAgency(
             ins: &Fixes.Inscription,
@@ -588,8 +616,9 @@ access(all) contract EVMAgent {
         }
 
         /// Get the agency by evm address
-        access(all) view
-        fun getAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}? {
+        ///
+        access(all)
+        fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}? {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             if let addr = acctsPool.getEVMEntrustedAccountAddress(evmAddress) {
                 if let entrustStatus = EVMAgent.borrowEntrustStatus(addr) {
