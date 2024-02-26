@@ -102,6 +102,18 @@ access(all) contract EVMAgent {
         fun borrowAgency(): &Agency{AgencyPublic, AgencyPrivate} {
             return self.agency.borrow() ?? panic("Agency not found")
         }
+
+        /// Withdraw the flow from the agency
+        ///
+        access(all)
+        fun withdraw(amt: UFix64): @FlowToken.Vault {
+            let agency = self.borrowAgency()
+            assert(
+                agency.getFlowBalance() >= amt,
+                message: "Insufficient balance"
+            )
+            return <- agency.withdraw(amt: amt)
+        }
     }
 
     /// Agency status
