@@ -21,7 +21,8 @@ fun main(): UFix64 {
 
         let indexer = FRC20Indexer.getIndexer()
         // calculate floor price
-        var floorPrice = indexer.getBenchmarkValue(tick: tick)
+        let benchmarkPrice = indexer.getBenchmarkValue(tick: tick)
+        var floorPrice = benchmarkPrice
 
         if let marketAddr = acctsPool.getFRC20MarketAddress(tick: tick) {
             if let market = FRC20Marketplace.borrowMarket(marketAddr) {
@@ -46,9 +47,9 @@ fun main(): UFix64 {
         } // end if
 
         var details = stakingPool!.getDetails()
-        let totalStaked = details.totalStaked
+        let validStaked = details.totalStaked - details.totalUnstakingLocked
 
-        totalTVL = totalTVL + (totalStaked * floorPrice)
+        totalTVL = totalTVL + (validStaked * (floorPrice - benchmarkPrice))
     }
     return totalTVL
 }
