@@ -232,6 +232,7 @@ access(all) contract FGameLottery {
         access(all) let pool: Address
         access(all) let lotteryId: UInt64
         access(all) let numbers: TicketNumber
+        access(all) let boughtAt: UFix64
         // view functions
         access(all) view fun getStatus(): TicketStatus
         access(all) view fun getTicketId(): UInt64
@@ -255,6 +256,8 @@ access(all) contract FGameLottery {
         access(all) let lotteryId: UInt64
         /// Ticket numbers
         access(all) let numbers: TicketNumber
+        /// Ticket bought at
+        access(all) let boughtAt: UFix64
         /// Ticket powerup, default is 1, you can increase the powerup to increase the winning amount
         access(self) var powerup: UFix64
         /// Ticket status
@@ -275,6 +278,7 @@ access(all) contract FGameLottery {
 
             self.pool = pool
             self.lotteryId = lotteryId
+            self.boughtAt = getCurrentBlock().timestamp
             // Create a new random ticket number
             self.numbers = FGameLottery.createRandomTicketNumber()
             // Set the default powerup to 1
@@ -498,9 +502,12 @@ access(all) contract FGameLottery {
     access(all) resource TicketCollection: TicketCollectionPublic {
         access(self)
         let tickets: @{UInt64: TicketEntry}
+        access(self)
+        let dscSortedIDs: [UInt64]
 
         init() {
             self.tickets <- {}
+            self.dscSortedIDs = []
         }
 
         /// @deprecated after Cadence 1.0
@@ -514,14 +521,14 @@ access(all) contract FGameLottery {
         ///
         access(all) view
         fun getIDs(): [UInt64] {
-            return self.tickets.keys
+            return self.dscSortedIDs
         }
 
         /// Get the ticket amount
         ///
         access(all) view
         fun getTicketAmount(): Int {
-            return self.tickets.keys.length
+            return self.dscSortedIDs.length
         }
 
         /// Borrow a ticket from the collection
@@ -545,6 +552,8 @@ access(all) contract FGameLottery {
             let ticketId = ticket.getTicketId()
 
             self.tickets[ticketId] <-! ticket
+            // Add the ticket ID to the sorted array in descending order (newest first)
+            self.dscSortedIDs.insert(at: 0, ticketId)
 
             let ref = self.borrowTicketRef(ticketId: ticketId)
 
