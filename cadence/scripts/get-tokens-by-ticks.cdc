@@ -3,22 +3,25 @@ import "FRC20AccountsPool"
 
 access(all)
 fun main(
-    tick: String,
-): FRC20Info? {
+    ticks: [String],
+): [FRC20Info] {
     let indexer = FRC20Indexer.getIndexer()
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
-    var ret: FRC20Info? = nil
-    if let meta = indexer.getTokenMeta(tick: tick) {
-        let stakingAddr = acctsPool.getFRC20StakingAddress(tick: tick)
-        ret = FRC20Info(
-            meta: meta,
-            holders: indexer.getHoldersAmount(tick: tick),
-            pool: indexer.getPoolBalance(tick: tick),
-            stakable: stakingAddr != nil,
-            stakingAddr: stakingAddr,
-            marketEnabled: acctsPool.getFRC20MarketAddress(tick: tick) != nil,
-        )
+    let ret: [FRC20Info] = []
+    for tick in ticks {
+        if let meta = indexer.getTokenMeta(tick: tick) {
+            let isCompleted = meta.max == meta.supplied
+            let stakingAddr = acctsPool.getFRC20StakingAddress(tick: tick)
+            ret.append(FRC20Info(
+                meta: meta,
+                holders: indexer.getHoldersAmount(tick: tick),
+                pool: indexer.getPoolBalance(tick: tick),
+                stakable: stakingAddr != nil,
+                stakingAddr: stakingAddr,
+                marketEnabled: acctsPool.getFRC20MarketAddress(tick: tick) != nil,
+            ))
+        }
     }
     return ret
 }
@@ -37,7 +40,7 @@ access(all) struct FRC20Info {
         pool: UFix64,
         stakable: Bool,
         stakingAddr: Address?,
-        marketEnabled: Bool
+        marketEnabled: Bool,
     ) {
         self.holders = holders
         self.meta = meta
