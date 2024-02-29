@@ -25,7 +25,7 @@ access(all) contract FGameLotteryRegistry {
     /// Event emitted when a lottery pool is enabled
     access(all) event LotteryPoolEnabled(name: String, tick: String, ticketPrice: UFix64, epochInterval: UFix64, address: Address, by: Address)
     /// Event emitted when a lottery pool resources are updated
-    access(all) event LotteryPoolResourcesUpdated(me: String, address: Address, by: Address)
+    access(all) event LotteryPoolResourcesUpdated(name: String, address: Address, by: Address)
 
     /* --- Variable, Enums and Structs --- */
 
@@ -170,13 +170,16 @@ access(all) contract FGameLotteryRegistry {
             // register the lottery pool
             registry.onRegisterLotteryPool(name)
 
+            let newAddr = acctsPool.getGameWorldAddress(key)
+                ?? panic("The game world account was not created")
+
             // emit the event
             emit LotteryPoolEnabled(
                 name: name,
                 tick: rewardTick,
                 ticketPrice: ticketPrice,
                 epochInterval: epochInterval,
-                address: addr ?? panic("The game world account was not created"),
+                address: newAddr,
                 by: self.getControllerAddress()
             )
         }
@@ -274,7 +277,7 @@ access(all) contract FGameLotteryRegistry {
 
             if isUpdated {
                 emit LotteryPoolResourcesUpdated(
-                    me: name,
+                    name: name,
                     address: acctsPool.getGameWorldAddress(key) ?? panic("The game world account was not created"),
                     by: self.getControllerAddress()
                 )

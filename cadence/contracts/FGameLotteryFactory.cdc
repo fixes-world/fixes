@@ -61,12 +61,16 @@ access(all) contract FGameLotteryFactory {
         let epochInterval: UFix64 = UFix64(3 * 24 * 60 * 60) // 3 days
         let rewardTick: String = "" // empty string means $FLOW
         let fixesMintingStr = FixesInscriptionFactory.buildMintFRC20(tick: "fixes", amt: 1000.0)
-        let mintingCost = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
+        var estimateMintingCost = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
         assert(
-            mintingCost < 0.25,
+            estimateMintingCost < 0.25,
             message: "Minting cost is too high"
         )
-        var ticketPrice: UFix64 = 1.0 - 4.0 * mintingCost // ticket price = 1.0 - 4 x $FIXES minting price
+        // ensure the minting cost is at least 0.2
+        if estimateMintingCost < 0.2 {
+            estimateMintingCost = 0.21630 // the minting price on mainnet
+        }
+        var ticketPrice: UFix64 = 1.0 - 4.0 * estimateMintingCost // ticket price = 1.0 - 4 x $FIXES minting price
 
         self._initializeLotteryPool(
             controller,
