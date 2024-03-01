@@ -16,6 +16,7 @@ fun main(): [LotteryPoolInfo] {
     for poolName in poolNames {
         if let poolAddr = registry.getLotteryPoolAddress(poolName) {
             if let poolRef = FGameLottery.borrowLotteryPool(poolAddr) {
+                let currentEpochIndex = poolRef.getCurrentEpochIndex()
                 let currentLotteryRef = poolRef.borrowCurrentLottery()
                 ret.append(LotteryPoolInfo(
                     name: poolRef.getName(),
@@ -23,8 +24,11 @@ fun main(): [LotteryPoolInfo] {
                     ticketPrice: poolRef.getTicketPrice(),
                     epochInterval: poolRef.getEpochInterval(),
                     jackpotPoolBalance: poolRef.getJackpotPoolBalance(),
-                    currentEpochIndex: poolRef.getCurrentEpochIndex(),
-                    currentLottery: currentLotteryRef?.getInfo()
+                    currentEpochIndex: currentEpochIndex,
+                    currentLottery: currentLotteryRef?.getInfo(),
+                    lastLotteryResult: currentEpochIndex > 0
+                        ? (poolRef.borrowLottery(currentEpochIndex - 1)?.getResult() ?? nil)
+                        : nil
                 ))
             }
         }
@@ -41,6 +45,7 @@ access(all) struct LotteryPoolInfo {
     // Lottery Data
     access(all) let currentEpochIndex: UInt64
     access(all) let currentLottery: FGameLottery.LotteryBasicInfo?
+    access(all) let lastLotteryResult: FGameLottery.LotteryResult?
 
     init(
         name: String,
@@ -50,6 +55,7 @@ access(all) struct LotteryPoolInfo {
         jackpotPoolBalance: UFix64,
         currentEpochIndex: UInt64,
         currentLottery: FGameLottery.LotteryBasicInfo?,
+        lastLotteryResult: FGameLottery.LotteryResult?
     ) {
         self.name = name
         self.address = address
@@ -58,5 +64,6 @@ access(all) struct LotteryPoolInfo {
         self.jackpotPoolBalance = jackpotPoolBalance
         self.currentEpochIndex = currentEpochIndex
         self.currentLottery = currentLottery
+        self.lastLotteryResult = lastLotteryResult
     }
 }
