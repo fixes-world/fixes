@@ -38,6 +38,7 @@ access(all) struct LotteryPoolInfo {
     access(all) let ticketPrice: UFix64
     access(all) let epochInterval: UFix64
     access(all) let jackpotPoolBalance: UFix64
+    // Lottery Data
     access(all) let currentEpochIndex: UInt64
     access(all) let currentLottery: FGameLottery.LotteryBasicInfo?
 

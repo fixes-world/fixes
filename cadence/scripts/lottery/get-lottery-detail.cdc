@@ -21,7 +21,9 @@ fun main(
                 name: poolRef.getName(),
                 address: poolRef.getAddress(),
                 ticketPrice: poolRef.getTicketPrice(),
-                historyJackpotPoolBalance: poolRef.getJackpotPoolBalance(),
+                epochInterval: poolRef.getEpochInterval(),
+                jackpotPoolBalance: poolRef.getJackpotPoolBalance(),
+                // Lottery Data
                 info: lotteryRef.getInfo(),
                 result: lotteryRef.getResult()
             )
@@ -34,7 +36,10 @@ access(all) struct LotteryDetail {
     access(all) let name: String
     access(all) let address: Address
     access(all) let ticketPrice: UFix64
-    access(all) let historyJackpotPoolBalance: UFix64
+    access(all) let epochInterval: UFix64
+    access(all) let jackpotPoolBalance: UFix64
+    // Lottery Data
+    access(all) let epochIndex: UInt64
     access(all) let info: FGameLottery.LotteryBasicInfo
     access(all) let result: FGameLottery.LotteryResult?
 
@@ -42,14 +47,17 @@ access(all) struct LotteryDetail {
         name: String,
         address: Address,
         ticketPrice: UFix64,
-        historyJackpotPoolBalance: UFix64,
+        epochInterval: UFix64,
+        jackpotPoolBalance: UFix64,
         info: FGameLottery.LotteryBasicInfo,
         result: FGameLottery.LotteryResult?
     ) {
         self.name = name
         self.address = address
         self.ticketPrice = ticketPrice
-        self.historyJackpotPoolBalance = historyJackpotPoolBalance
+        self.epochInterval = epochInterval
+        self.jackpotPoolBalance = jackpotPoolBalance
+        self.epochIndex = info.epochIndex
         self.info = info
         self.result = result
     }
