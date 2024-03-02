@@ -491,7 +491,7 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                     squareImage: squareMedia,
                     bannerImage: bannerMedia,
                     socials: {
-                        "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesOnFlow")
+                        "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesWorld")
                     }
                 )
         }

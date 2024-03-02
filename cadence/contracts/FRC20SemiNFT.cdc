@@ -916,7 +916,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                     squareImage: squareMedia,
                     bannerImage: bannerMedia,
                     socials: {
-                        "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesOnFlow")
+                        "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesWorld")
                     }
                 )
         }
