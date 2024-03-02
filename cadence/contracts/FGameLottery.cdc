@@ -918,6 +918,10 @@ access(all) contract FGameLottery {
                 totalBought: totalBought,
                 jackpotAmount: jackpotAmount,
             )
+            // set the verifying progress to 1.0 if there is no participant
+            if participantAmount == 0 {
+                self.drawnResult!.setVerifyingProgress(1.0)
+            }
             self.checkingQueue = self.participants.keys
 
             // emit event
@@ -1238,11 +1242,13 @@ access(all) contract FGameLottery {
         access(all) view
         fun getEpochInterval(): UFix64
         access(all) view
+        fun getLotteryToken(): String
+        access(all) view
         fun getTicketPrice(): UFix64
         access(all) view
-        fun isEpochAutoStart(): Bool
-        access(all) view
         fun getJackpotPoolBalance(): UFix64
+        access(all) view
+        fun isEpochAutoStart(): Bool
         access(all) view
         fun getWinnerPrizeByRank(_ rank: PrizeRank): UFix64
 
@@ -1392,6 +1398,11 @@ access(all) contract FGameLottery {
         }
 
         access(all) view
+        fun getLotteryToken(): String {
+            return self.jackpotPool.getOriginalTick()
+        }
+
+        access(all) view
         fun getJackpotPoolBalance(): UFix64 {
             return self.jackpotPool.getBalance()
         }
@@ -1536,6 +1547,8 @@ access(all) contract FGameLottery {
         access(account)
         fun onHeartbeat(_ deltaTime: UFix64) {
             // Step 0. Handle the current lottery
+
+            // Active or ready to draw is one step
             if self.isCurrentLotteryActive() {
                 // DO NOTHING if the current lottery is active
             } else if self.isCurrentLotteryReadyToDraw() {
@@ -1545,7 +1558,10 @@ access(all) contract FGameLottery {
                 lotteryRef.drawLottery()
                 // append the current epoch index to the finished epoches
                 self.finishedEpoches.append(self.currentEpochIndex)
-            } else if self.isCurrentLotteryFinished() {
+            }
+            // Check if the current lottery is finished, and start a new epoch if the auto start is enabled
+            // This is the second step, because the current lottery may be finished after the draw
+            if self.isCurrentLotteryFinished() {
                 // if the current lottery is finished
                 // Start a new epoch if the auto start is enabled
                 if self.isEpochAutoStart() {

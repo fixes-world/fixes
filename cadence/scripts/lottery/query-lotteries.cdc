@@ -19,11 +19,15 @@ fun main(): [LotteryPoolInfo] {
                 let currentEpochIndex = poolRef.getCurrentEpochIndex()
                 let currentLotteryRef = poolRef.borrowCurrentLottery()
                 ret.append(LotteryPoolInfo(
+                    // Pool Info
                     name: poolRef.getName(),
                     address: poolRef.getAddress(),
+                    lotteryToken: poolRef.getLotteryToken(),
                     ticketPrice: poolRef.getTicketPrice(),
                     epochInterval: poolRef.getEpochInterval(),
                     jackpotPoolBalance: poolRef.getJackpotPoolBalance(),
+                    // Ticket Price Token Info
+                    // Lottery Data
                     currentEpochIndex: currentEpochIndex,
                     currentLottery: currentLotteryRef?.getInfo(),
                     lastLotteryResult: currentEpochIndex > 0
@@ -37,8 +41,10 @@ fun main(): [LotteryPoolInfo] {
 }
 
 access(all) struct LotteryPoolInfo {
+    // Pool Info
     access(all) let name: String
     access(all) let address: Address
+    access(all) let lotteryToken: String
     access(all) let ticketPrice: UFix64
     access(all) let epochInterval: UFix64
     access(all) let jackpotPoolBalance: UFix64
@@ -50,6 +56,7 @@ access(all) struct LotteryPoolInfo {
     init(
         name: String,
         address: Address,
+        lotteryToken: String,
         ticketPrice: UFix64,
         epochInterval: UFix64,
         jackpotPoolBalance: UFix64,
@@ -59,6 +66,7 @@ access(all) struct LotteryPoolInfo {
     ) {
         self.name = name
         self.address = address
+        self.lotteryToken = lotteryToken
         self.ticketPrice = ticketPrice
         self.epochInterval = epochInterval
         self.jackpotPoolBalance = jackpotPoolBalance

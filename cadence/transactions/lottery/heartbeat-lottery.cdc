@@ -19,5 +19,6 @@ transaction() {
 
     execute {
         self.heartbeat.tick(scope: "FGameLottery")
+        log("Heartbeat ticked")
     }
 }
