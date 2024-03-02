@@ -21,7 +21,7 @@ fun main(
     )
     let defaultUrl = MetadataViews.ExternalURL("https://fixes.world/")
     let defaultSocial = {
-        "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesOnFlow")
+        "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesWorld")
     }
 
     let ignoreCollections = [
