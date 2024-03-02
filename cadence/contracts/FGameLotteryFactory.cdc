@@ -59,6 +59,7 @@ access(all) contract FGameLotteryFactory {
     ) {
         // initialize with 3 days
         let epochInterval: UFix64 = UFix64(3 * 24 * 60 * 60) // 3 days
+        // let epochInterval: UFix64 = UFix64(2 * 60) // 2 min
         let rewardTick: String = "" // empty string means $FLOW
         let fixesMintingStr = FixesInscriptionFactory.buildMintFRC20(tick: "fixes", amt: 1000.0)
         var estimateMintingCost = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
