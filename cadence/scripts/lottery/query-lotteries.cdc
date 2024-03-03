@@ -6,6 +6,7 @@ import "Fixes"
 import "FRC20Indexer"
 import "FGameLottery"
 import "FGameLotteryRegistry"
+import "FGameLotteryFactory"
 
 access(all)
 fun main(): [LotteryPoolInfo] {
@@ -18,15 +19,22 @@ fun main(): [LotteryPoolInfo] {
             if let poolRef = FGameLottery.borrowLotteryPool(poolAddr) {
                 let currentEpochIndex = poolRef.getCurrentEpochIndex()
                 let currentLotteryRef = poolRef.borrowCurrentLottery()
+                let name = poolRef.getName()
+                let extra: {String: AnyStruct} = {}
+                if name == FGameLotteryFactory.getFIXESMintingLotteryPoolName()
+                || name == FGameLotteryFactory.getFIXESLotteryPoolName() {
+                    extra["isMintable"] = FGameLotteryFactory.isFIXESMintingAvailable()
+                }
                 ret.append(LotteryPoolInfo(
                     // Pool Info
-                    name: poolRef.getName(),
+                    name: name,
                     address: poolRef.getAddress(),
                     lotteryToken: poolRef.getLotteryToken(),
                     ticketPrice: poolRef.getTicketPrice(),
                     epochInterval: poolRef.getEpochInterval(),
                     jackpotPoolBalance: poolRef.getJackpotPoolBalance(),
-                    // Ticket Price Token Info
+                    // Extra Info
+                    extra: extra,
                     // Lottery Data
                     currentEpochIndex: currentEpochIndex,
                     currentLottery: currentLotteryRef?.getInfo(),
@@ -48,6 +56,7 @@ access(all) struct LotteryPoolInfo {
     access(all) let ticketPrice: UFix64
     access(all) let epochInterval: UFix64
     access(all) let jackpotPoolBalance: UFix64
+    access(all) let extra: {String: AnyStruct}
     // Lottery Data
     access(all) let currentEpochIndex: UInt64
     access(all) let currentLottery: FGameLottery.LotteryBasicInfo?
@@ -60,6 +69,7 @@ access(all) struct LotteryPoolInfo {
         ticketPrice: UFix64,
         epochInterval: UFix64,
         jackpotPoolBalance: UFix64,
+        extra: {String: AnyStruct},
         currentEpochIndex: UInt64,
         currentLottery: FGameLottery.LotteryBasicInfo?,
         lastLotteryResult: FGameLottery.LotteryResult?
@@ -70,6 +80,7 @@ access(all) struct LotteryPoolInfo {
         self.ticketPrice = ticketPrice
         self.epochInterval = epochInterval
         self.jackpotPoolBalance = jackpotPoolBalance
+        self.extra = extra
         self.currentEpochIndex = currentEpochIndex
         self.currentLottery = currentLottery
         self.lastLotteryResult = lastLotteryResult
