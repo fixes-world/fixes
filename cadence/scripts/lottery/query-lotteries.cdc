@@ -17,14 +17,17 @@ fun main(): [LotteryPoolInfo] {
     for poolName in poolNames {
         if let poolAddr = registry.getLotteryPoolAddress(poolName) {
             if let poolRef = FGameLottery.borrowLotteryPool(poolAddr) {
-                let currentEpochIndex = poolRef.getCurrentEpochIndex()
-                let currentLotteryRef = poolRef.borrowCurrentLottery()
                 let name = poolRef.getName()
                 let extra: {String: AnyStruct} = {}
                 if name == FGameLotteryFactory.getFIXESMintingLotteryPoolName()
                 || name == FGameLotteryFactory.getFIXESLotteryPoolName() {
                     extra["isMintable"] = FGameLotteryFactory.isFIXESMintingAvailable()
                 }
+                let currentEpochIndex = poolRef.getCurrentEpochIndex()
+                let currentLotteryRef = poolRef.borrowCurrentLottery()
+                let lastLotteryRef = currentEpochIndex > 0
+                    ? poolRef.borrowLottery(currentEpochIndex - 1)
+                    : nil
                 ret.append(LotteryPoolInfo(
                     // Pool Info
                     name: name,
@@ -38,9 +41,8 @@ fun main(): [LotteryPoolInfo] {
                     // Lottery Data
                     currentEpochIndex: currentEpochIndex,
                     currentLottery: currentLotteryRef?.getInfo(),
-                    lastLotteryResult: currentEpochIndex > 0
-                        ? (poolRef.borrowLottery(currentEpochIndex - 1)?.getResult() ?? nil)
-                        : nil
+                    lastLottery: lastLotteryRef?.getInfo(),
+                    lastLotteryResult: lastLotteryRef?.getResult() ?? nil
                 ))
             }
         }
@@ -60,6 +62,7 @@ access(all) struct LotteryPoolInfo {
     // Lottery Data
     access(all) let currentEpochIndex: UInt64
     access(all) let currentLottery: FGameLottery.LotteryBasicInfo?
+    access(all) let lastLottery: FGameLottery.LotteryBasicInfo?
     access(all) let lastLotteryResult: FGameLottery.LotteryResult?
 
     init(
@@ -72,6 +75,7 @@ access(all) struct LotteryPoolInfo {
         extra: {String: AnyStruct},
         currentEpochIndex: UInt64,
         currentLottery: FGameLottery.LotteryBasicInfo?,
+        lastLottery: FGameLottery.LotteryBasicInfo?,
         lastLotteryResult: FGameLottery.LotteryResult?
     ) {
         self.name = name
@@ -83,6 +87,7 @@ access(all) struct LotteryPoolInfo {
         self.extra = extra
         self.currentEpochIndex = currentEpochIndex
         self.currentLottery = currentLottery
+        self.lastLottery = lastLottery
         self.lastLotteryResult = lastLotteryResult
     }
 }
