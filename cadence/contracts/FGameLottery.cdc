@@ -615,6 +615,7 @@ access(all) contract FGameLottery {
         access(all) let totalBought: UFix64
         access(all) let winners: [Address]
         access(all) var verifyingProgress: UFix64
+        access(all) var disbursingProgress: UFix64
         access(all) var nonJackpotTotal: UFix64
         access(all) var nonJackpotDowngradeRatio: UFix64
         access(all) var jackpotAmount: UFix64
@@ -631,6 +632,7 @@ access(all) contract FGameLottery {
             self.jackpotAmount = jackpotAmount
             self.jackpotWinners = nil
             self.verifyingProgress = 0.0
+            self.disbursingProgress = 0.0
             self.nonJackpotTotal = 0.0
             self.nonJackpotDowngradeRatio = 1.0
         }
@@ -669,6 +671,13 @@ access(all) contract FGameLottery {
             }
         }
 
+        access(contract)
+        fun setDisbursingProgress(_ progress: UFix64) {
+            if progress >= 0.0 && progress <= 1.0 {
+                self.disbursingProgress = progress
+            }
+        }
+
         /// Set the non-jackpot downgraded ratio
         ///
         access(contract)
@@ -691,20 +700,23 @@ access(all) contract FGameLottery {
     access(all) struct LotteryBasicInfo {
         access(all) let epochIndex: UInt64
         access(all) let epochStartAt: UFix64
-        access(all) let status: LotteryStatus
         access(all) let currentPool: UFix64
         access(all) let participantsAmount: UInt64
+        access(all) let status: LotteryStatus
+        access(all) let disbursing: Bool
 
         init(
             epochIndex: UInt64,
             epochStartAt: UFix64,
             status: LotteryStatus,
+            disbursing: Bool,
             currentPool: UFix64,
             participantsAmt: UInt64
         ) {
             self.epochIndex = epochIndex
             self.epochStartAt = epochStartAt
             self.status = status
+            self.disbursing = disbursing
             self.currentPool = currentPool
             self.participantsAmount = participantsAmt
         }
@@ -795,6 +807,7 @@ access(all) contract FGameLottery {
                 epochIndex: self.epochIndex,
                 epochStartAt: self.epochStartAt,
                 status: self.getStatus(),
+                disbursing: self.isDisbursing(),
                 currentPool: self.getCurrentLotteryBalance(),
                 participantsAmt: self.getParticipantAmount()
             )
@@ -921,6 +934,7 @@ access(all) contract FGameLottery {
             // set the verifying progress to 1.0 if there is no participant
             if participantAmount == 0 {
                 self.drawnResult!.setVerifyingProgress(1.0)
+                self.drawnResult!.setDisbursingProgress(1.0)
             }
             self.checkingQueue = self.participants.keys
 
@@ -1123,6 +1137,14 @@ access(all) contract FGameLottery {
                     self._disbursePrize(ticket: ticketRef)
                 }
                 i = i + 1
+            }
+
+            // update the disbursing progress
+            let totalWinners = self.drawnResult?.winners?.length ?? 0
+            let remainingWinners = self.disbursingQueque.length
+            if totalWinners > 0 {
+                let progress = UFix64(totalWinners - remainingWinners) / UFix64(totalWinners)
+                self.drawnResult?.setDisbursingProgress(progress)
             }
 
             // emit event
