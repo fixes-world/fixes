@@ -618,7 +618,7 @@ access(all) contract FGameLottery {
         access(all) let winners: {Address: UInt64}
         access(all) var nonJackpotTotal: UFix64
         access(all) var nonJackpotDowngradeRatio: UFix64
-        access(all) let nonJackpotWinners: {PrizeRank: UInt64}
+        access(all) let nonJackpotWinners: {UInt8: UInt64}
         access(all) var jackpotAmount: UFix64
         access(all) var jackpotWinners: [Address]?
 
@@ -650,7 +650,7 @@ access(all) contract FGameLottery {
         ///
         access(contract)
         fun incrementNonJackpotTotal(_ rank: PrizeRank, _ amount: UFix64) {
-            self.nonJackpotWinners[rank] = (self.nonJackpotWinners[rank] ?? 0) + 1
+            self.nonJackpotWinners[rank.rawValue] = (self.nonJackpotWinners[rank.rawValue] ?? 0) + 1
             self.nonJackpotTotal = self.nonJackpotTotal + amount
         }
 
