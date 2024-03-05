@@ -204,23 +204,25 @@ access(all) contract FGameLotteryFactory {
         let ticketsPayment = ticketPrice * UFix64(ticketAmount) * powerupValue
         // check if the FLOW balance is sufficient
         assert(
-            ticketsPayment > flowVault.balance,
+            flowVault.balance >= ticketsPayment,
             message: "Insufficient FLOW balance"
         )
 
         // for minting available
         if self.isFIXESMintingAvailable() {
             let totalCost: UFix64 = 1.0 * UFix64(ticketAmount) * powerupValue
+            log("Total cost: ".concat(totalCost.toString()))
             assert(
-                totalCost > flowVault.balance,
+                flowVault.balance >= totalCost,
                 message: "Insufficient FLOW balance"
             )
 
             // check if the total mint amount is valid
             let totalMintAmount = ticketAmount * UInt8(powerupValue) * 4
+            log("Total Mints: ".concat(totalMintAmount.toString()))
             assert(
-                totalMintAmount > 0 && totalMintAmount <= 100,
-                message: "Total mint amount must be between 1 and 100"
+                totalMintAmount > 0 && totalMintAmount <= 120,
+                message: "Total mint amount must be between 1 and 120"
             )
 
             // Mint $FIXES information

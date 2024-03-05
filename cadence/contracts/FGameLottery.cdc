@@ -613,11 +613,12 @@ access(all) contract FGameLottery {
     access(all) struct LotteryResult {
         access(all) let numbers: TicketNumber
         access(all) let totalBought: UFix64
-        access(all) let winners: [Address]
         access(all) var verifyingProgress: UFix64
         access(all) var disbursingProgress: UFix64
+        access(all) let winners: {Address: UInt64}
         access(all) var nonJackpotTotal: UFix64
         access(all) var nonJackpotDowngradeRatio: UFix64
+        access(all) let nonJackpotWinners: {PrizeRank: UInt64}
         access(all) var jackpotAmount: UFix64
         access(all) var jackpotWinners: [Address]?
 
@@ -628,20 +629,38 @@ access(all) contract FGameLottery {
         ) {
             self.numbers = numbers
             self.totalBought = totalBought
-            self.winners = []
+            self.winners = {}
             self.jackpotAmount = jackpotAmount
             self.jackpotWinners = nil
             self.verifyingProgress = 0.0
             self.disbursingProgress = 0.0
             self.nonJackpotTotal = 0.0
             self.nonJackpotDowngradeRatio = 1.0
+            self.nonJackpotWinners = {}
         }
 
         /// Add a winner
         ///
         access(contract)
         fun addWinner(_ address: Address) {
-            self.winners.append(address)
+            self.winners[address] = (self.winners[address] ?? 0) + 1
+        }
+
+        /// Increment the non-jackpot total
+        ///
+        access(contract)
+        fun incrementNonJackpotTotal(_ rank: PrizeRank, _ amount: UFix64) {
+            self.nonJackpotWinners[rank] = (self.nonJackpotWinners[rank] ?? 0) + 1
+            self.nonJackpotTotal = self.nonJackpotTotal + amount
+        }
+
+        /// Set the non-jackpot downgraded ratio
+        ///
+        access(contract)
+        fun setNonJackpotDowngradeRatio(_ ratio: UFix64) {
+            if ratio >= 0.0 && ratio <= 1.0 {
+                self.nonJackpotDowngradeRatio = ratio
+            }
         }
 
         /// Set the jackpot info
@@ -676,22 +695,6 @@ access(all) contract FGameLottery {
             if progress >= 0.0 && progress <= 1.0 {
                 self.disbursingProgress = progress
             }
-        }
-
-        /// Set the non-jackpot downgraded ratio
-        ///
-        access(contract)
-        fun setNonJackpotDowngradeRatio(_ ratio: UFix64) {
-            if ratio >= 0.0 && ratio <= 1.0 {
-                self.nonJackpotDowngradeRatio = ratio
-            }
-        }
-
-        /// Increment the non-jackpot total
-        ///
-        access(contract)
-        fun incrementNonJackpotTotal(_ amount: UFix64) {
-            self.nonJackpotTotal = self.nonJackpotTotal + amount
         }
     }
 
@@ -1009,7 +1012,7 @@ access(all) contract FGameLottery {
                                     let powerup = ticketRef.getPowerup()
                                     let prize = basePrize * powerup
                                     nonJackpotAmount = nonJackpotAmount + prize
-                                    self.drawnResult?.incrementNonJackpotTotal(prize)
+                                    self.drawnResult?.incrementNonJackpotTotal(prizeRank, prize)
                                 }
                             } // end if prizeRank
                         } // end if ticketRef
@@ -1140,7 +1143,7 @@ access(all) contract FGameLottery {
             }
 
             // update the disbursing progress
-            let totalWinners = self.drawnResult?.winners?.length ?? 0
+            let totalWinners = self.drawnResult?.winners?.keys?.length ?? 0
             let remainingWinners = self.disbursingQueque.length
             if totalWinners > 0 {
                 let progress = UFix64(totalWinners - remainingWinners) / UFix64(totalWinners)
