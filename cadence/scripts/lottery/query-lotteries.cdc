@@ -22,6 +22,7 @@ fun main(): [LotteryPoolInfo] {
                 if name == FGameLotteryFactory.getFIXESMintingLotteryPoolName()
                 || name == FGameLotteryFactory.getFIXESLotteryPoolName() {
                     extra["isMintable"] = FGameLotteryFactory.isFIXESMintingAvailable()
+                    extra["mintingToken"] = "fixes"
                 }
                 let currentEpochIndex = poolRef.getCurrentEpochIndex()
                 let currentLotteryRef = poolRef.borrowCurrentLottery()
