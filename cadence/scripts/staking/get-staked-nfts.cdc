@@ -16,7 +16,16 @@ fun main(
     page: Int,
     size: Int,
 ): [StakedNFTInfo] {
-    if let collection = getAccount(addr)
+    let acct = getAuthAccount(addr)
+    // ensure collection exists
+    if acct.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
+        return []
+    }
+    // ensure path correct
+    acct.unlink(FRC20SemiNFT.CollectionPublicPath)
+    acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath, target: FRC20SemiNFT.CollectionStoragePath)
+    // get the collection reference
+    if let collection = acct
         .getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath)
         .borrow() {
 
