@@ -28,25 +28,26 @@ fun main(
         let sliced = ids.slice(from: startAt, upTo: upTo)
         let ret: [TicketEntry] = []
         let poolNameCache: {Address: String} = {}
+        let prizeTokenCache: {Address: String} = {}
         for id in sliced {
             if let ticket = colRef.borrowTicket(ticketId: id) {
                 let poolAddr = ticket.pool
-                let poolName = poolNameCache[poolAddr] ?? FGameLottery.borrowLotteryPool(poolAddr)?.getName()
-                if poolName == nil {
-                    continue
-                } else if poolNameCache[poolAddr] == nil {
-                    poolNameCache[poolAddr] = poolName
+                if poolNameCache[poolAddr] == nil {
+                    let poolRef = FGameLottery.borrowLotteryPool(poolAddr)!
+                    poolNameCache[poolAddr] = poolRef.getName()
+                    prizeTokenCache[poolAddr] = poolRef.getLotteryToken()
                 }
                 ret.append(TicketEntry(
                     ticketOwner: ticket.getTicketOwner(),
                     ticketId: ticket.getTicketId(),
-                    poolName: poolName!,
+                    poolName: poolNameCache[poolAddr] ?? panic("Invalid pool address"),
                     poolAddr: poolAddr,
                     lotteryId: ticket.lotteryId,
                     numbers: ticket.numbers,
                     boughtAt: ticket.boughtAt,
                     status: ticket.getStatus(),
                     powerup: ticket.getPowerup(),
+                    prizeToken: prizeTokenCache[poolAddr] ?? panic("Invalid pool address"),
                     prizeRank: ticket.getWinPrizeRank(),
                     prizeAmount: ticket.getEstimatedPrizeAmount(),
                 ))
@@ -67,6 +68,7 @@ access(all) struct TicketEntry {
     access(all) let boughtAt: UFix64
     access(all) let status: FGameLottery.TicketStatus
     access(all) let powerup: UFix64
+    access(all) let prizeToken: String
     access(all) let prizeRank: FGameLottery.PrizeRank?
     access(all) let prizeAmount: UFix64?
 
@@ -80,6 +82,7 @@ access(all) struct TicketEntry {
         boughtAt: UFix64,
         status: FGameLottery.TicketStatus,
         powerup: UFix64,
+        prizeToken: String,
         prizeRank: FGameLottery.PrizeRank?,
         prizeAmount: UFix64?
     ) {
@@ -92,6 +95,7 @@ access(all) struct TicketEntry {
         self.boughtAt = boughtAt
         self.status = status
         self.powerup = powerup
+        self.prizeToken = prizeToken
         self.prizeRank = prizeRank
         self.prizeAmount = prizeAmount
     }
