@@ -27,12 +27,21 @@ fun main(
         }
         let sliced = ids.slice(from: startAt, upTo: upTo)
         let ret: [TicketEntry] = []
+        let poolNameCache: {Address: String} = {}
         for id in sliced {
             if let ticket = colRef.borrowTicket(ticketId: id) {
+                let poolAddr = ticket.pool
+                let poolName = poolNameCache[poolAddr] ?? FGameLottery.borrowLotteryPool(poolAddr)?.getName()
+                if poolName == nil {
+                    continue
+                } else if poolNameCache[poolAddr] == nil {
+                    poolNameCache[poolAddr] = poolName
+                }
                 ret.append(TicketEntry(
                     ticketOwner: ticket.getTicketOwner(),
                     ticketId: ticket.getTicketId(),
-                    pool: ticket.pool,
+                    poolName: poolName!,
+                    poolAddr: poolAddr,
                     lotteryId: ticket.lotteryId,
                     numbers: ticket.numbers,
                     boughtAt: ticket.boughtAt,
@@ -51,7 +60,8 @@ fun main(
 access(all) struct TicketEntry {
     access(all) let ticketOwner: Address
     access(all) let ticketId: UInt64
-    access(all) let pool: Address
+    access(all) let poolName: String
+    access(all) let poolAddr: Address
     access(all) let lotteryId: UInt64
     access(all) let numbers: FGameLottery.TicketNumber
     access(all) let boughtAt: UFix64
@@ -63,7 +73,8 @@ access(all) struct TicketEntry {
     init(
         ticketOwner: Address,
         ticketId: UInt64,
-        pool: Address,
+        poolName: String,
+        poolAddr: Address,
         lotteryId: UInt64,
         numbers: FGameLottery.TicketNumber,
         boughtAt: UFix64,
@@ -74,7 +85,8 @@ access(all) struct TicketEntry {
     ) {
         self.ticketOwner = ticketOwner
         self.ticketId = ticketId
-        self.pool = pool
+        self.poolName = poolName
+        self.poolAddr = poolAddr
         self.lotteryId = lotteryId
         self.numbers = numbers
         self.boughtAt = boughtAt
