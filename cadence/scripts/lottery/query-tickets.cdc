@@ -37,6 +37,7 @@ fun main(
                     poolNameCache[poolAddr] = poolRef.getName()
                     prizeTokenCache[poolAddr] = poolRef.getLotteryToken()
                 }
+                let lotteryRef = ticket.borrowLottery()
                 ret.append(TicketEntry(
                     ticketOwner: ticket.getTicketOwner(),
                     ticketId: ticket.getTicketId(),
@@ -48,6 +49,7 @@ fun main(
                     status: ticket.getStatus(),
                     powerup: ticket.getPowerup(),
                     prizeToken: prizeTokenCache[poolAddr] ?? panic("Invalid pool address"),
+                    drawnResult: lotteryRef.getResult()?.numbers,
                     prizeRank: ticket.getWinPrizeRank(),
                     prizeAmount: ticket.getEstimatedPrizeAmount(),
                 ))
@@ -69,6 +71,7 @@ access(all) struct TicketEntry {
     access(all) let status: FGameLottery.TicketStatus
     access(all) let powerup: UFix64
     access(all) let prizeToken: String
+    access(all) let drawnResult: FGameLottery.TicketNumber?
     access(all) let prizeRank: FGameLottery.PrizeRank?
     access(all) let prizeAmount: UFix64?
 
@@ -83,6 +86,7 @@ access(all) struct TicketEntry {
         status: FGameLottery.TicketStatus,
         powerup: UFix64,
         prizeToken: String,
+        drawnResult: FGameLottery.TicketNumber?,
         prizeRank: FGameLottery.PrizeRank?,
         prizeAmount: UFix64?
     ) {
@@ -96,6 +100,7 @@ access(all) struct TicketEntry {
         self.status = status
         self.powerup = powerup
         self.prizeToken = prizeToken
+        self.drawnResult = drawnResult
         self.prizeRank = prizeRank
         self.prizeAmount = prizeAmount
     }
