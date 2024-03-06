@@ -307,17 +307,8 @@ access(all) contract FRC20Staking {
             let stakedAmount = change.getBalance()
             let delegator = change.from
 
-            // check if delegator's record exists
-            if self.delegators[delegator] == nil {
-                self._addDelegator(<- create DelegatorRecord(
-                    id: self.delegatorIDCounter,
-                    tick: self.tick,
-                    address: delegator
-                ))
-            }
             // ensure delegator record exists
-            let delegatorRecordRef = self.borrowDelegatorRecord(delegator)
-                ?? panic("Delegator record must exist")
+            let delegatorRecordRef = self.borrowOrCreateDelegatorRecord(delegator)
 
             let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
 
@@ -376,8 +367,7 @@ access(all) contract FRC20Staking {
             let nft <- semiNFTCol.withdraw(withdrawID: nftId) as! @FRC20SemiNFT.NFT
 
             // ensure delegator record exists
-            let delegatorRecordRef = self.borrowDelegatorRecord(delegator)
-                ?? panic("Delegator record must exist")
+            let delegatorRecordRef = self.borrowOrCreateDelegatorRecord(delegator)
 
             // save the nft to unstaking queue in delegator record
             delegatorRecordRef.addUnstakingEntry(<- nft)
@@ -426,6 +416,21 @@ access(all) contract FRC20Staking {
         }
 
         /** ---- Contract Level Methods ----- */
+
+        /// Borrow or craete the delegator record
+        ///
+        access(contract)
+        fun borrowOrCreateDelegatorRecord(_ addr: Address): &DelegatorRecord {
+            // check if delegator's record exists
+            if self.delegators[addr] == nil {
+                self._addDelegator(<- create DelegatorRecord(
+                    id: self.delegatorIDCounter,
+                    tick: self.tick,
+                    address: addr
+                ))
+            }
+            return self.borrowDelegatorRecord(addr)!
+        }
 
         /// Borrow Delegator Record
         ///
