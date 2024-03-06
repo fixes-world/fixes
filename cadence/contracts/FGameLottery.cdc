@@ -268,7 +268,8 @@ access(all) contract FGameLottery {
         init(
             pool: Address,
             lotteryId: UInt64,
-            powerup: UFix64?
+            powerup: UFix64?,
+            numbers: TicketNumber?,
         ) {
             pre {
                 powerup == nil || powerup! >= 1.0: "Powerup must be greater than 0"
@@ -280,7 +281,7 @@ access(all) contract FGameLottery {
             self.lotteryId = lotteryId
             self.boughtAt = getCurrentBlock().timestamp
             // Create a new random ticket number
-            self.numbers = FGameLottery.createRandomTicketNumber()
+            self.numbers = numbers ?? FGameLottery.createRandomTicketNumber()
             // Set the default powerup to 1
             self.powerup = powerup ?? 1.0
             // Set the default status to ACTIVE
@@ -896,7 +897,8 @@ access(all) contract FGameLottery {
             let ticket <- create TicketEntry(
                 pool: self.borrowLotteryPool().getAddress(),
                 lotteryId: self.epochIndex,
-                powerup: powerup
+                powerup: powerup,
+                numbers: nil
             )
             let ticketId = ticket.getTicketId()
             // Add the ticket to the collection
