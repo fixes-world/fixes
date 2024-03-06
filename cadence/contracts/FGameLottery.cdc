@@ -240,6 +240,7 @@ access(all) contract FGameLottery {
         access(all) view fun getNumbers(): [UInt8;6]
         access(all) view fun getPowerup(): UFix64
         access(all) view fun getWinPrizeRank(): PrizeRank?
+        access(all) view fun getEstimatedPrizeAmount(): UFix64?
         // borrow methods
         access(all) fun borrowLottery(): &Lottery{LotteryPublic}
         // write methods - only the contract can call these methods
@@ -337,6 +338,44 @@ access(all) contract FGameLottery {
         access(all) view
         fun getWinPrizeRank(): PrizeRank? {
             return self.winPrizeRank
+        }
+
+        /// Get the estimated prize amount
+        ///
+        access(all) view
+        fun getEstimatedPrizeAmount(): UFix64? {
+            let prizeRank = self.getWinPrizeRank()
+            if prizeRank == nil {
+                return nil
+            }
+
+            let lotteryRef = self.borrowLottery()
+            let drawnResult = lotteryRef.getResult()
+            if drawnResult == nil {
+                return nil
+            }
+            let pool = FGameLottery.borrowLotteryPool(self.pool)
+                ?? panic("Lottery pool not found")
+            let ticketOwner = self.getTicketOwner()
+            // Get the prize amount
+            if prizeRank! == PrizeRank.JACKPOT {
+                // Disburse the jackpot prize
+                let winners = drawnResult!.jackpotWinners
+                if winners == nil || winners!.length == 0 || !winners!.contains(ticketOwner) {
+                    return nil
+                }
+                let jackpotAmount = drawnResult!.jackpotAmount
+                let jackpotWinnerAmt = winners?.length!
+                return jackpotAmount / UFix64(jackpotWinnerAmt)
+            } else {
+                // Get the base prize amount
+                let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
+
+                // Disburse the prize amount
+                let prizeAmountWithPowerup = basePrize * self.getPowerup()
+                let prizeDowngradeRatio = drawnResult!.nonJackpotDowngradeRatio
+                return prizeAmountWithPowerup * prizeDowngradeRatio
+            }
         }
 
         /// Borrow the lottery
@@ -494,7 +533,7 @@ access(all) contract FGameLottery {
         fun borrowTicket(ticketId: UInt64): &TicketEntry{TicketEntryPublic}?
 
         // --- write methods ---
-        access(all)
+        access(contract)
         fun addTicket(_ ticket: @TicketEntry)
     }
 
@@ -543,7 +582,7 @@ access(all) contract FGameLottery {
 
         /// Add a new ticket to the collection
         ///
-        access(all)
+        access(contract)
         fun addTicket(_ ticket: @TicketEntry) {
             pre {
                 self.owner != nil: "Only the collection with an owner can add a ticket"
