@@ -23,7 +23,7 @@ transaction(
 
         // check if agency manager already exists
         assert(
-            acct.borrow<&EVMAgent.AgencyManager>(from: EVMAgent.evmAgencyManagerStoragePath) == nil,
+            acct.borrow<&AnyResource>(from: EVMAgent.evmAgencyManagerStoragePath) == nil,
             message: "Agency Manager already exists!"
         )
 
@@ -70,9 +70,5 @@ transaction(
         // Create agency account
         let agencyMgr <- agencyCenter.createAgency(ins: insRef, cap)
         acct.save(<- agencyMgr, to: EVMAgent.evmAgencyManagerStoragePath)
-
-        // Refund the balance in the inscription
-        let rufund <- insRef.extract()
-        vaultRef.deposit(from: <- rufund)
     }
 }

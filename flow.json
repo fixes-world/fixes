@@ -770,6 +770,7 @@
 				"FRC20StakingManager",
 				"FRC20StakingForwarder",
 				"FRC20StakingVesting",
+				"EVMAgent",
 				"FGameLottery",
 				"FGameLotteryRegistry",
 				"FGameLotteryFactory"

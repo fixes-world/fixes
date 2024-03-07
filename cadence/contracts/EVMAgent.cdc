@@ -549,13 +549,10 @@ access(all) contract EVMAgent {
 
         access(self)
         fun _borrowAgencyAccount(): &AuthAccount {
-            let ownerAddr = self.getOwnerAddress()
-            let ownerKey = ownerAddr.toString()
-
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             return acctsPool.borrowChildAccount(
                 type: FRC20AccountsPool.ChildAccountType.EVMAgency,
-                ownerKey
+                self.creator.toString()
             ) ?? panic("Agency account not found")
         }
     }
