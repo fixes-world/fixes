@@ -359,6 +359,7 @@ access(all) contract FGameLottery {
             let pool = FGameLottery.borrowLotteryPool(self.pool)
                 ?? panic("Lottery pool not found")
             let ticketOwner = self.getTicketOwner()
+            let feeRatio = pool.getServiceFee()
             // Get the prize amount
             if prizeRank! == PrizeRank.JACKPOT {
                 // Disburse the jackpot prize
@@ -370,7 +371,7 @@ access(all) contract FGameLottery {
                 let jackpotWinnerAmt = winners?.length!
                 let basicPrize = jackpotAmount / UFix64(jackpotWinnerAmt)
                 // 16% prize is service fee
-                return basicPrize * 0.84
+                return basicPrize * (1.0 - feeRatio)
             } else {
                 // Get the base prize amount
                 let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
@@ -381,7 +382,7 @@ access(all) contract FGameLottery {
                 let basicPrize = prizeAmountWithPowerup * prizeDowngradeRatio
                 if prizeRank!.rawValue <= PrizeRank.THIRD.rawValue {
                     // 16% prize is service fee
-                    return basicPrize * 0.84
+                    return basicPrize * (1.0 - feeRatio)
                 } else {
                     return basicPrize
                 }
@@ -1250,6 +1251,8 @@ access(all) contract FGameLottery {
                 from: pool.getAddress()
             )
             let feeChangeRef = &feeChange as &FRC20FTShared.Change
+            // Get the fee ratio of the pool
+            let feeRatio = pool.getServiceFee()
 
             // Get the prize amount
             if prizeRank! == PrizeRank.JACKPOT {
@@ -1271,8 +1274,8 @@ access(all) contract FGameLottery {
                 }
                 let prizeChange <- jackpotPoolRef.withdrawAsChange(amount: withdrawAmount)
 
-                // 16% of prize will be charged as the service fee
-                let serviceFee = prizeChange.getBalance() * 0.16
+                // 16% (default) of prize will be charged as the service fee
+                let serviceFee = prizeChange.getBalance() * feeRatio
                 FRC20FTShared.depositToChange(
                     receiver: feeChangeRef,
                     change: <- prizeChange.withdrawAsChange(amount: serviceFee)
@@ -1295,7 +1298,7 @@ access(all) contract FGameLottery {
                 // if PrizeRank is 3rd or higher, 16% of prize will be charged as the service fee
                 // if PrizeRank is lower than 3rd, no service fee will be charged
                 if prizeRank!.rawValue <= PrizeRank.THIRD.rawValue {
-                    let serviceFee = prizeChange.getBalance() * 0.16
+                    let serviceFee = prizeChange.getBalance() * feeRatio
                     FRC20FTShared.depositToChange(
                         receiver: feeChangeRef,
                         change: <- prizeChange.withdrawAsChange(amount: serviceFee)
@@ -1391,6 +1394,8 @@ access(all) contract FGameLottery {
         fun getTicketPrice(): UFix64
         access(all) view
         fun getJackpotPoolBalance(): UFix64
+        access(all) view
+        fun getServiceFee(): UFix64
         access(all) view
         fun isEpochAutoStart(): Bool
         access(all) view
@@ -1532,6 +1537,13 @@ access(all) contract FGameLottery {
             let store = self.borrowConfigStore()
             let price = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryTicketPrice) as! UFix64?
             return price ?? self.initTicketPrice
+        }
+
+        access(all) view
+        fun getServiceFee(): UFix64 {
+            let store = self.borrowConfigStore()
+            let fee = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryServiceFee) as!  UFix64?
+            return fee ?? 0.16
         }
 
         access(all) view

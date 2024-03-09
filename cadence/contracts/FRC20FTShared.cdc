@@ -708,6 +708,7 @@ access(all) contract FRC20FTShared {
         access(all) case GameLotteryTicketPrice
         access(all) case GameLotteryEpochInterval
         access(all) case GameLotteryAutoStart
+        access(all) case GameLotteryServiceFee
     }
 
     /* --- Public Methods --- */
@@ -764,6 +765,9 @@ access(all) contract FRC20FTShared {
                 break
             case ConfigType.GameLotteryAutoStart:
                 key = "gameLottery:AutoStart"
+                break
+            case ConfigType.GameLotteryServiceFee:
+                key = "gameLottery:ServiceFee"
                 break
             }
             return key
