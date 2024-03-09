@@ -12,6 +12,8 @@ import "Fixes"
 import "FixesHeartbeat"
 import "FRC20FTShared"
 import "FRC20Indexer"
+import "FRC20AccountsPool"
+import "FRC20Staking"
 
 access(all) contract FGameLottery {
     /* --- Events --- */
@@ -366,7 +368,9 @@ access(all) contract FGameLottery {
                 }
                 let jackpotAmount = drawnResult!.jackpotAmount
                 let jackpotWinnerAmt = winners?.length!
-                return jackpotAmount / UFix64(jackpotWinnerAmt)
+                let basicPrize = jackpotAmount / UFix64(jackpotWinnerAmt)
+                // 16% prize is service fee
+                return basicPrize * 0.84
             } else {
                 // Get the base prize amount
                 let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
@@ -374,7 +378,13 @@ access(all) contract FGameLottery {
                 // Disburse the prize amount
                 let prizeAmountWithPowerup = basePrize * self.getPowerup()
                 let prizeDowngradeRatio = drawnResult!.nonJackpotDowngradeRatio
-                return prizeAmountWithPowerup * prizeDowngradeRatio
+                let basicPrize = prizeAmountWithPowerup * prizeDowngradeRatio
+                if prizeRank!.rawValue <= PrizeRank.THIRD.rawValue {
+                    // 16% prize is service fee
+                    return basicPrize * 0.84
+                } else {
+                    return basicPrize
+                }
             }
         }
 
@@ -1234,6 +1244,12 @@ access(all) contract FGameLottery {
             )
             // ref to the reward change
             let rewardChangeRef = &rewardChange as &FRC20FTShared.Change
+            // Initialize the fee change
+            let feeChange: @FRC20FTShared.Change <- FRC20FTShared.createEmptyChange(
+                tick: self.current.getOriginalTick(),
+                from: pool.getAddress()
+            )
+            let feeChangeRef = &feeChange as &FRC20FTShared.Change
 
             // Get the prize amount
             if prizeRank! == PrizeRank.JACKPOT {
@@ -1242,6 +1258,7 @@ access(all) contract FGameLottery {
                 let winners = self.drawnResult!.jackpotWinners
                 if winners == nil || winners!.length == 0 || !winners!.contains(ticketOwner) {
                     destroy rewardChange
+                    destroy feeChange
                     return
                 }
                 let jackpotAmount = self.drawnResult!.jackpotAmount
@@ -1249,9 +1266,17 @@ access(all) contract FGameLottery {
                 let withdrawAmount = jackpotAmount / UFix64(jackpotWinnerAmt)
                 if jackpotPoolRef.getBalance() < withdrawAmount {
                     destroy rewardChange
+                    destroy feeChange
                     return
                 }
                 let prizeChange <- jackpotPoolRef.withdrawAsChange(amount: withdrawAmount)
+
+                // 16% of prize will be charged as the service fee
+                let serviceFee = prizeChange.getBalance() * 0.16
+                FRC20FTShared.depositToChange(
+                    receiver: feeChangeRef,
+                    change: <- prizeChange.withdrawAsChange(amount: serviceFee)
+                )
 
                 // Deposit the prize to the ticket owner
                 FRC20FTShared.depositToChange(
@@ -1267,12 +1292,65 @@ access(all) contract FGameLottery {
                 let prizeDowngradeRatio = self.drawnResult!.nonJackpotDowngradeRatio
                 let prizeChange <- self.current.withdrawAsChange(amount: prizeAmountWithPowerup * prizeDowngradeRatio)
 
+                // if PrizeRank is 3rd or higher, 16% of prize will be charged as the service fee
+                // if PrizeRank is lower than 3rd, no service fee will be charged
+                if prizeRank!.rawValue <= PrizeRank.THIRD.rawValue {
+                    let serviceFee = prizeChange.getBalance() * 0.16
+                    FRC20FTShared.depositToChange(
+                        receiver: feeChangeRef,
+                        change: <- prizeChange.withdrawAsChange(amount: serviceFee)
+                    )
+                }
+
                 // Deposit the prize to the ticket owner
                 FRC20FTShared.depositToChange(
                     receiver: rewardChangeRef,
                     change: <- prizeChange
                 )
             }
+
+            // deposit the fee to the service pools
+            if feeChange.getBalance() > 0.0 {
+                let feeTickName = feeChange.getOriginalTick()
+                let totalFeeAmount = feeChange.getBalance()
+                // Borrow the FRC20 accounts pool
+                let acctsPool: &FRC20AccountsPool.Pool{FRC20AccountsPool.PoolPublic} = FRC20AccountsPool.borrowAccountsPool()
+                let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
+                let stakingFRC20Tick = (globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?) ?? "flows"
+
+                if feeTickName == "" {
+                    // this is $FLOW token
+                    let serviceFee = totalFeeAmount * 0.5
+                    // 50% of service fee will be deposited to the platform pool
+                    let serviceFeeVault <- feeChange.withdrawAsVault(amount: serviceFee)
+                    let frc20Indexer = FRC20Indexer.getIndexer()
+                    let platformFlowRecipient = frc20Indexer.borowPlatformTreasuryReceiver()
+                    platformFlowRecipient.deposit(from: <- serviceFeeVault)
+                    // 50% of service fee will be deposited to the shared pool
+                    let sharedFeeVault <- feeChange.extractAsVault()
+                    if let flowsStakingRecipient = acctsPool.borrowFRC20StakingFlowTokenReceiver(tick: stakingFRC20Tick) {
+                        flowsStakingRecipient.deposit(from: <- sharedFeeVault)
+                    } else {
+                        platformFlowRecipient.deposit(from: <- sharedFeeVault)
+                    }
+                } else {
+                    // Here is FRC20 token, all service fee will be deposited to the Staking shared pool
+                    if let stakingAddress = acctsPool.getFRC20StakingAddress(tick: stakingFRC20Tick) {
+                        if let stakingPool = FRC20Staking.borrowPool(stakingAddress) {
+                            if let rewardStrategy = stakingPool.borrowRewardStrategy(feeTickName) {
+                                // Donate the tokens
+                                rewardStrategy.addIncome(income: <- feeChange.withdrawAsChange(amount: totalFeeAmount))
+                            }
+                        }
+                    }
+                    if feeChange.getBalance() > 0.0 {
+                        // return to lottery pool address
+                        frc20Indexer.returnChange(change: <- feeChange.withdrawAsChange(amount: totalFeeAmount))
+                    }
+                }
+            }
+            // zero balance destroy
+            destroy feeChange
 
             // Get the prize amount
             let prizeAmount = rewardChange.getBalance()
