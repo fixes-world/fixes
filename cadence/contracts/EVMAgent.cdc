@@ -346,7 +346,7 @@ access(all) contract EVMAgent {
                 message: "EVM address already registered for an agent account"
             )
 
-            let message = "op=create-entrusted-account"
+            let message = "op=create-entrusted-account(),params="
                 .concat(",address=").concat(evmAddress)
                 .concat(",timestamp=").concat(timestamp.toString())
 
