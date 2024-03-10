@@ -349,7 +349,7 @@ access(all) contract EVMAgent {
             let message = "op=create-entrusted-account(),params="
                 .concat(",address=").concat(evmAddress)
                 .concat(",timestamp=").concat(timestamp.toString())
-
+            log("Verifying message: ".concat(message))
             let isValid = ETHUtils.verifySignature(hexPublicKey: hexPublicKey, hexSignature: hexSignature, message: message)
             assert(
                 isValid,
