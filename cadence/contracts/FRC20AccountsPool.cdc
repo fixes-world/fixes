@@ -428,12 +428,14 @@ access(all) contract FRC20AccountsPool {
 
             // check that paths are all configured properly
             // public path
+            // @deprecated after Cadence 1.0
             child.unlink(HybridCustody.OwnedAccountPublicPath)
             child.link<&HybridCustody.OwnedAccount{HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPublicPath, target: HybridCustody.OwnedAccountStoragePath)
 
-            // // private path(will deperated in the future)
-            // child.unlink(HybridCustody.OwnedAccountPrivatePath)
-            // child.link<&HybridCustody.OwnedAccount{HybridCustody.BorrowableAccount, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPrivatePath, target: HybridCustody.OwnedAccountStoragePath)
+            // private path(will deperated in the future)
+            // @deprecated after Cadence 1.0
+            child.unlink(HybridCustody.OwnedAccountPrivatePath)
+            child.link<&HybridCustody.OwnedAccount{HybridCustody.BorrowableAccount, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPrivatePath, target: HybridCustody.OwnedAccountStoragePath)
 
             let publishIdentifier = HybridCustody.getOwnerIdentifier(hcManagerAddr)
             // give ownership to manager
