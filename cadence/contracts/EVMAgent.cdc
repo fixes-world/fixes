@@ -636,7 +636,7 @@ access(all) contract EVMAgent {
             let stakedBalance = delegator.getStakedBalance(tick: tick)
             // only the delegator with enough staked balance can create the agency
             assert(
-                stakedBalance > 10000.0,
+                stakedBalance >= 10000.0,
                 message: "The delegator should have staked enough balance"
             )
 
