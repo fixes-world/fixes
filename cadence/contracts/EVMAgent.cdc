@@ -494,7 +494,7 @@ access(all) contract EVMAgent {
 
             let agencyFlowReceiptRef = self._borrowAgencyAccount()
                 .getCapability(/public/flowTokenReceiver)
-                .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+                .borrow<&{FungibleToken.Receiver}>()
                 ?? panic("Could not borrow receiver reference to the recipient's Vault")
 
             let fee = EVMAgent.getAgencyFlowFee()
