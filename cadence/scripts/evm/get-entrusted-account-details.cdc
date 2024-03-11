@@ -25,11 +25,11 @@ fun main(
 }
 
 access(all) struct EntrustedAccountDetails {
-    let address: Address
-    let entrustedBy: String
-    let flowBalance: UFix64
-    let feeSpent: UFix64
-    let parents: [Address]
+    access(all) let address: Address
+    access(all) let entrustedBy: String
+    access(all) let flowBalance: UFix64
+    access(all) let feeSpent: UFix64
+    access(all) let parents: [Address]
 
     init(
         address: Address,
