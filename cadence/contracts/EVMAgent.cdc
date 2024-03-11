@@ -416,7 +416,7 @@ access(all) contract EVMAgent {
             // emit event
             emit NewEntrustedAccountCreated(
                 evmAddress: evmAddress,
-                entrustedAccount: entrustedAcct.address,
+                entrustedAccount: entrustedAddress,
                 byAgency: agencyAcct.address,
                 initialFunding: spentFlowAmt
             )
@@ -502,6 +502,11 @@ access(all) contract EVMAgent {
 
             // update the status
             self.status.addEarnedFlowAmount(fee)
+            // update the entrusted account status
+            if let entrustedStatus = entrustedAcct
+                .borrow<&EntrustedStatus{IEntrustedStatus}>(from: EVMAgent.entrustedStatusStoragePath) {
+                entrustedStatus.addSpentFlowFee(fee)
+            }
 
             // emit event
             emit EntrustedAccountVerified(
