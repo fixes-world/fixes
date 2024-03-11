@@ -305,9 +305,8 @@ access(all) contract EVMAgent {
         ///
         access(all)
         fun withdraw(amt: UFix64): @FlowToken.Vault {
-            let flowVaultRef = self._borrowAgencyAccount()
-                .getCapability(/public/flowTokenVault)
-                .borrow<&FlowToken.Vault>()
+            let acct = self._borrowAgencyAccount()
+            let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("The flow vault is not found")
             assert(
                 flowVaultRef.balance >= amt,
