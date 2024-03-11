@@ -63,6 +63,7 @@ access(all) contract EVMAgent {
     /* --- Interfaces & Resources --- */
 
     access(all) resource interface  IEntrustedStatus {
+        access(all) let key: String
         /// Borrow the agency capability
         access(all) fun borrowAgency(): &Agency{AgencyPublic}
         /// Get the flow spent by the entrusted account
@@ -74,14 +75,17 @@ access(all) contract EVMAgent {
     /// Entrusted status resource stored in the entrusted child account
     ///
     access(all) resource EntrustedStatus: IEntrustedStatus {
+        access(all) let key: String
         // Capability to the agency
         access(self) let agency: Capability<&Agency{AgencyPublic}>
         // record the flow spent by the entrusted account
         access(self) var feeSpent: UFix64
 
         init(
+            key: String,
             _ agency: Capability<&Agency{AgencyPublic}>
         ) {
+            self.key = key
             self.agency = agency
             self.feeSpent = 0.0
         }
@@ -540,7 +544,7 @@ access(all) contract EVMAgent {
                 let cap = EVMAgent.getAgencyPublicCap(self.getOwnerAddress())
                 assert(cap.check(), message: "Invalid agency capability")
 
-                let sharedStore <- create EVMAgent.EntrustedStatus(agency: cap)
+                let sharedStore <- create EVMAgent.EntrustedStatus(key: key, cap)
                 childAcctRef.save(<- sharedStore, to: EVMAgent.entrustedStatusStoragePath)
 
                 // link the shared store to the public path
