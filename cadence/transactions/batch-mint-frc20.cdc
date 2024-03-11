@@ -1,6 +1,7 @@
-import "Fixes"
-import "FRC20Indexer"
 import "FlowToken"
+import "FRC20Indexer"
+import "Fixes"
+import "FixesInscriptionFactory"
 
 transaction(
     tick: String,
@@ -8,11 +9,15 @@ transaction(
     repeats: UInt64
 ) {
     prepare(acct: AuthAccount) {
-        // basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
-        let dataStr = "op=mint,tick=".concat(tick).concat(",amt=").concat(amt.toString())
-        let metadata = dataStr.utf8
+        /** ------------- Prepare the Inscription Store - Start ---------------- */
+        let storePath = Fixes.getFixesStoreStoragePath()
+        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        }
+
+        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+            ?? panic("Could not borrow a reference to the Inscriptions Store!")
+        /** ------------- End -------------------------------------------------- */
 
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
@@ -22,6 +27,8 @@ transaction(
         let indexer = FRC20Indexer.getIndexer()
         let tokenMeta = indexer.getTokenMeta(tick: tick)
         assert(tokenMeta != nil, message: "TokenMeta for tick ".concat(tick).concat(" does not exist!"))
+
+        let insDataStr = FixesInscriptionFactory.buildMintFRC20(tick: tick, amt: amt)
 
         var i = 0 as UInt64
         while i < repeats {
@@ -33,38 +40,21 @@ transaction(
             }
 
             // estimate the required storage
-            let estimatedReqValue = Fixes.estimateValue(
-                index: Fixes.totalInscriptions,
-                mimeType: mimeType,
-                data: metadata,
-                protocol: metaProtocol,
-                encoding: nil
-            )
+            let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(insDataStr)
 
-            let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
+            // get reserved cost
+            let flowToReserve <- (vaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
 
             // Create the Inscription first
-            let newIns <- Fixes.createInscription(
-                // Withdraw tokens from the signer's stored vault
-                value: <- (flowToReserve as! @FlowToken.Vault),
-                mimeType: mimeType,
-                metadata: metadata,
-                metaProtocol: metaProtocol,
-                encoding: nil,
-                parentId: nil
+            let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+                insDataStr,
+                <- flowToReserve,
+                store
             )
-            // save the new Inscription to storage
-            let newInsId = newIns.getId()
-            let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
-            assert(
-                acct.borrow<&AnyResource>(from: newInsPath) == nil,
-                message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
-            )
-            acct.save(<- newIns, to: newInsPath)
 
             // borrow a reference to the new Inscription
-            let insRef = acct.borrow<&Fixes.Inscription>(from: newInsPath)
-                ?? panic("Could not borrow reference to the new Inscription!")
+            let insRef = store.borrowInscriptionWritableRef(newInsId)
+                ?? panic("Could not borrow a reference to the newly created Inscription!")
 
             /// Mint the FRC20 token
             indexer.mint(ins: insRef)

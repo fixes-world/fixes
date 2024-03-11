@@ -52,13 +52,14 @@ access(all) contract FRC20StakingManager {
     /// Staking Admin Public Resource interface
     ///
     access(all) resource interface StakingAdminPublic {
-        access(all) fun isWhitelisted(address: Address): Bool
+        access(all) view
+        fun isWhitelisted(address: Address): Bool
     }
 
     /// Staking Admin Resource, represents a staking admin and store in admin's account
     ///
     access(all) resource StakingAdmin: StakingAdminPublic {
-        access(all)
+        access(self)
         let whitelist: {Address: Bool}
 
         init() {
@@ -108,7 +109,7 @@ access(all) contract FRC20StakingManager {
             let tokenMeta = frc20Indexer.getTokenMeta(tick: tick.toLower()) ?? panic("The token is not registered")
             // no need to check if deployer is whitelisted, because the controller is whitelisted
 
-            // create the account for the market at the accounts pool
+            // create the account for the staking at the accounts pool
             acctsPool.setupNewChildForStaking(
                 tick: tokenMeta.tick,
                 newAccount
@@ -268,16 +269,16 @@ access(all) contract FRC20StakingManager {
                 message: "The staking pool tick is not the same as the requested"
             )
         } else {
-            // create the market and save it in the account
+            // create the staking and save it in the account
             let pool <- FRC20Staking.createPool(tick)
-            // save the market in the account
+            // save the staking in the account
             childAcctRef.save(<- pool, to: FRC20Staking.StakingPoolStoragePath)
             // reference of stake pool
             let poolRef = childAcctRef.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath)
                 ?? panic("The staking pool is not found")
             poolRef.initialize()
 
-            // link the market to the public path
+            // link the staking to the public path
             childAcctRef.unlink(FRC20Staking.StakingPoolPublicPath)
             childAcctRef.link<&FRC20Staking.Pool{FRC20Staking.PoolPublic}>(FRC20Staking.StakingPoolPublicPath, target: FRC20Staking.StakingPoolStoragePath)
 
@@ -788,6 +789,7 @@ access(all) contract FRC20StakingManager {
         // create the admin account
         let admin <- create StakingAdmin()
         self.account.save(<-admin, to: self.StakingAdminStoragePath)
+        // @deprecated in Cadence 1.0
         self.account.link<&StakingAdmin{StakingAdminPublic}>(self.StakingAdminPublicPath, target: self.StakingAdminStoragePath)
 
         // create the controller

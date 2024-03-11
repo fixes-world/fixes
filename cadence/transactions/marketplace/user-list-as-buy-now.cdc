@@ -4,6 +4,7 @@ import "FungibleToken"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesAvatar"
 import "FixesHeartbeat"
 import "FRC20FTShared"
@@ -99,22 +100,11 @@ transaction(
         /** ------------- End --------------------------------------------------  */
 
         /** ------------- Start -- Inscription Initialization -------------  */
-        // basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
-        let dataStr = "op=list-buynow,tick=".concat(tick)
-            .concat(",amt=").concat(sellAmount.toString())
-            .concat(",price=").concat(sellPrice.toString())
-        let metadata = dataStr.utf8
+        // Create the metadata
+        let dataStr = FixesInscriptionFactory.buildMarketListBuyNow(tick: tick, amount: sellAmount, price: sellPrice)
 
         // estimate the required storage
-        let estimatedReqValue = Fixes.estimateValue(
-            index: Fixes.totalInscriptions,
-            mimeType: mimeType,
-            data: metadata,
-            protocol: metaProtocol,
-            encoding: nil
-        )
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
@@ -123,15 +113,7 @@ transaction(
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first
-        self.ins <- Fixes.createInscription(
-            // Withdraw tokens from the signer's stored vault
-            value: <- (flowToReserve as! @FlowToken.Vault),
-            mimeType: mimeType,
-            metadata: metadata,
-            metaProtocol: metaProtocol,
-            encoding: nil,
-            parentId: nil
-        )
+        self.ins <- FixesInscriptionFactory.createFrc20Inscription(dataStr, <- (flowToReserve as! @FlowToken.Vault))
         /** ------------- End ---------------------------------------------  */
 
         // Borrow a reference to the FRC20Marketplace contract

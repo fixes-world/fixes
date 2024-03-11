@@ -134,8 +134,7 @@ access(all) contract FRC20FungibleToken: FungibleToken {
             return [
                 Type<FungibleTokenMetadataViews.FTView>(),
                 Type<FungibleTokenMetadataViews.FTDisplay>(),
-                Type<FungibleTokenMetadataViews.FTVaultData>(),
-                Type<FungibleTokenMetadataViews.TotalSupply>()
+                Type<FungibleTokenMetadataViews.FTVaultData>()
             ]
         }
 
@@ -170,16 +169,16 @@ access(all) contract FRC20FungibleToken: FungibleToken {
                             return <-FRC20FungibleToken.createEmptyVault()
                         })
                     )
-                case Type<FungibleTokenMetadataViews.TotalSupply>():
-                    let indexer = FRC20Indexer.getIndexer()
-                    let tick = FRC20FungibleToken.getTickerName()
-                    if let tokenMeta = indexer.getTokenMeta(tick: tick) {
-                        return FungibleTokenMetadataViews.TotalSupply(
-                            totalSupply: tokenMeta.max
-                        )
-                    } else {
-                        return nil
-                    }
+                // case Type<FungibleTokenMetadataViews.TotalSupply>():
+                //     let indexer = FRC20Indexer.getIndexer()
+                //     let tick = FRC20FungibleToken.getTickerName()
+                //     if let tokenMeta = indexer.getTokenMeta(tick: tick) {
+                //         return FungibleTokenMetadataViews.TotalSupply(
+                //             totalSupply: tokenMeta.max
+                //         )
+                //     } else {
+                //         return nil
+                //     }
             }
             return nil
         }

@@ -1,9 +1,10 @@
 {
-	"name": "@fixes/contracts",
-	"version": "0.5.8",
+  "name": "@fixes/contracts",
+	"version": "0.6.0",
   "exports": {
     "./contracts/*": "./cadence/contracts/*",
     "./transactions/*": "./cadence/transactions/*",
+    "./transactions-for-evm/*": "./cadence/transactions-for-evm/*",
     "./scripts/*": "./cadence/scripts/*",
     "./flow.json": "./flow.json"
   },
@@ -12,6 +13,6 @@
     "deploy:testnet": "flow project deploy --update --network testnet",
     "deploy:mainnet": "flow project deploy --update --network mainnet",
     "fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
-		"dev": "pnpm deploy:emulator && pnpm fund:emulator"
+    "dev": "pnpm deploy:emulator && pnpm fund:emulator"
   }
 }

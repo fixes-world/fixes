@@ -1,15 +1,15 @@
 {
 	"contracts": {
-		"ArrayUtils": {
-			"source": "cadence/deps/ArrayUtils.cdc",
+		"AddressUtils": {
+			"source": "./imports/a340dc0a4ec828ab/AddressUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
-		"AddressUtils": {
-			"source": "cadence/deps/AddressUtils.cdc",
+		"ArrayUtils": {
+			"source": "./imports/a340dc0a4ec828ab/ArrayUtils.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
@@ -17,34 +17,88 @@
 			}
 		},
 		"CapabilityDelegator": {
-			"source": "./cadence/deps/CapabilityDelegator.cdc",
+			"source": "./imports/d8a7e05a7ac670c0/CapabilityDelegator.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
 			}
 		},
 		"CapabilityFactory": {
-			"source": "./cadence/deps/CapabilityFactory.cdc",
+			"source": "./imports/d8a7e05a7ac670c0/CapabilityFactory.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
 			}
 		},
 		"CapabilityFilter": {
-			"source": "./cadence/deps/CapabilityFilter.cdc",
+			"source": "./imports/d8a7e05a7ac670c0/CapabilityFilter.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
 			}
 		},
-		"FRC20Indexer": {
-			"source": "cadence/contracts/FRC20Indexer.cdc",
+		"Domains": {
+			"source": "./imports/233eb012d34b0070/Domains.cdc",
+			"aliases": {
+				"mainnet": "233eb012d34b0070",
+				"testnet": "b05b2abb42335e88"
+			}
+		},
+		"ETHUtils": {
+			"source": "cadence/contracts/ETHUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"EVMAgent": {
+			"source": "cadence/contracts/EVMAgent.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FIND": {
+			"source": "./imports/097bafa4e0b48eef/FIND.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FGameLottery": {
+			"source": "cadence/contracts/FGameLottery.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FGameLotteryRegistry": {
+			"source": "cadence/contracts/FGameLotteryRegistry.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FGameLotteryFactory": {
+			"source": "cadence/contracts/FGameLotteryFactory.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20AccountsPool": {
+			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -67,32 +121,8 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20NFTWrapper": {
-			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FRC20Storefront": {
-			"source": "cadence/contracts/FRC20Storefront.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FRC20AccountsPool": {
-			"source": "cadence/contracts/FRC20AccountsPool.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FRC20Marketplace": {
-			"source": "cadence/contracts/FRC20Marketplace.cdc",
+		"FRC20Indexer": {
+			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -107,8 +137,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20TradingRecord": {
-			"source": "cadence/contracts/FRC20TradingRecord.cdc",
+		"FRC20Marketplace": {
+			"source": "cadence/contracts/FRC20Marketplace.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20NFTWrapper": {
+			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -131,16 +169,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20StakingManager": {
-			"source": "cadence/contracts/FRC20StakingManager.cdc",
+		"FRC20StakingForwarder": {
+			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20StakingForwarder": {
-			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
+		"FRC20StakingManager": {
+			"source": "cadence/contracts/FRC20StakingManager.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -155,12 +193,35 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20Storefront": {
+			"source": "cadence/contracts/FRC20Storefront.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FRC20TradingRecord": {
+			"source": "cadence/contracts/FRC20TradingRecord.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FindViews": {
+			"source": "./imports/097bafa4e0b48eef/FindViews.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
 			}
 		},
 		"Fixes": {
@@ -173,6 +234,22 @@
 		},
 		"FixesAvatar": {
 			"source": "cadence/contracts/FixesAvatar.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FixesHeartbeat": {
+			"source": "cadence/contracts/FixesHeartbeat.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FixesInscriptionFactory": {
+			"source": "cadence/contracts/FixesInscriptionFactory.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -195,16 +272,8 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FixesHeartbeat": {
-			"source": "cadence/contracts/FixesHeartbeat.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
 		"FlowToken": {
-			"source": "cadence/deps/FlowToken.cdc",
+			"source": "./imports/1654653399040a61/FlowToken.cdc",
 			"aliases": {
 				"emulator": "0ae53cb6e3f42a79",
 				"mainnet": "1654653399040a61",
@@ -212,7 +281,7 @@
 			}
 		},
 		"FungibleToken": {
-			"source": "cadence/deps/FungibleToken.cdc",
+			"source": "./imports/f233dcee88fe0abe/FungibleToken.cdc",
 			"aliases": {
 				"emulator": "ee82856bf20e2aa6",
 				"mainnet": "f233dcee88fe0abe",
@@ -220,7 +289,7 @@
 			}
 		},
 		"FungibleTokenMetadataViews": {
-			"source": "cadence/deps/FungibleTokenMetadataViews.cdc",
+			"source": "./imports/f233dcee88fe0abe/FungibleTokenMetadataViews.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "f233dcee88fe0abe",
@@ -228,40 +297,23 @@
 			}
 		},
 		"HybridCustody": {
-			"source": "cadence/deps/HybridCustody.cdc",
+			"source": "./imports/d8a7e05a7ac670c0/HybridCustody.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6",
-				"mainnet": "d8a7e05a7ac670c0"
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"InscriptionMetadata": {
+			"source": "./imports/88dd257fcf26d3cc/InscriptionMetadata.cdc",
+			"aliases": {
+				"mainnet": "88dd257fcf26d3cc",
+				"testnet": "564b229bd8380848"
 			}
 		},
 		"MetadataViews": {
-			"source": "cadence/deps/MetadataViews.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
-		},
-		"NonFungibleToken": {
-			"source": "cadence/deps/NonFungibleToken.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
-		},
-		"StringUtils": {
-			"source": "cadence/deps/StringUtils.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
-		},
-		"ViewResolver": {
-			"source": "cadence/deps/ViewResolver.cdc",
+			"source": "./imports/1d7e57aa55817448/MetadataViews.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
@@ -269,7 +321,7 @@
 			}
 		},
 		"NFTCatalog": {
-			"source": "cadence/deps/NFTCatalog.cdc",
+			"source": "./imports/49a7cda3a1eecc29/NFTCatalog.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "49a7cda3a1eecc29",
@@ -277,79 +329,356 @@
 			}
 		},
 		"NFTRetrieval": {
-			"source": "cadence/deps/NFTRetrieval.cdc",
+			"source": "./imports/49a7cda3a1eecc29/NFTRetrieval.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "49a7cda3a1eecc29",
 				"testnet": "324c34e1c517e4db"
 			}
 		},
-		"InscriptionMetadata": {
-			"source": "cadence/deps/InscriptionMetadata.cdc",
+		"NonFungibleToken": {
+			"source": "./imports/1d7e57aa55817448/NonFungibleToken.cdc",
 			"aliases": {
-				"mainnet": "88dd257fcf26d3cc",
-				"testnet": "564b229bd8380848"
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
 			}
 		},
-		"FIND": {
-			"source": "",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
-		},
-		"FindViews": {
-			"source": "cadence/deps/FindViews.cdc",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
-		},
-		"Domains": {
-			"source": "",
-			"aliases": {
-				"mainnet": "233eb012d34b0070",
-				"testnet": "b05b2abb42335e88"
-			}
-		},
-		"OracleInterface": {
-			"source": "cadence/deps/OracleInterface.cdc",
+		"OracleConfig": {
+			"source": "./imports/cec15c814971c1dc/OracleConfig.cdc",
 			"aliases": {
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
 			}
 		},
-		"OracleConfig": {
-			"source": "cadence/deps/OracleConfig.cdc",
+		"OracleInterface": {
+			"source": "./imports/cec15c814971c1dc/OracleInterface.cdc",
 			"aliases": {
 				"mainnet": "cec15c814971c1dc",
 				"testnet": "2a9b59c3e2b72ee0"
 			}
 		},
 		"PublicPriceOracle": {
-			"source": "cadence/deps/PublicPriceOracle.cdc",
+			"source": "./imports/cec15c814971c1dc/PublicPriceOracle.cdc",
 			"aliases": {
 				"mainnet": "ec67451f8a58216a",
 				"testnet": "866a9f1e81898147"
+			}
+		},
+		"StringUtils": {
+			"source": "./imports/a340dc0a4ec828ab/StringUtils.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"ViewResolver": {
+			"source": "./imports/1d7e57aa55817448/ViewResolver.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		}
+	},
+	"dependencies": {
+		"AddressUtils": {
+			"source": "mainnet://a340dc0a4ec828ab.AddressUtils",
+			"hash": "fbef5765f68a64359f2ca799df0fbd594a6e1c92a6f6a0fbba980751e593803f",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"ArrayUtils": {
+			"source": "mainnet://a340dc0a4ec828ab.ArrayUtils",
+			"hash": "6b17ff77591d04ac7dbb07adbd8df3ee5a67ea5bf361099a7b78676b9a58eacc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"CapabilityDelegator": {
+			"source": "mainnet://d8a7e05a7ac670c0.CapabilityDelegator",
+			"hash": "026019cb04d32e65fca7f40f700f2d46d16a41521f38db27bbf5963816b5d971",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"CapabilityFactory": {
+			"source": "mainnet://d8a7e05a7ac670c0.CapabilityFactory",
+			"hash": "742bd314afa81bdff5eae4293e7df25923120c70d1f200dff253740deb741cb8",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"CapabilityFilter": {
+			"source": "mainnet://d8a7e05a7ac670c0.CapabilityFilter",
+			"hash": "ebf6b62fbc3b31ec825839e62a39baf481c0244106c0e55a7bdb9c15e374cd6a",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"Clock": {
+			"source": "mainnet://097bafa4e0b48eef.Clock",
+			"hash": "1f1f10093a45099eb5c6a5d4b4c54aba2b34fa21883026ea261007a554fccfdd",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"DapperUtilityCoin": {
+			"source": "mainnet://ead892083b3e2c6c.DapperUtilityCoin",
+			"hash": "1bc81bba195588adaa3c269d0c4f6e947c05b8a1301d17ea760c8b670a19cab1",
+			"aliases": {
+				"mainnet": "ead892083b3e2c6c"
+			}
+		},
+		"Debug": {
+			"source": "mainnet://097bafa4e0b48eef.Debug",
+			"hash": "ef5e5cc2f088a4fb23ff46bcedb95a9aaaf029d5d24d13f568933ba2b70ff777",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"Domains": {
+			"source": "mainnet://233eb012d34b0070.Domains",
+			"hash": "29164d9aa71f8a63de0025edee3ed3af5a10d609e8786ed430c59f2db4013432",
+			"aliases": {
+				"mainnet": "233eb012d34b0070",
+				"testnet": "b05b2abb42335e88"
+			}
+		},
+		"FIND": {
+			"source": "mainnet://097bafa4e0b48eef.FIND",
+			"hash": "6144210577276e0c231caacc7418262741c8c6acca11be0a77e4de0e19c2e58f",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FNSConfig": {
+			"source": "mainnet://233eb012d34b0070.FNSConfig",
+			"hash": "14ccdb14d52835ccb7c0026b9af778b902ef4006975a0e78694a69513fac4146",
+			"aliases": {
+				"mainnet": "233eb012d34b0070",
+				"testnet": "b05b2abb42335e88"
+			}
+		},
+		"FUSD": {
+			"source": "mainnet://3c5959b568896393.FUSD",
+			"hash": "ac7997071bc0d5b497ae1b9575a764e58e1ae657d1147f7bfb22883140aaa4bc",
+			"aliases": {
+				"mainnet": "3c5959b568896393"
+			}
+		},
+		"FiatToken": {
+			"source": "mainnet://b19436aae4d94622.FiatToken",
+			"hash": "503c6888f75e5475957e5cec1613c2884561a97e1fa521dbadd35cde216e69fd",
+			"aliases": {
+				"mainnet": "b19436aae4d94622"
+			}
+		},
+		"FindUtils": {
+			"source": "mainnet://097bafa4e0b48eef.FindUtils",
+			"hash": "6c95b363df99533a4f22198dfd0d64328ede2c162a6c2c9d312df3ca12d455b5",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FindViews": {
+			"source": "mainnet://097bafa4e0b48eef.FindViews",
+			"hash": "32a5e6232fe0998bf07fa11f968cd57320a741db3365920a5485ddff7fce742d",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FlowToken": {
+			"source": "mainnet://1654653399040a61.FlowToken",
+			"hash": "7e2bb5acf84ddcd8ad4a9ddb1e3595c8148ac0a711551e27aa7231db51b2d7ce",
+			"aliases": {
+				"emulator": "0ae53cb6e3f42a79",
+				"mainnet": "1654653399040a61",
+				"testnet": "7e60df042a9c0868"
+			}
+		},
+		"FungibleToken": {
+			"source": "mainnet://f233dcee88fe0abe.FungibleToken",
+			"hash": "6839378c7c94fa051db4f63fcc5c572ee7a7f49b962f2d161c8f2d7381805299",
+			"aliases": {
+				"emulator": "ee82856bf20e2aa6",
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"FungibleTokenMetadataViews": {
+			"source": "mainnet://f233dcee88fe0abe.FungibleTokenMetadataViews",
+			"hash": "46174b8f88bfe289c17e00348643536ab70a27f9b69e7bb1cddc70949fc8cb4b",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"HybridCustody": {
+			"source": "mainnet://d8a7e05a7ac670c0.HybridCustody",
+			"hash": "455e527f1ad0f6b842979350bad9f158a09cd94632884a46075939dfef2dce3c",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"InscriptionMetadata": {
+			"source": "mainnet://88dd257fcf26d3cc.InscriptionMetadata",
+			"hash": "4f40b2deeb052d4136b4203027e8c8020fa520e4044a4872abc9c612879afb57",
+			"aliases": {
+				"mainnet": "88dd257fcf26d3cc",
+				"testnet": "564b229bd8380848"
+			}
+		},
+		"MetadataViews": {
+			"source": "mainnet://1d7e57aa55817448.MetadataViews",
+			"hash": "8d605dbd8135085aa9e8bb0604ff67ddb24f70c9368c0be7673efaaa17fcfc8f",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"NFTCatalog": {
+			"source": "mainnet://49a7cda3a1eecc29.NFTCatalog",
+			"hash": "1764304baead3b4c248073011c931e0f803c8961e0b8a19be48e8562461e6e3c",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "49a7cda3a1eecc29",
+				"testnet": "324c34e1c517e4db"
+			}
+		},
+		"NFTRetrieval": {
+			"source": "mainnet://49a7cda3a1eecc29.NFTRetrieval",
+			"hash": "3daa75ef44751d4c45f99bb8f8a86008cfa81ca9d6cd449a91ca6209a4414074",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "49a7cda3a1eecc29",
+				"testnet": "324c34e1c517e4db"
+			}
+		},
+		"NFTStorefrontV2": {
+			"source": "mainnet://4eb8a10cb9f87357.NFTStorefrontV2",
+			"hash": "8658d48604357b783616d2de75f066ac8178c53b993f01059822a721aeda2409",
+			"aliases": {
+				"mainnet": "4eb8a10cb9f87357"
+			}
+		},
+		"NonFungibleToken": {
+			"source": "mainnet://1d7e57aa55817448.NonFungibleToken",
+			"hash": "cdd73be33e303af8e2658bca8a6c1a24494e492e4dc577dbeef14113f04b1ce1",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"OnChainMultiSig": {
+			"source": "mainnet://220c1b4155f86f2f.OnChainMultiSig",
+			"hash": "6aac70dde31d4e248dfbfab5574c89ca17e51981640152bb814dff7798cca3a6",
+			"aliases": {
+				"mainnet": "220c1b4155f86f2f"
+			}
+		},
+		"OracleConfig": {
+			"source": "mainnet://cec15c814971c1dc.OracleConfig",
+			"hash": "f8ad5b77d61a8b5fb16ae08429da686649097247592678efd7b2a498f8635898",
+			"aliases": {
+				"mainnet": "cec15c814971c1dc",
+				"testnet": "2a9b59c3e2b72ee0"
+			}
+		},
+		"OracleInterface": {
+			"source": "mainnet://cec15c814971c1dc.OracleInterface",
+			"hash": "e7c1f419eab82e4e4b6fef15c07052859e1de6751899574dbda8acdfeaf292c0",
+			"aliases": {
+				"mainnet": "cec15c814971c1dc",
+				"testnet": "2a9b59c3e2b72ee0"
+			}
+		},
+		"Profile": {
+			"source": "mainnet://097bafa4e0b48eef.Profile",
+			"hash": "a32ee064cefc7154cc3d94542f47437606ca76587bc8b369f32d48fd2477182f",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"ProfileCache": {
+			"source": "mainnet://097bafa4e0b48eef.ProfileCache",
+			"hash": "b43641a297a4a385dcc86d4247a2a948f0991338b415c87850bf90ddbf375f06",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"PublicPriceOracle": {
+			"source": "mainnet://ec67451f8a58216a.PublicPriceOracle",
+			"hash": "c3bbab7908f90655be297cb2bf127254f3072e61e0525c1832f4346ffaaf67f1",
+			"aliases": {
+				"mainnet": "ec67451f8a58216a",
+				"testnet": "866a9f1e81898147"
+			}
+		},
+		"Sender": {
+			"source": "mainnet://097bafa4e0b48eef.Sender",
+			"hash": "555e216d5e521efe4ed7f9a434a60c4ad524caf014189197153f6a421987880e",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"StringUtils": {
+			"source": "mainnet://a340dc0a4ec828ab.StringUtils",
+			"hash": "5cb6f0c52bac8014c4b40cae267e505b52c37cddf10b761b84cbe02aed9b80f3",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"ViewResolver": {
+			"source": "mainnet://1d7e57aa55817448.ViewResolver",
+			"hash": "9fa41186f38899625a6b4774f1a9addf8d16b76022d52a99174b4493499dc3de",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
 			}
 		}
 	},
 	"networks": {
 		"emulator": "127.0.0.1:3569",
-		"testing": "127.0.0.1:3569",
 		"mainnet": "access.mainnet.nodes.onflow.org:9000",
+		"testing": "127.0.0.1:3569",
 		"testnet": "access.devnet.nodes.onflow.org:9000"
 	},
 	"accounts": {
 		"default": {
 			"address": "01cf0e2f2f715450",
-			"key": {
-				"type": "file",
-				"location": "./emulator.key"
-			}
-		},
-		"emulator-account": {
-			"address": "f8d6e0586b0a20c7",
 			"key": {
 				"type": "file",
 				"location": "./emulator.key"
@@ -369,10 +698,20 @@
 				"location": "./emulator.key"
 			}
 		},
+		"emulator-account": {
+			"address": "f8d6e0586b0a20c7",
+			"key": {
+				"type": "file",
+				"location": "./emulator.key"
+			}
+		},
 		"mainnet-admin": {
 			"address": "d2abb5dbf5e08666",
 			"key": {
 				"type": "file",
+				"index": 1,
+				"signatureAlgorithm": "ECDSA_P256",
+				"hashAlgorithm": "SHA3_256",
 				"location": "mainnet-admin.pkey"
 			}
 		},
@@ -411,7 +750,9 @@
 				"CapabilityDelegator",
 				"CapabilityFilter",
 				"CapabilityFactory",
+				"ETHUtils",
 				"Fixes",
+				"FixesInscriptionFactory",
 				"FixesWrappedNFT",
 				"FixesHeartbeat",
 				"FRC20FTShared",
@@ -428,12 +769,18 @@
 				"FRC20Staking",
 				"FRC20StakingManager",
 				"FRC20StakingForwarder",
-				"FRC20StakingVesting"
+				"FRC20StakingVesting",
+				"EVMAgent",
+				"FGameLottery",
+				"FGameLotteryRegistry",
+				"FGameLotteryFactory"
 			]
 		},
 		"mainnet": {
 			"mainnet-admin": [
+				"ETHUtils",
 				"Fixes",
+				"FixesInscriptionFactory",
 				"FixesWrappedNFT",
 				"FixesHeartbeat",
 				"FRC20FTShared",
@@ -450,12 +797,18 @@
 				"FRC20Staking",
 				"FRC20StakingManager",
 				"FRC20StakingForwarder",
-				"FRC20StakingVesting"
+				"FRC20StakingVesting",
+				"EVMAgent",
+				"FGameLottery",
+				"FGameLotteryRegistry",
+				"FGameLotteryFactory"
 			]
 		},
 		"testnet": {
 			"testnet-admin": [
+				"ETHUtils",
 				"Fixes",
+				"FixesInscriptionFactory",
 				"FixesWrappedNFT",
 				"FixesHeartbeat",
 				"FRC20FTShared",
@@ -472,7 +825,11 @@
 				"FRC20Staking",
 				"FRC20StakingManager",
 				"FRC20StakingForwarder",
-				"FRC20StakingVesting"
+				"FRC20StakingVesting",
+				"EVMAgent",
+				"FGameLottery",
+				"FGameLotteryRegistry",
+				"FGameLotteryFactory"
 			]
 		}
 	}

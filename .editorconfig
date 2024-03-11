@@ -19,5 +19,8 @@ indent_size = 4
 [*.md]
 trim_trailing_whitespace = false
 
+[*.pkey]
+insert_final_newline = false
+
 [*.key]
 insert_final_newline = false

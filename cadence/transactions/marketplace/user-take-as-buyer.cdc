@@ -4,6 +4,7 @@ import "FungibleToken"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesAvatar"
 import "FixesHeartbeat"
 import "FRC20FTShared"
@@ -21,6 +22,16 @@ transaction(
     let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
 
     prepare(acct: AuthAccount) {
+        /** ------------- Prepare the Inscription Store - Start ---------------- */
+        let storePath = Fixes.getFixesStoreStoragePath()
+        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        }
+
+        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+            ?? panic("Could not borrow a reference to the Inscriptions Store!")
+        /** ------------- End -------------------------------------------------- */
+
         /** ------------- Start -- FRC20 Marketplace -------------  */
         // Borrow a reference to the FRC20Marketplace contract
         self.market = FRC20MarketManager.borrowMarket(tick)
@@ -99,9 +110,6 @@ transaction(
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
-        // frc20 basic attributes
-        let mimeType = "text/plain"
-        let metaProtocol = "frc20"
 
         // For each buy item, check the listing
         for rankedId in batchBuyItems.keys {
@@ -135,45 +143,25 @@ transaction(
             let buyPrice = listingDetails.totalPrice * buyAmount / listingDetails.amount
 
             /** ------------- Start -- Inscription Initialization -------------  */
-            // basic attributes
-            let dataStr = "op=list-take-buynow,tick=".concat(tick)
-                .concat(",amt=").concat(buyAmount.toString())
-            let metadata = dataStr.utf8
+            // create the metadata
+            let dataStr = FixesInscriptionFactory.buildMarketTakeBuyNow(tick: tick, amount: buyAmount)
 
             // estimate the required storage
-            let estimatedReqValue = Fixes.estimateValue(
-                index: Fixes.totalInscriptions,
-                mimeType: mimeType,
-                data: metadata,
-                protocol: metaProtocol,
-                encoding: nil
-            )
+            let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
             // Withdraw tokens from the signer's stored vault
             // Total amount to withdraw is the estimated required value + the buy price
             let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
 
             // Create the Inscription first
-            let newIns <- Fixes.createInscription(
-                // Withdraw tokens from the signer's stored vault
-                value: <- (flowToReserve as! @FlowToken.Vault),
-                mimeType: mimeType,
-                metadata: metadata,
-                metaProtocol: metaProtocol,
-                encoding: nil,
-                parentId: nil
+            let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+                dataStr,
+                <- (flowToReserve as! @FlowToken.Vault),
+                store
             )
-            // save the new Inscription to storage
-            let newInsId = newIns.getId()
-            let newInsPath = Fixes.getFixesStoragePath(index: newInsId)
-            assert(
-                acct.borrow<&AnyResource>(from: newInsPath) == nil,
-                message: "Inscription with ID ".concat(newInsId.toString()).concat(" already exists!")
-            )
-            acct.save(<- newIns, to: newInsPath)
 
             // borrow a reference to the new Inscription
-            let insRef = acct.borrow<&Fixes.Inscription>(from: newInsPath)
+            let insRef = store.borrowInscriptionWritableRef(newInsId)
                 ?? panic("Could not borrow reference to the new Inscription!")
             /** ------------- End ---------------------------------------------  */
 

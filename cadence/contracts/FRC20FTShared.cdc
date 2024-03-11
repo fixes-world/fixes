@@ -690,18 +690,25 @@ access(all) contract FRC20FTShared {
     /// The Market config type
     ///
     access(all) enum ConfigType: UInt8 {
+        // Platform config type
         access(all) case PlatformSalesFee
         access(all) case PlatformSalesCutTreasuryPoolRatio
         access(all) case PlatformSalesCutPlatformPoolRatio
         access(all) case PlatformSalesCutPlatformStakersRatio
         access(all) case PlatformSalesCutMarketRatio
         access(all) case PlatofrmMarketplaceStakingToken
+        // Market config type
         access(all) case MarketFeeSharedRatio
         access(all) case MarketFeeTokenSpecificRatio
         access(all) case MarketFeeDeployerRatio
         access(all) case MarketAccessibleAfter
         access(all) case MarketWhitelistClaimingToken
         access(all) case MarketWhitelistClaimingAmount
+        // FGameLottery config type
+        access(all) case GameLotteryTicketPrice
+        access(all) case GameLotteryEpochInterval
+        access(all) case GameLotteryAutoStart
+        access(all) case GameLotteryServiceFee
     }
 
     /* --- Public Methods --- */
@@ -749,6 +756,18 @@ access(all) contract FRC20FTShared {
                 break
             case ConfigType.MarketWhitelistClaimingAmount:
                 key = "market:WhitelistClaimingAmount"
+                break
+            case ConfigType.GameLotteryTicketPrice:
+                key = "gameLottery:TicketPrice"
+                break
+            case ConfigType.GameLotteryEpochInterval:
+                key = "gameLottery:EpochInterval"
+                break
+            case ConfigType.GameLotteryAutoStart:
+                key = "gameLottery:AutoStart"
+                break
+            case ConfigType.GameLotteryServiceFee:
+                key = "gameLottery:ServiceFee"
                 break
             }
             return key
