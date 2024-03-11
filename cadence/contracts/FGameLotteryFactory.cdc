@@ -230,7 +230,7 @@ access(all) contract FGameLotteryFactory {
             let fixesMintingStr = FixesInscriptionFactory.buildMintFRC20(tick: "fixes", amt: fixesMeta.limit)
 
             var i: UInt8 = 0
-            while i < totalMintAmount {
+            while i < totalMintAmount && self.isFIXESMintingAvailable() {
                 // required $FLOW per mint
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
                 let costReserve <- flowVault.withdraw(amount: estimatedReqValue)
@@ -347,7 +347,7 @@ access(all) contract FGameLotteryFactory {
             )
 
             var i: UInt64 = 0
-            while i < totalMintAmount {
+            while i < totalMintAmount && self.isFIXESMintingAvailable() {
                 // required $FLOW per mint
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
                 let costReserve <- flowVault.withdraw(amount: estimatedReqValue)
