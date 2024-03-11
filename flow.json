@@ -778,7 +778,9 @@
 		},
 		"mainnet": {
 			"mainnet-admin": [
+				"ETHUtils",
 				"Fixes",
+				"FixesInscriptionFactory",
 				"FixesWrappedNFT",
 				"FixesHeartbeat",
 				"FRC20FTShared",
@@ -795,12 +797,18 @@
 				"FRC20Staking",
 				"FRC20StakingManager",
 				"FRC20StakingForwarder",
-				"FRC20StakingVesting"
+				"FRC20StakingVesting",
+				"EVMAgent",
+				"FGameLottery",
+				"FGameLotteryRegistry",
+				"FGameLotteryFactory"
 			]
 		},
 		"testnet": {
 			"testnet-admin": [
+				"ETHUtils",
 				"Fixes",
+				"FixesInscriptionFactory",
 				"FixesWrappedNFT",
 				"FixesHeartbeat",
 				"FRC20FTShared",
@@ -817,7 +825,11 @@
 				"FRC20Staking",
 				"FRC20StakingManager",
 				"FRC20StakingForwarder",
-				"FRC20StakingVesting"
+				"FRC20StakingVesting",
+				"EVMAgent",
+				"FGameLottery",
+				"FGameLotteryRegistry",
+				"FGameLotteryFactory"
 			]
 		}
 	}
