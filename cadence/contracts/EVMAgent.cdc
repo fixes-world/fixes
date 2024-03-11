@@ -65,6 +65,10 @@ access(all) contract EVMAgent {
     access(all) resource interface  IEntrustedStatus {
         /// Borrow the agency capability
         access(all) fun borrowAgency(): &Agency{AgencyPublic}
+        /// Get the flow spent by the entrusted account
+        access(all) view fun getFeeSpent(): UFix64
+        /// Add the spent flow fee
+        access(contract) fun addSpentFlowFee(_ amount: UFix64)
     }
 
     /// Entrusted status resource stored in the entrusted child account
@@ -72,17 +76,30 @@ access(all) contract EVMAgent {
     access(all) resource EntrustedStatus: IEntrustedStatus {
         // Capability to the agency
         access(self) let agency: Capability<&Agency{AgencyPublic}>
+        // record the flow spent by the entrusted account
+        access(self) var feeSpent: UFix64
 
         init(
             _ agency: Capability<&Agency{AgencyPublic}>
         ) {
             self.agency = agency
+            self.feeSpent = 0.0
         }
 
         /// Borrow the agency capability
         access(all)
         fun borrowAgency(): &Agency{AgencyPublic} {
             return self.agency.borrow() ?? panic("Agency not found")
+        }
+
+        /// Get the flow spent by the entrusted account
+        access(all) view fun getFeeSpent(): UFix64 {
+            return self.feeSpent
+        }
+
+        /// Add the spent flow fee
+        access(contract) fun addSpentFlowFee(_ amount: UFix64) {
+            self.feeSpent = self.feeSpent + amount
         }
     }
 
@@ -515,7 +532,7 @@ access(all) contract EVMAgent {
 
             // create the shared store and save it in the account
             if childAcctRef.borrow<&AnyResource>(from: EVMAgent.entrustedStatusStoragePath) == nil {
-                let cap = EVMAgent.getAgencyPublicCap(childAcctRef.address)
+                let cap = EVMAgent.getAgencyPublicCap(self.getOwnerAddress())
                 assert(cap.check(), message: "Invalid agency capability")
 
                 let sharedStore <- create EVMAgent.EntrustedStatus(agency: cap)
