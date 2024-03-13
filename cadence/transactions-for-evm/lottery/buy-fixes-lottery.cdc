@@ -9,9 +9,10 @@ import "FGameLotteryFactory"
 import "EVMAgent"
 
 transaction(
-    ticketAmt: UInt8,
+    ticketAmt: UInt64,
     powerupLv: UInt8,
-    forMinting: Bool,
+    forFlow: Bool,
+    withMinting: Bool,
     hexPublicKey: String,
     hexSignature: String,
     timestamp: UInt64,
@@ -26,8 +27,8 @@ transaction(
             ?? panic("Could not borrow a reference to the EVMAgency!")
 
         let acct = agency.verifyAndBorrowEntrustedAccount(
-            methodFingerprint: "buy-fixes-lottery(UInt8|UInt8|Bool)",
-            params: [ticketAmt.toString(), powerupLv.toString(), forMinting ? "true" : "false"],
+            methodFingerprint: "buy-fixes-lottery(UInt64|UInt8|Bool|Bool)",
+            params: [ticketAmt.toString(), powerupLv.toString(), forFlow ? "true" : "false", withMinting ? "true" : "false"],
             hexPublicKey: hexPublicKey,
             hexSignature: hexSignature,
             timestamp: timestamp
@@ -66,8 +67,8 @@ transaction(
 
         let powerupType = FGameLotteryFactory.PowerUpType(rawValue: powerupLv) ?? panic("Invalid powerup level")
 
-        let estimateFlowCost = forMinting
-            ? FGameLotteryFactory.getFIXESMintingLotteryFlowCost(ticketAmt, powerupType)
+        let estimateFlowCost = forFlow
+            ? FGameLotteryFactory.getFIXESMintingLotteryFlowCost(ticketAmt, powerupType, withMinting)
             : FGameLotteryFactory.getFIXESLotteryFlowCost(ticketAmt, powerupType, acct.address)
 
         // Get a reference to the signer's stored vault
@@ -86,11 +87,12 @@ transaction(
 
         // Purchase the lottery
         var restVault: @FlowToken.Vault? <- nil
-        if forMinting {
+        if forFlow {
             restVault <-! FGameLotteryFactory.buyFIXESMintingLottery(
                 flowVault: <- self.flowCost,
                 ticketAmount: ticketAmt,
                 powerup: FGameLotteryFactory.PowerUpType(rawValue: powerupLv) ?? panic("Invalid powerup level"),
+                withMinting: withMinting,
                 recipient: ticketCollectionCap,
                 inscriptionStore: self.store
             )

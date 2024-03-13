@@ -157,18 +157,19 @@ access(all) contract FGameLotteryFactory {
     /// Get the cost of buying FIXES Minting Lottery Tickets
     ///
     access(all) view
-    fun getFIXESMintingLotteryFlowCost(_ ticketAmount: UInt8, _ powerup: PowerUpType): UFix64 {
+    fun getFIXESMintingLotteryFlowCost(_ ticketAmount: UInt64, _ powerup: PowerUpType, _ withMinting: Bool): UFix64 {
         let powerupValue: UFix64 = self.getPowerUpValue(powerup)
-        if self.isFIXESMintingAvailable() {
+        // singleton resource
+        let registry = FGameLotteryRegistry.borrowRegistry()
+        // Ticket info
+        let poolName = self.getFIXESMintingLotteryPoolName()
+        let lotteryPoolAddr = registry.getLotteryPoolAddress(poolName) ?? panic("Lottery pool not found")
+        let lotteryPoolRef = FGameLottery.borrowLotteryPool(lotteryPoolAddr)
+            ?? panic("Lottery pool not found")
+        let ticketPrice = lotteryPoolRef.getTicketPrice()
+        if self.isFIXESMintingAvailable() && withMinting {
             return 1.0 * UFix64(ticketAmount) * powerupValue
         } else {
-            let registry = FGameLotteryRegistry.borrowRegistry()
-            // Ticket info
-            let poolName = self.getFIXESMintingLotteryPoolName()
-            let lotteryPoolAddr = registry.getLotteryPoolAddress(poolName) ?? panic("Lottery pool not found")
-            let lotteryPoolRef = FGameLottery.borrowLotteryPool(lotteryPoolAddr)
-                ?? panic("Lottery pool not found")
-            let ticketPrice = lotteryPoolRef.getTicketPrice()
             return ticketPrice * UFix64(ticketAmount) * powerupValue
         }
     }
@@ -179,8 +180,9 @@ access(all) contract FGameLotteryFactory {
     access(all)
     fun buyFIXESMintingLottery(
         flowVault: @FlowToken.Vault,
-        ticketAmount: UInt8,
+        ticketAmount: UInt64,
         powerup: PowerUpType,
+        withMinting: Bool,
         recipient: Capability<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>,
         inscriptionStore: &Fixes.InscriptionsStore,
     ): @FlowToken.Vault {
@@ -209,7 +211,7 @@ access(all) contract FGameLotteryFactory {
         )
 
         // for minting available
-        if self.isFIXESMintingAvailable() {
+        if withMinting && self.isFIXESMintingAvailable() {
             let totalCost: UFix64 = 1.0 * UFix64(ticketAmount) * powerupValue
             log("Total cost: ".concat(totalCost.toString()))
             assert(
@@ -218,7 +220,7 @@ access(all) contract FGameLotteryFactory {
             )
 
             // check if the total mint amount is valid
-            let totalMintAmount = ticketAmount * UInt8(powerupValue) * 4
+            let totalMintAmount = ticketAmount * UInt64(powerupValue) * 4
             log("Total Mints: ".concat(totalMintAmount.toString()))
             assert(
                 totalMintAmount > 0 && totalMintAmount <= 120,
@@ -229,7 +231,7 @@ access(all) contract FGameLotteryFactory {
             let fixesMeta = frc20Indexer.getTokenMeta(tick: "fixes") ?? panic("FIXES Token meta not found")
             let fixesMintingStr = FixesInscriptionFactory.buildMintFRC20(tick: "fixes", amt: fixesMeta.limit)
 
-            var i: UInt8 = 0
+            var i: UInt64 = 0
             while i < totalMintAmount && self.isFIXESMintingAvailable() {
                 // required $FLOW per mint
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
@@ -269,7 +271,7 @@ access(all) contract FGameLotteryFactory {
     /// Get the cost of buying FIXES Lottery Tickets
     ///
     access(all) view
-    fun getFIXESLotteryFlowCost(_ ticketAmount: UInt8, _ powerup: PowerUpType, _ recipient: Address): UFix64 {
+    fun getFIXESLotteryFlowCost(_ ticketAmount: UInt64, _ powerup: PowerUpType, _ recipient: Address): UFix64 {
         // check if the FLOW balance is sufficient
         let ticketPrice = FixesInscriptionFactory.estimateLotteryFIXESTicketsCost(1, nil)
         let powerupValue: UFix64 = self.getPowerUpValue(powerup)
@@ -303,7 +305,7 @@ access(all) contract FGameLotteryFactory {
     access(all)
     fun buyFIXESLottery(
         flowVault: @FlowToken.Vault,
-        ticketAmount: UInt8,
+        ticketAmount: UInt64,
         powerup: PowerUpType,
         recipient: Capability<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>,
         inscriptionStore: &Fixes.InscriptionsStore,
@@ -340,11 +342,6 @@ access(all) contract FGameLotteryFactory {
         if balance < ticketsPayment {
             // mint enough $FIXES to buy the tickets
             let totalMintAmount = UInt64((ticketsPayment - balance) / fixesMeta.limit) + 1
-            let remainingMints = UInt64((fixesMeta.max - fixesMeta.supplied) / fixesMeta.limit)
-            assert(
-                totalMintAmount <= remainingMints,
-                message: "Insufficient $FIXES minting capacity"
-            )
 
             var i: UInt64 = 0
             while i < totalMintAmount && self.isFIXESMintingAvailable() {
@@ -367,13 +364,17 @@ access(all) contract FGameLotteryFactory {
 
         // check current balance
         balance = frc20Indexer.getBalance(tick: "fixes", addr: recipientAddr)
+        var ticketAmountFinal = ticketAmount
+        if ticketsPayment > balance {
+            ticketAmountFinal = UInt64(balance / (ticketPrice * powerupValue))
+        }
         assert(
-            balance >= ticketsPayment,
+            ticketAmountFinal > 0,
             message: "Insufficient $FIXES balance"
         )
 
         // build the inscription string
-        let buyTicketsInsStr = FixesInscriptionFactory.buildLotteryBuyFIXESTickets(ticketAmount, powerupValue)
+        let buyTicketsInsStr = FixesInscriptionFactory.buildLotteryBuyFIXESTickets(ticketAmountFinal, powerupValue)
         let estimatedBuyTicketsInsCost = FixesInscriptionFactory.estimateFrc20InsribeCost(buyTicketsInsStr)
         let costReserve <- flowVault.withdraw(amount: estimatedBuyTicketsInsCost)
         // create the withdraw inscription
@@ -391,7 +392,7 @@ access(all) contract FGameLotteryFactory {
         lotteryPoolRef.buyTickets(
             // withdraw flow token from the vault
             payment: <- change,
-            amount: ticketAmount,
+            amount: ticketAmountFinal,
             powerup: powerupValue,
             recipient: recipient,
         )

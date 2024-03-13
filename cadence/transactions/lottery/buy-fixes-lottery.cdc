@@ -8,9 +8,10 @@ import "FGameLottery"
 import "FGameLotteryFactory"
 
 transaction(
-    ticketAmt: UInt8,
+    ticketAmt: UInt64,
     powerupLv: UInt8,
-    forMinting: Bool
+    forFlow: Bool,
+    withMinting: Bool,
 ) {
     let address: Address
     let store: &Fixes.InscriptionsStore
@@ -49,8 +50,8 @@ transaction(
 
         let powerupType = FGameLotteryFactory.PowerUpType(rawValue: powerupLv) ?? panic("Invalid powerup level")
 
-        let estimateFlowCost = forMinting
-            ? FGameLotteryFactory.getFIXESMintingLotteryFlowCost(ticketAmt, powerupType)
+        let estimateFlowCost = forFlow
+            ? FGameLotteryFactory.getFIXESMintingLotteryFlowCost(ticketAmt, powerupType, withMinting)
             : FGameLotteryFactory.getFIXESLotteryFlowCost(ticketAmt, powerupType, acct.address)
 
         // Get a reference to the signer's stored vault
@@ -69,11 +70,12 @@ transaction(
 
         // Purchase the lottery
         var restVault: @FlowToken.Vault? <- nil
-        if forMinting {
+        if forFlow {
             restVault <-! FGameLotteryFactory.buyFIXESMintingLottery(
                 flowVault: <- self.flowCost,
                 ticketAmount: ticketAmt,
                 powerup: FGameLotteryFactory.PowerUpType(rawValue: powerupLv) ?? panic("Invalid powerup level"),
+                withMinting: withMinting,
                 recipient: ticketCollectionCap,
                 inscriptionStore: self.store
             )

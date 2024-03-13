@@ -217,7 +217,7 @@ access(all) contract FixesInscriptionFactory {
     ///
     access(all) view
     fun estimateLotteryFIXESTicketsCost(
-        _ ticketAmount: UInt8,
+        _ ticketAmount: UInt64,
         _ powerup: UFix64?
     ): UFix64 {
         pre {
@@ -228,26 +228,11 @@ access(all) contract FixesInscriptionFactory {
         return base * UFix64(ticketAmount) * (powerup ?? 1.0)
     }
 
-    /// The cost of this lottery pool is $FLOW
-    ///
-    access(all) view
-    fun estimateLotteryFIXESMintingTicketsCost(
-        _ ticketAmount: UInt8,
-        _ powerup: UFix64?
-    ): UFix64 {
-        pre {
-            ticketAmount > 0: "Ticket amount must be greater than 0"
-            powerup == nil || (powerup! >= 1.0 && powerup! <= 10.0): "Powerup must be between 1.0 and 10.0"
-        }
-        let base = 1.0
-        return base * UFix64(ticketAmount) * (powerup ?? 1.0)
-    }
-
     /// Build the inscription for lottery $FIXES tickets buying
     ///
     access(all) view
     fun buildLotteryBuyFIXESTickets(
-        _ ticketAmount: UInt8,
+        _ ticketAmount: UInt64,
         _ powerup: UFix64?
     ): String {
         let amount = self.estimateLotteryFIXESTicketsCost(ticketAmount, powerup)
