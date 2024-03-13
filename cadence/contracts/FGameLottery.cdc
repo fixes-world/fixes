@@ -1432,7 +1432,7 @@ access(all) contract FGameLottery {
         access(all)
         fun buyTickets(
             payment: @FRC20FTShared.Change,
-            amount: UInt8,
+            amount: UInt64,
             powerup: UFix64?,
             recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
         )
@@ -1608,7 +1608,7 @@ access(all) contract FGameLottery {
         access(all)
         fun buyTickets(
             payment: @FRC20FTShared.Change,
-            amount: UInt8,
+            amount: UInt64,
             powerup: UFix64?,
             recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
         ) {
@@ -1633,7 +1633,7 @@ access(all) contract FGameLottery {
 
             // Create tickets
             let purchasedIds: [UInt64] = []
-            var i: UInt8 = 0
+            var i: UInt64 = 0
             while i < amount {
                 // Withdraw the payment
                 let one <- payment.withdrawAsChange(amount: oneTicketCost)
