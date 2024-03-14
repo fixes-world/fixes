@@ -6,8 +6,10 @@
 TODO: Add description
 
 */
+import "NonFungibleToken"
 import "Fixes"
 import "FRC20Indexer"
+import "FRC20SemiNFT"
 
 access(all) contract FRC20Votes {
     /* --- Events --- */
@@ -52,60 +54,6 @@ access(all) contract FRC20Votes {
 
     /* --- Interfaces & Resources --- */
 
-    access(all) resource interface VoterPublic {
-        access(all)
-        fun hasVoted(tick: String, proposalId: UInt64): Bool
-        access(all)
-        fun getVotedProposals(tick: String): [UInt64]
-    }
-
-    /// The resource of the FixesVotes voter identifier.
-    ///
-    access(all) resource VoterIdentity: VoterPublic {
-        access(self)
-        let voted: {String: {UInt64: Bool}}
-
-        init() {
-            self.voted = {}
-        }
-
-        /** ----- Read ----- */
-
-        access(all)
-        fun hasVoted(tick: String, proposalId: UInt64): Bool {
-            if let tickVoted = self.voted[tick] {
-                return tickVoted[proposalId] ?? false
-            } else {
-                return false
-            }
-        }
-
-        access(all)
-        fun getVotedProposals(tick: String): [UInt64] {
-            if let tickVoted = self.voted[tick] {
-                return tickVoted.keys
-            } else {
-                return []
-            }
-        }
-
-        /** ----- Write ----- */
-
-        access(contract)
-        fun onVote(tick: String, proposalId: UInt64) {
-            post {
-                self.voted[tick]![proposalId] == true
-            }
-            if let tickVoted = &self.voted[tick] as &{UInt64: Bool}? {
-                tickVoted[proposalId] = true
-            } else {
-                let tickVoted: {UInt64: Bool} = {}
-                tickVoted[proposalId] = true
-                self.voted[tick] = tickVoted
-            }
-        }
-    }
-
     /// The Proposal status.
     ///
     access(all) enum ProposalStatus: UInt8 {
@@ -118,9 +66,72 @@ access(all) contract FRC20Votes {
     /// The Proposal command type.
     ///
     access(all) enum CommandType: UInt8 {
-        access(all) case MarketplaceFee;
-        access(all) case BurnUnsupplied;
         access(all) case SetBurnable;
+        access(all) case BurnUnsupplied;
+        access(all) case MoveToLotteryJackpot;
+    }
+
+    access(all) resource interface VoterPublic {
+        access(all)
+        fun hasVoted(proposalId: UInt64): Bool
+        access(all)
+        fun getVotedProposals(tick: String): [UInt64]
+    }
+
+    /// The resource of the FixesVotes voter identifier.
+    ///
+    access(all) resource VoterIdentity: VoterPublic {
+        access(self)
+        let voted: {UInt64: Bool}
+        access(self)
+        let votedTicksMapping: {String: [UInt64]}
+        access(self)
+        let lockedSemiNFTs: @{UInt64: FRC20SemiNFT.NFT}
+
+        init() {
+            self.lockedSemiNFTs <- {}
+            self.voted = {}
+            self.votedTicksMapping = {}
+        }
+
+        destroy() {
+            destroy self.lockedSemiNFTs
+        }
+
+        /** ----- Read ----- */
+
+        access(all)
+        fun hasVoted(proposalId: UInt64): Bool {
+            return self.voted[proposalId] != nil
+        }
+
+        access(all)
+        fun getVotedProposals(tick: String): [UInt64] {
+            if let voted = self.votedTicksMapping[tick] {
+                return voted
+            } else {
+                return []
+            }
+        }
+
+        /** ----- Write ----- */
+
+        access(contract)
+        fun onVote(tick: String, proposalId: UInt64) {
+            pre {
+                self.voted[proposalId] == false: "Proposal is already voted"
+            }
+            post {
+                self.voted[proposalId] == true: "Proposal is not voted"
+                self.votedTicksMapping[tick]?.length! == before(self.votedTicksMapping[tick]?.length!) + 1: "Proposal is not added to the tick"
+            }
+            self.voted[proposalId] = true
+            if self.votedTicksMapping[tick] == nil {
+                self.votedTicksMapping[tick] = [proposalId]
+            } else {
+                self.votedTicksMapping[tick]?.append(proposalId)
+            }
+        }
     }
 
     /// The struct of the FixesVotes proposal.
