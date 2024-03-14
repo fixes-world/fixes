@@ -21,8 +21,8 @@ fun main(
 }
 
 access(all) struct ArchivedInfo {
-    let maxIndex: UInt64
-    let archivedAmount: [UInt64]
+    access(all) let maxIndex: UInt64
+    access(all) let archivedAmount: [UInt64]
 
     init(maxIndex: UInt64, archivedAmount: [UInt64]) {
         self.maxIndex = maxIndex
