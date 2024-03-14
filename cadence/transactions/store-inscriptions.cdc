@@ -2,6 +2,7 @@ import "Fixes"
 import "FixesInscriptionFactory"
 
 transaction(
+    limit: Int
 ) {
     prepare(acct: AuthAccount) {
         let archiveIdxPath = Fixes.getArchivedFixesMaxIndexStoragePath()
@@ -18,7 +19,6 @@ transaction(
             ?? panic("Could not borrow a reference to the Archived Inscriptions!")
 
         let paths: [StoragePath] = []
-        let limit = 500
         var i = 0
         acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
             if type == Type<@Fixes.Inscription>() {
