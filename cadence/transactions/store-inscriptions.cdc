@@ -18,7 +18,7 @@ transaction(
             ?? panic("Could not borrow a reference to the Archived Inscriptions!")
 
         let paths: [StoragePath] = []
-        let limit = 1000
+        let limit = 500
         var i = 0
         acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
             if type == Type<@Fixes.Inscription>() {
