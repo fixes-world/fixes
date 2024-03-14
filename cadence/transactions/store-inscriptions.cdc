@@ -2,7 +2,7 @@ import "Fixes"
 import "FixesInscriptionFactory"
 
 transaction(
-    limit: Int
+    insIds: [UInt64]
 ) {
     prepare(acct: AuthAccount) {
         let archiveIdxPath = Fixes.getArchivedFixesMaxIndexStoragePath()
@@ -18,30 +18,19 @@ transaction(
         let archiveRef = acct.borrow<&Fixes.ArchivedInscriptions>(from: archivePath)
             ?? panic("Could not borrow a reference to the Archived Inscriptions!")
 
-        let paths: [StoragePath] = []
-        var i = 0
-        acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
-            if type == Type<@Fixes.Inscription>() {
-                if let insRef = acct.borrow<&Fixes.Inscription>(from: path) {
-                    if !insRef.isExtracted() {
-                        return true
-                    }
-                    paths.append(path)
-                    if i > limit {
-                        return false
-                    }
+        for insId in insIds {
+            let insPath = Fixes.getFixesStoragePath(index: insId)
+            if let insRef = acct.borrow<&Fixes.Inscription>(from: insPath) {
+                if !insRef.isExtracted() {
+                    continue
                 }
-            }
-            return true
-        })
-        for path in paths {
-            if let ins <- acct.load<@Fixes.Inscription>(from: path) {
-                archiveRef.archive(<- ins)
-                i = i + 1
-                let isFull = archiveRef.isFull()
-                if isFull {
-                    acct.save<UInt64>(archiveIdx! + 1, to: archiveIdxPath)
-                    break
+                if let ins <- acct.load<@Fixes.Inscription>(from: insPath) {
+                    archiveRef.archive(<- ins)
+                    let isFull = archiveRef.isFull()
+                    if isFull {
+                        acct.save<UInt64>(archiveIdx! + 1, to: archiveIdxPath)
+                        break
+                    }
                 }
             }
         }
