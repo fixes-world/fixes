@@ -129,6 +129,7 @@ transaction(
         // add to user's storefront
         let listingId = self.storefront.createListing(
             ins: <- self.ins,
+            marginVault: nil,
             commissionRecipientCaps: nil,
             customID: nil
         )

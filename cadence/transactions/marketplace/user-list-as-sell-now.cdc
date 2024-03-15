@@ -23,6 +23,7 @@ transaction(
     let storefront: &FRC20Storefront.Storefront
     let flowTokenReceiver: Capability<&FlowToken.Vault{FungibleToken.Receiver}>
     let ins: @Fixes.Inscription
+    let marginVault: @FlowToken.Vault
 
     prepare(acct: AuthAccount) {
         /** ------------- Start -- FRC20 Marketing Account General Initialization -------------  */
@@ -111,10 +112,14 @@ transaction(
             ?? panic("Could not borrow reference to the owner's Vault!")
         // Withdraw tokens from the signer's stored vault
         // Total amount to withdraw is the estimated required value + the buy price
-        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
+        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first
         self.ins <- FixesInscriptionFactory.createFrc20Inscription(dataStr, <- (flowToReserve as! @FlowToken.Vault))
+
+        // Deposit the payment flow vault to the inscription vault
+        self.marginVault <- vaultRef.withdraw(amount: buyPrice) as! @FlowToken.Vault
+
         /** ------------- End ---------------------------------------------  */
 
         // Borrow a reference to the FRC20Marketplace contract
@@ -130,6 +135,7 @@ transaction(
         // add to user's storefront
         let listingId = self.storefront.createListing(
             ins: <- self.ins,
+            marginVault: <- self.marginVault,
             commissionRecipientCaps: nil,
             customID: nil
         )
