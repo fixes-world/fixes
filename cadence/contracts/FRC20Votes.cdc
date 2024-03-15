@@ -59,8 +59,8 @@ access(all) contract FRC20Votes {
     access(all) enum ProposalStatus: UInt8 {
         access(all) case Drafting;
         access(all) case Voting;
+        access(all) case Pending;
         access(all) case Executed;
-        access(all) case Cancelled;
     }
 
     /// The Proposal command type.
@@ -80,7 +80,7 @@ access(all) contract FRC20Votes {
 
     /// The resource of the FixesVotes voter identifier.
     ///
-    access(all) resource VoterIdentity: VoterPublic {
+    access(all) resource VoterIdentity: VoterPublic, FRC20SemiNFT.FRC20SemiNFTCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic {
         access(self)
         let voted: {UInt64: Bool}
         access(self)
@@ -142,17 +142,15 @@ access(all) contract FRC20Votes {
         access(all)
         let tick: String
         access(all)
-        let votingWeight: {String: UFix64}
-        access(all)
         let message: String
-        access(all)
-        let commandType: CommandType
         access(all)
         let slots: UInt8
         access(all)
-        var status: ProposalStatus
+        let slotsInscriptions: {UInt8: [UInt64]}
         access(all)
-        var endAt: UFix64?
+        let beginningTime: UFix64
+        access(all)
+        let endingTime: UFix64
         access(all)
         var votersAmt: UInt64
         access(all)
@@ -161,23 +159,24 @@ access(all) contract FRC20Votes {
         init(
             proposer: Address,
             tick: String,
-            weights: {String: UFix64},
-            message: String,
             commandType: CommandType,
+            message: String,
+            beginningTime: UFix64,
+            endingTime: UFix64,
             slots: UInt8,
+            slotsInscriptions: {UInt8: [UInt64]}
         ) {
             pre {
                 slots > 0: "Slots must be greater than 0"
-                weights.length > 0: "Weights must be greater than 0"
             }
             self.proposer = proposer
             self.tick = tick
-            self.votingWeight = weights
             self.message = message
             self.commandType = commandType
             self.slots = slots
-            self.status = ProposalStatus.Drafting
-            self.endAt = nil
+            self.slotsInscriptions = slotsInscriptions
+            self.beginningTime = beginningTime
+            self.endingTime = endingTime
             self.votersAmt = 0
             // init votes
             self.votes = {}
@@ -194,7 +193,7 @@ access(all) contract FRC20Votes {
         ///
         access(all) view
         fun isEnded(): Bool {
-            return self.endAt != nil
+            return self.endingTime <= getCurrentBlock().timestamp
         }
 
         /// Get the winning choice.
@@ -218,24 +217,30 @@ access(all) contract FRC20Votes {
             return winningChoice
         }
 
-        /** ----- Write ----- */
-
-        /// Write: Update the Proposal status.
-        ///
-        access(contract)
-        fun updateStatus(status: ProposalStatus) {
-            pre {
-                status.rawValue > self.status.rawValue: "Cannot update status to a lower value"
-            }
-            self.status = status
-            // update endAt
-            if status == ProposalStatus.Executed || status == ProposalStatus.Cancelled {
-                self.endAt = getCurrentBlock().timestamp
+        access(all) view
+        fun getCurrentStatus(): ProposalStatus {
+            let now = getCurrentBlock().timestamp
+            if now < self.beginningTime {
+                return ProposalStatus.Drafting
+            } else if now < self.endingTime {
+                return ProposalStatus.Voting
+            } else if self.isEnded() {
+                return ProposalStatus.Pending
+            } else {
+                return ProposalStatus.Executed
             }
         }
 
+        access(all) view
+        fun isAnyInscriptionExecuted(): Bool {
+            // TODO
+            return false
+        }
+
+        /** ----- Write ----- */
+
         access(contract)
-        fun vote(choice: UInt8, tick: String, points: UFix64) {
+        fun vote(choice: UInt8, points: UFix64) {
             pre {
                 self.status == ProposalStatus.Voting: "Proposal is not in voting status"
                 choice < self.slots: "Choice is out of range"
@@ -304,16 +309,38 @@ access(all) contract FRC20Votes {
         }
     }
 
+    /* --- Public Functions --- */
+
+    access(all)
+    fun borrowSystemInscriptionsStore(): &Fixes.InscriptionsStore{Fixes.InscriptionsPublic} {
+        let storePubPath = Fixes.getFixesStorePublicPath()
+        return self.account
+            .getCapability<&Fixes.InscriptionsStore{Fixes.InscriptionsPublic}>(storePubPath)
+            .borrow() ?? panic("Fixes.InscriptionsStore is not found")
+    }
+
     init() {
         let votesIdentifier = "FRC20VotesManager_".concat(self.account.address.toString())
         self.FRC20VotesManagerStoragePath = StoragePath(identifier: votesIdentifier)!
         self.FRC20VotesManagerPublicPath = PublicPath(identifier: votesIdentifier)!
+
         // create the resource
         self.account.save(<- create VotesManager(), to: self.FRC20VotesManagerStoragePath)
         self.account.link<&VotesManager{VotesManagerPublic}>(
             self.FRC20VotesManagerPublicPath,
             target: self.FRC20VotesManagerStoragePath
         )
+
+        // Ensure InscriptionsStore resource
+        let insStoreStoragePath = Fixes.getFixesStoreStoragePath()
+        if self.account.borrow<&AnyResource>(from: insStoreStoragePath) == nil {
+            self.account.save<@Fixes.InscriptionsStore>(<- Fixes.createInscriptionsStore(), to: insStoreStoragePath)
+            // @deprecated after Cadence 1.0
+            self.account.link<&Fixes.InscriptionsStore{Fixes.InscriptionsPublic}>(
+                Fixes.getFixesStorePublicPath(),
+                target: insStoreStoragePath
+            )
+        }
 
         let voterIdentifier = "FRC20Voter_".concat(self.account.address.toString())
         self.VoterStoragePath = StoragePath(identifier: voterIdentifier)!

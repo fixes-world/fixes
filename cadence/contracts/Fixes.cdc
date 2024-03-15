@@ -716,6 +716,16 @@ access(all) contract Fixes {
         )!
     }
 
+    /// Get the public path of the inscriptions store
+    ///
+    access(all) view
+    fun getFixesStorePublicPath(): PublicPath {
+        let prefix = "Fixes_".concat(self.account.address.toString())
+        return PublicPath(
+            identifier: prefix.concat("_collection_store")
+        )!
+    }
+
     init() {
         self.totalInscriptions = 0
 
