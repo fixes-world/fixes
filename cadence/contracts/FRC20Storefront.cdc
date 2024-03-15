@@ -1043,6 +1043,7 @@ access(all) contract FRC20Storefront {
         access(all)
         fun createListing(
             ins: @Fixes.Inscription,
+            marginVault: @FlowToken.Vault?,
             commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
             customID: String?
         ): UInt64
@@ -1137,6 +1138,7 @@ access(all) contract FRC20Storefront {
         access(all)
         fun createListing(
             ins: @Fixes.Inscription,
+            marginVault: @FlowToken.Vault?,
             commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
             customID: String?
          ): UInt64 {
@@ -1144,7 +1146,7 @@ access(all) contract FRC20Storefront {
                 self.owner != nil : "Resource doesn't have the assigned owner"
             }
 
-            let insRef = &ins as &Fixes.Inscription
+            var insRef = &ins as &Fixes.Inscription
             assert(
                 FRC20Storefront.isListFRC20Inscription(ins: insRef),
                 message: "Given inscription is not a valid FRC20 listing inscription"
@@ -1156,6 +1158,16 @@ access(all) contract FRC20Storefront {
             let inscriptionId = insRef.getId()
             let nothing <- self.inscriptions[inscriptionId] <- ins
             destroy nothing
+
+            // borrow again to get the reference
+            insRef = self.borrowInspection(inscriptionId)
+
+            // save the margin vault if it is not nil
+            if marginVault != nil {
+                insRef.deposit(<- marginVault!)
+            } else {
+                destroy marginVault
+            }
 
             // Instead of letting an arbitrary value be set for the UUID of a given NFT, the contract
             // should fetch it itself

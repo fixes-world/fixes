@@ -218,6 +218,25 @@ access(all) contract Fixes {
             )
         }
 
+        /// Deposit the inscription value
+        ///
+        access(all)
+        fun deposit(_ otherValue: @FlowToken.Vault) {
+            pre {
+                !self.isExtracted(): "Inscription already extracted"
+            }
+            let fusedValue = otherValue.balance
+            let selfValue = (&self.value as &FlowToken.Vault?)!
+            selfValue.deposit(from: <- otherValue)
+
+            // Same id means just deposit new value
+            emit InscriptionFused(
+                from: self.getId(),
+                to: self.getId(),
+                value: fusedValue
+            )
+        }
+
         /// Extract the inscription value
         ///
         access(all)

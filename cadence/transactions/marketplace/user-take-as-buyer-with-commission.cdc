@@ -159,7 +159,7 @@ transaction(
 
             // Withdraw tokens from the signer's stored vault
             // Total amount to withdraw is the estimated required value + the buy price
-            let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue + buyPrice)
+            let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
             // Create the Inscription first
             let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
@@ -171,6 +171,11 @@ transaction(
             // borrow a reference to the new Inscription
             let insRef = store.borrowInscriptionWritableRef(newInsId)
                 ?? panic("Could not borrow reference to the new Inscription!")
+
+            // Deposit the payment flow vault to the inscription vault
+            let payment <- vaultRef.withdraw(amount: buyPrice)
+            insRef.deposit(<- (payment as! @FlowToken.Vault))
+
             /** ------------- End ---------------------------------------------  */
 
             // Execute the buy
