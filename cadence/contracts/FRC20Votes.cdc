@@ -61,6 +61,7 @@ access(all) contract FRC20Votes {
         access(all) case Voting;
         access(all) case Pending;
         access(all) case Executed;
+        access(all) case Cancelled;
     }
 
     /// The Proposal command type.
@@ -134,15 +135,13 @@ access(all) contract FRC20Votes {
         }
     }
 
-    /// The struct of the FixesVotes proposal.
+    /// The struct of the FixesVotes proposal details.
     ///
-    access(all) struct Proposal {
+    access(all) struct ProposalDetails {
         access(all)
         let proposer: Address
         access(all)
         let tick: String
-        access(all)
-        let message: String
         access(all)
         let slots: UInt8
         access(all)
@@ -151,16 +150,32 @@ access(all) contract FRC20Votes {
         let beginningTime: UFix64
         access(all)
         let endingTime: UFix64
+        // vars
         access(all)
-        var votersAmt: UInt64
+        var title: String
+        access(all)
+        var message: String
+        access(all)
+        var executableThreshold: UFix64
+        access(all)
+        var isCancelled: Bool
+        // ----- Voting status -----
+        /// Address -> Points
+        access(all)
+        var votedAccounts: {Address: UFix64}
+        /// NFTId -> Bool
+        access(all)
+        var votedNFTs: {UInt64: Bool}
+        /// Vote choice -> Points
         access(all)
         var votes: {UInt8: UFix64}
 
         init(
             proposer: Address,
             tick: String,
-            commandType: CommandType,
+            title: String,
             message: String,
+            executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
             slots: UInt8,
@@ -168,16 +183,21 @@ access(all) contract FRC20Votes {
         ) {
             pre {
                 slots > 0: "Slots must be greater than 0"
+                executableThreshold >= 0.1 && executableThreshold <= 0.8: "Executable threshold must be between 0.1 and 0.8"
+                beginningTime < endingTime: "Beginning time must be less than ending time"
             }
             self.proposer = proposer
             self.tick = tick
+            self.title = title
             self.message = message
-            self.commandType = commandType
             self.slots = slots
             self.slotsInscriptions = slotsInscriptions
             self.beginningTime = beginningTime
             self.endingTime = endingTime
-            self.votersAmt = 0
+            self.executableThreshold = executableThreshold
+            self.isCancelled = false
+            self.votedAccounts = {}
+            self.votedNFTs = {}
             // init votes
             self.votes = {}
             var i = 0 as UInt8
@@ -194,6 +214,13 @@ access(all) contract FRC20Votes {
         access(all) view
         fun isEnded(): Bool {
             return self.endingTime <= getCurrentBlock().timestamp
+        }
+
+        /// Get the voters amount.
+        ///
+        access(all) view
+        fun getVotersAmount(): Int {
+            return self.votedAccounts.length
         }
 
         /// Get the winning choice.
@@ -217,14 +244,18 @@ access(all) contract FRC20Votes {
             return winningChoice
         }
 
+        /// Get current status.
+        ///
         access(all) view
         fun getCurrentStatus(): ProposalStatus {
             let now = getCurrentBlock().timestamp
-            if now < self.beginningTime {
+            if self.isCancelled {
+                return ProposalStatus.Cancelled
+            } else if now < self.beginningTime {
                 return ProposalStatus.Drafting
             } else if now < self.endingTime {
                 return ProposalStatus.Voting
-            } else if self.isEnded() {
+            } else if self.isEnded() && !self.isWinningInscriptionAllExecuted() {
                 return ProposalStatus.Pending
             } else {
                 return ProposalStatus.Executed
@@ -232,25 +263,53 @@ access(all) contract FRC20Votes {
         }
 
         access(all) view
-        fun isAnyInscriptionExecuted(): Bool {
-            // TODO
+        fun isWinningInscriptionAllExecuted(): Bool {
+            if !self.isEnded() {
+                return false
+            }
+            if let winningChoice = self.getWinningChoice() {
+                let winningInsIds = self.slotsInscriptions[winningChoice]!
+                let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
+                var allExecuted = true
+                for id in winningInsIds {
+                    let insRef = inscriptionsStore.borrowInscription(id)
+                    allExecuted = allExecuted && (insRef?.isExtracted() ?? false)
+                    if !allExecuted {
+                        break
+                    }
+                }
+                return allExecuted
+            }
             return false
         }
 
         /** ----- Write ----- */
 
         access(contract)
-        fun vote(choice: UInt8, points: UFix64) {
+        fun vote(choice: UInt8, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}) {
             pre {
-                self.status == ProposalStatus.Voting: "Proposal is not in voting status"
+                self.getCurrentStatus() == ProposalStatus.Voting: "Proposal is not in voting status"
                 choice < self.slots: "Choice is out of range"
-                points > 0.0: "Points must be greater than 0"
-                self.votingWeight[tick] != nil: "Voting weight is not found"
+                semiNFT.isStakedTick(): "The ticker is not staked"
+                semiNFT.getBalance() > 0.0: "The NFT balance is zero"
+                self.votedNFTs[semiNFT.id] == nil: "NFT is already voted"
             }
-            let weight = self.votingWeight[tick]!
-            self.votes[choice] = self.votes[choice]! + weight * points
-            self.votersAmt = self.votersAmt + 1
+            post {
+                self.votes[choice]! == before(self.votes[choice]!) + semiNFT.getBalance(): "Votes are not added"
+                self.votedNFTs[semiNFT.id] == true: "NFT is not added to the votedNFTs"
+            }
+            let points = semiNFT.getBalance()
+            self.votes[choice] = self.votes[choice]! + points
+            // add the voter
+            let voterAddr = semiNFT.owner?.address ?? panic("Voter's owner is not found")
+            self.votedAccounts[voterAddr] = (self.votedAccounts[voterAddr] ?? 0.0) + points
+            self.votedNFTs[semiNFT.id] = true
         }
+    }
+
+    /// The struct of the FixesVotes proposal.
+    ///
+    access(all) resource Proposal {
     }
 
     /// The public interface of the FixesVotes manager.
