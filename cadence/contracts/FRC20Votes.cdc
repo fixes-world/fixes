@@ -9,7 +9,10 @@ TODO: Add description
 import "NonFungibleToken"
 import "Fixes"
 import "FRC20Indexer"
+import "FRC20FTShared"
+import "FRC20AccountsPool"
 import "FRC20SemiNFT"
+import "FRC20Staking"
 
 access(all) contract FRC20Votes {
     /* --- Events --- */
@@ -18,11 +21,12 @@ access(all) contract FRC20Votes {
 
     /// Event emitted when a proposal is created
     access(all) event ProposalCreated(
+        proposer: Address,
         tick: String,
         proposalId: UInt64,
-        proposer: Address,
+        title: String,
         message: String,
-        command: UInt8,
+        discussionLink: String,
         inscriptions: [UInt64],
     )
     /// Event emitted when a proposal is voted
@@ -57,11 +61,12 @@ access(all) contract FRC20Votes {
     /// The Proposal status.
     ///
     access(all) enum ProposalStatus: UInt8 {
-        access(all) case Drafting;
-        access(all) case Voting;
-        access(all) case Pending;
-        access(all) case Executed;
+        access(all) case Created;
+        access(all) case Activated;
         access(all) case Cancelled;
+        access(all) case Failed;
+        access(all) case Successed;
+        access(all) case Executed;
     }
 
     /// The Proposal command type.
@@ -156,6 +161,8 @@ access(all) contract FRC20Votes {
         access(all)
         var message: String
         access(all)
+        var discussionLink: String
+        access(all)
         var executableThreshold: UFix64
         access(all)
         var isCancelled: Bool
@@ -175,6 +182,7 @@ access(all) contract FRC20Votes {
             tick: String,
             title: String,
             message: String,
+            discussionLink: String,
             executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
@@ -190,6 +198,7 @@ access(all) contract FRC20Votes {
             self.tick = tick
             self.title = title
             self.message = message
+            self.discussionLink = discussionLink
             self.slots = slots
             self.slotsInscriptions = slotsInscriptions
             self.beginningTime = beginningTime
@@ -223,6 +232,17 @@ access(all) contract FRC20Votes {
             return self.votedAccounts.length
         }
 
+        /// Get the total voted points.
+        ///
+        access(all) view
+        fun getTotalVotedPoints(): UFix64 {
+            var total = 0.0
+            for k in self.votes.keys {
+                total = total + self.votes[k]!
+            }
+            return total
+        }
+
         /// Get the winning choice.
         ///
         access(all) view
@@ -244,6 +264,18 @@ access(all) contract FRC20Votes {
             return winningChoice
         }
 
+        /// WHether the proposal is validate for the threshold.
+        ///
+        access(all) view
+        fun isValidateForThreshold(): Bool {
+            if !self.isEnded() {
+                return false
+            }
+            let totalStaked = FRC20Votes.getTotalStakedAmount()
+            let votedAmount = self.getTotalVotedPoints()
+            return totalStaked * self.executableThreshold <= votedAmount
+        }
+
         /// Get current status.
         ///
         access(all) view
@@ -252,13 +284,18 @@ access(all) contract FRC20Votes {
             if self.isCancelled {
                 return ProposalStatus.Cancelled
             } else if now < self.beginningTime {
-                return ProposalStatus.Drafting
+                return ProposalStatus.Created
             } else if now < self.endingTime {
-                return ProposalStatus.Voting
-            } else if self.isEnded() && !self.isWinningInscriptionAllExecuted() {
-                return ProposalStatus.Pending
+                return ProposalStatus.Activated
             } else {
-                return ProposalStatus.Executed
+                // ended
+                if !self.isValidateForThreshold() {
+                    return ProposalStatus.Failed
+                } else if !self.isWinningInscriptionAllExecuted() {
+                    return ProposalStatus.Successed
+                } else {
+                    return ProposalStatus.Executed
+                }
             }
         }
 
@@ -288,9 +325,10 @@ access(all) contract FRC20Votes {
         access(contract)
         fun vote(choice: UInt8, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}) {
             pre {
-                self.getCurrentStatus() == ProposalStatus.Voting: "Proposal is not in voting status"
+                self.getCurrentStatus() == ProposalStatus.Activated: "Proposal is not in voting status"
                 choice < self.slots: "Choice is out of range"
                 semiNFT.isStakedTick(): "The ticker is not staked"
+                semiNFT.getOriginalTick() == FRC20Votes.getStakingTickerName(): "The ticker is not the staking ticker"
                 semiNFT.getBalance() > 0.0: "The NFT balance is zero"
                 self.votedNFTs[semiNFT.id] == nil: "NFT is already voted"
             }
@@ -307,9 +345,58 @@ access(all) contract FRC20Votes {
         }
     }
 
+    access(all) struct StatusLog {
+        access(all)
+        let status: ProposalStatus
+        access(all)
+        let timestamp: UFix64
+
+        init(
+            _ status: ProposalStatus,
+            _ timestamp: UFix64
+        ) {
+            self.status = status
+            self.timestamp = timestamp
+        }
+    }
+
     /// The struct of the FixesVotes proposal.
     ///
     access(all) resource Proposal {
+        access(all)
+        let statusLog: [StatusLog]
+        access(all)
+        let details: ProposalDetails
+
+        init(
+            voter: &VoterIdentity,
+            tick: String,
+            title: String,
+            message: String,
+            discussionLink: String,
+            executableThreshold: UFix64,
+            beginningTime: UFix64,
+            endingTime: UFix64,
+            slots: UInt8,
+            slotsInscriptions: {UInt8: [UInt64]}
+        ) {
+            // ensure voter is
+
+
+            // self.statusLog = [StatusLog(ProposalStatus.Created, getCurrentBlock().timestamp)]
+            // self.details = ProposalDetails(
+            //     proposer: self.account.address,
+            //     tick: tick,
+            //     title: title,
+            //     message: message,
+            //     discussionLink: discussionLink,
+            //     executableThreshold: executableThreshold,
+            //     beginningTime: beginningTime,
+            //     endingTime: endingTime,
+            //     slots: slots,
+            //     slotsInscriptions: slotsInscriptions
+            // )
+        }
     }
 
     /// The public interface of the FixesVotes manager.
@@ -324,7 +411,7 @@ access(all) contract FRC20Votes {
         access(self)
         let proposals: {String: [UInt64]}
         access(self)
-        let proposalDetails: {UInt64: Proposal}
+        let proposalDetails: &{UInt64: Proposal}
         access(self)
         let pendingInscriptions: @{UInt64: [Fixes.Inscription]}
         access(self)
@@ -369,6 +456,54 @@ access(all) contract FRC20Votes {
     }
 
     /* --- Public Functions --- */
+
+    /// Get the staking ticker name.
+    ///
+    access(all) view
+    fun getStakingTickerName(): String {
+        let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
+        let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
+        return stakingToken ?? "flows"
+    }
+
+    /// Get the proposor staking threshold.
+    ///
+    access(all) view
+    fun getProposorStakingThreshold(): UFix64 {
+        return 0.2
+    }
+
+    access(all) view
+    fun getDelegatorStakedAmount(addr: Address): UFix64 {
+        if let delegator = FRC20Staking.borrowDelegator(addr) {
+            // Get the staking pool address
+            let stakeTick = self.getStakingTickerName()
+            return delegator.getStakedBalance(tick: stakeTick)
+        }
+        return 0.0
+    }
+
+    /// Create a proposal
+    ///
+    access(all) view
+    fun getTotalStakedAmount(): UFix64 {
+        let pool = self.borrowStakingPool()
+        return pool.getDetails().totalStaked
+    }
+
+    /// Borrow the staking pool.
+    ///
+    access(all)
+    fun borrowStakingPool(): &FRC20Staking.Pool{FRC20Staking.PoolPublic} {
+        // singleton resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        // Get the staking pool address
+        let stakeTick = self.getStakingTickerName()
+        let poolAddress = acctsPool.getFRC20StakingAddress(tick: stakeTick)
+            ?? panic("The staking pool is not enabled")
+        // borrow the staking pool
+        return FRC20Staking.borrowPool(poolAddress) ?? panic("The staking pool is not found")
+    }
 
     access(all)
     fun borrowSystemInscriptionsStore(): &Fixes.InscriptionsStore{Fixes.InscriptionsPublic} {
