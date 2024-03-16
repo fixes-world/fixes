@@ -8,6 +8,7 @@ TODO: Add description
 */
 import "NonFungibleToken"
 import "Fixes"
+import "FixesHeartbeat"
 import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
@@ -27,22 +28,57 @@ access(all) contract FRC20Votes {
         title: String,
         message: String,
         discussionLink: String,
-        inscriptions: [UInt64],
+        executableThreshold: UFix64,
+        beginningTime: UFix64,
+        endingTime: UFix64,
+        slots: UInt8,
+        slotsInscriptions: {UInt8: [UInt64]}
     )
+    /// Event emitted when a proposal status is changed
+    access(all) event ProposalStatusChanged(
+        proposalId: UInt64,
+        tick: String,
+        prevStatus: UInt8?,
+        newStatus: UInt8,
+        timestamp: UFix64
+    )
+    /// Event emitted when a proposal is updated
+    access(all) event ProposalInfoUpdated(
+        proposalId: UInt64,
+        tick: String,
+        title: String?,
+        message: String?,
+        discussionLink: String?
+    )
+    /// Event emitted when a proposal is cancelled
+    access(all) event ProposalCancelled(
+        proposalId: UInt64,
+        tick: String
+    )
+
     /// Event emitted when a proposal is voted
     access(all) event ProposalVoted(
         tick: String,
         proposalId: UInt64,
         voter: Address,
-        choice: UInt8
+        choice: UInt8,
+        points: UFix64,
     )
+
+    /// Event emitted when a proposal is failed
+    access(all) event ProposalFailed(
+        tick: String,
+        proposalId: UInt64,
+        votedPoints: UFix64,
+        failedAt: UFix64
+    )
+
     /// Event emitted when a proposal is executed
     access(all) event ProposalExecuted(
         tick: String,
         proposalId: UInt64,
         choice: UInt8,
-        executedAt: UFix64,
-        success: Bool
+        executedAt: UFix64
     )
 
     /* --- Variable, Enums and Structs --- */
@@ -155,15 +191,15 @@ access(all) contract FRC20Votes {
         let beginningTime: UFix64
         access(all)
         let endingTime: UFix64
-        // vars
+        access(all)
+        let executableThreshold: UFix64
+        // ------ vars ------
         access(all)
         var title: String
         access(all)
         var message: String
         access(all)
         var discussionLink: String
-        access(all)
-        var executableThreshold: UFix64
         access(all)
         var isCancelled: Bool
         // ----- Voting status -----
@@ -320,7 +356,38 @@ access(all) contract FRC20Votes {
             return false
         }
 
+        /// Check whether the NFT is voted.
+        ///
+        access(all) view
+        fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool {
+            return self.votedNFTs[semiNFT.id] != nil
+        }
+
         /** ----- Write ----- */
+
+        access(contract)
+        fun updateProposal(title: String?, message: String?, discussionLink: String?) {
+            pre {
+                self.getCurrentStatus().rawValue <= ProposalStatus.Activated.rawValue: "Proposal is not in the right status"
+            }
+            if title != nil {
+                self.title = title!
+            }
+            if message != nil {
+                self.message = message!
+            }
+            if discussionLink != nil {
+                self.discussionLink = discussionLink!
+            }
+        }
+
+        access(contract)
+        fun cancelProposal() {
+            pre {
+                self.getCurrentStatus().rawValue <= ProposalStatus.Activated.rawValue: "Proposal is not in the right status"
+            }
+            self.isCancelled = true
+        }
 
         access(contract)
         fun vote(choice: UInt8, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}) {
@@ -337,7 +404,7 @@ access(all) contract FRC20Votes {
                 self.votedNFTs[semiNFT.id] == true: "NFT is not added to the votedNFTs"
             }
             let points = semiNFT.getBalance()
-            self.votes[choice] = self.votes[choice]! + points
+            self.votes[choice] = (self.votes[choice] ?? 0.0) + points
             // add the voter
             let voterAddr = semiNFT.owner?.address ?? panic("Voter's owner is not found")
             self.votedAccounts[voterAddr] = (self.votedAccounts[voterAddr] ?? 0.0) + points
@@ -360,12 +427,27 @@ access(all) contract FRC20Votes {
         }
     }
 
+    access(all) resource interface ProposalPublic {
+        // --- Read Methods ---
+        access(all) view
+        fun getDetails(): ProposalDetails
+        access(all) view
+        fun getLogs(): [StatusLog]
+        // --- Write Methods ---
+        access(all)
+        fun updateProposal(voter: &VoterIdentity, title: String?, message: String?, discussionLink: String?)
+        access(all)
+        fun cancelProposal(voter: &VoterIdentity)
+    }
+
     /// The struct of the FixesVotes proposal.
     ///
-    access(all) resource Proposal {
-        access(all)
+    access(all) resource Proposal: ProposalPublic, FixesHeartbeat.IHeartbeatHook {
+        access(self)
+        let proposor: Address
+        access(self)
         let statusLog: [StatusLog]
-        access(all)
+        access(self)
         let details: ProposalDetails
 
         init(
@@ -380,34 +462,116 @@ access(all) contract FRC20Votes {
             slots: UInt8,
             slotsInscriptions: {UInt8: [UInt64]}
         ) {
-            // ensure voter is
+            let voterAddr = voter.owner?.address ?? panic("Voter's owner is not found")
+            let votesMgr = FRC20Votes.borrowVotesManager()
+            assert(
+                votesMgr.isValidProposer(addr: voterAddr),
+                message: "The staked amount is not enough"
+            )
 
+            self.proposor = voterAddr
+            self.statusLog = [StatusLog(ProposalStatus.Created, getCurrentBlock().timestamp)]
+            self.details = ProposalDetails(
+                proposer: voterAddr,
+                tick: tick,
+                title: title,
+                message: message,
+                discussionLink: discussionLink,
+                executableThreshold: executableThreshold,
+                beginningTime: beginningTime,
+                endingTime: endingTime,
+                slots: slots,
+                slotsInscriptions: slotsInscriptions
+            )
 
-            // self.statusLog = [StatusLog(ProposalStatus.Created, getCurrentBlock().timestamp)]
-            // self.details = ProposalDetails(
-            //     proposer: self.account.address,
-            //     tick: tick,
-            //     title: title,
-            //     message: message,
-            //     discussionLink: discussionLink,
-            //     executableThreshold: executableThreshold,
-            //     beginningTime: beginningTime,
-            //     endingTime: endingTime,
-            //     slots: slots,
-            //     slotsInscriptions: slotsInscriptions
-            // )
+            emit ProposalCreated(
+                proposer: voterAddr,
+                tick: tick,
+                proposalId: self.uuid,
+                title: title,
+                message: message,
+                discussionLink: discussionLink,
+                executableThreshold: executableThreshold,
+                beginningTime: beginningTime,
+                endingTime: endingTime,
+                slots: slots,
+                slotsInscriptions: slotsInscriptions,
+            )
+        }
+
+        /** ------ Public Methods ------ */
+
+        access(all) view
+        fun getDetails(): ProposalDetails {
+            return self.details
+        }
+
+        access(all) view
+        fun getLogs(): [StatusLog] {
+            return self.statusLog
+        }
+
+        /** ------ Private Methods ------- */
+
+        access(all)
+        fun updateProposal(voter: &VoterIdentity, title: String?, message: String?, discussionLink: String?) {
+            // ensure the voter is the proposor
+            assert(
+                voter.owner?.address == self.proposor,
+                message: "The voter is not the proposor"
+            )
+
+            self.details.updateProposal(title: title, message: message, discussionLink: discussionLink)
+
+            emit ProposalInfoUpdated(
+                proposalId: self.uuid,
+                tick: self.details.tick,
+                title: title,
+                message: message,
+                discussionLink: discussionLink
+            )
+        }
+
+        /** ------ Internal Methods ------ */
+
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            let status = self.details.getCurrentStatus()
+            let lastIdx = self.statusLog.length - 1
+            let lastStatus = lastIdx >= 0
+                ? self.statusLog[lastIdx].status
+                : nil
+            if status != lastStatus {
+                self.statusLog.append(StatusLog(status, getCurrentBlock().timestamp))
+
+                emit ProposalStatusChanged(
+                    proposalId: self.uuid,
+                    tick: self.details.tick,
+                    prevStatus: lastStatus?.rawValue,
+                    newStatus: status.rawValue,
+                    timestamp: getCurrentBlock().timestamp
+                )
+            }
+        }
+
+        access(contract)
+        fun borrowDetails(): &ProposalDetails {
+            return &self.details as &ProposalDetails
         }
     }
 
     /// The public interface of the FixesVotes manager.
     ///
     access(all) resource interface VotesManagerPublic {
-
+        access(all) view
+        fun isValidProposer(addr: Address): Bool
     }
 
     /// The resource of the FixesVotes manager.
     ///
     access(all) resource VotesManager: VotesManagerPublic {
+        access(self)
+        let whitelisted: {Address: Bool}
         access(self)
         let proposals: {String: [UInt64]}
         access(self)
@@ -418,6 +582,7 @@ access(all) contract FRC20Votes {
         let appliedInscriptions: @{UInt64: [Fixes.Inscription]}
 
         init() {
+            self.whitelisted = {}
             self.proposals = {}
             self.proposalDetails = {}
             self.pendingInscriptions <- {}
@@ -431,6 +596,23 @@ access(all) contract FRC20Votes {
         }
 
         /** ----- Read ----- */
+
+        /// Check whether the proposer is valid.
+        ///
+        access(all) view
+        fun isValidProposer(_ voterAddr: Address): Bool {
+            if let whitelist = self.whitelisted[voterAddr] {
+                if whitelist {
+                    return true
+                }
+            }
+            // check the staked amount
+            let stakedAmount = FRC20Votes.getDelegatorStakedAmount(addr: voterAddr)
+            let proposorThreshold = FRC20Votes.getProposorStakingThreshold()
+            let totalStaked = FRC20Votes.getTotalStakedAmount()
+            // ensure the staked amount is enough
+            return stakedAmount >= totalStaked * proposorThreshold
+        }
 
         access(all) view
         fun getProposalIds(tick: String): [UInt64] {
@@ -505,12 +687,23 @@ access(all) contract FRC20Votes {
         return FRC20Staking.borrowPool(poolAddress) ?? panic("The staking pool is not found")
     }
 
+    /// Borrow the system inscriptions store.
+    ///
     access(all)
     fun borrowSystemInscriptionsStore(): &Fixes.InscriptionsStore{Fixes.InscriptionsPublic} {
         let storePubPath = Fixes.getFixesStorePublicPath()
         return self.account
             .getCapability<&Fixes.InscriptionsStore{Fixes.InscriptionsPublic}>(storePubPath)
             .borrow() ?? panic("Fixes.InscriptionsStore is not found")
+    }
+
+    /// Borrow the VotesManager resource.
+    ///
+    access(all)
+    fun borrowVotesManager(): &VotesManager{VotesManagerPublic} {
+        return self.account
+            .getCapability<&VotesManager{VotesManagerPublic}>(self.FRC20VotesManagerPublicPath)
+            .borrow() ?? panic("VotesManager is not found")
     }
 
     init() {
