@@ -530,7 +530,16 @@ access(all) contract Fixes {
         }
     }
 
-    /// The private interface to the executable archivor
+    /// The public interface to the inscriptions store
+    ///
+    access(all) resource interface InscriptionsStorePublic {
+        /// Store executable inscription
+        ///
+        access(account)
+        fun store(_ ins: @Fixes.Inscription)
+    }
+
+    /// The private interface to the inscriptions store
     ///
     access(all) resource interface InscriptionsStorePrivate {
         /// Store executable inscription
@@ -549,7 +558,7 @@ access(all) contract Fixes {
 
     /// The resource that stores the executable inscriptions
     ///
-    access(all) resource InscriptionsStore: InscriptionsStorePrivate, InscriptionsPublic, InscriptionsPrivate {
+    access(all) resource InscriptionsStore: InscriptionsStorePublic, InscriptionsStorePrivate, InscriptionsPublic, InscriptionsPrivate {
         access(self)
         let inscriptions: @{UInt64: Fixes.Inscription}
 
