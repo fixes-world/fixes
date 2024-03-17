@@ -1083,23 +1083,7 @@ access(all) contract FRC20Staking {
         access(all) view
         fun getStakedBalance(tick: String): UFix64 {
             let colRef = self.borrowSemiNFTCollection()
-            let tickIds = colRef.getIDsByTick(tick: tick)
-            if tickIds.length > 0 {
-                var totalBalance = 0.0
-                for id in tickIds {
-                    if let nft = colRef.borrowFRC20SemiNFT(id: id) {
-                        if nft.getOriginalTick() != tick {
-                            continue
-                        }
-                        if !nft.isStakedTick() {
-                            continue
-                        }
-                        totalBalance = totalBalance + nft.getBalance()
-                    }
-                }
-                return totalBalance
-            }
-            return 0.0
+            return colRef.getStakedBalance(tick: tick)
         }
 
         /// Get the staked frc20 Semi-NFTs of the delegator
