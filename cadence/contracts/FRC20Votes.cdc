@@ -922,7 +922,7 @@ access(all) contract FRC20Votes {
     ///
     access(all) view
     fun getProposorStakingThreshold(): UFix64 {
-        return 0.333
+        return 0.15
     }
 
     /// Create a proposal
