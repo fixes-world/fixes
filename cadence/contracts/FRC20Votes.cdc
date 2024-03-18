@@ -61,7 +61,7 @@ access(all) contract FRC20Votes {
         tick: String,
         proposalId: UInt64,
         voter: Address,
-        choice: UInt8,
+        choice: Int,
         points: UFix64,
     )
 
@@ -77,7 +77,7 @@ access(all) contract FRC20Votes {
     access(all) event ProposalExecuted(
         tick: String,
         proposalId: UInt64,
-        choice: UInt8,
+        choice: Int,
         executedAt: UFix64
     )
 
@@ -131,11 +131,18 @@ access(all) contract FRC20Votes {
         /// Get the voted proposals.
         access(all)
         fun getVotedProposals(tick: String): [UInt64]
+        /// ---- Write: contract level ----
+        access(contract)
+        fun onVote(choice: Int, proposal: &Proposal{ProposalPublic})
+        access(contract)
+        fun onProposalFinalized(proposal: &Proposal{ProposalPublic})
     }
 
     /// The resource of the FixesVotes voter identifier.
     ///
     access(all) resource VoterIdentity: VoterPublic, FRC20SemiNFT.FRC20SemiNFTCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic {
+        access(self)
+        let semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
         access(self)
         let lockedSemiNFTCollection: @FRC20SemiNFT.Collection
         // ----- Voting Info ----
@@ -145,11 +152,21 @@ access(all) contract FRC20Votes {
         /// Tick -> ProposalId[]
         access(self)
         let votedTicksMapping: {String: [UInt64]}
+        /// ProposalID -> EndedAt
+        access(self)
+        let activeProposals: {UInt64: UFix64}
 
-        init() {
+        init(
+            _ cap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+        ) {
+            pre {
+                cap.check(): "The capability is invalid"
+            }
+            self.semiNFTColCap = cap
             self.lockedSemiNFTCollection <- (FRC20SemiNFT.createEmptyCollection() as! @FRC20SemiNFT.Collection)
             self.voted = {}
             self.votedTicksMapping = {}
+            self.activeProposals = {}
         }
 
         destroy() {
@@ -242,19 +259,73 @@ access(all) contract FRC20Votes {
         /** ----- Write ----- */
 
         access(contract)
-        fun onVote(tick: String, proposalId: UInt64) {
+        fun onVote(choice: Int, proposal: &Proposal{ProposalPublic}) {
             pre {
-                self.voted[proposalId] == false: "Proposal is already voted"
+                self.voted[proposal.uuid] == false: "Proposal is already voted"
             }
             post {
-                self.voted[proposalId] == true: "Proposal is not voted"
-                self.votedTicksMapping[tick]?.length! == before(self.votedTicksMapping[tick]?.length!) + 1: "Proposal is not added to the tick"
+                self.voted[proposal.uuid] == true: "Proposal is not voted"
             }
-            self.voted[proposalId] = true
-            if self.votedTicksMapping[tick] == nil {
-                self.votedTicksMapping[tick] = [proposalId]
+            let details = proposal.getDetails()
+
+            // check the staked balance
+            let stakeTick = FRC20Votes.getStakingTickerName()
+            let stakedBalance = self.getStakedBalance(tick: stakeTick)
+            if stakedBalance > 0.0 {
+                let stakedNFTColRef = self.semiNFTColCap.borrow() ?? panic("The staked NFT collection is not found")
+                // move the staked NFTs to the locked collection
+                let ids = stakedNFTColRef.getIDsByTick(tick: stakeTick)
+                for id in ids {
+                    self.lockedSemiNFTCollection.deposit(token: <- stakedNFTColRef.withdraw(withdrawID: id))
+                }
+            }
+
+            // check staked balance
+            let votingPower = self.getVotingPower()
+            assert(
+                votingPower > 0.0,
+                message: "The voting power is zero"
+            )
+
+            // vote on the proposal
+            let lockedNFTIds = self.lockedSemiNFTCollection.getIDsByTick(tick: stakeTick)
+            for id in lockedNFTIds {
+                let semiNFT = self.lockedSemiNFTCollection.borrowFRC20SemiNFTPublic(id: id)
+                    ?? panic("The semiNFT is not found")
+                if !proposal.isVoted(semiNFT) {
+                    proposal.vote(choice: choice, semiNFT: semiNFT)
+                }
+            }
+
+            // update the local voting status
+            self.voted[proposal.uuid] = true
+            if self.votedTicksMapping[details.tick] == nil {
+                self.votedTicksMapping[details.tick] = [proposal.uuid]
             } else {
-                self.votedTicksMapping[tick]?.append(proposalId)
+                self.votedTicksMapping[details.tick]?.append(proposal.uuid)
+            }
+            // add the proposal to the locking queue
+            self.activeProposals[proposal.uuid] = details.endingTime
+        }
+
+        access(contract)
+        fun onProposalFinalized(proposal: &Proposal{ProposalPublic}) {
+            if !proposal.isFinalized() {
+                return
+            }
+            // remove the proposal from the locking queue
+            self.activeProposals.remove(key: proposal.uuid)
+
+            // check is no more active proposals
+            if self.activeProposals.keys.length == 0 {
+                // return all the staked NFTs to the staked collection
+                let stakeTick = FRC20Votes.getStakingTickerName()
+                let lockedNFTIds = self.lockedSemiNFTCollection.getIDsByTick(tick: stakeTick)
+                if let semiNFTColRef = self.semiNFTColCap.borrow() {
+                    for id in lockedNFTIds {
+                        semiNFTColRef.deposit(token: <- self.lockedSemiNFTCollection.withdraw(withdrawID: id))
+                    }
+                }
             }
         }
     }
@@ -299,16 +370,6 @@ access(all) contract FRC20Votes {
         var discussionLink: String
         access(all)
         var isCancelled: Bool
-        // ----- Voting status -----
-        /// Address -> Points
-        access(all)
-        var votedAccounts: {Address: UFix64}
-        /// NFTId -> Bool
-        access(all)
-        var votedNFTs: {UInt64: Bool}
-        /// Vote choice -> Points
-        access(all)
-        var votes: {Int: UFix64}
 
         init(
             proposer: Address,
@@ -336,15 +397,6 @@ access(all) contract FRC20Votes {
             self.endingTime = endingTime
             self.executableThreshold = executableThreshold
             self.isCancelled = false
-            self.votedAccounts = {}
-            self.votedNFTs = {}
-            // init votes
-            self.votes = {}
-            var i = 0
-            while i < slots.length {
-                self.votes[i] = 0.0
-                i = i + 1
-            }
         }
 
         /** ----- Read ----- */
@@ -361,116 +413,10 @@ access(all) contract FRC20Votes {
             return self.endingTime <= getCurrentBlock().timestamp
         }
 
-        /// Get the voters amount.
-        ///
-        access(all) view
-        fun getVotersAmount(): Int {
-            return self.votedAccounts.length
-        }
-
-        /// Get the total voted points.
-        ///
-        access(all) view
-        fun getTotalVotedPoints(): UFix64 {
-            var total = 0.0
-            for k in self.votes.keys {
-                total = total + self.votes[k]!
-            }
-            return total
-        }
-
-        /// Get the winning choice.
-        ///
-        access(all) view
-        fun getWinningChoice(): Int? {
-            if !self.isEnded() {
-                return nil
-            }
-            // get the winning choice
-            var winningChoice = 0
-            var winningVotes = 0.0
-            for k in self.votes.keys {
-                if let points = self.votes[k] {
-                    if points > winningVotes {
-                        winningChoice = k
-                        winningVotes = points
-                    }
-                }
-            }
-            return winningChoice
-        }
-
-        /// WHether the proposal is validate for the threshold.
-        ///
-        access(all) view
-        fun isValidateForThreshold(): Bool {
-            if !self.isEnded() {
-                return false
-            }
-            let totalStaked = FRC20Votes.getTotalStakedAmount()
-            let votedAmount = self.getTotalVotedPoints()
-            return totalStaked * self.executableThreshold <= votedAmount
-        }
-
-        /// Get current status.
-        ///
-        access(all) view
-        fun getCurrentStatus(): ProposalStatus {
-            let now = getCurrentBlock().timestamp
-            if self.isCancelled {
-                return ProposalStatus.Cancelled
-            } else if now < self.beginningTime {
-                return ProposalStatus.Created
-            } else if now < self.endingTime {
-                return ProposalStatus.Activated
-            } else {
-                // ended
-                if !self.isValidateForThreshold() {
-                    return ProposalStatus.Failed
-                } else if !self.isWinningInscriptionAllExecuted() {
-                    return ProposalStatus.Successed
-                } else {
-                    return ProposalStatus.Executed
-                }
-            }
-        }
-
-        access(all) view
-        fun isWinningInscriptionAllExecuted(): Bool {
-            if !self.isEnded() {
-                return false
-            }
-            if let winningChoice = self.getWinningChoice() {
-                let slotInfoRef = self.slots[winningChoice]
-                let winningInsIds = slotInfoRef.inscriptions
-                let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
-                var allExecuted = true
-                for id in winningInsIds {
-                    let insRef = inscriptionsStore.borrowInscription(id)
-                    allExecuted = allExecuted && (insRef?.isExtracted() ?? false)
-                    if !allExecuted {
-                        break
-                    }
-                }
-                return allExecuted
-            }
-            return false
-        }
-
-        /// Check whether the NFT is voted.
-        ///
-        access(all) view
-        fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool {
-            return self.votedNFTs[semiNFT.id] != nil
-        }
-
         /** ----- Write ----- */
 
         access(contract)
         fun updateProposal(title: String?, message: String?, discussionLink: String?) {
-            pre {
-                self.getCurrentStatus().rawValue <= ProposalStatus.Activated.rawValue: "Proposal is not in the right status"
-            }
             if title != nil {
                 self.title = title!
             }
@@ -485,31 +431,9 @@ access(all) contract FRC20Votes {
         access(contract)
         fun cancelProposal() {
             pre {
-                self.getCurrentStatus().rawValue <= ProposalStatus.Activated.rawValue: "Proposal is not in the right status"
+                self.isCancelled == false: "Proposal is already cancelled"
             }
             self.isCancelled = true
-        }
-
-        access(contract)
-        fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}) {
-            pre {
-                self.getCurrentStatus() == ProposalStatus.Activated: "Proposal is not in voting status"
-                choice < self.slots.length: "Choice is out of range"
-                semiNFT.isStakedTick(): "The ticker is not staked"
-                semiNFT.getOriginalTick() == FRC20Votes.getStakingTickerName(): "The ticker is not the staking ticker"
-                semiNFT.getBalance() > 0.0: "The NFT balance is zero"
-                self.votedNFTs[semiNFT.id] == nil: "NFT is already voted"
-            }
-            post {
-                self.votes[choice]! == before(self.votes[choice]!) + semiNFT.getBalance(): "Votes are not added"
-                self.votedNFTs[semiNFT.id] == true: "NFT is not added to the votedNFTs"
-            }
-            let points = semiNFT.getBalance()
-            self.votes[choice] = (self.votes[choice] ?? 0.0) + points
-            // add the voter
-            let voterAddr = semiNFT.owner?.address ?? panic("Voter's owner is not found")
-            self.votedAccounts[voterAddr] = (self.votedAccounts[voterAddr] ?? 0.0) + points
-            self.votedNFTs[semiNFT.id] = true
         }
     }
 
@@ -531,6 +455,8 @@ access(all) contract FRC20Votes {
     access(all) resource interface ProposalPublic {
         // --- Read Methods ---
         access(all) view
+        fun isEditable(): Bool
+        access(all) view
         fun isFinalized(): Bool
         access(all) view
         fun getStatus(): ProposalStatus
@@ -538,13 +464,23 @@ access(all) contract FRC20Votes {
         fun getDetails(): ProposalDetails
         access(all) view
         fun getLogs(): [StatusLog]
+        access(all) view
+        fun getVotersAmount(): Int
+        access(all) view
+        fun getVoters(): [Address]
+        access(all) view
+        fun getTotalVotedPoints(): UFix64
+        access(all) view
+        fun getWinningChoice(): Int?
+        access(all) view
+        fun isValidateForThreshold(): Bool
+        access(all) view
+        fun isWinningInscriptionAllExecuted(): Bool
+        access(all) view
+        fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool
         // --- Write Methods ---
-        access(all)
-        fun vote(voter: &VoterIdentity, choice: Int)
-        access(all)
-        fun updateProposal(voter: &VoterIdentity, title: String?, message: String?, discussionLink: String?)
-        access(all)
-        fun cancelProposal(voter: &VoterIdentity)
+        access(contract)
+        fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT})
     }
 
     /// The struct of the FixesVotes proposal.
@@ -556,6 +492,16 @@ access(all) contract FRC20Votes {
         let statusLog: [StatusLog]
         access(self)
         let details: ProposalDetails
+        // ----- Voting status -----
+        /// Address -> Points
+        access(self)
+        var votedAccounts: {Address: UFix64}
+        /// NFTId -> Bool
+        access(self)
+        var votedNFTs: {UInt64: Bool}
+        /// Vote choice -> Points
+        access(self)
+        var votes: {Int: UFix64}
 
         init(
             voter: Address,
@@ -581,6 +527,15 @@ access(all) contract FRC20Votes {
                 endingTime: endingTime,
                 slots: slots,
             )
+            self.votedAccounts = {}
+            self.votedNFTs = {}
+            // init votes
+            self.votes = {}
+            var i = 0
+            while i < slots.length {
+                self.votes[i] = 0.0
+                i = i + 1
+            }
 
             emit ProposalCreated(
                 proposer: voter,
@@ -599,14 +554,38 @@ access(all) contract FRC20Votes {
         /** ------ Public Methods ------ */
 
         access(all) view
-        fun isFinalized(): Bool {
-            let status = self.details.getCurrentStatus()
-            return status == ProposalStatus.Failed || status == ProposalStatus.Cancelled || status == ProposalStatus.Executed
+        fun isEditable(): Bool {
+            let status = self.getStatus()
+            return status == ProposalStatus.Created || status == ProposalStatus.Activated
         }
 
         access(all) view
+        fun isFinalized(): Bool {
+            let status = self.getStatus()
+            return status == ProposalStatus.Failed || status == ProposalStatus.Cancelled || status == ProposalStatus.Executed
+        }
+
+        /// Get current status.
+        ///
+        access(all) view
         fun getStatus(): ProposalStatus {
-            return self.details.getCurrentStatus()
+            let now = getCurrentBlock().timestamp
+            if self.details.isCancelled {
+                return ProposalStatus.Cancelled
+            } else if now < self.details.beginningTime {
+                return ProposalStatus.Created
+            } else if now < self.details.endingTime {
+                return ProposalStatus.Activated
+            } else {
+                // ended
+                if !self.isValidateForThreshold() {
+                    return ProposalStatus.Failed
+                } else if !self.isWinningInscriptionAllExecuted() {
+                    return ProposalStatus.Successed
+                } else {
+                    return ProposalStatus.Executed
+                }
+            }
         }
 
         access(all) view
@@ -619,72 +598,183 @@ access(all) contract FRC20Votes {
             return self.statusLog
         }
 
-        /** ------ Private Methods ------- */
-
-        /// Vote the proposal.
+        /// Get the voters amount.
         ///
-        access(all)
-        fun vote(voter: &VoterIdentity, choice: Int) {
+        access(all) view
+        fun getVotersAmount(): Int {
+            return self.votedAccounts.keys.length
+        }
+
+        /// Get the voters.
+        ///
+        access(all) view
+        fun getVoters(): [Address] {
+            return self.votedAccounts.keys
+        }
+
+        /// Get the total voted points.
+        ///
+        access(all) view
+        fun getTotalVotedPoints(): UFix64 {
+            var total = 0.0
+            for k in self.votes.keys {
+                total = total + self.votes[k]!
+            }
+            return total
+        }
+
+        /// Get the winning choice.
+        ///
+        access(all) view
+        fun getWinningChoice(): Int? {
+            if !self.details.isEnded() {
+                return nil
+            }
+            // get the winning choice
+            var winningChoice = 0
+            var winningVotes = 0.0
+            for k in self.votes.keys {
+                if let points = self.votes[k] {
+                    if points > winningVotes {
+                        winningChoice = k
+                        winningVotes = points
+                    }
+                }
+            }
+            return winningChoice
+        }
+
+        /// WHether the proposal is validate for the threshold.
+        ///
+        access(all) view
+        fun isValidateForThreshold(): Bool {
+            if !self.details.isEnded() {
+                return false
+            }
+            let totalStaked = FRC20Votes.getTotalStakedAmount()
+            let votedAmount = self.getTotalVotedPoints()
+            return totalStaked * self.details.executableThreshold <= votedAmount
+        }
+
+        access(all) view
+        fun isWinningInscriptionAllExecuted(): Bool {
+            if !self.details.isEnded() {
+                return false
+            }
+            if let winningChoice = self.getWinningChoice() {
+                let slotInfoRef = self.details.slots[winningChoice]
+                let winningInsIds = slotInfoRef.inscriptions
+                let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
+                var allExecuted = true
+                for id in winningInsIds {
+                    let insRef = inscriptionsStore.borrowInscription(id)
+                    allExecuted = allExecuted && (insRef?.isExtracted() ?? false)
+                    if !allExecuted {
+                        break
+                    }
+                }
+                return allExecuted
+            }
+            return false
+        }
+
+        /// Check whether the NFT is voted.
+        ///
+        access(all) view
+        fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool {
+            return self.votedNFTs[semiNFT.id] != nil
+        }
+
+        /** ------ Write Methods: Contract ------ */
+
+        /// Vote on a proposal.
+        ///
+        access(contract)
+        fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}) {
             pre {
                 self.details.isStarted(): "Proposal is not started"
                 !self.details.isEnded(): "Proposal is ended"
+                choice < self.details.slots.length: "Choice is out of range"
+                semiNFT.getOriginalTick() == FRC20Votes.getStakingTickerName(): "The ticker is not the staking ticker"
+                semiNFT.isStakedTick(): "The ticker is not staked"
+                semiNFT.getBalance() > 0.0: "The NFT balance is zero"
+                self.votedNFTs[semiNFT.id] == nil: "NFT is already voted"
             }
-            // TODO vote on the proposal
-        }
-
-        /// Update the proposal.
-        ///
-        access(all)
-        fun updateProposal(voter: &VoterIdentity, title: String?, message: String?, discussionLink: String?) {
-            pre {
-                voter.owner?.address == self.proposor: "The voter is not the proposor"
+            post {
+                self.votes[choice]! == before(self.votes[choice]!) + semiNFT.getBalance(): "Votes are not added"
+                self.votedNFTs[semiNFT.id] == true: "NFT is not added to the votedNFTs"
             }
 
-            self.details.updateProposal(title: title, message: message, discussionLink: discussionLink)
+            let points = semiNFT.getBalance()
+            self.votes[choice] = (self.votes[choice] ?? 0.0) + points
+            // add the voter
+            let voterAddr = semiNFT.owner?.address ?? panic("Voter's owner is not found")
+            self.votedAccounts[voterAddr] = (self.votedAccounts[voterAddr] ?? 0.0) + points
+            self.votedNFTs[semiNFT.id] = true
 
-            emit ProposalInfoUpdated(
-                proposalId: self.uuid,
+            emit ProposalVoted(
                 tick: self.details.tick,
-                title: title,
-                message: message,
-                discussionLink: discussionLink
-            )
-        }
-
-        /// Cancel the proposal.
-        ///
-        access(all)
-        fun cancelProposal(voter: &VoterIdentity) {
-            pre {
-                voter.owner?.address == self.proposor: "The voter is not the proposor"
-            }
-            self.details.cancelProposal()
-
-            emit ProposalCancelled(
                 proposalId: self.uuid,
-                tick: self.details.tick
+                voter: semiNFT.owner?.address ?? panic("Voter's owner is not found"),
+                choice: choice,
+                points: semiNFT.getBalance()
             )
         }
 
-        /** ------ Internal Methods ------ */
+        /** ------ Internal Methods: Implement Heartbeat ------ */
 
+        /// Implement the heartbeat hook.
+        ///
         access(account)
         fun onHeartbeat(_ deltaTime: UFix64) {
-            let status = self.details.getCurrentStatus()
+            let status = self.getStatus()
             let lastIdx = self.statusLog.length - 1
             let lastStatus = lastIdx >= 0
                 ? self.statusLog[lastIdx].status
                 : nil
-            if status != lastStatus {
-                self.statusLog.append(StatusLog(status, getCurrentBlock().timestamp))
 
+            if status != lastStatus {
+                let now = getCurrentBlock().timestamp
+                self.statusLog.append(StatusLog(status, now))
+
+                // emit event
                 emit ProposalStatusChanged(
                     proposalId: self.uuid,
                     tick: self.details.tick,
                     prevStatus: lastStatus?.rawValue,
                     newStatus: status.rawValue,
-                    timestamp: getCurrentBlock().timestamp
+                    timestamp: now
                 )
+
+                // invoke onProposalFinalized in voters
+                if self.isFinalized() {
+                    let allVoters = self.getVoters()
+                    for addr in allVoters {
+                        if let voterRef = FRC20Votes.borrowVoterPublic(addr) {
+                            voterRef.onProposalFinalized(proposal: &self as &Proposal{ProposalPublic})
+                        }
+                    }
+                }
+
+                // check the status and do the action
+                switch status {
+                case ProposalStatus.Failed:
+                    // emit event
+                    emit ProposalFailed(
+                        tick: self.details.tick,
+                        proposalId: self.uuid,
+                        votedPoints: self.getTotalVotedPoints(),
+                        failedAt: now
+                    )
+                case ProposalStatus.Executed:
+                    // emit event
+                    emit ProposalExecuted(
+                        tick: self.details.tick,
+                        proposalId: self.uuid,
+                        choice: self.getWinningChoice()!,
+                        executedAt: now
+                    )
+                }
             }
         }
 
@@ -711,8 +801,34 @@ access(all) contract FRC20Votes {
         fun getProposalIdsByTick(tick: String): [UInt64]
         /// Borrow the proposal.
         access(all)
-        fun borrowProposal(proposalId: UInt64): &Proposal{ProposalPublic}?
+        fun borrowProposal(_ proposalId: UInt64): &Proposal{ProposalPublic}?
         /** ------ Write Methods ------ */
+        /// Create a new proposal.
+        access(all)
+        fun createProposal(
+            voter: &VoterIdentity,
+            tick: String,
+            title: String,
+            message: String,
+            discussionLink: String,
+            executableThreshold: UFix64,
+            beginningTime: UFix64,
+            endingTime: UFix64,
+            messages: [String],
+            inscriptions: @[[Fixes.Inscription]]
+        )
+        /// Vote on a proposal.
+        access(all)
+        fun vote(
+            voter: &VoterIdentity,
+            proposalId: UInt64,
+            choice: Int,
+        )
+        // --- Write Methods: Proposer ---
+        access(all)
+        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, message: String?, discussionLink: String?)
+        access(all)
+        fun cancelProposal(voter: &VoterIdentity, proposalId: UInt64)
     }
 
     /// The resource of the FixesVotes manager.
@@ -785,7 +901,7 @@ access(all) contract FRC20Votes {
         }
 
         access(all)
-        fun borrowProposal(proposalId: UInt64): &Proposal{ProposalPublic}? {
+        fun borrowProposal(_ proposalId: UInt64): &Proposal{ProposalPublic}? {
             return self.borrowProposalRef(proposalId)
         }
 
@@ -868,6 +984,69 @@ access(all) contract FRC20Votes {
             self.activeProposalIds.insert(at: 0, proposalId)
         }
 
+        access(all)
+        fun vote(
+            voter: &VoterIdentity,
+            proposalId: UInt64,
+            choice: Int,
+        ) {
+            let proposalRef = self.borrowProposal(proposalId)
+                ?? panic("The proposal is not found")
+            voter.onVote(choice: choice, proposal: proposalRef)
+        }
+
+        // --- Write Methods: Proposor ---
+
+        /** ------ Private Methods ------- */
+
+        /// Update the proposal.
+        ///
+        access(all)
+        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, message: String?, discussionLink: String?) {
+            let proposalRef = self.borrowProposalRef(proposalId)
+                ?? panic("The proposal is not found")
+            let detailsRef = proposalRef.borrowDetails()
+            assert(
+                detailsRef.proposer == voter.owner?.address,
+                message: "The voter is not the proposor"
+            )
+            assert(
+                proposalRef.isEditable(),
+                message: "The proposal is not editable"
+            )
+            detailsRef.updateProposal(title: title, message: message, discussionLink: discussionLink)
+
+            emit ProposalInfoUpdated(
+                proposalId: proposalRef.uuid,
+                tick: detailsRef.tick,
+                title: title,
+                message: message,
+                discussionLink: discussionLink
+            )
+        }
+
+        /// Cancel the proposal.
+        ///
+        access(all)
+        fun cancelProposal(voter: &VoterIdentity, proposalId: UInt64) {
+            let proposalRef = self.borrowProposalRef(proposalId)
+                ?? panic("The proposal is not found")
+            let detailsRef = proposalRef.borrowDetails()
+            assert(
+                detailsRef.proposer == voter.owner?.address,
+                message: "The voter is not the proposor"
+            )
+            assert(
+                proposalRef.isEditable(),
+                message: "The proposal is not editable"
+            )
+            detailsRef.cancelProposal()
+
+            emit ProposalCancelled(
+                proposalId: self.uuid,
+                tick: detailsRef.tick
+            )
+        }
 
         /** ----- Write: Private ----- */
 
@@ -908,6 +1087,13 @@ access(all) contract FRC20Votes {
     }
 
     /* --- Public Functions --- */
+
+    access(all)
+    fun createVoter(
+        _ cap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+    ): @VoterIdentity {
+        return <- create VoterIdentity(cap)
+    }
 
     /// Get the staking ticker name.
     ///
