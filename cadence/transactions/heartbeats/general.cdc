@@ -5,6 +5,7 @@ transaction(
     scope: String
 ) {
     let heartbeat: &FixesHeartbeat.Heartbeat
+
     prepare(acct: AuthAccount) {
         /** ------------- Start -- Fixes Heartbeat Initialization ------------  */
         // ensure resource
