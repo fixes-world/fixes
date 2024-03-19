@@ -533,10 +533,13 @@ access(all) contract Fixes {
     /// The public interface to the inscriptions store
     ///
     access(all) resource interface InscriptionsStorePublic {
+        // ---- Access Control: Account Level ----
         /// Store executable inscription
-        ///
         access(account)
         fun store(_ ins: @Fixes.Inscription)
+        // returns the inscription with the given id
+        access(account)
+        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription?
     }
 
     /// The private interface to the inscriptions store

@@ -15,6 +15,7 @@ import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20SemiNFT"
 import "FRC20Staking"
+import "FRC20VoteCommands"
 
 access(all) contract FRC20Votes {
     /* --- Events --- */
@@ -32,7 +33,8 @@ access(all) contract FRC20Votes {
         executableThreshold: UFix64,
         beginningTime: UFix64,
         endingTime: UFix64,
-        slots: [ChoiceSlotDetails],
+        slotCommands: [UInt8],
+        slotMessages: [String],
     )
     /// Event emitted when a proposal status is changed
     access(all) event ProposalStatusChanged(
@@ -109,14 +111,6 @@ access(all) contract FRC20Votes {
         access(all) case Failed;
         access(all) case Successed;
         access(all) case Executed;
-    }
-
-    /// The Proposal command type.
-    ///
-    access(all) enum CommandType: UInt8 {
-        access(all) case SetBurnable;
-        access(all) case BurnUnsupplied;
-        access(all) case MoveToLotteryJackpot;
     }
 
     access(all) resource interface VoterPublic {
@@ -335,13 +329,17 @@ access(all) contract FRC20Votes {
         access(all)
         let message: String
         access(all)
+        let command: FRC20VoteCommands.CommandType
+        access(all)
         let inscriptions: [UInt64]
 
         init(
+            command: FRC20VoteCommands.CommandType,
             message: String,
             inscriptions: [UInt64]
         ) {
             self.message = message
+            self.command = command
             self.inscriptions = inscriptions
         }
     }
@@ -531,9 +529,14 @@ access(all) contract FRC20Votes {
             self.votedNFTs = {}
             // init votes
             self.votes = {}
+
+            let messages: [String] = []
+            let commands: [UInt8] = []
             var i = 0
             while i < slots.length {
                 self.votes[i] = 0.0
+                messages.append(slots[i].message)
+                commands.append(slots[i].command.rawValue)
                 i = i + 1
             }
 
@@ -547,7 +550,8 @@ access(all) contract FRC20Votes {
                 executableThreshold: executableThreshold,
                 beginningTime: beginningTime,
                 endingTime: endingTime,
-                slots: slots,
+                slotCommands: commands,
+                slotMessages: messages
             )
         }
 
@@ -721,6 +725,66 @@ access(all) contract FRC20Votes {
             )
         }
 
+        /// Execute the proposal without panic
+        ///
+        access(contract)
+        fun executeSafe(): Bool {
+            if self.getStatus() != ProposalStatus.Successed {
+                return false
+            }
+
+            if let winningChoice = self.getWinningChoice() {
+                let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
+
+                for i, slot in self.details.slots {
+                    let insRefArr: [&Fixes.Inscription] = []
+                    let insLen = slot.inscriptions.length
+                    for id in slot.inscriptions {
+                        if let insRef = inscriptionsStore.borrowInscriptionWritableRef(id) {
+                            insRefArr.append(insRef)
+                        }
+                    }
+                    // check the inscriptions length, if not equal, return false
+                    if insRefArr.length != insLen {
+                        return false
+                    }
+                    var result = false
+                    // execute the winning choice
+                    if i == winningChoice {
+                        // run the commands
+                        result = FRC20VoteCommands.safeRunVoteCommands(slot.command, insRefArr)
+                    } else {
+                        // refund the unexecuted inscriptions
+                        result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposor, insRefArr)
+                    }
+                    if !result {
+                        return false
+                    }
+                }
+
+                // emit event
+                emit ProposalExecuted(
+                    tick: self.details.tick,
+                    proposalId: self.uuid,
+                    choice: winningChoice,
+                    executedAt: getCurrentBlock().timestamp
+                )
+                return true
+            }
+            return false
+        }
+
+        /// Execute the proposal.
+        ///
+        access(contract)
+        fun execute() {
+            pre {
+                self.getStatus() == ProposalStatus.Successed: "Proposal is not successed"
+            }
+            let result = self.executeSafe()
+            assert(result, message: "The proposal is not executed")
+        }
+
         /** ------ Internal Methods: Implement Heartbeat ------ */
 
         /// Implement the heartbeat hook.
@@ -766,14 +830,11 @@ access(all) contract FRC20Votes {
                         votedPoints: self.getTotalVotedPoints(),
                         failedAt: now
                     )
-                case ProposalStatus.Executed:
-                    // emit event
-                    emit ProposalExecuted(
-                        tick: self.details.tick,
-                        proposalId: self.uuid,
-                        choice: self.getWinningChoice()!,
-                        executedAt: now
-                    )
+                    break
+                case ProposalStatus.Successed:
+                    // Excute the inscriptions
+                    self.executeSafe()
+                    break
                 }
             }
         }
@@ -814,21 +875,20 @@ access(all) contract FRC20Votes {
             executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
+            commands: [FRC20VoteCommands.CommandType],
             messages: [String],
             inscriptions: @[[Fixes.Inscription]]
         )
         /// Vote on a proposal.
         access(all)
-        fun vote(
-            voter: &VoterIdentity,
-            proposalId: UInt64,
-            choice: Int,
-        )
+        fun vote( voter: &VoterIdentity, proposalId: UInt64, choice: Int)
         // --- Write Methods: Proposer ---
         access(all)
         fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, message: String?, discussionLink: String?)
         access(all)
         fun cancelProposal(voter: &VoterIdentity, proposalId: UInt64)
+        access(all)
+        fun executeProposal(voter: &VoterIdentity, proposalId: UInt64)
     }
 
     /// The resource of the FixesVotes manager.
@@ -919,6 +979,7 @@ access(all) contract FRC20Votes {
             executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
+            commands: [FRC20VoteCommands.CommandType],
             messages: [String],
             inscriptions: @[[Fixes.Inscription]]
         ) {
@@ -926,6 +987,7 @@ access(all) contract FRC20Votes {
                 beginningTime < endingTime: "Beginning time must be less than ending time"
                 messages.length > 0: "Messages must be greater than 0"
                 messages.length == inscriptions.length: "Messages and inscriptions must be the same length"
+                messages.length == commands.length: "Messages and commands must be the same length"
             }
             let voterAddr = voter.owner?.address ?? panic("Voter's owner is not found")
             assert(
@@ -954,12 +1016,27 @@ access(all) contract FRC20Votes {
                 destroy insList
 
                 slots.append(ChoiceSlotDetails(
+                    command: commands[i],
                     message: messages[i],
                     inscriptions: insIds
                 ))
                 i = i + 1
             }
             destroy inscriptions
+
+            // verfiy inscriptions
+            for slot in slots {
+                let insRefArr: [&Fixes.Inscription{Fixes.InscriptionPublic}] = []
+                for id in slot.inscriptions {
+                    if let insRef = inscriptionsStore.borrowInscription(id) {
+                        insRefArr.append(insRef)
+                    }
+                }
+                assert(
+                    FRC20VoteCommands.verifyVoteCommands(slot.command, insRefArr),
+                    message: "The inscriptions for the vote command are not valid"
+                )
+            }
 
             let proposal <- create Proposal(
                 voter: voterAddr,
@@ -1046,6 +1123,25 @@ access(all) contract FRC20Votes {
                 proposalId: self.uuid,
                 tick: detailsRef.tick
             )
+        }
+
+        /// Manual execute the proposal.
+        ///
+        access(all)
+        fun executeProposal(voter: &VoterIdentity, proposalId: UInt64) {
+            let proposalRef = self.borrowProposalRef(proposalId)
+                ?? panic("The proposal is not found")
+            let detailsRef = proposalRef.borrowDetails()
+            assert(
+                detailsRef.proposer == voter.owner?.address,
+                message: "The voter is not the proposor"
+            )
+            let status = proposalRef.getStatus()
+            assert(
+                status == ProposalStatus.Successed,
+                message: "The proposal is not successed"
+            )
+            proposalRef.execute()
         }
 
         /** ----- Write: Private ----- */
