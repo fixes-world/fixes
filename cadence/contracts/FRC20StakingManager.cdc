@@ -187,7 +187,7 @@ access(all) contract FRC20StakingManager {
                 from: systemAddr
             )
             // call the internal method to donate
-            FRC20StakingManager._donateToVesting(
+            FRC20StakingManager.donateToVestingFromChange(
                 changeToDonate: <- changeToDonate,
                 tick: tick,
                 vestingBatchAmount: vestingBatchAmount,
@@ -455,6 +455,29 @@ access(all) contract FRC20StakingManager {
 
     /** ---- Public Methods - User ---- */
 
+    /// Get the staking ticker name.
+    ///
+    access(all) view
+    fun getPlatformStakingTickerName(): String {
+        let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
+        let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
+        return stakingToken ?? "flows"
+    }
+
+    /// Borrow the platform staking pool.
+    ///
+    access(all)
+    fun borrowPlatformStakingPool(): &FRC20Staking.Pool{FRC20Staking.PoolPublic} {
+        // singleton resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        // Get the staking pool address
+        let stakeTick = self.getPlatformStakingTickerName()
+        let poolAddress = acctsPool.getFRC20StakingAddress(tick: stakeTick)
+            ?? panic("The staking pool is not enabled")
+        // borrow the staking pool
+        return FRC20Staking.borrowPool(poolAddress) ?? panic("The staking pool is not found")
+    }
+
     /// Stake tokens
     ///
     access(all)
@@ -614,7 +637,7 @@ access(all) contract FRC20StakingManager {
         vestingInterval: UFix64,
     ) {
         // call the internal method
-        self._donateToVesting(
+        self.donateToVestingFromChange(
             changeToDonate: <- self._withdrawDonateChange(tick: tick, ins: ins),
             tick: tick,
             vestingBatchAmount: vestingBatchAmount,
@@ -625,8 +648,8 @@ access(all) contract FRC20StakingManager {
     /// Donate Change to the staking's vesting pool
     /// (Internal Method)
     ///
-    access(contract)
-    fun _donateToVesting(
+    access(account)
+    fun donateToVestingFromChange(
         changeToDonate: @FRC20FTShared.Change,
         tick: String,
         vestingBatchAmount: UInt32,

@@ -114,6 +114,11 @@ access(all) contract FGameLottery {
         poolAddr: Address,
         lotteryId: UInt64,
     )
+    /// Event emitted when a lottery jackpot is donated
+    access(all) event LotteryJackpotDonated(
+        poolAddr: Address,
+        donationAmount: UFix64
+    )
 
     /* --- Variable, Enums and Structs --- */
 
@@ -1437,6 +1442,12 @@ access(all) contract FGameLottery {
             recipient: Capability<&TicketCollection{TicketCollectionPublic}>,
         )
 
+        /// Donate to the jackpot pool
+        access(all)
+        fun donateToJackpot(
+            payment: @FRC20FTShared.Change
+        )
+
         // --- borrow methods ---
 
         access(all)
@@ -1661,6 +1672,32 @@ access(all) contract FGameLottery {
                 ticketIds: purchasedIds,
                 costTick: self.jackpotPool.getOriginalTick(),
                 costAmount: totalCost
+            )
+        }
+
+        /// Donate to the jackpot pool
+        ///
+        access(all)
+        fun donateToJackpot(
+            payment: @FRC20FTShared.Change
+        ) {
+            pre {
+                payment.getOriginalTick() == self.jackpotPool.getOriginalTick(): "Invalid payment token"
+                payment.getBalance() > 0.0: "Payment balance must be greater than 0"
+            }
+
+            let jackpotRef = self.borrowJackpotPool()
+            let donatableAmount = payment.getBalance()
+
+            // deposit the new added amount to the jackpot pool
+            FRC20FTShared.depositToChange(
+                receiver: jackpotRef,
+                change: <- payment
+            )
+
+            emit LotteryJackpotDonated(
+                poolAddr: self.getAddress(),
+                donationAmount: donatableAmount
             )
         }
 

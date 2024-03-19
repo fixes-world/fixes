@@ -14,7 +14,7 @@ import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20SemiNFT"
-import "FRC20Staking"
+import "FRC20StakingManager"
 import "FRC20VoteCommands"
 
 access(all) contract FRC20Votes {
@@ -221,13 +221,13 @@ access(all) contract FRC20Votes {
         ///
         access(all)
         fun getVotingPower(): UFix64 {
-            let stakeTick = FRC20Votes.getStakingTickerName()
+            let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
             let selfAddr = self.getVoterAddress()
 
             var power = 0.0
-            if let delegator = FRC20Staking.borrowDelegator(selfAddr) {
+            if let semiColRef = self.semiNFTColCap.borrow() {
                 // Get the staking pool address
-                power = delegator.getStakedBalance(tick: stakeTick)
+                power = semiColRef.getStakedBalance(tick: stakeTick)
             }
             return power + self.getStakedBalance(tick: stakeTick)
         }
@@ -263,7 +263,7 @@ access(all) contract FRC20Votes {
             let details = proposal.getDetails()
 
             // check the staked balance
-            let stakeTick = FRC20Votes.getStakingTickerName()
+            let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
             let stakedBalance = self.getStakedBalance(tick: stakeTick)
             if stakedBalance > 0.0 {
                 let stakedNFTColRef = self.semiNFTColCap.borrow() ?? panic("The staked NFT collection is not found")
@@ -313,7 +313,7 @@ access(all) contract FRC20Votes {
             // check is no more active proposals
             if self.activeProposals.keys.length == 0 {
                 // return all the staked NFTs to the staked collection
-                let stakeTick = FRC20Votes.getStakingTickerName()
+                let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
                 let lockedNFTIds = self.lockedSemiNFTCollection.getIDsByTick(tick: stakeTick)
                 if let semiNFTColRef = self.semiNFTColCap.borrow() {
                     for id in lockedNFTIds {
@@ -699,7 +699,7 @@ access(all) contract FRC20Votes {
                 self.details.isStarted(): "Proposal is not started"
                 !self.details.isEnded(): "Proposal is ended"
                 choice < self.details.slots.length: "Choice is out of range"
-                semiNFT.getOriginalTick() == FRC20Votes.getStakingTickerName(): "The ticker is not the staking ticker"
+                semiNFT.getOriginalTick() == FRC20StakingManager.getPlatformStakingTickerName(): "The ticker is not the staking ticker"
                 semiNFT.isStakedTick(): "The ticker is not staked"
                 semiNFT.getBalance() > 0.0: "The NFT balance is zero"
                 self.votedNFTs[semiNFT.id] == nil: "NFT is already voted"
@@ -1191,15 +1191,6 @@ access(all) contract FRC20Votes {
         return <- create VoterIdentity(cap)
     }
 
-    /// Get the staking ticker name.
-    ///
-    access(all) view
-    fun getStakingTickerName(): String {
-        let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
-        let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
-        return stakingToken ?? "flows"
-    }
-
     /// Get the proposor staking threshold.
     ///
     access(all) view
@@ -1207,26 +1198,12 @@ access(all) contract FRC20Votes {
         return 0.15
     }
 
-    /// Create a proposal
+    /// Get the total staked amount.
     ///
     access(all) view
     fun getTotalStakedAmount(): UFix64 {
-        let pool = self.borrowStakingPool()
+        let pool = FRC20StakingManager.borrowPlatformStakingPool()
         return pool.getDetails().totalStaked
-    }
-
-    /// Borrow the staking pool.
-    ///
-    access(all)
-    fun borrowStakingPool(): &FRC20Staking.Pool{FRC20Staking.PoolPublic} {
-        // singleton resources
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-        // Get the staking pool address
-        let stakeTick = self.getStakingTickerName()
-        let poolAddress = acctsPool.getFRC20StakingAddress(tick: stakeTick)
-            ?? panic("The staking pool is not enabled")
-        // borrow the staking pool
-        return FRC20Staking.borrowPool(poolAddress) ?? panic("The staking pool is not found")
     }
 
     /// Borrow the system inscriptions store.
