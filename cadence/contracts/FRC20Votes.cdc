@@ -28,8 +28,8 @@ access(all) contract FRC20Votes {
         tick: String,
         proposalId: UInt64,
         title: String,
-        message: String,
-        discussionLink: String,
+        description: String,
+        discussionLink: String?,
         executableThreshold: UFix64,
         beginningTime: UFix64,
         endingTime: UFix64,
@@ -49,7 +49,7 @@ access(all) contract FRC20Votes {
         proposalId: UInt64,
         tick: String,
         title: String?,
-        message: String?,
+        description: String?,
         discussionLink: String?
     )
     /// Event emitted when a proposal is cancelled
@@ -363,9 +363,9 @@ access(all) contract FRC20Votes {
         access(all)
         var title: String
         access(all)
-        var message: String
+        var description: String
         access(all)
-        var discussionLink: String
+        var discussionLink: String?
         access(all)
         var isCancelled: Bool
 
@@ -373,8 +373,8 @@ access(all) contract FRC20Votes {
             proposer: Address,
             tick: String,
             title: String,
-            message: String,
-            discussionLink: String,
+            description: String,
+            discussionLink: String?,
             executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
@@ -388,7 +388,7 @@ access(all) contract FRC20Votes {
             self.proposer = proposer
             self.tick = tick
             self.title = title
-            self.message = message
+            self.description = description
             self.discussionLink = discussionLink
             self.slots = slots
             self.beginningTime = beginningTime
@@ -414,12 +414,12 @@ access(all) contract FRC20Votes {
         /** ----- Write ----- */
 
         access(contract)
-        fun updateProposal(title: String?, message: String?, discussionLink: String?) {
+        fun updateProposal(title: String?, description: String?, discussionLink: String?) {
             if title != nil {
                 self.title = title!
             }
-            if message != nil {
-                self.message = message!
+            if description != nil {
+                self.description = description!
             }
             if discussionLink != nil {
                 self.discussionLink = discussionLink!
@@ -505,8 +505,8 @@ access(all) contract FRC20Votes {
             voter: Address,
             tick: String,
             title: String,
-            message: String,
-            discussionLink: String,
+            description: String,
+            discussionLink: String?,
             executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
@@ -518,7 +518,7 @@ access(all) contract FRC20Votes {
                 proposer: voter,
                 tick: tick,
                 title: title,
-                message: message,
+                description: description,
                 discussionLink: discussionLink,
                 executableThreshold: executableThreshold,
                 beginningTime: beginningTime,
@@ -545,7 +545,7 @@ access(all) contract FRC20Votes {
                 tick: tick,
                 proposalId: self.uuid,
                 title: title,
-                message: message,
+                description: description,
                 discussionLink: discussionLink,
                 executableThreshold: executableThreshold,
                 beginningTime: beginningTime,
@@ -870,8 +870,8 @@ access(all) contract FRC20Votes {
             voter: &VoterIdentity,
             tick: String,
             title: String,
-            message: String,
-            discussionLink: String,
+            description: String,
+            discussionLink: String?,
             executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
@@ -884,7 +884,7 @@ access(all) contract FRC20Votes {
         fun vote( voter: &VoterIdentity, proposalId: UInt64, choice: Int)
         // --- Write Methods: Proposer ---
         access(all)
-        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, message: String?, discussionLink: String?)
+        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, description: String?, discussionLink: String?)
         access(all)
         fun cancelProposal(voter: &VoterIdentity, proposalId: UInt64)
         access(all)
@@ -974,8 +974,8 @@ access(all) contract FRC20Votes {
             voter: &VoterIdentity,
             tick: String,
             title: String,
-            message: String,
-            discussionLink: String,
+            description: String,
+            discussionLink: String?,
             executableThreshold: UFix64,
             beginningTime: UFix64,
             endingTime: UFix64,
@@ -1042,7 +1042,7 @@ access(all) contract FRC20Votes {
                 voter: voterAddr,
                 tick: tick,
                 title: title,
-                message: message,
+                description: description,
                 discussionLink: discussionLink,
                 executableThreshold: executableThreshold,
                 beginningTime: beginningTime,
@@ -1079,7 +1079,7 @@ access(all) contract FRC20Votes {
         /// Update the proposal.
         ///
         access(all)
-        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, message: String?, discussionLink: String?) {
+        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, description: String?, discussionLink: String?) {
             let proposalRef = self.borrowProposalRef(proposalId)
                 ?? panic("The proposal is not found")
             let detailsRef = proposalRef.borrowDetails()
@@ -1091,13 +1091,13 @@ access(all) contract FRC20Votes {
                 proposalRef.isEditable(),
                 message: "The proposal is not editable"
             )
-            detailsRef.updateProposal(title: title, message: message, discussionLink: discussionLink)
+            detailsRef.updateProposal(title: title, description: description, discussionLink: discussionLink)
 
             emit ProposalInfoUpdated(
                 proposalId: proposalRef.uuid,
                 tick: detailsRef.tick,
                 title: title,
-                message: message,
+                description: description,
                 discussionLink: discussionLink
             )
         }

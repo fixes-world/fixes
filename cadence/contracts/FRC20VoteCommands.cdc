@@ -30,6 +30,52 @@ access(all) contract FRC20VoteCommands {
         access(all) case MoveTreasuryToStakingReward;
     }
 
+    /// Create a new FRC20 vote command string.
+    ///
+    access(all)
+    fun buildInscriptionStringsByCommand(_ commandType: CommandType, _ meta: {String: String}): [String] {
+        switch commandType {
+        case CommandType.None:
+            return []
+        case CommandType.SetBurnable:
+            return [
+                FixesInscriptionFactory.buildVoteCommandSetBurnable(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    burnable: meta["v"] == "1"
+                )
+            ]
+        case CommandType.BurnUnsupplied:
+            return [
+                FixesInscriptionFactory.buildVoteCommandBurnUnsupplied(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    percent: UFix64.fromString(meta["perc"] ?? panic("Missing perc in params")) ?? panic("Invalid perc")
+                )
+            ]
+        case CommandType.MoveTreasuryToLotteryJackpot:
+            return [
+                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToLotteryJackpot(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt")
+                )
+            ]
+        case CommandType.MoveTreasuryToStakingReward:
+            return [
+                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToStaking(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt"),
+                    vestingBatchAmount: UInt32.fromString(meta["batch"] ?? panic("Missing batch in params")) ?? panic("Invalid batch"),
+                    vestingInterval: UFix64.fromString(meta["interval"] ?? panic("Missing interval in params")) ?? panic("Invalid interval")
+                )
+
+            ]
+        }
+        panic("Unknown command type")
+    }
+
+    /** -------- Account Level Methods -------- */
+
+    /// Verify the vote commands.
+    ///
     access(account) view
     fun verifyVoteCommands(_ commandType: CommandType, _ insRefArr: [&Fixes.Inscription{Fixes.InscriptionPublic}]): Bool {
         // Singleton Resource
@@ -79,6 +125,8 @@ access(all) contract FRC20VoteCommands {
         return isValid
     }
 
+    /// Run the vote commands.
+    ///
     access(account)
     fun safeRunVoteCommands(_ commandType: CommandType, _ insRefArr: [&Fixes.Inscription]): Bool {
         let isValid = self.verifyVoteCommands(commandType, insRefArr)

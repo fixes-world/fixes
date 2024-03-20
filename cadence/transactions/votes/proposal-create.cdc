@@ -9,6 +9,16 @@ import "FRC20Votes"
 import "FRC20VoteCommands"
 
 transaction(
+    tick: String,
+    title: String,
+    description: String,
+    discussionLink: String?,
+    executableThreshold: UFix64,
+    beginningTime: UFix64,
+    endingTime: UFix64,
+    commands: [FRC20VoteCommands.CommandType],
+    messages: [String],
+    params: {String: String}
 ) {
     let voter: &FRC20Votes.VoterIdentity
     let flowVault: &FlowToken.Vault
@@ -77,7 +87,50 @@ transaction(
             ?? panic("Could not borrow reference to the owner's Vault!")
     }
 
-    execute {
+    pre {
+        messages.length == commands.length: "The number of messages must be equal to the number of commands"
+    }
 
+    execute {
+        // Singleton Resources
+        let voteMgr = FRC20Votes.borrowVotesManager()
+
+        let inscriptions: @[[Fixes.Inscription]] <- []
+
+        var i = 0
+        while i < commands.length {
+            let command = commands[i]
+            let insArr: @[Fixes.Inscription] <- []
+            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(command, params)
+            for dataStr in insDataStrArr {
+                // estimate the required storage
+                let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+                // Withdraw tokens from the signer's stored vault
+                let costReserve <- self.flowVault.withdraw(amount: estimatedReqValue)
+                // create the inscription
+                let ins <- FixesInscriptionFactory.createFrc20Inscription(
+                    dataStr,
+                    <- (costReserve as! @FlowToken.Vault),
+                )
+                insArr.append(<- ins)
+            }
+            inscriptions.append(<- insArr)
+            i = i + 1
+        }
+
+        // create the proposal
+        voteMgr.createProposal(
+            voter: self.voter,
+            tick: tick,
+            title: title,
+            description: description,
+            discussionLink: discussionLink,
+            executableThreshold: executableThreshold,
+            beginningTime: beginningTime,
+            endingTime: endingTime,
+            commands: commands,
+            messages: messages,
+            inscriptions: <- inscriptions
+        )
     }
 }
