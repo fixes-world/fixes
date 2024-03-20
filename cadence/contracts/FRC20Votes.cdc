@@ -121,7 +121,13 @@ access(all) contract FRC20Votes {
         fun getVotingPower(): UFix64
         /// Check whether the proposal is voted.
         access(all)
-        fun hasVoted(proposalId: UInt64): Bool
+        fun hasVoted(_ proposalId: UInt64): Bool
+        /// Get the voted points.
+        access(all)
+        fun getVotedPoints(_ proposalId: UInt64): UFix64?
+        /// Get the voted choice.
+        access(all)
+        fun getVotedChoice(_ proposalId: UInt64): Int?
         /// Get the voted proposals.
         access(all)
         fun getVotedProposals(tick: String): [UInt64]
@@ -142,7 +148,10 @@ access(all) contract FRC20Votes {
         // ----- Voting Info ----
         /// Voted proposal id -> Points
         access(self)
-        let voted: {UInt64: Bool}
+        let voted: {UInt64: UFix64}
+        /// ProposalID -> Choice ID
+        access(self)
+        let votedChoices: {UInt64: Int}
         /// Tick -> ProposalId[]
         access(self)
         let votedTicksMapping: {String: [UInt64]}
@@ -159,6 +168,7 @@ access(all) contract FRC20Votes {
             self.semiNFTColCap = cap
             self.lockedSemiNFTCollection <- (FRC20SemiNFT.createEmptyCollection() as! @FRC20SemiNFT.Collection)
             self.voted = {}
+            self.votedChoices = {}
             self.votedTicksMapping = {}
             self.activeProposals = {}
         }
@@ -235,8 +245,22 @@ access(all) contract FRC20Votes {
         /// Check whether the proposal is voted.
         ///
         access(all)
-        fun hasVoted(proposalId: UInt64): Bool {
+        fun hasVoted(_ proposalId: UInt64): Bool {
             return self.voted[proposalId] != nil
+        }
+
+        /// Get the voted points.
+        ///
+        access(all)
+        fun getVotedPoints(_ proposalId: UInt64): UFix64? {
+            return self.voted[proposalId]
+        }
+
+        /// Get the voted choice.
+        ///
+        access(all)
+        fun getVotedChoice(_ proposalId: UInt64): Int? {
+            return self.votedChoices[proposalId]
         }
 
         /// Get the voted proposals.
@@ -255,10 +279,10 @@ access(all) contract FRC20Votes {
         access(contract)
         fun onVote(choice: Int, proposal: &Proposal{ProposalPublic}) {
             pre {
-                self.voted[proposal.uuid] == false: "Proposal is already voted"
+                !self.hasVoted(proposal.uuid): "Proposal is already voted"
             }
             post {
-                self.voted[proposal.uuid] == true: "Proposal is not voted"
+                self.hasVoted(proposal.uuid): "Proposal is not voted"
             }
             let details = proposal.getDetails()
 
@@ -292,7 +316,8 @@ access(all) contract FRC20Votes {
             }
 
             // update the local voting status
-            self.voted[proposal.uuid] = true
+            self.voted[proposal.uuid] = votingPower
+            self.votedChoices[proposal.uuid] = choice
             if self.votedTicksMapping[details.tick] == nil {
                 self.votedTicksMapping[details.tick] = [proposal.uuid]
             } else {
@@ -453,6 +478,8 @@ access(all) contract FRC20Votes {
     access(all) resource interface ProposalPublic {
         // --- Read Methods ---
         access(all) view
+        fun getProposer(): Address
+        access(all) view
         fun isEditable(): Bool
         access(all) view
         fun isFinalized(): Bool
@@ -489,7 +516,7 @@ access(all) contract FRC20Votes {
     ///
     access(all) resource Proposal: ProposalPublic, FixesHeartbeat.IHeartbeatHook {
         access(self)
-        let proposor: Address
+        let proposer: Address
         access(self)
         let statusLog: [StatusLog]
         access(self)
@@ -516,7 +543,7 @@ access(all) contract FRC20Votes {
             endingTime: UFix64,
             slots: [ChoiceSlotDetails],
         ) {
-            self.proposor = voter
+            self.proposer = voter
             self.statusLog = [StatusLog(ProposalStatus.Created, getCurrentBlock().timestamp)]
             self.details = ProposalDetails(
                 proposer: voter,
@@ -560,6 +587,11 @@ access(all) contract FRC20Votes {
         }
 
         /** ------ Public Methods ------ */
+
+        access(all) view
+        fun getProposer(): Address {
+            return self.proposer
+        }
 
         access(all) view
         fun isEditable(): Bool {
@@ -787,7 +819,7 @@ access(all) contract FRC20Votes {
                         result = FRC20VoteCommands.safeRunVoteCommands(slot.command, insRefArr)
                     } else {
                         // refund the unexecuted inscriptions
-                        result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposor, insRefArr)
+                        result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposer, insRefArr)
                     }
                     if !result {
                         return false
@@ -841,7 +873,7 @@ access(all) contract FRC20Votes {
                     return false
                 }
                 // refund the unexecuted inscriptions
-                let result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposor, insRefArr)
+                let result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposer, insRefArr)
                 if !result {
                     return false
                 }
@@ -1005,10 +1037,10 @@ access(all) contract FRC20Votes {
             }
             if let voter = FRC20Votes.borrowVoterPublic(voterAddr) {
                 // check the staked amount
-                let proposorThreshold = FRC20Votes.getProposorStakingThreshold()
+                let proposerThreshold = FRC20Votes.getProposerStakingThreshold()
                 let totalStaked = FRC20Votes.getTotalStakedAmount()
                 // ensure the staked amount is enough
-                return voter.getVotingPower() >= totalStaked * proposorThreshold
+                return voter.getVotingPower() >= totalStaked * proposerThreshold
             }
             return false
         }
@@ -1145,9 +1177,7 @@ access(all) contract FRC20Votes {
             voter.onVote(choice: choice, proposal: proposalRef)
         }
 
-        // --- Write Methods: Proposor ---
-
-        /** ------ Private Methods ------- */
+        /** ------ Write Methods: Proposer ------- */
 
         /// Update the proposal.
         ///
@@ -1158,7 +1188,7 @@ access(all) contract FRC20Votes {
             let detailsRef = proposalRef.borrowDetails()
             assert(
                 detailsRef.proposer == voter.owner?.address,
-                message: "The voter is not the proposor"
+                message: "The voter is not the proposer"
             )
             assert(
                 proposalRef.isEditable(),
@@ -1184,7 +1214,7 @@ access(all) contract FRC20Votes {
             let detailsRef = proposalRef.borrowDetails()
             assert(
                 detailsRef.proposer == voter.owner?.address,
-                message: "The voter is not the proposor"
+                message: "The voter is not the proposer"
             )
             assert(
                 proposalRef.isEditable(),
@@ -1209,7 +1239,7 @@ access(all) contract FRC20Votes {
             let detailsRef = proposalRef.borrowDetails()
             assert(
                 detailsRef.proposer == voter.owner?.address,
-                message: "The voter is not the proposor"
+                message: "The voter is not the proposer"
             )
             let status = proposalRef.getStatus()
             assert(
@@ -1266,10 +1296,10 @@ access(all) contract FRC20Votes {
         return <- create VoterIdentity(cap)
     }
 
-    /// Get the proposor staking threshold.
+    /// Get the proposer staking threshold.
     ///
     access(all) view
-    fun getProposorStakingThreshold(): UFix64 {
+    fun getProposerStakingThreshold(): UFix64 {
         return 0.15
     }
 
