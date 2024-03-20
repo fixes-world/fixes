@@ -3,15 +3,16 @@ import "FungibleToken"
 import "NonFungibleToken"
 import "MetadataViews"
 import "Fixes"
-import "FixesInscriptionFactory"
 import "FRC20SemiNFT"
 import "FRC20Votes"
-import "FRC20VoteCommands"
 
 transaction(
+    proposalId: UInt64,
+    title: String?,
+    description: String?,
+    discussionLink: String?,
 ) {
     let voter: &FRC20Votes.VoterIdentity
-    let flowVault: &FlowToken.Vault
 
     prepare(acct: AuthAccount) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -71,13 +72,17 @@ transaction(
 
         self.voter = acct.borrow<&FRC20Votes.VoterIdentity>(from: FRC20Votes.VoterStoragePath)
             ?? panic("Could not borrow a reference to the Voter Resource!")
-
-        // Get a reference to the signer's stored vault
-        self.flowVault = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-            ?? panic("Could not borrow reference to the owner's Vault!")
     }
 
     execute {
-
+        // Singleton Resources
+        let voteMgr = FRC20Votes.borrowVotesManager()
+        voteMgr.updateProposal(
+            voter: self.voter,
+            proposalId: proposalId,
+            title: title,
+            description: description,
+            discussionLink: discussionLink
+        )
     }
 }

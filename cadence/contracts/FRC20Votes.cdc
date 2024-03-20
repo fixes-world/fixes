@@ -473,7 +473,11 @@ access(all) contract FRC20Votes {
         access(all) view
         fun isValidateForThreshold(): Bool
         access(all) view
-        fun isWinningInscriptionAllExecuted(): Bool
+        fun isVoteCommandsExecutable(): Bool
+        access(all) view
+        fun isWinningInscriptionsExecuted(): Bool
+        access(all) view
+        fun isChoiceInscriptionsExtracted(choice: Int): Bool
         access(all) view
         fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool
         // --- Write Methods ---
@@ -560,7 +564,8 @@ access(all) contract FRC20Votes {
         access(all) view
         fun isEditable(): Bool {
             let status = self.getStatus()
-            return status == ProposalStatus.Created || status == ProposalStatus.Activated
+            return status == ProposalStatus.Created || status == ProposalStatus.Activated ||
+                (status == ProposalStatus.Successed && !self.isWinningInscriptionsExecuted())
         }
 
         access(all) view
@@ -584,7 +589,7 @@ access(all) contract FRC20Votes {
                 // ended
                 if !self.isValidateForThreshold() {
                     return ProposalStatus.Failed
-                } else if !self.isWinningInscriptionAllExecuted() {
+                } else if !self.isWinningInscriptionsExecuted() {
                     return ProposalStatus.Successed
                 } else {
                     return ProposalStatus.Executed
@@ -660,26 +665,53 @@ access(all) contract FRC20Votes {
             return totalStaked * self.details.executableThreshold <= votedAmount
         }
 
+        /// Check whether the inscriptions are all executed
+        ///
         access(all) view
-        fun isWinningInscriptionAllExecuted(): Bool {
+        fun isWinningInscriptionsExecuted(): Bool {
             if !self.details.isEnded() {
                 return false
             }
             if let winningChoice = self.getWinningChoice() {
-                let slotInfoRef = self.details.slots[winningChoice]
-                let winningInsIds = slotInfoRef.inscriptions
-                let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
-                var allExecuted = true
-                for id in winningInsIds {
-                    let insRef = inscriptionsStore.borrowInscription(id)
-                    allExecuted = allExecuted && (insRef?.isExtracted() ?? false)
-                    if !allExecuted {
-                        break
-                    }
-                }
-                return allExecuted
+                return self.isChoiceInscriptionsExtracted(choice: winningChoice)
             }
             return false
+        }
+
+        /// check whether the choice inscriptions are all executed
+        ///
+        access(all) view
+        fun isChoiceInscriptionsExtracted(choice: Int): Bool {
+            let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
+
+            let slotInfoRef = self.details.slots[choice]
+            let insIds = slotInfoRef.inscriptions
+            var allExecuted = true
+            for id in insIds {
+                let insRef = inscriptionsStore.borrowInscription(id)
+                allExecuted = allExecuted && (insRef?.isExtracted() ?? false)
+                if !allExecuted {
+                    break
+                }
+            }
+            return allExecuted
+        }
+
+        /// Check whether the proposal is executable.
+        ///
+        access(all) view
+        fun isVoteCommandsExecutable(): Bool {
+            if self.getStatus() != ProposalStatus.Successed {
+                return false
+            }
+            var allExecutable = true
+            for i, slot in self.details.slots {
+                allExecutable = allExecutable && !self.isChoiceInscriptionsExtracted(choice: i)
+                if !allExecutable {
+                    break
+                }
+            }
+            return allExecutable
         }
 
         /// Check whether the NFT is voted.
@@ -785,6 +817,46 @@ access(all) contract FRC20Votes {
             assert(result, message: "The proposal is not executed")
         }
 
+        /// Refund the inscriptions cost without panic
+        ///
+        access(contract)
+        fun refundInscriptionCostSafe(): Bool {
+            let status = self.getStatus()
+            if status == ProposalStatus.Successed || status == ProposalStatus.Executed {
+                return false
+            }
+
+            let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
+
+            for i, slot in self.details.slots {
+                let insRefArr: [&Fixes.Inscription] = []
+                let insLen = slot.inscriptions.length
+                for id in slot.inscriptions {
+                    if let insRef = inscriptionsStore.borrowInscriptionWritableRef(id) {
+                        insRefArr.append(insRef)
+                    }
+                }
+                // check the inscriptions length, if not equal, return false
+                if insRefArr.length != insLen {
+                    return false
+                }
+                // refund the unexecuted inscriptions
+                let result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposor, insRefArr)
+                if !result {
+                    return false
+                }
+            }
+            return true
+        }
+
+        /// Refund the inscriptions cost.
+        ///
+        access(contract)
+        fun refundInscriptionCost() {
+            let result = self.refundInscriptionCostSafe()
+            assert(result, message: "The proposal cannot be not refunded")
+        }
+
         /** ------ Internal Methods: Implement Heartbeat ------ */
 
         /// Implement the heartbeat hook.
@@ -823,6 +895,7 @@ access(all) contract FRC20Votes {
                 // check the status and do the action
                 switch status {
                 case ProposalStatus.Failed:
+                    self.refundInscriptionCostSafe()
                     // emit event
                     emit ProposalFailed(
                         tick: self.details.tick,
@@ -1118,6 +1191,8 @@ access(all) contract FRC20Votes {
                 message: "The proposal is not editable"
             )
             detailsRef.cancelProposal()
+            // refund the inscriptions
+            proposalRef.refundInscriptionCost()
 
             emit ProposalCancelled(
                 proposalId: self.uuid,
