@@ -7,14 +7,31 @@ import "FixesInscriptionFactory"
 import "FRC20SemiNFT"
 import "FRC20Votes"
 import "FRC20VoteCommands"
+import "EVMAgent"
 
 transaction(
     proposalId: UInt64,
     choice: Int,
+    hexPublicKey: String,
+    hexSignature: String,
+    timestamp: UInt64,
 ) {
     let voter: &FRC20Votes.VoterIdentity
 
     prepare(acct: AuthAccount) {
+        /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
+        let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
+            ?? panic("Could not borrow a reference to the EVMAgency!")
+
+        let acct = agency.verifyAndBorrowEntrustedAccount(
+            methodFingerprint: "vote(UInt64|Int)",
+            params: [proposalId.toString(), choice.toString()],
+            hexPublicKey: hexPublicKey,
+            hexSignature: hexSignature,
+            timestamp: timestamp
+        )
+        /** ------------- EVMAgency: End --------------------------------------- */
+
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
         if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
