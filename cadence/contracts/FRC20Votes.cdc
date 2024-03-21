@@ -354,18 +354,14 @@ access(all) contract FRC20Votes {
         access(all)
         let message: String
         access(all)
-        let command: FRC20VoteCommands.CommandType
-        access(all)
-        let inscriptions: [UInt64]
+        let command: {FRC20VoteCommands.IVoteCommand}
 
         init(
-            command: FRC20VoteCommands.CommandType,
             message: String,
-            inscriptions: [UInt64]
+            command: {FRC20VoteCommands.IVoteCommand},
         ) {
             self.message = message
             self.command = command
-            self.inscriptions = inscriptions
         }
     }
 
@@ -567,7 +563,7 @@ access(all) contract FRC20Votes {
             while i < slots.length {
                 self.votes[i] = 0.0
                 messages.append(slots[i].message)
-                commands.append(slots[i].command.rawValue)
+                commands.append(slots[i].command.getCommandType().rawValue)
                 i = i + 1
             }
 
@@ -714,19 +710,8 @@ access(all) contract FRC20Votes {
         ///
         access(all) view
         fun isChoiceInscriptionsExtracted(choice: Int): Bool {
-            let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
-
             let slotInfoRef = self.details.slots[choice]
-            let insIds = slotInfoRef.inscriptions
-            var allExecuted = true
-            for id in insIds {
-                let insRef = inscriptionsStore.borrowInscription(id)
-                allExecuted = allExecuted && (insRef?.isExtracted() ?? false)
-                if !allExecuted {
-                    break
-                }
-            }
-            return allExecuted
+            return slotInfoRef.command.isAllInscriptionsExtracted()
         }
 
         /// Check whether the proposal is executable.
@@ -798,28 +783,15 @@ access(all) contract FRC20Votes {
             }
 
             if let winningChoice = self.getWinningChoice() {
-                let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
-
                 for i, slot in self.details.slots {
-                    let insRefArr: [&Fixes.Inscription] = []
-                    let insLen = slot.inscriptions.length
-                    for id in slot.inscriptions {
-                        if let insRef = inscriptionsStore.borrowInscriptionWritableRef(id) {
-                            insRefArr.append(insRef)
-                        }
-                    }
-                    // check the inscriptions length, if not equal, return false
-                    if insRefArr.length != insLen {
-                        return false
-                    }
                     var result = false
                     // execute the winning choice
                     if i == winningChoice {
                         // run the commands
-                        result = FRC20VoteCommands.safeRunVoteCommands(slot.command, insRefArr)
+                        result = slot.command.safeRunVoteCommands()
                     } else {
                         // refund the unexecuted inscriptions
-                        result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposer, insRefArr)
+                        result = slot.command.refundFailedVoteCommands(receiver: self.proposer)
                     }
                     if !result {
                         return false
@@ -858,22 +830,9 @@ access(all) contract FRC20Votes {
                 return false
             }
 
-            let inscriptionsStore = FRC20Votes.borrowSystemInscriptionsStore()
-
             for i, slot in self.details.slots {
-                let insRefArr: [&Fixes.Inscription] = []
-                let insLen = slot.inscriptions.length
-                for id in slot.inscriptions {
-                    if let insRef = inscriptionsStore.borrowInscriptionWritableRef(id) {
-                        insRefArr.append(insRef)
-                    }
-                }
-                // check the inscriptions length, if not equal, return false
-                if insRefArr.length != insLen {
-                    return false
-                }
                 // refund the unexecuted inscriptions
-                let result = FRC20VoteCommands.refundFailedVoteCommands(receiver: self.proposer, insRefArr)
+                let result = slot.command.refundFailedVoteCommands(receiver: self.proposer)
                 if !result {
                     return false
                 }
@@ -1121,27 +1080,12 @@ access(all) contract FRC20Votes {
                 destroy insList
 
                 slots.append(ChoiceSlotDetails(
-                    command: commands[i],
                     message: messages[i],
-                    inscriptions: insIds
+                    command: FRC20VoteCommands.createByCommandType(commands[i], insIds),
                 ))
                 i = i + 1
             }
             destroy inscriptions
-
-            // verfiy inscriptions
-            for slot in slots {
-                let insRefArr: [&Fixes.Inscription{Fixes.InscriptionPublic}] = []
-                for id in slot.inscriptions {
-                    if let insRef = inscriptionsStore.borrowInscription(id) {
-                        insRefArr.append(insRef)
-                    }
-                }
-                assert(
-                    FRC20VoteCommands.verifyVoteCommands(slot.command, insRefArr),
-                    message: "The inscriptions for the vote command are not valid"
-                )
-            }
 
             let proposal <- create Proposal(
                 voter: voterAddr,

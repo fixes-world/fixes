@@ -47,9 +47,20 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun getCommandType(): CommandType
         access(all) view
-        fun buildInscriptionString(_ meta: {String: String}): [String]
-        access(all) view
         fun verifyVoteCommands(): Bool
+
+        /// Check if all inscriptions are extracted.
+        ///
+        access(all) view
+        fun isAllInscriptionsExtracted(): Bool {
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+            for insRef in insRefArr {
+                if !insRef.isExtracted() {
+                    return false
+                }
+            }
+            return true
+        }
 
         // ----- Account level methods -----
 
@@ -115,11 +126,6 @@ access(all) contract FRC20VoteCommands {
         }
 
         access(all) view
-        fun buildInscriptionString(_ meta: {String: String}): [String] {
-            return []
-        }
-
-        access(all) view
         fun verifyVoteCommands(): Bool {
             return true
         }
@@ -148,16 +154,6 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun getCommandType(): CommandType {
             return CommandType.SetBurnable
-        }
-
-        access(all) view
-        fun buildInscriptionString(_ meta: {String: String}): [String] {
-            return [
-                FixesInscriptionFactory.buildVoteCommandSetBurnable(
-                    tick: meta["tick"] ?? panic("Missing tick in params"),
-                    burnable: meta["v"] == "1"
-                )
-            ]
         }
 
         access(all) view
@@ -212,16 +208,6 @@ access(all) contract FRC20VoteCommands {
         }
 
         access(all) view
-        fun buildInscriptionString(_ meta: {String: String}): [String] {
-            return [
-                FixesInscriptionFactory.buildVoteCommandBurnUnsupplied(
-                    tick: meta["tick"] ?? panic("Missing tick in params"),
-                    percent: UFix64.fromString(meta["perc"] ?? panic("Missing perc in params")) ?? panic("Invalid perc")
-                )
-            ]
-        }
-
-        access(all) view
         fun verifyVoteCommands(): Bool {
             // Refs
             let frc20Indexer = FRC20Indexer.getIndexer()
@@ -269,16 +255,6 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun getCommandType(): CommandType {
             return CommandType.MoveTreasuryToLotteryJackpot
-        }
-
-        access(all) view
-        fun buildInscriptionString(_ meta: {String: String}): [String] {
-            return [
-                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToLotteryJackpot(
-                    tick: meta["tick"] ?? panic("Missing tick in params"),
-                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt")
-                )
-            ]
         }
 
         access(all) view
@@ -338,18 +314,6 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun getCommandType(): CommandType {
             return CommandType.MoveTreasuryToStakingReward
-        }
-
-        access(all) view
-        fun buildInscriptionString(_ meta: {String: String}): [String] {
-            return [
-                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToStaking(
-                    tick: meta["tick"] ?? panic("Missing tick in params"),
-                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt"),
-                    vestingBatchAmount: UInt32.fromString(meta["batch"] ?? panic("Missing batch in params")) ?? panic("Invalid batch"),
-                    vestingInterval: UFix64.fromString(meta["interval"] ?? panic("Missing interval in params")) ?? panic("Invalid interval")
-                )
-            ]
         }
 
         access(all) view
@@ -428,5 +392,74 @@ access(all) contract FRC20VoteCommands {
         return self.account
             .getCapability<&Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic}>(storePubPath)
             .borrow() ?? panic("Fixes.InscriptionsStore is not found")
+    }
+
+    /// Build the inscription strings by the given command type and meta.
+    ///
+    access(all)
+    fun buildInscriptionStringsByCommand(_ type: CommandType, _ meta: {String: String}): [String] {
+        switch type {
+        case CommandType.None:
+            return []
+        case CommandType.SetBurnable:
+            return [
+                FixesInscriptionFactory.buildVoteCommandSetBurnable(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    burnable: meta["v"] == "1"
+                )
+            ]
+        case CommandType.BurnUnsupplied:
+            return [
+                FixesInscriptionFactory.buildVoteCommandBurnUnsupplied(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    percent: UFix64.fromString(meta["perc"] ?? panic("Missing perc in params")) ?? panic("Invalid perc")
+                )
+            ]
+        case CommandType.MoveTreasuryToLotteryJackpot:
+            return [
+                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToLotteryJackpot(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt")
+                )
+            ]
+        case CommandType.MoveTreasuryToStakingReward:
+            return [
+                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToStaking(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt"),
+                    vestingBatchAmount: UInt32.fromString(meta["batch"] ?? panic("Missing batch in params")) ?? panic("Invalid batch"),
+                    vestingInterval: UFix64.fromString(meta["interval"] ?? panic("Missing interval in params")) ?? panic("Invalid interval")
+                )
+            ]
+        }
+        panic("Invalid command type")
+    }
+
+    /// Create a vote command by the given type and inscriptions.
+    ///
+    access(all)
+    fun createByCommandType(_ type: CommandType, _ inscriptions: [UInt64]): {IVoteCommand} {
+        let store = self.borrowSystemInscriptionsStore()
+        // Ensure the inscriptions are valid
+        for ins in inscriptions {
+            let insRef = store.borrowInscription(ins)
+            if insRef == nil {
+                panic("Invalid inscription")
+            }
+        }
+
+        switch type {
+        case CommandType.None:
+            return CommandNone()
+        case CommandType.SetBurnable:
+            return CommandSetBurnable(inscriptions)
+        case CommandType.BurnUnsupplied:
+            return CommandBurnUnsupplied(inscriptions)
+        case CommandType.MoveTreasuryToLotteryJackpot:
+            return CommandMoveTreasuryToLotteryJackpot(inscriptions)
+        case CommandType.MoveTreasuryToStakingReward:
+            return CommandMoveTreasuryToStakingReward(inscriptions)
+        }
+        panic("Invalid command type")
     }
 }

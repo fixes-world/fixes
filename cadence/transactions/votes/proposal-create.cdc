@@ -18,7 +18,7 @@ transaction(
     endingTime: UFix64,
     commands: [FRC20VoteCommands.CommandType],
     messages: [String],
-    params: {String: String}
+    params: [{String: String}]
 ) {
     let voter: &FRC20Votes.VoterIdentity
     let flowVault: &FlowToken.Vault
@@ -89,6 +89,7 @@ transaction(
 
     pre {
         messages.length == commands.length: "The number of messages must be equal to the number of commands"
+        messages.length == params.length: "The number of messages must be equal to the number of params"
     }
 
     execute {
@@ -101,7 +102,7 @@ transaction(
         while i < commands.length {
             let command = commands[i]
             let insArr: @[Fixes.Inscription] <- []
-            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(command, params)
+            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(command, params[i])
             for dataStr in insDataStrArr {
                 // estimate the required storage
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
