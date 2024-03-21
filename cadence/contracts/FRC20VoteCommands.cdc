@@ -30,127 +30,281 @@ access(all) contract FRC20VoteCommands {
         access(all) case MoveTreasuryToStakingReward;
     }
 
-    /// Create a new FRC20 vote command string.
+    /// The interface of FRC20 vote command struct.
     ///
-    access(all)
-    fun buildInscriptionStringsByCommand(_ commandType: CommandType, _ meta: {String: String}): [String] {
-        switch commandType {
-        case CommandType.None:
+    access(all) struct interface IVoteCommand {
+        access(all)
+        let inscriptionIds: [UInt64]
+
+        init() {
+            post {
+                self.verifyVoteCommands(): "Invalid vote commands"
+            }
+        }
+
+        // ----- Readonly Mehtods -----
+
+        access(all) view
+        fun getCommandType(): CommandType
+        access(all) view
+        fun buildInscriptionString(_ meta: {String: String}): [String]
+        access(all) view
+        fun verifyVoteCommands(): Bool
+
+        // ----- Account level methods -----
+
+        /// Refund the inscription cost for failed vote commands.
+        ///
+        access(account)
+        fun refundFailedVoteCommands(receiver: Address): Bool {
+            let recieverRef = FRC20Indexer.borrowFlowTokenReceiver(receiver)
+            if recieverRef == nil {
+                return false
+            }
+            let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
+            let vault <- FlowToken.createEmptyVault()
+            for insRef in insRefArr {
+                if !insRef.isExtracted() {
+                    vault.deposit(from: <-insRef.extract())
+                }
+            }
+            // deposit to the receiver
+            recieverRef!.deposit(from: <- vault)
+            return true
+        }
+
+        // Methods: Write
+        access(account)
+        fun safeRunVoteCommands(): Bool
+
+        // ----- General Methods -----
+
+        /// Borrow the system inscriptions references from store.
+        ///
+        access(contract)
+        fun borrowSystemInscriptionWritableRefs(): [&Fixes.Inscription] {
+            let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
+            let ret: [&Fixes.Inscription] = []
+            for id in self.inscriptionIds {
+                if let ref = store.borrowInscriptionWritableRef(id) {
+                    ret.append(ref)
+                }
+            }
+            return ret
+        }
+    }
+
+    /**
+     * Command: None
+     */
+    access(all) struct CommandNone: IVoteCommand {
+        access(all)
+        let inscriptionIds: [UInt64]
+
+        init() {
+            self.inscriptionIds = []
+        }
+
+        // ----- Methods: Read -----
+
+        access(all) view
+        fun getCommandType(): CommandType {
+            return CommandType.None
+        }
+
+        access(all) view
+        fun buildInscriptionString(_ meta: {String: String}): [String] {
             return []
-        case CommandType.SetBurnable:
+        }
+
+        access(all) view
+        fun verifyVoteCommands(): Bool {
+            return true
+        }
+
+        // ---- Methods: Write ----
+
+        access(account)
+        fun safeRunVoteCommands(): Bool {
+            return true
+        }
+    }
+
+    /**
+     * Command: SetBurnable
+     */
+    access(all) struct CommandSetBurnable: IVoteCommand {
+        access(all)
+        let inscriptionIds: [UInt64]
+
+        init(_ insIds: [UInt64]) {
+            self.inscriptionIds = insIds
+        }
+
+        // ----- Methods: Read -----
+
+        access(all) view
+        fun getCommandType(): CommandType {
+            return CommandType.SetBurnable
+        }
+
+        access(all) view
+        fun buildInscriptionString(_ meta: {String: String}): [String] {
             return [
                 FixesInscriptionFactory.buildVoteCommandSetBurnable(
                     tick: meta["tick"] ?? panic("Missing tick in params"),
                     burnable: meta["v"] == "1"
                 )
             ]
-        case CommandType.BurnUnsupplied:
+        }
+
+        access(all) view
+        fun verifyVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
+            var isValid = false
+            isValid = insRefArr.length == 1
+            if isValid {
+                let ins = insRefArr[0]
+                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                isValid = FRC20VoteCommands.isValidSystemInscription(ins)
+                    && meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil
+            }
+            return isValid
+        }
+
+        // ---- Methods: Write ----
+
+        access(account)
+        fun safeRunVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
+            if insRefArr.length != 1 {
+                return false
+            }
+            frc20Indexer.setBurnable(ins: insRefArr[0])
+            return true
+        }
+    }
+
+    /**
+     * Command: BurnUnsupplied
+     */
+    access(all) struct CommandBurnUnsupplied: IVoteCommand {
+        access(all)
+        let inscriptionIds: [UInt64]
+
+        init(_ insIds: [UInt64]) {
+            self.inscriptionIds = insIds
+        }
+
+        // ----- Methods: Read -----
+
+        access(all) view
+        fun getCommandType(): CommandType {
+            return CommandType.BurnUnsupplied
+        }
+
+        access(all) view
+        fun buildInscriptionString(_ meta: {String: String}): [String] {
             return [
                 FixesInscriptionFactory.buildVoteCommandBurnUnsupplied(
                     tick: meta["tick"] ?? panic("Missing tick in params"),
                     percent: UFix64.fromString(meta["perc"] ?? panic("Missing perc in params")) ?? panic("Invalid perc")
                 )
             ]
-        case CommandType.MoveTreasuryToLotteryJackpot:
+        }
+
+        access(all) view
+        fun verifyVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
+            var isValid = insRefArr.length == 1
+            if isValid {
+                let ins = insRefArr[0]
+                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                isValid = FRC20VoteCommands.isValidSystemInscription(ins)
+                    && meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil
+            }
+            return isValid
+        }
+
+        // ---- Methods: Write ----
+
+        access(account)
+        fun safeRunVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
+            if insRefArr.length != 1 {
+                return false
+            }
+            frc20Indexer.burnUnsupplied(ins: insRefArr[0])
+            return true
+        }
+    }
+
+    /**
+     * Command: MoveTreasuryToLotteryJackpot
+     */
+    access(all) struct CommandMoveTreasuryToLotteryJackpot: IVoteCommand {
+        access(all)
+        let inscriptionIds: [UInt64]
+
+        init(_ insIds: [UInt64]) {
+            self.inscriptionIds = insIds
+        }
+
+        // ----- Methods: Read -----
+
+        access(all) view
+        fun getCommandType(): CommandType {
+            return CommandType.MoveTreasuryToLotteryJackpot
+        }
+
+        access(all) view
+        fun buildInscriptionString(_ meta: {String: String}): [String] {
             return [
                 FixesInscriptionFactory.buildVoteCommandMoveTreasuryToLotteryJackpot(
                     tick: meta["tick"] ?? panic("Missing tick in params"),
                     amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt")
                 )
             ]
-        case CommandType.MoveTreasuryToStakingReward:
-            return [
-                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToStaking(
-                    tick: meta["tick"] ?? panic("Missing tick in params"),
-                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt"),
-                    vestingBatchAmount: UInt32.fromString(meta["batch"] ?? panic("Missing batch in params")) ?? panic("Invalid batch"),
-                    vestingInterval: UFix64.fromString(meta["interval"] ?? panic("Missing interval in params")) ?? panic("Invalid interval")
-                )
-
-            ]
         }
-        panic("Unknown command type")
-    }
 
-    /** -------- Account Level Methods -------- */
+        access(all) view
+        fun verifyVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
-    /// Verify the vote commands.
-    ///
-    access(account) view
-    fun verifyVoteCommands(_ commandType: CommandType, _ insRefArr: [&Fixes.Inscription{Fixes.InscriptionPublic}]): Bool {
-        // Singleton Resource
-        let frc20Indexer = FRC20Indexer.getIndexer()
-
-        var isValid = false
-        switch commandType {
-        case CommandType.SetBurnable:
-            isValid = insRefArr.length == 1
+            var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
                 let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-                isValid = self._isValidSystemInscription(ins)
-                    && meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil
-            }
-            break
-        case CommandType.BurnUnsupplied:
-            isValid = insRefArr.length == 1
-            if isValid {
-                let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-                isValid = self._isValidSystemInscription(ins)
-                    && meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil
-            }
-            break
-        case CommandType.MoveTreasuryToLotteryJackpot:
-            isValid = insRefArr.length == 1
-            if isValid {
-                let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-                isValid = self._isValidSystemInscription(ins)
+                isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "lottery" && meta["tick"] != nil && meta["amt"] != nil
             }
-            break
-        case CommandType.MoveTreasuryToStakingReward:
-            isValid = insRefArr.length == 1
-            if isValid {
-                let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-                isValid = self._isValidSystemInscription(ins)
-                    && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "staking"
-                    && meta["tick"] != nil && meta["amt"] != nil
-                    && meta["batch"] != nil && meta["interval"] != nil
-            }
-            break
-        }
-        return isValid
-    }
-
-    /// Run the vote commands.
-    ///
-    access(account)
-    fun safeRunVoteCommands(_ commandType: CommandType, _ insRefArr: [&Fixes.Inscription]): Bool {
-        let isValid = self.verifyVoteCommands(commandType, insRefArr)
-        if !isValid {
-            return false
+            return isValid
         }
 
-        // Singleton Resource
-        let frc20Indexer = FRC20Indexer.getIndexer()
+        // ---- Methods: Write ----
 
-        switch commandType {
-        case CommandType.SetBurnable:
-            if insRefArr.length != 1 {
-                return false
-            }
-            frc20Indexer.setBurnable(ins: insRefArr[0])
-            return true
-        case CommandType.BurnUnsupplied:
-            if insRefArr.length != 1 {
-                return false
-            }
-            frc20Indexer.burnUnsupplied(ins: insRefArr[0])
-            return true
-        case CommandType.MoveTreasuryToLotteryJackpot:
+        access(account)
+        fun safeRunVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
             if insRefArr.length != 1 {
                 return false
             }
@@ -165,7 +319,65 @@ access(all) contract FRC20VoteCommands {
             }
             log("Failed to find the lottery pool")
             return false
-        case CommandType.MoveTreasuryToStakingReward:
+        }
+    }
+
+    /**
+     * Command: MoveTreasuryToStakingReward
+     */
+    access(all) struct CommandMoveTreasuryToStakingReward: IVoteCommand {
+        access(all)
+        let inscriptionIds: [UInt64]
+
+        init(_ insIds: [UInt64]) {
+            self.inscriptionIds = insIds
+        }
+
+        // ----- Methods: Read -----
+
+        access(all) view
+        fun getCommandType(): CommandType {
+            return CommandType.MoveTreasuryToStakingReward
+        }
+
+        access(all) view
+        fun buildInscriptionString(_ meta: {String: String}): [String] {
+            return [
+                FixesInscriptionFactory.buildVoteCommandMoveTreasuryToStaking(
+                    tick: meta["tick"] ?? panic("Missing tick in params"),
+                    amount: UFix64.fromString(meta["amt"] ?? panic("Missing amt in params")) ?? panic("Invalid amt"),
+                    vestingBatchAmount: UInt32.fromString(meta["batch"] ?? panic("Missing batch in params")) ?? panic("Invalid batch"),
+                    vestingInterval: UFix64.fromString(meta["interval"] ?? panic("Missing interval in params")) ?? panic("Invalid interval")
+                )
+            ]
+        }
+
+        access(all) view
+        fun verifyVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
+            var isValid = insRefArr.length == 1
+            if isValid {
+                let ins = insRefArr[0]
+                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                isValid = FRC20VoteCommands.isValidSystemInscription(ins)
+                    && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "staking"
+                    && meta["tick"] != nil && meta["amt"] != nil
+                    && meta["batch"] != nil && meta["interval"] != nil
+            }
+            return isValid
+        }
+
+        // ---- Methods: Write ----
+
+        access(account)
+        fun safeRunVoteCommands(): Bool {
+            // Refs
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let insRefArr = self.borrowSystemInscriptionWritableRefs()
+
             if insRefArr.length != 1 {
                 return false
             }
@@ -196,37 +408,25 @@ access(all) contract FRC20VoteCommands {
             log("Failed to find valid staking pool")
             return false
         }
-        log("Unknown command type")
-        return false
-    }
-
-    /// Refund the inscription cost for failed vote commands.
-    ///
-    access(account)
-    fun refundFailedVoteCommands(receiver: Address, _ insRefArr: [&Fixes.Inscription]): Bool {
-        let recieverRef = FRC20Indexer.borrowFlowTokenReceiver(receiver)
-        if recieverRef == nil {
-            return false
-        }
-
-        let vault <- FlowToken.createEmptyVault()
-        for insRef in insRefArr {
-            if !insRef.isExtracted() {
-                vault.deposit(from: <-insRef.extract())
-            }
-        }
-        // deposit to the receiver
-        recieverRef!.deposit(from: <- vault)
-        return true
     }
 
     /// Check if the given inscription is a valid system inscription.
     ///
     access(contract)
-    fun _isValidSystemInscription(_ ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
+    fun isValidSystemInscription(_ ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
         let frc20Indexer = FRC20Indexer.getIndexer()
         return ins.owner?.address == self.account.address
             && ins.isExtractable()
             && frc20Indexer.isValidFRC20Inscription(ins: ins)
+    }
+
+    /// Borrow the system inscriptions store.
+    ///
+    access(all)
+    fun borrowSystemInscriptionsStore(): &Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic} {
+        let storePubPath = Fixes.getFixesStorePublicPath()
+        return self.account
+            .getCapability<&Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic}>(storePubPath)
+            .borrow() ?? panic("Fixes.InscriptionsStore is not found")
     }
 }
