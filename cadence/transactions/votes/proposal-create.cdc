@@ -16,7 +16,7 @@ transaction(
     executableThreshold: UFix64,
     beginningTime: UFix64,
     endingTime: UFix64,
-    commands: [FRC20VoteCommands.CommandType],
+    commands: [UInt8],
     messages: [String],
     params: [{String: String}]
 ) {
@@ -97,12 +97,15 @@ transaction(
         let voteMgr = FRC20Votes.borrowVotesManager()
 
         let inscriptions: @[[Fixes.Inscription]] <- []
+        let commandTypes: [FRC20VoteCommands.CommandType] = []
 
         var i = 0
         while i < commands.length {
             let command = commands[i]
             let insArr: @[Fixes.Inscription] <- []
-            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(command, params[i])
+            let cmdType = FRC20VoteCommands.CommandType(rawValue: command) ?? panic("Invalid command type")
+            commandTypes.append(cmdType)
+            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(cmdType, params[i])
             for dataStr in insDataStrArr {
                 // estimate the required storage
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
@@ -129,7 +132,7 @@ transaction(
             executableThreshold: executableThreshold,
             beginningTime: beginningTime,
             endingTime: endingTime,
-            commands: commands,
+            commands: commandTypes,
             messages: messages,
             inscriptions: <- inscriptions
         )
