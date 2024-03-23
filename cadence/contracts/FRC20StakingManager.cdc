@@ -171,7 +171,7 @@ access(all) contract FRC20StakingManager {
                 ?? panic("The flow vault is not found")
             let storageUsageBalance = UFix64(childAcctRef.storageUsed) / UFix64(childAcctRef.storageCapacity) * flowVaultRef.balance
             // Keep the 2x of the storage usage balance
-            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 + 0.01
+            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 - 0.01
             // ensure the flow balance is enough
             assert(
                 availbleBalance > 0.0,
@@ -210,7 +210,7 @@ access(all) contract FRC20StakingManager {
                 ?? panic("The flow vault is not found")
             let storageUsageBalance = UFix64(childAcctRef.storageUsed) / UFix64(childAcctRef.storageCapacity) * flowVaultRef.balance
             // Keep the 2x of the storage usage balance
-            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 + 0.01
+            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 - 0.01
             // ensure the flow balance is enough
             assert(
                 availbleBalance >= amount,
