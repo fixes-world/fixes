@@ -148,6 +148,45 @@ access(all) contract FRC20StakingManager {
             }
         }
 
+        /// Donate all shared pool FLOW tokens to the vesting pool
+        ///
+        access(all)
+        fun donateAllSharedPoolFlowTokenToVesting(
+            tick: String,
+            childType: FRC20AccountsPool.ChildAccountType,
+            vestingBatchAmount: UInt32,
+            vestingInterval: UFix64,
+        ) {
+            pre {
+                FRC20StakingManager.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
+            }
+
+            // singleton resources
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            // try to borrow the account to check if it was created
+            let childAcctRef = acctsPool.borrowChildAccount(type: childType, nil)
+                ?? panic("The shared pool account was not created")
+
+            let flowVaultRef = childAcctRef.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                ?? panic("The flow vault is not found")
+            let storageUsageBalance = UFix64(childAcctRef.storageUsed) / UFix64(childAcctRef.storageCapacity) * flowVaultRef.balance
+            // Keep the 2x of the storage usage balance
+            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 - 0.01
+            // ensure the flow balance is enough
+            assert(
+                availbleBalance > 0.0,
+                message: "The flow balance is not enough"
+            )
+
+            // withdraw the flow tokens
+            self._donateTokenToVesting(
+                vault: <- flowVaultRef.withdraw(amount: availbleBalance),
+                tick: tick,
+                vestingBatchAmount: vestingBatchAmount,
+                vestingInterval: vestingInterval
+            )
+        }
+
         /// Donate FLOW in the child account to the vesting pool
         ///
         access(all)
@@ -171,7 +210,7 @@ access(all) contract FRC20StakingManager {
                 ?? panic("The flow vault is not found")
             let storageUsageBalance = UFix64(childAcctRef.storageUsed) / UFix64(childAcctRef.storageCapacity) * flowVaultRef.balance
             // Keep the 2x of the storage usage balance
-            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0
+            let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 - 0.01
             // ensure the flow balance is enough
             assert(
                 availbleBalance >= amount,
@@ -179,11 +218,27 @@ access(all) contract FRC20StakingManager {
             )
 
             // withdraw the flow tokens
-            let tokenToDonate <- flowVaultRef.withdraw(amount: amount)
+            self._donateTokenToVesting(
+                vault: <- flowVaultRef.withdraw(amount: amount),
+                tick: tick,
+                vestingBatchAmount: vestingBatchAmount,
+                vestingInterval: vestingInterval
+            )
+        }
+
+        /// Donate FLOW in the child account to the vesting pool
+        ///
+        access(self)
+        fun _donateTokenToVesting(
+            vault: @FungibleToken.Vault,
+            tick: String,
+            vestingBatchAmount: UInt32,
+            vestingInterval: UFix64,
+        ) {
             let systemAddr = FRC20StakingManager.account.address
             // convert to change
             let changeToDonate <- FRC20FTShared.wrapFungibleVaultChange(
-                ftVault: <- tokenToDonate,
+                ftVault: <- vault,
                 from: systemAddr
             )
             // call the internal method to donate
