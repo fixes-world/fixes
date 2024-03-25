@@ -14,6 +14,7 @@ import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20SemiNFT"
+import "FRC20Staking"
 import "FRC20StakingManager"
 import "FRC20VoteCommands"
 
@@ -994,12 +995,16 @@ access(all) contract FRC20Votes {
                     return true
                 }
             }
+            // check the staked amount
+            let proposerThreshold = FRC20Votes.getProposerStakingThreshold()
+            let totalStaked = FRC20Votes.getTotalStakedAmount()
+            let thresholdPower = totalStaked * proposerThreshold
             if let voter = FRC20Votes.borrowVoterPublic(voterAddr) {
-                // check the staked amount
-                let proposerThreshold = FRC20Votes.getProposerStakingThreshold()
-                let totalStaked = FRC20Votes.getTotalStakedAmount()
                 // ensure the staked amount is enough
-                return voter.getVotingPower() >= totalStaked * proposerThreshold
+                return voter.getVotingPower() >= thresholdPower
+            } else if let delegatorRef = FRC20Staking.borrowDelegator(voterAddr) {
+                let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+                return delegatorRef.getStakedBalance(tick: stakeTick) >= thresholdPower
             }
             return false
         }
