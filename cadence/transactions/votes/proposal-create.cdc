@@ -105,7 +105,9 @@ transaction(
             let insArr: @[Fixes.Inscription] <- []
             let cmdType = FRC20VoteCommands.CommandType(rawValue: command) ?? panic("Invalid command type")
             commandTypes.append(cmdType)
-            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(cmdType, params[i])
+            let cmdParams = params[i]
+            cmdParams["tick"] = tick
+            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(cmdType, cmdParams)
             for dataStr in insDataStrArr {
                 // estimate the required storage
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)

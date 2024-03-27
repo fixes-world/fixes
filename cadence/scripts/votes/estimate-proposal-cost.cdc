@@ -4,6 +4,7 @@ import "FRC20VoteCommands"
 
 access(all)
 fun main(
+    tick: String,
     commands: [UInt8],
     params: [{String: String}]
 ): UFix64 {
@@ -13,7 +14,9 @@ fun main(
     var i = 0
     while i < commands.length {
         if let cmdType = FRC20VoteCommands.CommandType(rawValue: commands[i]) {
-            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(cmdType, params[i])
+            let cmdParams = params[i]
+            cmdParams["tick"] = tick
+            let insDataStrArr = FRC20VoteCommands.buildInscriptionStringsByCommand(cmdType, cmdParams)
             for datastr in insDataStrArr {
                 total = total + FixesInscriptionFactory.estimateFrc20InsribeCost(datastr)
             }
