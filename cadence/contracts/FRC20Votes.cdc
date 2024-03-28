@@ -289,9 +289,10 @@ access(all) contract FRC20Votes {
 
             // check the staked balance
             let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
-            let stakedBalance = self.getStakedBalance(tick: stakeTick)
-            if stakedBalance > 0.0 {
-                let stakedNFTColRef = self.semiNFTColCap.borrow() ?? panic("The staked NFT collection is not found")
+
+            let stakedNFTColRef = self.semiNFTColCap.borrow() ?? panic("The staked NFT collection is not found")
+            let unlockingStakedBalance = stakedNFTColRef.getStakedBalance(tick: stakeTick)
+            if unlockingStakedBalance > 0.0 {
                 // move the staked NFTs to the locked collection
                 let ids = stakedNFTColRef.getIDsByTick(tick: stakeTick)
                 for id in ids {
@@ -305,11 +306,14 @@ access(all) contract FRC20Votes {
                 votingPower > 0.0,
                 message: "The voting power is zero"
             )
+            log("Voting Power:".concat(votingPower.toString()))
 
             // vote on the proposal
             let lockedNFTIds = self.lockedSemiNFTCollection.getIDsByTick(tick: stakeTick)
+            log("Locked NFTs Amount:".concat(lockedNFTIds.length.toString()))
             var voted = false
             for id in lockedNFTIds {
+                log("Vote on the proposal, ID:".concat(id.toString()))
                 let semiNFT = self.lockedSemiNFTCollection.borrowFRC20SemiNFTPublic(id: id)
                     ?? panic("The semiNFT is not found")
                 if !proposal.isVoted(semiNFT) {
