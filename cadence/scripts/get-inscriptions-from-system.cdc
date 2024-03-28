@@ -1,10 +1,12 @@
 import "Fixes"
+import "FRC20Indexer"
 
 access(all)
 fun main(
     ids: [UInt64],
 ): [Inscription] {
-    let systemAddr = Fixes.account.address
+    let frc20Indexer = FRC20Indexer.getIndexer()
+    let systemAddr = frc20Indexer.owner!.address
     let acct = getAuthAccount(systemAddr)
     let storePath = Fixes.getFixesStoreStoragePath()
     if let storeRef = acct.borrow<&Fixes.InscriptionsStore>(from: storePath) {
