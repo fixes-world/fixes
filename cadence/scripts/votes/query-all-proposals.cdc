@@ -47,6 +47,8 @@ access(all) struct ProposalInfo {
     access(all)
     let votedPoints: UFix64
     access(all)
+    let slotsTypes: [String]
+    access(all)
     let votingChoices: {Int: UFix64}
     access(all)
     let winningChoice: Int?
@@ -71,5 +73,10 @@ access(all) struct ProposalInfo {
         self.votedPoints = votedPoints
         self.votingChoices = votingChoices
         self.winningChoice = winningChoice
+        let slotsTypes: [String] = []
+        for s in details.slots {
+            slotsTypes.append(s.command.getType().identifier)
+        }
+        self.slotsTypes = slotsTypes
     }
 }
