@@ -1,9 +1,14 @@
 import "FRC20Votes"
 
 access(all)
-fun main(): [ProposalInfo] {
+fun main(
+    isActive: Bool,
+    tick: String?,
+): [ProposalInfo] {
     let votesMgr = FRC20Votes.borrowVotesManager()
-    let ids = votesMgr.getActiveProposalIds()
+    let ids = isActive
+        ? votesMgr.getActiveProposalIds()
+        : tick != nil ? votesMgr.getProposalIdsByTick(tick: tick!) : votesMgr.getProposalIds()
     let ret: [ProposalInfo] = []
     for id in ids {
         if let proposal = votesMgr.borrowProposal(id) {
