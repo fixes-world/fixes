@@ -52,6 +52,8 @@ access(all) struct ProposalDetailedInfo {
     access(all)
     let votedPoints: UFix64
     access(all)
+    let thresholdPoints: UFix64
+    access(all)
     let slotsTypes: [String]
     access(all)
     let votingChoices: {Int: UFix64}
@@ -106,6 +108,8 @@ access(all) struct ProposalDetailedInfo {
             slotsTypes.append(s.command.getType().identifier)
         }
         self.slotsTypes = slotsTypes
+        let totalStakedAmount = FRC20Votes.getTotalStakedAmount()
+        self.thresholdPoints = details.executableThreshold * totalStakedAmount
 
         self.logs = logs
         self.voters = voters
