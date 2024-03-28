@@ -17,6 +17,7 @@ fun main(
             isEditable: proposal.isEditable(),
             voterAmount: proposal.getVotersAmount(),
             votedPoints: proposal.getTotalVotedPoints(),
+            votingChoices: proposal.getVotingChoices(),
             winningChoice: proposal.getWinningChoice(),
             // Detailed information of a proposal.
             logs: proposal.getLogs(),
@@ -51,6 +52,8 @@ access(all) struct ProposalDetailedInfo {
     access(all)
     let votedPoints: UFix64
     access(all)
+    let votingChoices: {Int: UFix64}
+    access(all)
     let winningChoice: Int?
     // Detailed information of a proposal.
     access(all)
@@ -77,6 +80,7 @@ access(all) struct ProposalDetailedInfo {
         isEditable: Bool,
         voterAmount: Int,
         votedPoints: UFix64,
+        votingChoices: {Int: UFix64},
         winningChoice: Int?,
         logs: [FRC20Votes.StatusLog],
         voters: [Address],
@@ -94,6 +98,7 @@ access(all) struct ProposalDetailedInfo {
         self.voterAmount = voterAmount
         self.votedPoints = votedPoints
         self.winningChoice = winningChoice
+        self.votingChoices = votingChoices
         self.logs = logs
         self.voters = voters
         self.isVoteCommandsExecutable = isVoteCommandsExecutable

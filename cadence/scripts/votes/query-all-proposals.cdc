@@ -20,6 +20,7 @@ fun main(
                 isEditable: proposal.isEditable(),
                 voterAmount: proposal.getVotersAmount(),
                 votedPoints: proposal.getTotalVotedPoints(),
+                votingChoices: proposal.getVotingChoices(),
                 winningChoice: proposal.getWinningChoice()
             ))
         }
@@ -46,6 +47,8 @@ access(all) struct ProposalInfo {
     access(all)
     let votedPoints: UFix64
     access(all)
+    let votingChoices: {Int: UFix64}
+    access(all)
     let winningChoice: Int?
 
     init(
@@ -56,6 +59,7 @@ access(all) struct ProposalInfo {
         isEditable: Bool,
         voterAmount: Int,
         votedPoints: UFix64,
+        votingChoices: {Int: UFix64},
         winningChoice: Int?
     ) {
         self.id = id
@@ -65,6 +69,7 @@ access(all) struct ProposalInfo {
         self.isEditable = isEditable
         self.voterAmount = voterAmount
         self.votedPoints = votedPoints
+        self.votingChoices = votingChoices
         self.winningChoice = winningChoice
     }
 }

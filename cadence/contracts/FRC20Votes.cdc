@@ -493,6 +493,8 @@ access(all) contract FRC20Votes {
         access(all) view
         fun getTotalVotedPoints(): UFix64
         access(all) view
+        fun getVotingChoices(): {Int: UFix64}
+        access(all) view
         fun getWinningChoice(): Int?
         access(all) view
         fun isValidateForThreshold(): Bool
@@ -659,6 +661,13 @@ access(all) contract FRC20Votes {
                 total = total + self.votes[k]!
             }
             return total
+        }
+
+        /// Get the voting choices.
+        ///
+        access(all) view
+        fun getVotingChoices(): {Int: UFix64} {
+            return self.votes
         }
 
         /// Get the winning choice.
