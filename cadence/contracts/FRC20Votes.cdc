@@ -308,13 +308,16 @@ access(all) contract FRC20Votes {
 
             // vote on the proposal
             let lockedNFTIds = self.lockedSemiNFTCollection.getIDsByTick(tick: stakeTick)
+            var voted = false
             for id in lockedNFTIds {
                 let semiNFT = self.lockedSemiNFTCollection.borrowFRC20SemiNFTPublic(id: id)
                     ?? panic("The semiNFT is not found")
                 if !proposal.isVoted(semiNFT) {
                     proposal.vote(choice: choice, semiNFT: semiNFT)
+                    voted = true
                 }
             }
+            assert(voted, message: "You have not voted on the proposal")
 
             // update the local voting status
             self.voted[proposal.uuid] = votingPower
@@ -498,6 +501,8 @@ access(all) contract FRC20Votes {
         fun getWinningChoice(): Int?
         access(all) view
         fun isValidateForThreshold(): Bool
+        access(all) view
+        fun isVotingAllowed(): Bool
         access(all) view
         fun isVoteCommandsExecutable(): Bool
         access(all) view
@@ -724,6 +729,13 @@ access(all) contract FRC20Votes {
             return slotInfoRef.command.isAllInscriptionsExtracted()
         }
 
+        /// Check whether the voting is allowed.
+        ///
+        access(all) view
+        fun isVotingAllowed(): Bool {
+            return self.details.isStarted() && !self.details.isEnded()
+        }
+
         /// Check whether the proposal is executable.
         ///
         access(all) view
@@ -755,8 +767,7 @@ access(all) contract FRC20Votes {
         access(contract)
         fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}) {
             pre {
-                self.details.isStarted(): "Proposal is not started"
-                !self.details.isEnded(): "Proposal is ended"
+                self.isVotingAllowed(): "Voting is not allowed for now"
                 choice < self.details.slots.length: "Choice is out of range"
                 semiNFT.getOriginalTick() == FRC20StakingManager.getPlatformStakingTickerName(): "The ticker is not the staking ticker"
                 semiNFT.isStakedTick(): "The ticker is not staked"
@@ -955,7 +966,7 @@ access(all) contract FRC20Votes {
         )
         /// Vote on a proposal.
         access(all)
-        fun vote( voter: &VoterIdentity, proposalId: UInt64, choice: Int)
+        fun vote(voter: &VoterIdentity, proposalId: UInt64, choice: Int)
         // --- Write Methods: Proposer ---
         access(all)
         fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, description: String?, discussionLink: String?)
@@ -1132,6 +1143,10 @@ access(all) contract FRC20Votes {
         ) {
             let proposalRef = self.borrowProposal(proposalId)
                 ?? panic("The proposal is not found")
+            assert(
+                proposalRef.isVotingAllowed(),
+                message: "Voting is not allowed for now"
+            )
             voter.onVote(choice: choice, proposal: proposalRef)
         }
 
