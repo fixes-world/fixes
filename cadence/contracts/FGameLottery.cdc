@@ -1038,44 +1038,51 @@ access(all) contract FGameLottery {
                 // remove the first address from the queue
                 let addr = self.checkingQueue!.removeFirst()
                 participants.append(addr)
-                // retrieve the participant tickets
-                let tickets = self.participants[addr]!
+                // user collection
                 let userColCap = FGameLottery.getUserTicketCollection(addr)
                 var checkedEntries = 1
                 if let userColRef = userColCap.borrow() {
-                    for ticketId in tickets {
-                        if let ticketRef = userColRef.borrowTicket(ticketId: ticketId) {
-                            // verify the ticket
-                            ticketRef.onPrizeVerify()
-                            // if the ticket is a winner, update prize amount by rank
-                            if let prizeRank = ticketRef.getWinPrizeRank() {
-                                // update the winner count
-                                winnersCnt = winnersCnt + 1
-                                // add the winner to the result
-                                self.drawnResult?.addWinner(addr)
-                                // add the ticket to the disbursing queue
-                                self.disbursingQueque.append(TicketIdentifier(addr, ticketId))
-                                // update result data
-                                if prizeRank == PrizeRank.JACKPOT {
-                                    self.drawnResult?.addJackpotWinner(addr)
-                                    // emit event
-                                    emit LotteryJackpotWinnerUpdated(
-                                        poolAddr: pool.getAddress(),
-                                        lotteryId: self.epochIndex,
-                                        winner: addr
-                                    )
-                                } else {
-                                    let basePrize = pool.getWinnerPrizeByRank(prizeRank)
-                                    let powerup = ticketRef.getPowerup()
-                                    let prize = basePrize * powerup
-                                    nonJackpotAmount = nonJackpotAmount + prize
-                                    self.drawnResult?.incrementNonJackpotTotal(prizeRank, prize)
-                                }
-                            } // end if prizeRank
-                        } // end if ticketRef
-                        // one entry is checked
-                        checkedEntries = checkedEntries + 1
-                    } // end for
+                    // retrieve the participant tickets
+                    if let ticketsRef = &self.participants[addr] as &[UInt64]? {
+                        while ticketsRef.length > 0 && checkedEntries < maxEntries {
+                            let ticketId = ticketsRef.removeFirst()
+                            if let ticketRef = userColRef.borrowTicket(ticketId: ticketId) {
+                                // verify the ticket
+                                ticketRef.onPrizeVerify()
+                                // if the ticket is a winner, update prize amount by rank
+                                if let prizeRank = ticketRef.getWinPrizeRank() {
+                                    // update the winner count
+                                    winnersCnt = winnersCnt + 1
+                                    // add the winner to the result
+                                    self.drawnResult?.addWinner(addr)
+                                    // add the ticket to the disbursing queue
+                                    self.disbursingQueque.append(TicketIdentifier(addr, ticketId))
+                                    // update result data
+                                    if prizeRank == PrizeRank.JACKPOT {
+                                        self.drawnResult?.addJackpotWinner(addr)
+                                        // emit event
+                                        emit LotteryJackpotWinnerUpdated(
+                                            poolAddr: pool.getAddress(),
+                                            lotteryId: self.epochIndex,
+                                            winner: addr
+                                        )
+                                    } else {
+                                        let basePrize = pool.getWinnerPrizeByRank(prizeRank)
+                                        let powerup = ticketRef.getPowerup()
+                                        let prize = basePrize * powerup
+                                        nonJackpotAmount = nonJackpotAmount + prize
+                                        self.drawnResult?.incrementNonJackpotTotal(prizeRank, prize)
+                                    }
+                                } // end if prizeRank
+                            } // end if ticketRef
+                            // one entry is checked
+                            checkedEntries = checkedEntries + 1
+                        }
+                        // if there are remaining tickets, add addr back to the queue
+                        if ticketsRef.length > 0 {
+                            self.checkingQueue!.append(addr)
+                        }
+                    }
                 } // end if userColRef
                 i = i + checkedEntries
             }
@@ -1768,7 +1775,7 @@ access(all) contract FGameLottery {
                 let lotteryRef = self.borrowLotteryRef(firstFinsihedEpochIndex)!
 
                 // max entries to compute in one heartbeat
-                let heartbeatComputeEntries = 100
+                let heartbeatComputeEntries = 200
 
                 // verify the participants' tickets
                 var status = lotteryRef.getStatus()
