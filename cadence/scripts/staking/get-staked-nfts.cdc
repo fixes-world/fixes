@@ -2,12 +2,8 @@
 import "NonFungibleToken"
 import "MetadataViews"
 // Fixes imports
-// import "FRC20Indexer"
-// import "FRC20FTShared"
-// import "FRC20AccountsPool"
-// import "FRC20Staking"
-// import "FRC20StakingManager"
 import "FRC20SemiNFT"
+import "FRC20Votes"
 
 access(all)
 fun main(
@@ -21,6 +17,13 @@ fun main(
     if acct.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
         return []
     }
+
+    let ret: [StakedNFTInfo] = []
+    let retRef = &ret as &[StakedNFTInfo]
+    var startAt = page * size
+    var restSize = size
+
+    // Load from staked NFT Collection
     // ensure path correct
     acct.unlink(FRC20SemiNFT.CollectionPublicPath)
     acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath, target: FRC20SemiNFT.CollectionStoragePath)
@@ -30,46 +33,83 @@ fun main(
         .borrow() {
 
         let nftIDs = collection.getIDs()
-        var startAt = page * size
-        if startAt >= nftIDs.length {
-            return []
+        if startAt < nftIDs.length {
+            var endAt = startAt + restSize
+            if endAt > nftIDs.length {
+                endAt = nftIDs.length
+                // size is total items needed to return
+                // restSize is the remaining items to return
+                // so we need to update restSize to be the remaining items
+                restSize = size - (endAt - startAt)
+            }
+            let sliced = nftIDs.slice(from: startAt, upTo: endAt)
+            for id in sliced {
+                if let nft = collection.borrowFRC20SemiNFTPublic(id: id) {
+                    tryAddStakedNFT(ret: retRef, tick: tick, nft: nft, locked: false)
+                }
+            }
+            // if we are at the end of the list, we need to reset the startAt
+            if ret.length <= size {
+                startAt = 0
+            }
+        } else {
+            // if we are at the end of the list, we need to reset the startAt
+            startAt = startAt - nftIDs.length
         }
-        let sliced = nftIDs.slice(from: startAt, upTo: nftIDs.length)
-        let ret: [StakedNFTInfo] = []
-        for id in sliced {
-            if let nft = collection.borrowFRC20SemiNFTPublic(id: id) {
-                // skip if not staked
-                if nft.isStakedTick() == false {
-                    continue
+    }
+
+    // Load from Voting NFT Collection
+    if restSize > 0 {
+        if let voter = FRC20Votes.borrowVoterPublic(addr) {
+            let nftIDs = voter.getIDs()
+            if startAt < nftIDs.length {
+                var endAt = startAt + restSize
+                if endAt > nftIDs.length {
+                    endAt = nftIDs.length
                 }
-                // skip if not the tick we want
-                if tick != nil && nft.getOriginalTick() != tick! {
-                    continue
-                }
-                // get the NFT view
-                let nftView = MetadataViews.getNFTView(id: id, viewResolver: nft)
-                let balance = nft.getBalance()
-                let rewardNames = nft.getRewardStrategies()
-                let claimingRecords: {String: FRC20SemiNFT.RewardClaimRecord} = {}
-                for name in rewardNames {
-                    claimingRecords[name] = nft.getClaimingRecord(name)!
-                }
-                ret.append(StakedNFTInfo(
-                    basic: nftView,
-                    tick: nft.getOriginalTick(),
-                    sTick: nft.getTickerName(),
-                    balance: nft.getBalance(),
-                    claimingRecords: claimingRecords,
-                ))
-                // break if we have enough
-                if ret.length >= size {
-                    break
+                let sliced = nftIDs.slice(from: startAt, upTo: endAt)
+                for id in sliced {
+                    if let nft = voter.borrowFRC20SemiNFTPublic(id: id) {
+                        tryAddStakedNFT(ret: retRef, tick: tick, nft: nft, locked: true)
+                    }
                 }
             }
         }
-        return ret
     }
-    return []
+    return ret
+}
+
+access(all)
+fun tryAddStakedNFT(
+    ret: &[StakedNFTInfo],
+    tick: String?,
+    nft: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver},
+    locked: Bool,
+) {
+    // skip if not staked
+    if nft.isStakedTick() == false {
+        return
+    }
+    // skip if not the tick we want
+    if tick != nil && nft.getOriginalTick() != tick! {
+        return
+    }
+    // get the NFT view
+    let nftView = MetadataViews.getNFTView(id: nft.id, viewResolver: nft)
+    let balance = nft.getBalance()
+    let rewardNames = nft.getRewardStrategies()
+    let claimingRecords: {String: FRC20SemiNFT.RewardClaimRecord} = {}
+    for name in rewardNames {
+        claimingRecords[name] = nft.getClaimingRecord(name)!
+    }
+    ret.append(StakedNFTInfo(
+        basic: nftView,
+        tick: nft.getOriginalTick(),
+        sTick: nft.getTickerName(),
+        balance: nft.getBalance(),
+        claimingRecords: claimingRecords,
+        isLocked: locked,
+    ))
 }
 
 access(all) struct StakedNFTInfo {
@@ -84,6 +124,8 @@ access(all) struct StakedNFTInfo {
     access(all) let sTick: String
     access(all) let balance: UFix64
     access(all) let claimingRecords: {String: FRC20SemiNFT.RewardClaimRecord}
+    // Locking status
+    access(all) let locked: Bool
 
     init(
         basic: MetadataViews.NFTView,
@@ -91,6 +133,7 @@ access(all) struct StakedNFTInfo {
         sTick: String,
         balance: UFix64,
         claimingRecords: {String: FRC20SemiNFT.RewardClaimRecord},
+        isLocked: Bool,
     ) {
         // NFT data
         self.id = basic.id
@@ -103,5 +146,7 @@ access(all) struct StakedNFTInfo {
         self.sTick = sTick
         self.balance = balance
         self.claimingRecords = claimingRecords
+        // Locking status
+        self.locked = isLocked
     }
 }
