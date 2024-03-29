@@ -1,4 +1,6 @@
 import "FRC20Votes"
+import "FRC20Staking"
+import "FRC20StakingManager"
 
 access(all)
 fun main(
@@ -9,6 +11,14 @@ fun main(
     let ids = votesMgr.getActiveProposalIds()
     if let proposal = votesMgr.borrowProposal(proposalId) {
         let voter = addr != nil ? FRC20Votes.borrowVoterPublic(addr!) : nil
+        var votingPower = 0.0
+        if addr != nil {
+            votingPower = voter?.getVotingPower() ?? 0.0
+            if let delegatorRef = FRC20Staking.borrowDelegator(addr!) {
+                let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+                votingPower = delegatorRef.getStakedBalance(tick: stakeTick)
+            }
+        }
         return ProposalDetailedInfo(
             id: proposal.uuid,
             proposer: proposal.getProposer(),
@@ -24,10 +34,10 @@ fun main(
             voters: proposal.getVoters(),
             isVoteCommandsExecutable: proposal.isVoteCommandsExecutable(),
             // Voter Status
+            currentVotingPower: votingPower,
             currentHasVoted: voter?.hasVoted(proposalId),
             currentVotedPoints: voter?.getVotedPoints(proposalId) ?? nil,
             currentVotedChoice: voter?.getVotedChoice(proposalId) ?? nil,
-            currentVotingPower: voter?.getVotingPower() ?? nil,
         )
     }
     return nil
@@ -68,13 +78,13 @@ access(all) struct ProposalDetailedInfo {
     let isVoteCommandsExecutable: Bool
     // Voter Status
     access(all)
+    let currentVotingPower: UFix64
+    access(all)
     let currentHasVoted: Bool?
     access(all)
     let currentVotedPoints: UFix64?
     access(all)
     let currentVotedChoice: Int?
-    access(all)
-    let currentVotingPower: UFix64?
 
     init(
         id: UInt64,
@@ -89,10 +99,10 @@ access(all) struct ProposalDetailedInfo {
         logs: [FRC20Votes.StatusLog],
         voters: [Address],
         isVoteCommandsExecutable: Bool,
+        currentVotingPower: UFix64,
         currentHasVoted: Bool?,
         currentVotedPoints: UFix64?,
         currentVotedChoice: Int?,
-        currentVotingPower: UFix64?
     ) {
         self.id = id
         self.proposer = proposer
