@@ -530,7 +530,19 @@ access(all) contract Fixes {
         }
     }
 
-    /// The private interface to the executable archivor
+    /// The public interface to the inscriptions store
+    ///
+    access(all) resource interface InscriptionsStorePublic {
+        // ---- Access Control: Account Level ----
+        /// Store executable inscription
+        access(account)
+        fun store(_ ins: @Fixes.Inscription)
+        // returns the inscription with the given id
+        access(account)
+        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription?
+    }
+
+    /// The private interface to the inscriptions store
     ///
     access(all) resource interface InscriptionsStorePrivate {
         /// Store executable inscription
@@ -549,7 +561,7 @@ access(all) contract Fixes {
 
     /// The resource that stores the executable inscriptions
     ///
-    access(all) resource InscriptionsStore: InscriptionsStorePrivate, InscriptionsPublic, InscriptionsPrivate {
+    access(all) resource InscriptionsStore: InscriptionsStorePublic, InscriptionsStorePrivate, InscriptionsPublic, InscriptionsPrivate {
         access(self)
         let inscriptions: @{UInt64: Fixes.Inscription}
 
@@ -731,6 +743,16 @@ access(all) contract Fixes {
     fun getFixesStoreStoragePath(): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
+            identifier: prefix.concat("_collection_store")
+        )!
+    }
+
+    /// Get the public path of the inscriptions store
+    ///
+    access(all) view
+    fun getFixesStorePublicPath(): PublicPath {
+        let prefix = "Fixes_".concat(self.account.address.toString())
+        return PublicPath(
             identifier: prefix.concat("_collection_store")
         )!
     }

@@ -23,6 +23,8 @@ access(all) contract FRC20Indexer {
 
     /// Event emitted when the admin calls the sponsorship method
     access(all) event PlatformTreasurySponsorship(amount: UFix64, to: Address, forTick: String)
+    /// Event emitted when the Treasury Withdrawn invoked
+    access(all) event TokenTreasuryWithdrawn(tick: String, amount: UFix64, byInsId: UInt64, reason: String)
 
     /// Event emitted when a FRC20 token is deployed
     access(all) event FRC20Deployed(tick: String, max: UFix64, limit: UFix64, deployer: Address)
@@ -109,7 +111,7 @@ access(all) contract FRC20Indexer {
         fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay?
         /// Check if an inscription is a valid FRC20 inscription
         access(all) view
-        fun isValidFRC20Inscription(ins: &Fixes.Inscription): Bool
+        fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool
         /// Get the balance of a FRC20 token
         access(all) view
         fun getBalance(tick: String, addr: Address): UFix64
@@ -203,6 +205,9 @@ access(all) contract FRC20Indexer {
         // Burn unsupplied frc20 tokens
         access(account)
         fun burnUnsupplied(ins: &Fixes.Inscription)
+        /// Burn unsupplied frc20 tokens
+        access(account)
+        fun withdrawFromTreasury(ins: &Fixes.Inscription): @FRC20FTShared.Change
         /// Allocate the tokens to some address
         access(account)
         fun allocate(ins: &Fixes.Inscription): @FlowToken.Vault
@@ -355,7 +360,7 @@ access(all) contract FRC20Indexer {
         /// Check if an inscription is a valid FRC20 inscription
         ///
         access(all) view
-        fun isValidFRC20Inscription(ins: &Fixes.Inscription): Bool {
+        fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
             let p = ins.getMetaProtocol()
             return ins.getMimeType() == "text/plain" &&
                 (p == "FRC20" || p == "frc20" || p == "frc-20" || p == "FRC-20")
@@ -743,6 +748,66 @@ access(all) contract FRC20Indexer {
 
             // extract inscription
             self._extractInscription(tick: tick, ins: ins)
+        }
+
+        /// Burn unsupplied frc20 tokens
+        ///
+        access(account)
+        fun withdrawFromTreasury(ins: &Fixes.Inscription): @FRC20FTShared.Change {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
+                // The command inscriptions should be only executed by the indexer
+                self._isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
+            }
+            post {
+                result.isBackedByFlowTokenVault(): "The result should be backed by a FlowToken.Vault"
+                result.getBalance() > 0.0: "The result should have a positive balance"
+            }
+
+            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "withdrawFromTreasury" && meta["tick"] != nil && meta["amt"] != nil && meta["usage"] != nil,
+                message: "The inscription is not a valid FRC20 inscription for withdrawing from treasury"
+            )
+
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            let amtToWithdraw = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let usage = meta["usage"]!
+            assert(
+                usage == "lottery" || usage == "staking",
+                message: "The usage should be 'lottery'"
+            )
+
+            let treasury = self._borrowTokenTreasury(tick: tick)
+            assert(
+                treasury.balance >= amtToWithdraw,
+                message: "The treasury does not have enough balance"
+            )
+
+            let ret <- FRC20FTShared.wrapFungibleVaultChange(
+                ftVault: <- treasury.withdraw(amount: amtToWithdraw),
+                from: FRC20Indexer.getAddress()
+            )
+
+            assert(
+                ret.getBalance() == amtToWithdraw,
+                message: "The result should have the same balance as the amount to withdraw"
+            )
+
+            // emit event
+            emit TokenTreasuryWithdrawn(
+                tick: tick,
+                amount: amtToWithdraw,
+                byInsId: ins.getId(),
+                reason: usage
+            )
+
+            // extract inscription
+            self._extractInscription(tick: tick, ins: ins)
+
+            return <- ret
         }
 
         /// Allocate the tokens to some address

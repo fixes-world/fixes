@@ -240,4 +240,54 @@ access(all) contract FixesInscriptionFactory {
             .concat(",amt=").concat(amount.toString())
             .concat(",usage=lottery")
     }
+
+    // FRC20 Voting Commands
+
+    /// Build the inscription for voting command to set the burnable status of a FRC20 token
+    ///
+    access(all) view
+    fun buildVoteCommandSetBurnable(
+        tick: String,
+        burnable: Bool,
+    ): String {
+        return "op=burnable,tick=".concat(tick)
+            .concat(",v=").concat(burnable ? "1" : "0")
+    }
+
+    /// Build the inscription for voting command to burn unsupplied tokens of a FRC20 token
+    ///
+    access(all) view
+    fun buildVoteCommandBurnUnsupplied(
+        tick: String,
+        percent: UFix64,
+    ): String {
+        return "op=burnUnsup,tick=".concat(tick)
+            .concat(",perc=").concat(percent.toString())
+    }
+
+    /// Build the inscription for voting command to move treasury to lottery jackpot
+    ///
+    access(all) view
+    fun buildVoteCommandMoveTreasuryToLotteryJackpot(
+        tick: String,
+        amount: UFix64,
+    ): String {
+        return "op=withdrawFromTreasury,usage=lottery,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+    }
+
+    /// Build the inscription for voting command to move treasury to staking
+    ///
+    access(all) view
+    fun buildVoteCommandMoveTreasuryToStaking(
+        tick: String,
+        amount: UFix64,
+        vestingBatchAmount: UInt32,
+        vestingInterval: UFix64,
+    ): String {
+        return "op=withdrawFromTreasury,usage=staking,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+            .concat(",batch=").concat(vestingBatchAmount.toString())
+            .concat(",interval=").concat(vestingInterval.toString())
+    }
 }

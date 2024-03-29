@@ -600,9 +600,15 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         fun getIDs(): [UInt64]
         access(all)
         fun borrowNFT(id: UInt64): &NonFungibleToken.NFT
+        access(all)
+        fun borrowNFTSafe(id: UInt64): &NonFungibleToken.NFT?
         /** ----- Specific Methods For SemiNFT ----- */
         access(all) view
         fun getIDsByTick(tick: String): [UInt64]
+        /// Gets the staked balance of the tick
+        access(all) view
+        fun getStakedBalance(tick: String): UFix64
+        /// Borrow the FRC20SemiNFT reference by the ID
         access(all)
         fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT{IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver}? {
             post {
@@ -711,7 +717,18 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         ///
         access(all)
         fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
-            return (&self.ownedNFTs[id] as &NonFungibleToken.NFT?)!
+            return self.borrowNFTSafe(id: id)!
+        }
+
+        /// Gets a reference to an NFT in the collection so that
+        /// the caller can read its metadata and call its methods
+        ///
+        /// @param id: The ID of the wanted NFT
+        /// @return A reference to the wanted NFT resource
+        ///
+        access(all)
+        fun borrowNFTSafe(id: UInt64): &NonFungibleToken.NFT? {
+            return &self.ownedNFTs[id] as &NonFungibleToken.NFT?
         }
 
         /// Gets an array of NFT IDs in the collection by the tick
@@ -722,6 +739,29 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 return ids
             }
             return []
+        }
+
+        /// Gets the staked balance of the tick
+        ///
+        access(all) view
+        fun getStakedBalance(tick: String): UFix64 {
+            let tickIds = self.getIDsByTick(tick: tick)
+            if tickIds.length > 0 {
+                var totalBalance = 0.0
+                for id in tickIds {
+                    if let nft = self.borrowFRC20SemiNFT(id: id) {
+                        if nft.getOriginalTick() != tick {
+                            continue
+                        }
+                        if !nft.isStakedTick() {
+                            continue
+                        }
+                        totalBalance = totalBalance + nft.getBalance()
+                    }
+                }
+                return totalBalance
+            }
+            return 0.0
         }
 
         /// Gets a reference to an NFT in the collection with the public interface

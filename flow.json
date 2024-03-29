@@ -217,6 +217,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20VoteCommands": {
+			"source": "cadence/contracts/FRC20VoteCommands.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FindViews": {
 			"source": "./imports/097bafa4e0b48eef/FindViews.cdc",
 			"aliases": {
@@ -770,6 +778,8 @@
 				"FRC20StakingManager",
 				"FRC20StakingForwarder",
 				"FRC20StakingVesting",
+				"FRC20VoteCommands",
+				"FRC20Votes",
 				"EVMAgent",
 				"FGameLottery",
 				"FGameLotteryRegistry",

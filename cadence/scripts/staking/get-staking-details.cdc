@@ -2,6 +2,7 @@
 import "FRC20Indexer"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
+import "FRC20Votes"
 import "FRC20Staking"
 import "FRC20StakingManager"
 import "FRC20Marketplace"
@@ -50,6 +51,7 @@ fun main(
         }
     } // end if
 
+    var totalLockedStakedBalance: UFix64 = 0.0
     var totalStakedBalance: UFix64 = 0.0
     var totalUnstakingBalance: UFix64 = 0.0
     var totalUnlockedClaimableBalance: UFix64 = 0.0
@@ -62,12 +64,10 @@ fun main(
                 totalUnlockedClaimableBalance = unstakingRecord.totalUnlockedClaimableBalance
             }
         }
+        if let voter = FRC20Votes.borrowVoterPublic(addr!) {
+            totalLockedStakedBalance = voter.getStakedBalance(tick: tick)
+        }
     } // update delegator info
-
-    log("tick: ".concat(tick).concat(" addr: ").concat(addr?.toString() ?? "nil"))
-    log("TotalStakedBalance: ".concat(totalStakedBalance.toString()))
-    log("TotalUnstakingBalance: ".concat(totalUnstakingBalance.toString()))
-    log("TotalUnlockedClaimableBalance: ".concat(totalUnlockedClaimableBalance.toString()))
 
     return StakingDetails(
         meta: tokenMeta,
@@ -85,7 +85,8 @@ fun main(
             : false,
         totalStakedBalance: totalStakedBalance,
         totalUnstakingBalance: totalUnstakingBalance,
-        totalUnlockedClaimableBalance: totalUnlockedClaimableBalance
+        totalUnlockedClaimableBalance: totalUnlockedClaimableBalance,
+        totalLockedStakedBalance: totalLockedStakedBalance,
     )
 }
 
@@ -108,6 +109,7 @@ access(all) struct StakingDetails {
     access(all) let totalStakedBalance: UFix64
     access(all) let totalUnstakingBalance: UFix64
     access(all) let totalUnlockedClaimableBalance: UFix64
+    access(all) let totalLockedStakedBalance: UFix64
 
     init(
         meta: FRC20Indexer.FRC20Meta,
@@ -121,7 +123,8 @@ access(all) struct StakingDetails {
         isEligibleForRegistering: Bool,
         totalStakedBalance: UFix64,
         totalUnstakingBalance: UFix64,
-        totalUnlockedClaimableBalance: UFix64
+        totalUnlockedClaimableBalance: UFix64,
+        totalLockedStakedBalance: UFix64,
     ) {
         self.meta = meta
         self.holders = holders
@@ -137,5 +140,6 @@ access(all) struct StakingDetails {
         self.totalStakedBalance = totalStakedBalance
         self.totalUnstakingBalance = totalUnstakingBalance
         self.totalUnlockedClaimableBalance = totalUnlockedClaimableBalance
+        self.totalLockedStakedBalance = totalLockedStakedBalance
     }
 }
