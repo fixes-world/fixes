@@ -13,8 +13,9 @@ fun main(
         let voter = addr != nil ? FRC20Votes.borrowVoterPublic(addr!) : nil
         var votingPower = 0.0
         if addr != nil {
-            votingPower = voter?.getVotingPower() ?? 0.0
-            if let delegatorRef = FRC20Staking.borrowDelegator(addr!) {
+            if voter != nil {
+                votingPower = voter?.getVotingPower() ?? 0.0
+            } else if let delegatorRef = FRC20Staking.borrowDelegator(addr!) {
                 let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
                 votingPower = delegatorRef.getStakedBalance(tick: stakeTick)
             }
