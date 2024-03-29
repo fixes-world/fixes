@@ -1,9 +1,9 @@
 /**
 > Author: FIXeS World <https://fixes.world/>
 
-# FRC20Votes
+# FRC20VoteCommands
 
-This contract is used to manage the FRC20 votes.
+This contract is used to manage the frc20 vote commands.
 
 */
 import "FlowToken"
