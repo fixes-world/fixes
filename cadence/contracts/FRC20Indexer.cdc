@@ -1184,7 +1184,7 @@ access(all) contract FRC20Indexer {
             let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let usage = meta["usage"]!
             assert(
-                usage == "staking" || usage == "donate" || usage == "lottery",
+                usage == "staking" || usage == "donate" || usage == "lottery" || usage == "convert",
                 message: "The usage should be 'staking' or 'donate' or 'lottery'"
             )
             let fromAddr = ins.owner!.address

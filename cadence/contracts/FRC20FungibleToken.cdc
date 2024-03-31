@@ -13,6 +13,7 @@ import "ViewResolver"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
 // Fixes imports
+import "Fixes"
 import "FRC20FTShared"
 import "FRC20Indexer"
 
@@ -39,10 +40,10 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     access(all) event TokensDeposited(amount: UFix64, to: Address?)
 
     /// The event that is emitted when new tokens are minted
-    access(all) event TokensConvertedToStanard(amount: UFix64, changeFrom: Address)
+    access(all) event TokensConvertedToStanard(amount: UFix64, by: Address)
 
     /// The event that is emitted when tokens are destroyed
-    access(all) event TokensConvertedToFRC20(amount: UFix64, changeFrom: Address)
+    access(all) event TokensConvertedToFRC20(amount: UFix64, by: Address)
 
     /// The public interface for the FRC20 FT
     ///
@@ -284,41 +285,44 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         }
     }
 
-    /// ------------ FRC20 Change <> FungibleToken Methods ------------
-
-    /// Withdraw all Fungible Tokens from a FRC20 FT Change
-    ///
-    access(account)
-    fun withdrawFromChange(change: @FRC20FTShared.Change): @FRC20FungibleToken.Vault {
-        pre {
-            change.isBackedByVault(): "The change must be backed by a vault"
-            change.tick == Type<@FRC20FungibleToken.Vault>().identifier: "The change must be backed by the same ticker"
-            change.getVaultType() == Type<@FRC20FungibleToken.Vault>(): "The change must be backed by the same type of vault"
-        }
-        let amount = change.getBalance()
-        assert(
-            amount > 0.0,
-            message: "The change must be greater than zero."
-        )
-        let vault <- change.withdrawAsVault(amount: amount)
-        assert(
-            change.getBalance() == 0.0,
-            message: "The change must be empty after the withdrawal."
-        )
-        destroy change
-        // no need to emit the event, it is emitted in the withdraw function
-        // no need to update the total supply, it is not changed
-        return <- (vault as! @FRC20FungibleToken.Vault)
-    }
+    /// ------------ FRC20 <> FungibleToken Methods ------------
 
     /// Issue new Fungible Tokens from a FRC20 FT Change
     ///
-    access(account)
-    fun mintFromChange(change: @FRC20FTShared.Change): @FRC20FungibleToken.Vault {
+    access(all)
+    fun convertFromIndexer(ins: &Fixes.Inscription): @FRC20FungibleToken.Vault {
         pre {
-            change.isBackedByVault() == false: "The change must not be backed by a vault"
-            change.tick == self.getSymbol(): "The change must be backed by the same ticker"
+            ins.isExtractable(): "The inscription must be extractable"
         }
+
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        // ensure tick is the same
+        let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+        assert(
+            tick == FRC20FungibleToken.getSymbol(),
+            message: "The token tick is not matched"
+        )
+
+        // ensure usage is 'convert'
+        let usage = meta["usage"] ?? panic("The token usage is not found")
+        assert(
+            usage == "convert",
+            message: "The token usage is not matched"
+        )
+
+        let insOwner = ins.owner?.address ?? panic("The owner of the inscription is not found")
+        let beforeBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+
+        // withdraw the change from indexer
+        let change <- frc20Indexer.withdrawChange(ins: ins)
+
+        let afterBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+        // ensure the balance is matched
+        assert(
+            beforeBalance - afterBalance == change.getBalance(),
+            message: "The balance is not matched"
+        )
 
         let retVault <- self.createEmptyVault()
         retVault.initialize(<- change)
@@ -326,7 +330,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         // emit the event
         emit TokensConvertedToStanard(
             amount: retVault.balance,
-            changeFrom: retVault.getSourceAddress(),
+            by: insOwner,
         )
 
         // update the total supply
@@ -338,27 +342,51 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
     /// Burn Fungible Tokens and convert into a FRC20 FT Change
     ///
-    access(account)
-    fun burnIntoChange(vault: @FungibleToken.Vault): @FRC20FTShared.Change {
+    access(all)
+    fun convertBackToIndexer(ins: &Fixes.Inscription, vault: @FungibleToken.Vault) {
         pre {
+            ins.isExtractable(): "The inscription must be extractable"
             vault.isInstance(Type<@FRC20FungibleToken.Vault>()): "The vault must be of the same type as the token"
         }
+
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        // ensure tick is the same
+        let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+        assert(
+            tick == FRC20FungibleToken.getSymbol(),
+            message: "The token tick is not matched"
+        )
+
         let fromVault <- vault as! @FRC20FungibleToken.Vault
         let retChange <- fromVault.extract()
         // no need to emit the event, it is emitted in the extract function
         destroy fromVault
 
+        let convertBalance = retChange.getBalance()
+
+        // before balance
+        let insOwner = ins.owner?.address ?? panic("The owner of the inscription is not found")
+        let beforeBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+
+        frc20Indexer.depositChange(ins: ins, change: <- retChange)
+
+        // after balance
+        let afterBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+        // ensure the balance is matched
+        assert(
+            afterBalance - beforeBalance == convertBalance,
+            message: "The balance is not matched"
+        )
+
         // emit the converted event
         emit TokensConvertedToFRC20(
-            amount: retChange.getBalance(),
-            changeFrom: retChange.from,
+            amount: convertBalance,
+            by: insOwner,
         )
 
         // update the total supply
-        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply - retChange.getBalance()
-
-        // create the change
-        return <- retChange
+        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply - convertBalance
     }
 
     /// ------------ General Functions ------------
