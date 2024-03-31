@@ -4,11 +4,12 @@
 
 # FRC20FungibleToken
 
-TODO: Add description
+This is the fungible token contract for all FRC20 tokens. It is the template contract that is used to deploy.
 
 */
 
 import "FungibleToken"
+import "ViewResolver"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
 // Fixes imports
@@ -16,11 +17,10 @@ import "FRC20FTShared"
 import "FRC20Indexer"
 
 /// This is the template source for a FRC20 Fungible Token
-/// When a new FRC20 FT contract is created, the deployer will replace
-/// all instances of the string "FRC20FungibleToken" with the name of the
-/// "FRC20TokenTICKER_NAME" contract and then replace all instances of the string
-/// "TICKER_NAME" with the ticker name of the token.
-access(all) contract FRC20FungibleToken: FungibleToken {
+/// The contract is deployed in the child account of the FRC20Indexer
+/// All real FRC20 tokens are deployed in the FRC20Indexer, and
+/// the FT Token issued by the FRC20FTShared.Change
+access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
     /// Total supply of FRC20FungibleToken in existence
     /// This value is only a record of the quantity existing in the form of Flow Fungible Tokens.
@@ -28,14 +28,6 @@ access(all) contract FRC20FungibleToken: FungibleToken {
     /// The total quantity of the token that has been minted is loaded from the FRC20Indexer.
     access(all)
     var totalSupply: UFix64
-
-    /// Storage and Public Paths
-    access(all)
-    let VaultStoragePath: StoragePath
-    access(all)
-    let VaultPublicPath: PublicPath
-    access(all)
-    let ReceiverPublicPath: PublicPath
 
     /// The event that is emitted when the contract is created
     access(all) event TokensInitialized(initialSupply: UFix64)
@@ -47,10 +39,27 @@ access(all) contract FRC20FungibleToken: FungibleToken {
     access(all) event TokensDeposited(amount: UFix64, to: Address?)
 
     /// The event that is emitted when new tokens are minted
-    access(all) event TokensConvertedToStanard(amount: UFix64)
+    access(all) event TokensConvertedToStanard(amount: UFix64, changeFrom: Address)
 
     /// The event that is emitted when tokens are destroyed
-    access(all) event TokensConvertedToFRC20(amount: UFix64)
+    access(all) event TokensConvertedToFRC20(amount: UFix64, changeFrom: Address)
+
+    /// The public interface for the FRC20 FT
+    ///
+    access(all) resource interface FRC20Metadata {
+        /// Is the vault valid
+        access(all) view
+        fun isValidVault(): Bool
+        /// is the token a staked token
+        access(all) view
+        fun isStakedToken(): Bool
+        /// Get the ticker name of the token
+        access(all) view
+        fun getTickerName(): String
+        /// Get the change's from address
+        access(all) view
+        fun getSourceAddress(): Address
+    }
 
     /// Each user stores an instance of only the Vault in their storage
     /// The functions in the Vault and governed by the pre and post conditions
@@ -62,14 +71,22 @@ access(all) contract FRC20FungibleToken: FungibleToken {
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    access(all) resource Vault: FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: FRC20Metadata, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
+        // The change should be inside the vault
+        access(self)
+        var change: @FRC20FTShared.Change?
 
         /// Initialize the balance at resource creation time
         init(balance: UFix64) {
+            pre {
+                balance == 0.0: "For initialization, the balance must be zero"
+            }
+            // Initialize with a zero balance and nil change
             self.balance = balance
+            self.change <- nil
         }
 
         /// @deprecated after Cadence 1.0
@@ -78,7 +95,99 @@ access(all) contract FRC20FungibleToken: FungibleToken {
             pre {
                 self.balance == UFix64(0): "Balance must be zero for destroy"
             }
+            destroy self.change
         }
+
+        /// ----- Internal Methods -----
+
+        /// Borrow the change reference
+        ///
+        access(contract)
+        fun borrowChangeRef(): &FRC20FTShared.Change? {
+            return &self.change as &FRC20FTShared.Change?
+        }
+
+        /// The initialize method for the Vault, a Vault for FRC20 must be initialized with a Change
+        ///
+        access(contract)
+        fun initialize(_ change: @FRC20FTShared.Change) {
+            pre {
+                self.change == nil: "The change must be nil"
+                !change.isBackedByVault(): "The change must not be backed by a vault"
+                change.tick == FRC20FungibleToken.getSymbol(): "The change must be backed by the same ticker"
+            }
+            post {
+                self.isValidVault(): "The vault must be valid"
+            }
+            let balance = change.getBalance()
+            let from = change.from
+            self.change <-! change
+            // update balance
+            self.syncBalance()
+        }
+
+        /// Extract the change from the vault
+        ///
+        access(contract)
+        fun extract(): @FRC20FTShared.Change {
+            pre {
+                self.isValidVault(): "The vault must be valid"
+            }
+            post {
+                self.change == nil: "The change must be nil"
+            }
+            let balance = self.change?.getBalance()!
+
+            var retChange: @FRC20FTShared.Change? <- nil
+            retChange <-> self.change
+            // update balance
+            self.syncBalance()
+
+            // return the change
+            return <- retChange!
+        }
+
+        /// The balance can be only updated by the change
+        ///
+        access(self)
+        fun syncBalance() {
+            if self.change == nil {
+                self.balance = 0.0
+            } else {
+                self.balance = (self.change?.getBalance())!
+            }
+        }
+
+        /// --------- Implement FRC20Metadata --------- ///
+
+        /// Is the vault valid
+        access(all) view
+        fun isValidVault(): Bool {
+            return self.change != nil
+        }
+
+        /// is the token a staked token
+        ///
+        access(all) view
+        fun isStakedToken(): Bool {
+            return self.change?.isStakedTick() ?? panic("The change must be initialized")
+        }
+
+        /// Get the ticker name of the token
+        ///
+        access(all) view
+        fun getTickerName(): String {
+            return self.change?.tick ?? panic("The change must be initialized")
+        }
+
+        /// Get the change's from address
+        ///
+        access(all) view
+        fun getSourceAddress(): Address {
+            return self.change?.from ?? panic("The change must be initialized")
+        }
+
+        /// --------- Implement FungibleToken.Provider --------- ///
 
         /// Function that takes an amount as an argument
         /// and withdraws that amount from the Vault.
@@ -92,10 +201,27 @@ access(all) contract FRC20FungibleToken: FungibleToken {
         ///
         access(all)
         fun withdraw(amount: UFix64): @FungibleToken.Vault {
-            self.balance = self.balance - amount
-            emit TokensWithdrawn(amount: amount, from: self.owner?.address)
-            return <-create Vault(balance: amount)
+            pre {
+                self.isValidVault(): "The vault must be valid"
+            }
+            let changeRef = self.borrowChangeRef()!
+            let newChange <- changeRef.withdrawAsChange(amount: amount)
+            // update balance
+            self.syncBalance()
+
+            // initialize the new vault with the amount
+            let newVault <- FRC20FungibleToken.createEmptyVault()
+            newVault.initialize(<- newChange)
+
+            // emit the event
+            emit TokensWithdrawn(
+                amount: amount,
+                from: self.owner?.address
+            )
+            return <- newVault
         }
+
+        /// --------- Implement FungibleToken.Receiver --------- ///
 
         /// Function that takes a Vault object as an argument and adds
         /// its balance to the balance of the owners Vault.
@@ -107,22 +233,34 @@ access(all) contract FRC20FungibleToken: FungibleToken {
         ///
         access(all)
         fun deposit(from: @FungibleToken.Vault) {
+            pre {
+                self.isValidVault(): "The vault must be valid"
+            }
+            // the interface ensured that the vault is of the same type
+            // so we can safely cast it
             let vault <- from as! @FRC20FungibleToken.Vault
-            self.balance = self.balance + vault.balance
-            emit TokensDeposited(amount: vault.balance, to: self.owner?.address)
-            vault.balance = 0.0
+            let change <- vault.extract()
+
+            // when change extracted, the balance is updated and vault is useless
             destroy vault
+            let depositedBalance = change.getBalance()
+
+            // borrow the change reference
+            let changeRef = self.borrowChangeRef()!
+            FRC20FTShared.depositToChange(
+                receiver: changeRef,
+                change: <- change
+            )
+            // update balance
+            self.syncBalance()
+
+            emit TokensDeposited(
+                amount: depositedBalance,
+                to: self.owner?.address
+            )
         }
 
-        /// This function only can be called by in the context of the contract before
-        /// destruction.
-        ///
-        access(contract)
-        fun extract(): UFix64 {
-            let amount = self.balance
-            self.balance = 0.0
-            return amount
-        }
+        /// --------- Implement MetadataViews.Resolver --------- ///
 
         /// The way of getting all the Metadata Views implemented by FRC20FungibleToken
         ///
@@ -131,11 +269,8 @@ access(all) contract FRC20FungibleToken: FungibleToken {
         ///
         access(all)
         fun getViews(): [Type] {
-            return [
-                Type<FungibleTokenMetadataViews.FTView>(),
-                Type<FungibleTokenMetadataViews.FTDisplay>(),
-                Type<FungibleTokenMetadataViews.FTVaultData>()
-            ]
+            let contractViews = FRC20FungibleToken.getViews()
+            return contractViews
         }
 
         /// The way of getting a Metadata View out of the FRC20FungibleToken
@@ -145,70 +280,19 @@ access(all) contract FRC20FungibleToken: FungibleToken {
         ///
         access(all)
         fun resolveView(_ view: Type): AnyStruct? {
-            switch view {
-                case Type<FungibleTokenMetadataViews.FTView>():
-                    return FungibleTokenMetadataViews.FTView(
-                        ftDisplay: self.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?,
-                        ftVaultData: self.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
-                    )
-                case Type<FungibleTokenMetadataViews.FTDisplay>():
-                    let tick = FRC20FungibleToken.getTickerName()
-                    let indexer = FRC20Indexer.getIndexer()
-                    return indexer.getTokenDisplay(tick: tick)
-                case Type<FungibleTokenMetadataViews.FTVaultData>():
-                    let prefix = FRC20FungibleToken.getPathPrefix()
-                    return FungibleTokenMetadataViews.FTVaultData(
-                        storagePath: FRC20FungibleToken.VaultStoragePath,
-                        receiverPath: FRC20FungibleToken.ReceiverPublicPath,
-                        metadataPath: FRC20FungibleToken.VaultPublicPath,
-                        providerPath: PrivatePath(identifier: prefix.concat("Vault"))!,
-                        receiverLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Receiver}>(),
-                        metadataLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver}>(),
-                        providerLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Provider}>(),
-                        createEmptyVaultFunction: (fun (): @FRC20FungibleToken.Vault {
-                            return <-FRC20FungibleToken.createEmptyVault()
-                        })
-                    )
-                // case Type<FungibleTokenMetadataViews.TotalSupply>():
-                //     let indexer = FRC20Indexer.getIndexer()
-                //     let tick = FRC20FungibleToken.getTickerName()
-                //     if let tokenMeta = indexer.getTokenMeta(tick: tick) {
-                //         return FungibleTokenMetadataViews.TotalSupply(
-                //             totalSupply: tokenMeta.max
-                //         )
-                //     } else {
-                //         return nil
-                //     }
-            }
-            return nil
+            return FRC20FungibleToken.resolveView(view)
         }
     }
 
-    /// Function that creates a new Vault with a balance of zero
-    /// and returns it to the calling context. A user must call this function
-    /// and store the returned Vault in their storage in order to allow their
-    /// account to be able to receive deposits of this token type.
-    ///
-    /// @return The new Vault resource
-    ///
-    access(all)
-    fun createEmptyVault(): @Vault {
-        return <-create Vault(balance: 0.0)
-    }
-
-    access(all)
-    fun getTickerName(): String {
-        // This string will be replaced by the real ticker name
-        return "TICKER_NAME"
-    }
+    /// ------------ FRC20 Change <> FungibleToken Methods ------------
 
     /// Withdraw all Fungible Tokens from a FRC20 FT Change
     ///
-    access(all)
+    access(account)
     fun withdrawFromChange(change: @FRC20FTShared.Change): @FRC20FungibleToken.Vault {
         pre {
             change.isBackedByVault(): "The change must be backed by a vault"
-            change.tick == self.getTickerName(): "The change must be backed by the same ticker"
+            change.tick == Type<@FRC20FungibleToken.Vault>().identifier: "The change must be backed by the same ticker"
             change.getVaultType() == Type<@FRC20FungibleToken.Vault>(): "The change must be backed by the same type of vault"
         }
         let amount = change.getBalance()
@@ -230,82 +314,344 @@ access(all) contract FRC20FungibleToken: FungibleToken {
     /// Issue new Fungible Tokens from a FRC20 FT Change
     ///
     access(account)
-    fun mintByChange(change: @FRC20FTShared.Change): @FRC20FungibleToken.Vault {
+    fun mintFromChange(change: @FRC20FTShared.Change): @FRC20FungibleToken.Vault {
         pre {
             change.isBackedByVault() == false: "The change must not be backed by a vault"
-            change.tick == self.getTickerName(): "The change must be backed by the same ticker"
+            change.tick == self.getSymbol(): "The change must be backed by the same ticker"
         }
-        let extractedAmount = change.extract()
-        assert(
-            extractedAmount > 0.0,
-            message: "The change must contain at least one token"
-        )
-        // destroy the empty change
-        destroy change
-        // update the total supply
-        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply + extractedAmount
+
+        let retVault <- self.createEmptyVault()
+        retVault.initialize(<- change)
+
         // emit the event
-        emit TokensConvertedToStanard(amount: extractedAmount)
+        emit TokensConvertedToStanard(
+            amount: retVault.balance,
+            changeFrom: retVault.getSourceAddress(),
+        )
+
+        // update the total supply
+        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply + retVault.balance
+
         // return the new vault
-        return <-create Vault(balance: extractedAmount)
+        return <- retVault
     }
 
     /// Burn Fungible Tokens and convert into a FRC20 FT Change
     ///
     access(account)
-    fun burnIntoChange(vault: @FungibleToken.Vault, from: Address): @FRC20FTShared.Change {
+    fun burnIntoChange(vault: @FungibleToken.Vault): @FRC20FTShared.Change {
         pre {
-            vault.getType() == Type<@FRC20FungibleToken.Vault>(): "The vault must be of the same type as the token"
+            vault.isInstance(Type<@FRC20FungibleToken.Vault>()): "The vault must be of the same type as the token"
         }
         let fromVault <- vault as! @FRC20FungibleToken.Vault
-        let amount = fromVault.extract()
-        // the total supply is updated in the vault's destroy method
+        let retChange <- fromVault.extract()
+        // no need to emit the event, it is emitted in the extract function
         destroy fromVault
-        // update the total supply
-        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply - amount
-        // emit the event
-        emit TokensConvertedToFRC20(amount: amount)
-        // create the change
-        return <- FRC20FTShared.createChange(
-            tick: self.getTickerName(),
-            from: from,
-            balance: amount,
-            ftVault: nil
+
+        // emit the converted event
+        emit TokensConvertedToFRC20(
+            amount: retChange.getBalance(),
+            changeFrom: retChange.from,
         )
+
+        // update the total supply
+        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply - retChange.getBalance()
+
+        // create the change
+        return <- retChange
     }
 
+    /// ------------ General Functions ------------
+
+    /// Function that creates a new Vault with a balance of zero
+    /// and returns it to the calling context. A user must call this function
+    /// and store the returned Vault in their storage in order to allow their
+    /// account to be able to receive deposits of this token type.
+    ///
+    /// @return The new Vault resource
+    ///
     access(all)
-    fun getPathPrefix(): String {
-        return "FRC20FT_".concat(self.account.address.toString()).concat(self.getTickerName()).concat("_")
+    fun createEmptyVault(): @Vault {
+        return <-create Vault(balance: 0.0)
     }
 
-    init() {
+    /// Borrow the shared store
+    ///
+    access(all)
+    fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
+        let addr = self.account.address
+        return FRC20FTShared.borrowStoreRef(addr) ?? panic("Config store not found")
+    }
+
+    /// Function that resolves a metadata view for this contract.
+    ///
+    /// @param view: The Type of the desired view.
+    /// @return A structure representing the requested view.
+    ///
+    access(all)
+    fun resolveView(_ view: Type): AnyStruct? {
+        // external url
+        let externalUrl = FRC20FungibleToken.getExternalUrl()
+        switch view {
+            case Type<MetadataViews.ExternalURL>():
+                return externalUrl != nil
+                    ? MetadataViews.ExternalURL(externalUrl!)
+                    : MetadataViews.ExternalURL("https://fixes.world/")
+            case Type<FungibleTokenMetadataViews.FTView>():
+                return FungibleTokenMetadataViews.FTView(
+                    ftDisplay: self.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?,
+                    ftVaultData: self.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+                )
+            case Type<FungibleTokenMetadataViews.FTDisplay>():
+                let frc20Indexer = FRC20Indexer.getIndexer()
+                let store = FRC20FungibleToken.borrowSharedStore()
+                let tick = FRC20FungibleToken.getSymbol()
+
+                if let display = frc20Indexer.getTokenDisplay(tick: tick) {
+                    // medias
+                    let medias: [MetadataViews.Media] = []
+                    let logoKey = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenLogoPrefix)!
+                    if let iconUrl = store.get(logoKey) as! String? {
+                        medias.append(MetadataViews.Media(
+                            file: MetadataViews.HTTPFile(url: iconUrl),
+                            mediaType: "image/png" // default is png
+                        ))
+                    }
+                    if let iconUrl = store.get(logoKey.concat("png")) as! String? {
+                        medias.append(MetadataViews.Media(
+                            file: MetadataViews.HTTPFile(url: iconUrl),
+                            mediaType: "image/png"
+                        ))
+                    }
+                    if let iconUrl = store.get(logoKey.concat("svg")) as! String? {
+                        medias.append(MetadataViews.Media(
+                            file: MetadataViews.HTTPFile(url: iconUrl),
+                            mediaType: "image/svg+xml"
+                        ))
+                    }
+                    if let iconUrl = store.get(logoKey.concat("jpg")) as! String? {
+                        medias.append(MetadataViews.Media(
+                            file: MetadataViews.HTTPFile(url: iconUrl),
+                            mediaType: "image/jpeg"
+                        ))
+                    }
+                    // socials
+                    let socialDict: {String: MetadataViews.ExternalURL} = {}
+                    let socialKey = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenSocialPrefix)!
+                    // load social infos
+                    if let socialUrl = store.get(socialKey.concat("twitter")) {
+                        socialDict["twitter"] = MetadataViews.ExternalURL((socialUrl as! String?)!)
+                    }
+                    if let socialUrl = store.get(socialKey.concat("telegram")) {
+                        socialDict["telegram"] = MetadataViews.ExternalURL((socialUrl as! String?)!)
+                    }
+                    if let socialUrl = store.get(socialKey.concat("discord")) {
+                        socialDict["discord"] = MetadataViews.ExternalURL((socialUrl as! String?)!)
+                    }
+                    if let socialUrl = store.get(socialKey.concat("github")) {
+                        socialDict["github"] = MetadataViews.ExternalURL((socialUrl as! String?)!)
+                    }
+                    if let socialUrl = store.get(socialKey.concat("website")) {
+                        socialDict["website"] = MetadataViews.ExternalURL((socialUrl as! String?)!)
+                    }
+                    // override all customized fields
+                    return FungibleTokenMetadataViews.FTDisplay(
+                        name: FRC20FungibleToken.getDisplayName() ?? display.name,
+                        symbol: tick,
+                        description: FRC20FungibleToken.getTokenDescription() ?? display.description,
+                        externalURL: externalUrl != nil
+                            ? MetadataViews.ExternalURL(externalUrl!)
+                            : display.externalURL,
+                        logos: medias.length > 0
+                            ? MetadataViews.Medias(medias)
+                            : display.logos,
+                        socials: socialDict
+                    )
+                }
+            case Type<FungibleTokenMetadataViews.FTVaultData>():
+                let prefix = FRC20FungibleToken.getPathPrefix()
+                return FungibleTokenMetadataViews.FTVaultData(
+                    storagePath: FRC20FungibleToken.getVaultStoragePath(),
+                    receiverPath: FRC20FungibleToken.getReceiverPublicPath(),
+                    metadataPath: FRC20FungibleToken.getVaultPublicPath(),
+                    providerPath: PrivatePath(identifier: prefix.concat("Vault"))!,
+                    receiverLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Receiver}>(),
+                    metadataLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver}>(),
+                    providerLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Provider}>(),
+                    createEmptyVaultFunction: (fun (): @FRC20FungibleToken.Vault {
+                        return <-FRC20FungibleToken.createEmptyVault()
+                    })
+                )
+            // case Type<FungibleTokenMetadataViews.TotalSupply>():
+            //     let indexer = FRC20Indexer.getIndexer()
+            //     let tick = FRC20FungibleToken.getTickerName()
+            //     if let tokenMeta = indexer.getTokenMeta(tick: tick) {
+            //         return FungibleTokenMetadataViews.TotalSupply(
+            //             totalSupply: tokenMeta.max
+            //         )
+            //     } else {
+            //         return nil
+            //     }
+        }
+        return nil
+    }
+
+    /// Function that returns all the Metadata Views implemented by a Fungible Token
+    ///
+    /// @return An array of Types defining the implemented views. This value will be used by
+    ///         developers to know which parameter to pass to the resolveView() method.
+    ///
+    access(all)
+    fun getViews(): [Type] {
+        return [
+            Type<MetadataViews.ExternalURL>(),
+            Type<FungibleTokenMetadataViews.FTView>(),
+            Type<FungibleTokenMetadataViews.FTDisplay>(),
+            Type<FungibleTokenMetadataViews.FTVaultData>()
+        ]
+    }
+
+    /// the real total supply is loaded from the FRC20Indexer
+    ///
+    access(all) view
+    fun getTotalSupply(): UFix64 {
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let tokenMeta = frc20Indexer.getTokenMeta(tick: self.getSymbol())!
+        return tokenMeta.max
+    }
+
+    /// Get the total supply of the standard fungible token
+    ///
+    access(all) view
+    fun getStandardFungibleTokenTotalSupply(): UFix64 {
+        return self.totalSupply
+    }
+
+    /// Get the ticker name of the token
+    ///
+    access(all) view
+    fun getSymbol(): String {
+        let store = self.borrowSharedStore()
+        let tick = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
+        return tick ?? panic("Ticker name not found")
+    }
+
+    /// Get the display name of the token
+    ///
+    access(all) view
+    fun getDisplayName(): String? {
+        let store = self.borrowSharedStore()
+        return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDisplayName) as! String?
+    }
+
+    /// Get the token description
+    ///
+    access(all) view
+    fun getTokenDescription(): String? {
+        let store = self.borrowSharedStore()
+        return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDescription) as! String?
+    }
+
+    /// Get the external URL of the token
+    ///
+    access(all) view
+    fun getExternalUrl(): String? {
+        let store = self.borrowSharedStore()
+        return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenExternalUrl) as! String?
+    }
+
+    /// Get the icon URL of the token
+    ///
+    access(all) view
+    fun getLogoUrl(): String? {
+        let store = self.borrowSharedStore()
+        let key = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenLogoPrefix)!
+        let iconDefault = store.get(key) as! String?
+        let iconPng = store.get(key.concat("png")) as! String?
+        let iconSvg = store.get(key.concat("svg")) as! String?
+        let iconJpg = store.get(key.concat("jpg")) as! String?
+        return iconPng ?? iconSvg ?? iconJpg ?? iconDefault
+    }
+
+    /// Get the prefix for the storage paths
+    ///
+    access(all) view
+    fun getPathPrefix(): String {
+        return "FRC20FT_".concat(self.account.address.toString()).concat(self.getSymbol()).concat("_")
+    }
+
+    /// Get the storage path for the Vault
+    ///
+    access(all) view
+    fun getVaultStoragePath(): StoragePath {
+        let prefix = FRC20FungibleToken.getPathPrefix()
+        return StoragePath(identifier: prefix.concat("Vault"))!
+    }
+
+    /// Get the public path for the Vault
+    ///
+    access(all) view
+    fun getVaultPublicPath(): PublicPath {
+        let prefix = FRC20FungibleToken.getPathPrefix()
+        return PublicPath(identifier: prefix.concat("Metadata"))!
+    }
+
+    /// Get the public path for the Receiver
+    ///
+    access(all) view
+    fun getReceiverPublicPath(): PublicPath {
+        let prefix = FRC20FungibleToken.getPathPrefix()
+        return PublicPath(identifier: prefix.concat("Receiver"))!
+    }
+
+    /// Initialize the contract with ticker name
+    ///
+    init(_ tickerName: String) {
         // Initialize the total supply to zero
         self.totalSupply = 0.0
 
-        // Create the storage paths for the Vault and the Receiver
-        let prefix = FRC20FungibleToken.getPathPrefix()
-        self.VaultStoragePath = StoragePath(identifier: prefix.concat("Vault"))!
-        self.VaultPublicPath = PublicPath(identifier: prefix.concat("Metadata"))!
-        self.ReceiverPublicPath = PublicPath(identifier: prefix.concat("Receiver"))!
+        // Initialize the shared store
+        if self.account.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+            let sharedStore <- FRC20FTShared.createSharedStore()
+            self.account.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+        }
+        // link the resource to the public path
+        // @deprecated after Cadence 1.0
+        if self.account
+            .getCapability<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath)
+            .borrow() == nil {
+            self.account.unlink(FRC20FTShared.SharedStorePublicPath)
+            self.account.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+        }
+
+        // FRC20 Indexer
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        // ensure frc20 exists
+        assert(
+            frc20Indexer.getTokenMeta(tick: tickerName) != nil,
+            message: "The FRC20 token does not exist"
+        )
+
+        let store = self.borrowSharedStore()
+        // set the ticker name
+        store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol, value: tickerName)
+
+        // paths
+        let storagePath = self.getVaultStoragePath()
+        let publicPath = self.getVaultPublicPath()
+        let receiverPath = self.getReceiverPublicPath()
 
         // Create the Vault with the total supply of tokens and save it in storage.
         let vault <- create Vault(balance: self.totalSupply)
-        self.account.save(<-vault, to: self.VaultStoragePath)
+        self.account.save(<-vault, to: storagePath)
 
+        // @deprecated after Cadence 1.0
         // Create a public capability to the stored Vault that exposes
         // the `deposit` method through the `Receiver` interface.
-        self.account.link<&{FungibleToken.Receiver}>(
-            self.ReceiverPublicPath,
-            target: self.VaultStoragePath
-        )
-
+        self.account.link<&{FungibleToken.Receiver}>(receiverPath, target: storagePath)
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field and the `resolveView` method through the `Balance` interface
-        self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance}>(
-            self.VaultPublicPath,
-            target: self.VaultStoragePath
-        )
+        self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance}>(publicPath, target: storagePath)
 
         // Emit an event that shows that the contract was initialized
         emit TokensInitialized(initialSupply: self.totalSupply)

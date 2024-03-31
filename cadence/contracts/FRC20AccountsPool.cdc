@@ -40,6 +40,7 @@ access(all) contract FRC20AccountsPool {
         access(all) case EVMAgency
         access(all) case EVMEntrustedAccount
         access(all) case GameWorld
+        access(all) case FungibleToken
     }
 
     /// The public interface can be accessed by anyone
@@ -91,6 +92,13 @@ access(all) contract FRC20AccountsPool {
         /// Returns the flow token receiver for the given key
         access(all)
         fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}?
+
+        /// Returns the address of the FRC20 Fungible token with the given type
+        access(all) view
+        fun getFTContractAddress(_ tick: String): Address?
+        /// Returns the flow token receiver for the given tick
+        access(all)
+        fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}?
 
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
@@ -266,6 +274,24 @@ access(all) contract FRC20AccountsPool {
             return nil
         }
 
+        /// Returns the address of the FRC20 Fungible token with the given type
+        access(all) view
+        fun getFTContractAddress(_ tick: String): Address? {
+            if let tickDict = self.borrowDict(type: ChildAccountType.FungibleToken) {
+                return tickDict[tick]
+            }
+            return nil
+        }
+
+        /// Returns the flow token receiver for the given tick
+        access(all)
+        fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getFTContractAddress(tick) {
+                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+            }
+            return nil
+        }
+
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         ///
@@ -323,6 +349,12 @@ access(all) contract FRC20AccountsPool {
         access(account)
         fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>) {
             self.setupNewChildByKey(type: ChildAccountType.GameWorld, key: key, acctCap)
+        }
+
+        /// Sets up a new child account for FungibleToken
+        access(account)
+        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByKey(type: ChildAccountType.FungibleToken, key: tick, acctCap)
         }
 
         /** ---- Admin Methods ---- */

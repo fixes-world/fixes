@@ -709,6 +709,13 @@ access(all) contract FRC20FTShared {
         access(all) case GameLotteryEpochInterval
         access(all) case GameLotteryAutoStart
         access(all) case GameLotteryServiceFee
+        // FungibleToken config type
+        access(all) case FungibleTokenSymbol
+        access(all) case FungibleTokenDisplayName
+        access(all) case FungibleTokenDescription
+        access(all) case FungibleTokenExternalUrl
+        access(all) case FungibleTokenLogoPrefix
+        access(all) case FungibleTokenSocialPrefix
     }
 
     /* --- Public Methods --- */
@@ -768,6 +775,24 @@ access(all) contract FRC20FTShared {
                 break
             case ConfigType.GameLotteryServiceFee:
                 key = "gameLottery:ServiceFee"
+                break
+            case ConfigType.FungibleTokenSymbol:
+                key = "fungibleToken:Symbol"
+                break
+            case ConfigType.FungibleTokenDisplayName:
+                key = "fungibleToken:DisplayName"
+                break
+            case ConfigType.FungibleTokenDescription:
+                key = "fungibleToken:Description"
+                break
+            case ConfigType.FungibleTokenExternalUrl:
+                key = "fungibleToken:ExternalUrl"
+                break
+            case ConfigType.FungibleTokenLogoPrefix:
+                key = "fungibleToken:Logo:"
+                break
+            case ConfigType.FungibleTokenSocialPrefix:
+                key = "fungibleToken:Social:"
                 break
             }
             return key
