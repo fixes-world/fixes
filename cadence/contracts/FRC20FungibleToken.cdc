@@ -16,6 +16,7 @@ import "FungibleTokenMetadataViews"
 import "Fixes"
 import "FRC20FTShared"
 import "FRC20Indexer"
+import "FRC20AccountsPool"
 
 /// This is the template source for a FRC20 Fungible Token
 /// The contract is deployed in the child account of the FRC20Indexer
@@ -634,9 +635,24 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
     /// Initialize the contract with ticker name
     ///
-    init(_ tickerName: String) {
+    init() {
         // Initialize the total supply to zero
         self.totalSupply = 0.0
+
+        // Emit an event that shows that the contract was initialized
+        emit TokensInitialized(initialSupply: self.totalSupply)
+
+        // Singleton resources
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        let isSysmtemDeploy = self.account.address == frc20Indexer.owner?.address
+        if isSysmtemDeploy {
+            // DO NOTHING, It will be a template contract for deploying new FRC20 Fungible tokens
+            return
+        }
+
+        // Step.0 Ensure shared store exists
 
         // Initialize the shared store
         if self.account.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
@@ -651,20 +667,39 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             self.account.unlink(FRC20FTShared.SharedStorePublicPath)
             self.account.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
         }
+        // borrow the shared store
+        let store = self.borrowSharedStore()
 
-        // FRC20 Indexer
-        let frc20Indexer = FRC20Indexer.getIndexer()
-        // ensure frc20 exists
+        // Step.1 Try get the ticker name from the shared store
+        var tickerName = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
+        if tickerName == nil {
+            // try load the ticker name from AccountPools
+            let addrDict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
+            let contractAddr = self.account.address
+            addrDict.forEachKey(fun (key: String): Bool {
+                if let addr = addrDict[key] {
+                    if addr == contractAddr {
+                        tickerName = key
+                        return false
+                    }
+                }
+                return true
+            })
+
+            // set the ticker name
+            if tickerName != nil {
+                store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol, value: tickerName!)
+            }
+        }
+
+        // ensure frc20 metadata exists
         assert(
-            frc20Indexer.getTokenMeta(tick: tickerName) != nil,
+            tickerName != nil && frc20Indexer.getTokenMeta(tick: tickerName!) != nil,
             message: "The FRC20 token does not exist"
         )
 
-        let store = self.borrowSharedStore()
-        // set the ticker name
-        store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol, value: tickerName)
+        // Step.2 Setup the vault and receiver for the contract account
 
-        // paths
         let storagePath = self.getVaultStoragePath()
         let publicPath = self.getVaultPublicPath()
         let receiverPath = self.getReceiverPublicPath()
@@ -680,8 +715,5 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field and the `resolveView` method through the `Balance` interface
         self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance}>(publicPath, target: storagePath)
-
-        // Emit an event that shows that the contract was initialized
-        emit TokensInitialized(initialSupply: self.totalSupply)
     }
 }
