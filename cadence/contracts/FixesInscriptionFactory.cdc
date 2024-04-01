@@ -290,4 +290,36 @@ access(all) contract FixesInscriptionFactory {
             .concat(",batch=").concat(vestingBatchAmount.toString())
             .concat(",interval=").concat(vestingInterval.toString())
     }
+
+    // FRC20 Fungible Token Inscription
+
+    /// Build the inscription for initializing a fungible token account
+    ///
+    access(all) view
+    fun buildFungibleTokenInitialize(
+        tick: String,
+    ): String {
+        return "op=init-ft,tick=".concat(tick)
+    }
+
+    /// Build the inscription for converting fungible token to indexer
+    ///
+    access(all) view
+    fun buildFungibleTokenConvertFromIndexer(
+        tick: String,
+        amount: UFix64,
+    ): String {
+        return "op=withdraw,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+            .concat(",usage=convert")
+    }
+
+    /// Build the inscription for converting fungible token back to indexer
+    ///
+    access(all) view
+    fun buildDepositFRC20(
+        tick: String,
+    ): String {
+        return "op=deposit,tick=".concat(tick)
+    }
 }

@@ -119,6 +119,9 @@ access(all) contract FRC20AccountsPool {
         /// Sets up a new child account for some Game World
         access(account)
         fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>)
+        /// Sets up a new child account for FungibleToken
+        access(account)
+        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner

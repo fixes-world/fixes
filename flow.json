@@ -121,6 +121,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20FungibleTokenManager": {
+			"source": "cadence/contracts/FRC20FungibleTokenManager.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
@@ -770,6 +778,8 @@
 				"FRC20NFTWrapper",
 				"FRC20Storefront",
 				"FRC20AccountsPool",
+				"FRC20FungibleToken",
+				"FRC20FungibleTokenManager",
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
 				"FRC20MarketManager",
