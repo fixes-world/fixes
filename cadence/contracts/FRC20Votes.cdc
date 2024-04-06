@@ -898,16 +898,6 @@ access(all) contract FRC20Votes {
                     timestamp: now
                 )
 
-                // invoke onProposalFinalized in voters
-                if self.isFinalized() {
-                    let allVoters = self.getVoters()
-                    for addr in allVoters {
-                        if let voterRef = FRC20Votes.borrowVoterPublic(addr) {
-                            voterRef.onProposalFinalized(proposal: &self as &Proposal{ProposalPublic})
-                        }
-                    }
-                }
-
                 // check the status and do the action
                 switch status {
                 case ProposalStatus.Failed:
@@ -925,6 +915,16 @@ access(all) contract FRC20Votes {
                     self.executeSafe()
                     break
                 }
+
+                // invoke onProposalFinalized in voters
+                if self.isFinalized() {
+                    let allVoters = self.getVoters()
+                    for addr in allVoters {
+                        if let voterRef = FRC20Votes.borrowVoterPublic(addr) {
+                            voterRef.onProposalFinalized(proposal: &self as &Proposal{ProposalPublic})
+                        }
+                    }
+                } // end finalized
             }
         }
 
@@ -1232,6 +1232,16 @@ access(all) contract FRC20Votes {
         fun updateWhitelist(voter: Address, isWhitelisted: Bool) {
             self.whitelisted[voter] = isWhitelisted
             emit VotesManagerWhitelistUpdated(voter: voter, isWhitelisted: isWhitelisted)
+        }
+
+        access(all)
+        fun forceHeartbeat() {
+            let proposalIds = self.proposals.keys
+            for proposalId in proposalIds {
+                if let proposal = self.borrowProposalRef(proposalId) {
+                    proposal.onHeartbeat(0.0)
+                }
+            }
         }
 
         /** ------ Internal Methods ------ */
