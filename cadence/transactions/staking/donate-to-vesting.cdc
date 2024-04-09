@@ -87,9 +87,8 @@ transaction(
         // Get a reference to the signer's stored vault
         let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
-        var withdrawAmount = rewardTick == "" ? estimatedReqValue + amount : estimatedReqValue
         // Withdraw tokens from the signer's stored vault
-        let flowToReserve <- vaultRef.withdraw(amount: withdrawAmount)
+        let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
         // Create the Inscription first
         let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
@@ -100,6 +99,12 @@ transaction(
         // borrow a reference to the new Inscription
         self.ins = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow reference to the new Inscription!")
+
+        // Deposit the payment flow vault to the inscription vault
+        if rewardTick == "" {
+            let donateVault <- vaultRef.withdraw(amount: amount)
+            self.ins.deposit(<- (donateVault as! @FlowToken.Vault))
+        }
         /** ------------- End ---------------------------------------------  */
     }
 
