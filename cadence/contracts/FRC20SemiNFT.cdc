@@ -120,7 +120,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         fun isStakedTick(): Bool
 
         access(all) view
-        fun isBackedByVault(): Bool
+        fun isTreasuryLPVoucher(): Bool
 
         access(all) view
         fun getVaultType(): Type?
@@ -317,8 +317,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         }
 
         access(all) view
-        fun isBackedByVault(): Bool {
-            return self.wrappedChange.isBackedByVault()
+        fun isTreasuryLPVoucher(): Bool {
+            return self.wrappedChange.isTreasuryLPVoucher()
         }
 
         access(all) view
@@ -358,8 +358,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(all)
         fun merge(_ other: @FRC20SemiNFT.NFT) {
             pre {
-                self.getOriginalTick() == other.getOriginalTick(): "The tick must be the same"
-                self.isBackedByVault() == other.isBackedByVault(): "The vault type must be the same"
+                self.getTickerName() == other.getTickerName(): "The tick must be the same"
             }
             // check tick and pool address
             let otherChangeRef = other.borrowChange()
@@ -839,6 +838,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         initialYieldRates: {String: UFix64}
     ): UInt64 {
         pre {
+            change.isStakedTick() || change.isTreasuryLPVoucher(): "The tick must be a staked 𝔉rc20 token or a treasury LP voucher"
             change.isBackedByVault() == false: "Cannot wrap a vault backed FRC20 change"
         }
         let poolAddress = change.from
@@ -858,11 +858,11 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// using their collection reference
     ///
     access(account)
-    fun unwrapFRC20(
+    fun unwrapTreasuryLPVoucherFRC20(
         nftToUnwrap: @FRC20SemiNFT.NFT,
     ): @FRC20FTShared.Change {
         pre {
-            nftToUnwrap.isStakedTick() == false: "Cannot unwrap a staked 𝔉rc20 token by this method."
+            nftToUnwrap.isTreasuryLPVoucher() == true: "Cannot unwrap a non-treasury LP voucher 𝔉rc20 token by this method."
         }
         return <- self._unwrap(<- nftToUnwrap)
     }

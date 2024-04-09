@@ -52,9 +52,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Is the vault valid
         access(all) view
         fun isValidVault(): Bool
-        /// is the token a staked token
-        access(all) view
-        fun isStakedToken(): Bool
         /// Get the ticker name of the token
         access(all) view
         fun getTickerName(): String
@@ -115,7 +112,9 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         fun initialize(_ change: @FRC20FTShared.Change) {
             pre {
                 self.change == nil: "The change must be nil"
-                !change.isBackedByVault(): "The change must not be backed by a vault"
+                change.isBackedByVault() == false: "The change must not be backed by a vault"
+                change.isStakedTick() == false: "The change must not be staked"
+                change.isTreasuryLPVoucher() == false: "The change must not be a treasury LP voucher"
                 change.tick == FRC20FungibleToken.getSymbol(): "The change must be backed by the same ticker"
             }
             post {
@@ -166,13 +165,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         access(all) view
         fun isValidVault(): Bool {
             return self.change != nil
-        }
-
-        /// is the token a staked token
-        ///
-        access(all) view
-        fun isStakedToken(): Bool {
-            return self.change?.isStakedTick() ?? panic("The change must be initialized")
         }
 
         /// Get the ticker name of the token
