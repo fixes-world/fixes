@@ -566,23 +566,19 @@ access(all) contract FRC20FTShared {
     ///
     access(account)
     fun createTreasuryLPVoucher(
-        ref: &Change,
-        issuer: Address
+        tick: String,
+        issuer: Address,
+        balance: UFix64,
     ): @Change {
-        pre {
-            ref.isStakedTick() == false: "The input Change must not be a staked tick"
-            ref.isTreasuryLPVoucher() == false: "The input Change must not be a LP Voucher"
-            ref.isBackedByVault() == false: "The input Change must not be backed by a Vault"
-        }
         post {
-            result.tick == "^".concat(ref.tick): "Tick must be equal to the provided tick"
-            result.getBalance() == ref.getBalance(): "Balance must be equal to the provided balance"
+            result.tick == "^".concat(tick): "Tick must be equal to the provided tick"
+            result.getBalance() == balance: "Balance must be equal to the provided balance"
             result.from == issuer: "The owner of the Change must be the same as the issuer"
         }
         return <- create Change(
-            tick: "^".concat(ref.tick), // LP Voucher is prefixed with "^"
+            tick: "^".concat(tick), // LP Voucher is prefixed with "^"
             from: issuer, // all LP Vouchers are from issuer
-            balance: ref.getBalance(),
+            balance: balance,
             ftVault: nil
         )
     }
