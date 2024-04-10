@@ -46,6 +46,20 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     /// The event that is emitted when tokens are destroyed
     access(all) event TokensConvertedToFRC20(amount: UFix64, by: Address)
 
+    /// The mergeable data interface
+    ///
+    access(all) struct interface MergeableData {
+        /// Get the value of the data
+        access(all) view
+        fun getValue(): AnyStruct
+        /// Merge the data from another instance
+        access(all)
+        fun merge(_ from: {MergeableData}): Void
+        /// Split the data into another instance
+        access(all)
+        fun split(_ perc: UFix64): {MergeableData}
+    }
+
     /// The public interface for the FRC20 FT
     ///
     access(all) resource interface FRC20Metadata {
@@ -58,6 +72,12 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Get the change's from address
         access(all) view
         fun getSourceAddress(): Address
+        /// Get mergeable metadata keys
+        access(all) view
+        fun getMergeableKeys(): [String]
+        /// Get the mergeable metadata by key
+        access(all) view
+        fun getMergeableData(_ key: String): {MergeableData}?
     }
 
     /// Each user stores an instance of only the Vault in their storage
@@ -77,6 +97,9 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         // The change should be inside the vault
         access(self)
         var change: @FRC20FTShared.Change?
+        /// Metadata
+        access(self)
+        let metadata: {String: {MergeableData}}
 
         /// Initialize the balance at resource creation time
         init(balance: UFix64) {
@@ -86,6 +109,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             // Initialize with a zero balance and nil change
             self.balance = balance
             self.change <- nil
+            self.metadata = {}
         }
 
         /// @deprecated after Cadence 1.0
@@ -159,6 +183,27 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             }
         }
 
+        /// Borrow the mergeable data by key
+        ///
+        access(self)
+        fun _borrowMergeableDataRef(_ key: String): &{MergeableData}? {
+            return &self.metadata[key] as &{MergeableData}?
+        }
+
+        /// --------- Write Methods --------- ///
+
+        /// Set the metadata by key
+        /// Using entitlement in Cadence 1.0
+        ///
+        access(all)
+        fun setMetadata(_ key: String, _ data: {MergeableData}) {
+            pre {
+                self.isValidVault(): "The vault must be valid"
+                self.metadata.keys.contains(key) == false: "The key must not exist"
+            }
+            self.metadata[key] = data
+        }
+
         /// --------- Implement FRC20Metadata --------- ///
 
         /// Is the vault valid
@@ -181,6 +226,20 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             return self.change?.from ?? panic("The change must be initialized")
         }
 
+        /// Get mergeable metadata keys
+        ///
+        access(all) view
+        fun getMergeableKeys(): [String] {
+            return self.metadata.keys
+        }
+
+        /// Get the mergeable metadata by key
+        ///
+        access(all) view
+        fun getMergeableData(_ key: String): {MergeableData}? {
+            return self.metadata[key]
+        }
+
         /// --------- Implement FungibleToken.Provider --------- ///
 
         /// Function that takes an amount as an argument
@@ -199,6 +258,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 self.isValidVault(): "The vault must be valid"
             }
             let changeRef = self.borrowChangeRef()!
+            let oldBalance = changeRef.getBalance()
             let newChange <- changeRef.withdrawAsChange(amount: amount)
             // update balance
             self.syncBalance()
@@ -206,6 +266,16 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             // initialize the new vault with the amount
             let newVault <- FRC20FungibleToken.createEmptyVault()
             newVault.initialize(<- newChange)
+
+            // setup mergeable data, split from withdraw percentage
+            let percentage = amount / oldBalance
+            let mergeableKeys = self.getMergeableKeys()
+            for key in mergeableKeys {
+                if let dataRef = self._borrowMergeableDataRef(key) {
+                    let splitData = dataRef.split(percentage)
+                    newVault.metadata[key] = splitData
+                }
+            }
 
             // emit the event
             emit TokensWithdrawn(
@@ -234,6 +304,17 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             // so we can safely cast it
             let vault <- from as! @FRC20FungibleToken.Vault
             let change <- vault.extract()
+
+            // merge the metadata
+            let keys = vault.getMergeableKeys()
+            for key in keys {
+                let data = vault.getMergeableData(key)!
+                if let selfData = self._borrowMergeableDataRef(key) {
+                    selfData.merge(data)
+                } else {
+                    self.metadata[key] = data
+                }
+            }
 
             // when change extracted, the balance is updated and vault is useless
             destroy vault
