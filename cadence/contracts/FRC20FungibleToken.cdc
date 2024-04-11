@@ -316,6 +316,13 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 }
             }
 
+            // ensure that there is a record in the FRC20 Indexer
+            let ownerAddr = self.owner?.address
+            if ownerAddr != nil {
+                let frc20Indexer = FRC20Indexer.getIndexer()
+                frc20Indexer.ensureBalanceExists(tick: self.getTickerName(), addr: ownerAddr!)
+            }
+
             // when change extracted, the balance is updated and vault is useless
             destroy vault
             let depositedBalance = change.getBalance()

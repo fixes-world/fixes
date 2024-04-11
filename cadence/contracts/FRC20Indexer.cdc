@@ -158,6 +158,9 @@ access(all) contract FRC20Indexer {
         access(account) view
         fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
         /** ---- Account Methods for listing ---- */
+        /// Ensure the balance of an address exists
+        access(account)
+        fun ensureBalanceExists(tick: String, addr: Address)
         /// Building a selling FRC20 Token order with the sale cut from a FRC20 inscription
         /// This method will not extract all value of the inscription
         access(account)
@@ -528,12 +531,12 @@ access(all) contract FRC20Indexer {
                 amtToAdd > 0.0,
                 message: "The amount should be greater than 0.0"
             )
+
             // update the balance
-            if let oldBalance = balancesRef[fromAddr] {
-                balancesRef[fromAddr] = oldBalance.saturatingAdd(amtToAdd)
-            } else {
-                balancesRef[fromAddr] = amtToAdd
-            }
+            self.ensureBalanceExists(tick: tick, addr: fromAddr)
+            let oldBalance = balancesRef[fromAddr] ?? panic("Failed to refer to balance")
+            balancesRef[fromAddr] = oldBalance.saturatingAdd(amtToAdd)
+
             tokenMeta.updateSupplied(tokenMeta.supplied + amtToAdd)
 
             // emit event
@@ -1265,6 +1268,16 @@ access(all) contract FRC20Indexer {
             }
         }
 
+        /// Ensure the balance of an address exists
+        ///
+        access(account)
+        fun ensureBalanceExists(tick: String, addr: Address) {
+            let balancesRef = self._borrowBalancesRef(tick: tick)
+            if balancesRef[addr] == nil {
+                balancesRef[addr] = 0.0
+            }
+        }
+
         /// Extract a part of the inscription's value to a FRC20 token change
         ///
         access(account)
@@ -1461,15 +1474,14 @@ access(all) contract FRC20Indexer {
             }
             let tick = change.tick
             let amt = change.extract()
+
+            // ensure the balance exists
+            self.ensureBalanceExists(tick: tick, addr: to)
             // borrow the balance mapping
             let balancesRef = self._borrowBalancesRef(tick: tick)
-
             // update the balance
-            if let oldBalance = balancesRef[to] {
-                balancesRef[to] = oldBalance.saturatingAdd(amt)
-            } else {
-                balancesRef[to] = amt
-            }
+            let oldBalance = balancesRef[to] ?? panic("Failed to refer to balance")
+            balancesRef[to] = oldBalance.saturatingAdd(amt)
 
             // emit event
             emit FRC20DepositedFromChange(
