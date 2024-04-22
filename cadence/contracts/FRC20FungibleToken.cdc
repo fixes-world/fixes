@@ -54,6 +54,9 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     /// The event that is emitted when the metadata is updated
     access(all) event TokensMetadataUpdated(typeIdentifier: String, id: String, value: String, owner: Address?)
 
+    /// The event that is emitted when the dna metadata is updated
+    access(all) event TokenDNAGenerated(identifier: String, value: String, owner: Address?)
+
     /// The public interface for the FRC20 FT
     ///
     access(all) resource interface FRC20Metadata {
@@ -143,6 +146,11 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             self.change <-! change
             // update balance
             self.syncBalance()
+            /// init DNA to the metadata
+            self.metadata[Type<FixesAssetGenes.DNA>()] = FixesAssetGenes.DNA(
+                self.getDNAIdentifier(),
+                from,
+            )
         }
 
         /// Extract the change from the vault
@@ -262,7 +270,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         access(all)
         fun withdraw(amount: UFix64): @FungibleToken.Vault {
             pre {
-                self.isValidVault(): "The vault must be valid"
+                self.isValidVault(): "The vault must be valid, need to be initialized with FRC20Change"
             }
             let changeRef = self.borrowChangeRef()!
             let oldBalance = changeRef.getBalance()
@@ -292,6 +300,10 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 }
             }
 
+            // every 5% of balance change will get a new attempt to mutate the DNA
+            var attempt = UInt64(UFix64(amount) / UFix64(oldBalance) / 0.05)
+            self._attemptGenerateGene(attempt)
+
             // emit the event
             emit TokensWithdrawn(
                 amount: amount,
@@ -313,7 +325,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         access(all)
         fun deposit(from: @FungibleToken.Vault) {
             pre {
-                self.isValidVault(): "The vault must be valid"
+                self.isValidVault(): "The vault must be valid, need to be initialized with FRC20Change"
             }
             // the interface ensured that the vault is of the same type
             // so we can safely cast it
@@ -360,6 +372,10 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             // update balance
             self.syncBalance()
 
+            // every 5% of balance change will get a new attempt to mutate the DNA
+            let attempt = UInt64(UFix64(depositedBalance) / UFix64(self.balance) / 0.05)
+            self._attemptGenerateGene(attempt)
+
             emit TokensDeposited(
                 amount: depositedBalance,
                 to: self.owner?.address
@@ -387,6 +403,52 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         access(all)
         fun resolveView(_ view: Type): AnyStruct? {
             return FRC20FungibleToken.resolveView(view)
+        }
+
+        /// --------- Internal Methods --------- ///
+
+        access(self)
+        view fun getDNAIdentifier(): String {
+            return self.getType().identifier.concat("-").concat(self.getTickerName())
+        }
+
+        /// Attempt to generate a new gene, Max attempts is 10
+        ///
+        access(self)
+        fun _attemptGenerateGene(_ attempt: UInt64) {
+            var max = attempt
+            if max > 10 {
+                max = 10
+            }
+            if max == 0 {
+                return
+            }
+            let newDNA = FixesAssetGenes.DNA(
+                self.getDNAIdentifier(),
+                self.getSourceAddress(),
+            )
+            var anyAdded = false
+            var i: UInt64 = 0
+            while i < max {
+                if let gene = FixesAssetGenes.attemptToGenerateGene() {
+                    newDNA.addGene(gene)
+                    anyAdded = true
+                }
+                i = i + 1
+            }
+
+            if anyAdded {
+                let dnaRef = &self.metadata[Type<FixesAssetGenes.DNA>()] as &{FixesTraits.MergeableData}?
+                    ?? panic("The DNA metadata is not found")
+                // emit the event
+                emit TokenDNAGenerated(
+                    identifier: newDNA.identifier,
+                    value: newDNA.toString(),
+                    owner: self.owner?.address
+                )
+                // merge the DNA
+                dnaRef.merge(newDNA)
+            }
         }
     }
 

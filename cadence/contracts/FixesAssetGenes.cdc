@@ -12,6 +12,8 @@ import "FungibleToken"
 import "StringUtils"
 import "FixesTraits"
 
+/// The Fixes Asset Genes contract
+///
 access(all) contract FixesAssetGenes {
 
     /// The gene quality level
@@ -176,13 +178,13 @@ access(all) contract FixesAssetGenes {
     /// The DNA data structure
     ///
     access(all) struct DNA: FixesTraits.MergeableData {
-        access(all) let owner: Address
         access(all) let identifier: String
+        access(all) let owner: Address
         access(all) let genes: {String: Gene}
 
         init(
+            _ identifier: String,
             _ owner: Address,
-            _ identifier: String
         ) {
             self.owner = owner
             self.identifier = identifier
@@ -222,7 +224,7 @@ access(all) contract FixesAssetGenes {
             post {
                 self.getId() == result.getId(): "The result id is not the same so cannot split"
             }
-            let newDna = DNA(self.owner, self.identifier)
+            let newDna = DNA(self.identifier, self.owner)
             for key in self.genes.keys {
                 // Split the gene, use reference to ensure data consistency
                 if let geneRef = &self.genes[key] as &Gene? {
@@ -240,17 +242,38 @@ access(all) contract FixesAssetGenes {
         access(all)
         fun merge(_ from: {FixesTraits.MergeableData}): Void {
             let fromDna = from as! DNA
+            // identifer must be the same
+            assert(
+                self.identifier == fromDna.identifier,
+                message: "The DNA identifier is not the same so cannot merge"
+            )
             for key in fromDna.genes.keys {
                 if let fromGene = fromDna.genes[key] {
-                    // Merge the gene, use reference to ensure data consistency
-                    if let geneRef = &self.genes[key] as &Gene? {
-                        geneRef.merge(fromGene)
-                    } else {
-                        // If the gene is not exist, just copy it
-                        self.genes[key] = fromGene
-                    }
+                    self.addGene(fromGene)
                 }
             } // end for
         }
+
+        /// Add a gene to the DNA
+        ///
+        access(account)
+        fun addGene(_ gene: Gene): Void {
+            let geneId = gene.getId()
+            // Merge the gene, use reference to ensure data consistency
+            if let geneRef = &self.genes[geneId] as &Gene? {
+                geneRef.merge(gene)
+            } else {
+                // If the gene is not exist, just copy it
+                self.genes[geneId] = gene
+            }
+        }
+    }
+
+    /// Try mutate or generate a new gene
+    ///
+    access(all)
+    fun attemptToGenerateGene(): Gene? {
+        // TODO: Implement the gene generation
+        return nil
     }
 }
