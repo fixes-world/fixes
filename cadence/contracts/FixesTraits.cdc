@@ -3,16 +3,48 @@
 
 # FixesTraits
 
-TODO: Add description
+This contract mainly includes commonly used Structs related to Asset Traits.
 
 */
-
 // Thirdparty Imports
 import "MetadataViews"
 
 /// The `FixesTraits` contract
 ///
 access(all) contract FixesTraits {
+
+    /// =============  Trait: Fungible Token =============
+
+    /// The mergeable data interface
+    ///
+    access(all) struct interface MergeableData {
+        /// Get the id of the data
+        access(all) view
+        fun getId(): String
+        /// Get the value of the data
+        access(all) view
+        fun getValue(): AnyStruct
+        /// Get the string value of the data
+        access(all) view
+        fun toString(): String
+        /// Split the data into another instance
+        access(all)
+        fun split(_ perc: UFix64): {MergeableData} {
+            pre {
+                perc > 0.0 && perc <= 1.0: "The percentage should be between 0 and 1"
+            }
+            post {
+                self.getType().identifier == result.getType().identifier: "The data type must be the same"
+            }
+        }
+        /// Merge the data from another instance
+        access(all)
+        fun merge(_ from: {MergeableData}): Void {
+            pre {
+                self.getType().identifier == from.getType().identifier: "The data type must be the same"
+            }
+        }
+    }
 
     /// =============  Trait: Season 0 - Secret Garden =============
 

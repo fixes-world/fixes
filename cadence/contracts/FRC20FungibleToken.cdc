@@ -14,6 +14,8 @@ import "MetadataViews"
 import "FungibleTokenMetadataViews"
 // Fixes imports
 import "Fixes"
+import "FixesTraits"
+import "FixesAssetGenes"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
@@ -46,19 +48,11 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     /// The event that is emitted when tokens are destroyed
     access(all) event TokensConvertedToFRC20(amount: UFix64, by: Address)
 
-    /// The mergeable data interface
-    ///
-    access(all) struct interface MergeableData {
-        /// Get the value of the data
-        access(all) view
-        fun getValue(): AnyStruct
-        /// Merge the data from another instance
-        access(all)
-        fun merge(_ from: {MergeableData}): Void
-        /// Split the data into another instance
-        access(all)
-        fun split(_ perc: UFix64): {MergeableData}
-    }
+    /// The event that is emitted when the metadata is updated
+    access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
+
+    /// The event that is emitted when the metadata is updated
+    access(all) event TokensMetadataUpdated(typeIdentifier: String, id: String, value: String, owner: Address?)
 
     /// The public interface for the FRC20 FT
     ///
@@ -74,10 +68,10 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         fun getSourceAddress(): Address
         /// Get mergeable metadata keys
         access(all) view
-        fun getMergeableKeys(): [String]
+        fun getMergeableKeys(): [Type]
         /// Get the mergeable metadata by key
         access(all) view
-        fun getMergeableData(_ key: String): {MergeableData}?
+        fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}?
     }
 
     /// Each user stores an instance of only the Vault in their storage
@@ -97,9 +91,9 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         // The change should be inside the vault
         access(self)
         var change: @FRC20FTShared.Change?
-        /// Metadata
+        /// Metadata: Type of MergeableData => MergeableData
         access(self)
-        let metadata: {String: {MergeableData}}
+        let metadata: {Type: {FixesTraits.MergeableData}}
 
         /// Initialize the balance at resource creation time
         init(balance: UFix64) {
@@ -186,8 +180,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Borrow the mergeable data by key
         ///
         access(self)
-        fun _borrowMergeableDataRef(_ key: String): &{MergeableData}? {
-            return &self.metadata[key] as &{MergeableData}?
+        fun _borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
+            return &self.metadata[type] as &{FixesTraits.MergeableData}?
         }
 
         /// --------- Write Methods --------- ///
@@ -196,12 +190,25 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Using entitlement in Cadence 1.0
         ///
         access(all)
-        fun setMetadata(_ key: String, _ data: {MergeableData}) {
+        fun initializeMetadata(_ data: {FixesTraits.MergeableData}) {
             pre {
                 self.isValidVault(): "The vault must be valid"
-                self.metadata.keys.contains(key) == false: "The key must not exist"
             }
+            let key = data.getType()
+            assert(
+                self._borrowMergeableDataRef(key) == nil,
+                message: "The metadata key already exists"
+            )
+
             self.metadata[key] = data
+
+            // emit the event
+            emit TokensMetadataInitialized(
+                typeIdentifier: key.identifier,
+                id: data.getId(),
+                value: data.toString(),
+                owner: self.owner?.address
+            )
         }
 
         /// --------- Implement FRC20Metadata --------- ///
@@ -229,14 +236,14 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Get mergeable metadata keys
         ///
         access(all) view
-        fun getMergeableKeys(): [String] {
+        fun getMergeableKeys(): [Type] {
             return self.metadata.keys
         }
 
         /// Get the mergeable metadata by key
         ///
         access(all) view
-        fun getMergeableData(_ key: String): {MergeableData}? {
+        fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}? {
             return self.metadata[key]
         }
 
@@ -274,6 +281,14 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 if let dataRef = self._borrowMergeableDataRef(key) {
                     let splitData = dataRef.split(percentage)
                     newVault.metadata[key] = splitData
+
+                    // emit the event
+                    emit TokensMetadataUpdated(
+                        typeIdentifier: key.identifier,
+                        id: dataRef.getId(),
+                        value: dataRef.toString(),
+                        owner: self.owner?.address
+                    )
                 }
             }
 
@@ -314,6 +329,15 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 } else {
                     self.metadata[key] = data
                 }
+
+                let dataRef = self._borrowMergeableDataRef(key)!
+                // emit the event
+                emit TokensMetadataUpdated(
+                    typeIdentifier: key.identifier,
+                    id: dataRef.getId(),
+                    value: dataRef.toString(),
+                    owner: self.owner?.address
+                )
             }
 
             // ensure that there is a record in the FRC20 Indexer

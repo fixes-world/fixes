@@ -256,6 +256,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesAssetGenes": {
+			"source": "cadence/contracts/FixesAssetGenes.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FixesHeartbeat": {
 			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
@@ -778,8 +786,6 @@
 				"FRC20NFTWrapper",
 				"FRC20Storefront",
 				"FRC20AccountsPool",
-				"FRC20FungibleToken",
-				"FRC20FungibleTokenManager",
 				"FRC20TradingRecord",
 				"FRC20Marketplace",
 				"FRC20MarketManager",
@@ -793,7 +799,10 @@
 				"EVMAgent",
 				"FGameLottery",
 				"FGameLotteryRegistry",
-				"FGameLotteryFactory"
+				"FGameLotteryFactory",
+				"FixesAssetGenes",
+				"FRC20FungibleToken",
+				"FRC20FungibleTokenManager"
 			]
 		},
 		"mainnet": {
