@@ -88,6 +88,8 @@ access(all) contract FixesAssetGenes {
 
         init(
             id: [Character;4]?,
+            quality: GeneQuality?,
+            quantity: UInt64?
         ) {
             if id != nil {
                 self.id = id!
@@ -100,8 +102,8 @@ access(all) contract FixesAssetGenes {
                     dnaKeys[UInt32(revertibleRandom() % 4)]
                 ]
             }
-            self.quality = GeneQuality.Nascent
-            self.quantity = 0
+            self.quality = quality ?? GeneQuality.Nascent
+            self.quantity = quantity ?? 0
         }
 
         /// Get the id of the data
@@ -123,11 +125,25 @@ access(all) contract FixesAssetGenes {
             .concat(self.quantity.toString())
         }
 
+        /// Get the data keys
+        ///
+        access(all)
+        view fun getKeys(): [String] {
+            return ["id", "quality", "quantity"]
+        }
+
         /// Get the value of the data
         ///
         access(all)
-        view fun getValue(): [AnyStruct] {
-            return [self.getId(), self.quality, self.quantity]
+        view fun getValue(_ key: String): AnyStruct? {
+            if key == "id" {
+                return self.getId()
+            } else if key == "quality" {
+                return self.quality
+            } else if key == "quantity" {
+                return self.quantity
+            }
+            return nil
         }
 
         /// Split the data into another instance
@@ -143,9 +159,11 @@ access(all) contract FixesAssetGenes {
             )
             self.quantity = self.quantity - withdrawQuantity
             // Create a new struct
-            let newGenes = Gene(id: self.id)
-            newGenes.quality = self.quality // same quality
-            newGenes.quantity = withdrawQuantity // splited the quantity
+            let newGenes: FixesAssetGenes.Gene = Gene(
+                id: self.id,
+                quality: self.quality, // same quality
+                quantity: withdrawQuantity, // splited the quantity
+            )
             return newGenes
         }
 
@@ -181,14 +199,17 @@ access(all) contract FixesAssetGenes {
         access(all) let identifier: String
         access(all) let owner: Address
         access(all) let genes: {String: Gene}
+        access(all) var mutatableAmount: UInt64
 
         init(
             _ identifier: String,
             _ owner: Address,
+            _ mutatableAmount: UInt64?
         ) {
             self.owner = owner
             self.identifier = identifier
             self.genes = {}
+            self.mutatableAmount = mutatableAmount ?? 0
         }
 
         /// Get the id of the data
@@ -209,12 +230,44 @@ access(all) contract FixesAssetGenes {
             return StringUtils.join(genes, ",")
         }
 
+        /// Get the data keys
+        ///
+        access(all)
+        view fun getKeys(): [String] {
+            return ["identifier", "owner", "genes", "mutatableAmount"]
+        }
+
         /// Get the value of the data
         /// It means genes keys of the DNA
         ///
         access(all)
-        view fun getValue(): [String] {
-            return self.genes.keys
+        view fun getValue(_ key: String): AnyStruct? {
+            if key == "identifier" {
+                return self.identifier
+            } else if key == "owner" {
+                return self.owner
+            } else if key == "genes" {
+                return self.genes.keys
+            } else if key == "mutatableAmount" {
+                return self.mutatableAmount
+            }
+            return nil
+        }
+
+        /// Get the writable keys
+        ///
+        access(all)
+        view fun getWritableKeys(): [String] {
+            return ["mutatableAmount"]
+        }
+
+        /// Set the value of the data
+        ///
+        access(all)
+        fun setValue(_ key: String, _ value: AnyStruct) {
+            if key == "mutatableAmount" {
+                self.mutatableAmount = value as! UInt64
+            }
         }
 
         /// Split the data into another instance
@@ -224,7 +277,7 @@ access(all) contract FixesAssetGenes {
             post {
                 self.getId() == result.getId(): "The result id is not the same so cannot split"
             }
-            let newDna = DNA(self.identifier, self.owner)
+            let newDna = DNA(self.identifier, self.owner, nil)
             for key in self.genes.keys {
                 // Split the gene, use reference to ensure data consistency
                 if let geneRef = &self.genes[key] as &Gene? {
@@ -254,10 +307,22 @@ access(all) contract FixesAssetGenes {
             } // end for
         }
 
+        // ---- Customized Methods ----
+
+        /// Check if the DNA is mutatable
+        ///
+        access(all)
+        view fun isMutatable(): Bool {
+            return self.mutatableAmount > 0
+        }
+
         /// Add a gene to the DNA
         ///
         access(account)
         fun addGene(_ gene: Gene): Void {
+            pre {
+                self.isMutatable(): "The DNA is not mutatable"
+            }
             let geneId = gene.getId()
             // Merge the gene, use reference to ensure data consistency
             if let geneRef = &self.genes[geneId] as &Gene? {
@@ -266,6 +331,8 @@ access(all) contract FixesAssetGenes {
                 // If the gene is not exist, just copy it
                 self.genes[geneId] = gene
             }
+            // Decrease the mutatable amount
+            self.mutatableAmount = self.mutatableAmount - 1
         }
     }
 
@@ -273,7 +340,29 @@ access(all) contract FixesAssetGenes {
     ///
     access(all)
     fun attemptToGenerateGene(): Gene? {
-        // TODO: Implement the gene generation
+        let randPercent = UInt8(revertibleRandom() % 100)
+        // - 2%: Empowered
+        // - 3%: Augmented
+        // - 5%: Enhanced
+        // - 7%: Basic
+        // - 13%: Nascent
+        // in total 30%
+        if randPercent < 2 {
+            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Empowered)
+            return Gene(id: nil, quality: GeneQuality.Empowered, quantity: revertibleRandom() % threshold)
+        } else if randPercent < 5 {
+            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Augmented)
+            return Gene(id: nil, quality: GeneQuality.Augmented, quantity: revertibleRandom() % threshold)
+        } else if randPercent < 10 {
+            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Enhanced)
+            return Gene(id: nil, quality: GeneQuality.Enhanced, quantity: revertibleRandom() % threshold)
+        } else if randPercent < 17 {
+            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Basic)
+            return Gene(id: nil, quality: GeneQuality.Basic, quantity: revertibleRandom() % threshold)
+        } else if randPercent < 30 {
+            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Nascent)
+            return Gene(id: nil, quality: GeneQuality.Nascent, quantity: revertibleRandom() % threshold)
+        }
         return nil
     }
 }

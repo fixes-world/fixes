@@ -130,7 +130,10 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// The initialize method for the Vault, a Vault for FRC20 must be initialized with a Change
         ///
         access(contract)
-        fun initialize(_ change: @FRC20FTShared.Change) {
+        fun initialize(
+            _ change: @FRC20FTShared.Change,
+            _ isInitedFromIndexer: Bool
+        ) {
             pre {
                 self.change == nil: "The change must be nil"
                 change.isBackedByVault() == false: "The change must not be backed by a vault"
@@ -147,10 +150,12 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             // update balance
             self.syncBalance()
             /// init DNA to the metadata
-            self.metadata[Type<FixesAssetGenes.DNA>()] = FixesAssetGenes.DNA(
+            self.initializeMetadata(FixesAssetGenes.DNA(
                 self.getDNAIdentifier(),
                 from,
-            )
+                // Only FungibleTokens initialized from the Indexer can have 10 mutation attempts.
+                isInitedFromIndexer ? 10 : 0
+            ))
         }
 
         /// Extract the change from the vault
@@ -174,30 +179,10 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             return <- retChange!
         }
 
-        /// The balance can be only updated by the change
-        ///
-        access(self)
-        fun syncBalance() {
-            if self.change == nil {
-                self.balance = 0.0
-            } else {
-                self.balance = (self.change?.getBalance())!
-            }
-        }
-
-        /// Borrow the mergeable data by key
-        ///
-        access(self)
-        fun _borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
-            return &self.metadata[type] as &{FixesTraits.MergeableData}?
-        }
-
-        /// --------- Write Methods --------- ///
-
         /// Set the metadata by key
         /// Using entitlement in Cadence 1.0
         ///
-        access(all)
+        access(contract)
         fun initializeMetadata(_ data: {FixesTraits.MergeableData}) {
             pre {
                 self.isValidVault(): "The vault must be valid"
@@ -217,6 +202,24 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 value: data.toString(),
                 owner: self.owner?.address
             )
+        }
+
+        /// The balance can be only updated by the change
+        ///
+        access(self)
+        fun syncBalance() {
+            if self.change == nil {
+                self.balance = 0.0
+            } else {
+                self.balance = (self.change?.getBalance())!
+            }
+        }
+
+        /// Borrow the mergeable data by key
+        ///
+        access(self)
+        fun _borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
+            return &self.metadata[type] as &{FixesTraits.MergeableData}?
         }
 
         /// --------- Implement FRC20Metadata --------- ///
@@ -280,7 +283,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
             // initialize the new vault with the amount
             let newVault <- FRC20FungibleToken.createEmptyVault()
-            newVault.initialize(<- newChange)
+            newVault.initialize(<- newChange, false)
 
             // setup mergeable data, split from withdraw percentage
             let percentage = amount / oldBalance
@@ -423,13 +426,22 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             if max == 0 {
                 return
             }
+
+            let dnaRef = &self.metadata[Type<FixesAssetGenes.DNA>()] as &{FixesTraits.MergeableData}?
+                ?? panic("The DNA metadata is not found")
+            let mutatableAmt = dnaRef.getValue("mutatableAmount")
+            if mutatableAmt == nil {
+                return
+            }
+            // create a new DNA
             let newDNA = FixesAssetGenes.DNA(
                 self.getDNAIdentifier(),
                 self.getSourceAddress(),
+                mutatableAmt! as! UInt64,
             )
             var anyAdded = false
             var i: UInt64 = 0
-            while i < max {
+            while i < max && newDNA.isMutatable() {
                 if let gene = FixesAssetGenes.attemptToGenerateGene() {
                     newDNA.addGene(gene)
                     anyAdded = true
@@ -438,8 +450,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             }
 
             if anyAdded {
-                let dnaRef = &self.metadata[Type<FixesAssetGenes.DNA>()] as &{FixesTraits.MergeableData}?
-                    ?? panic("The DNA metadata is not found")
                 // emit the event
                 emit TokenDNAGenerated(
                     identifier: newDNA.identifier,
@@ -448,6 +458,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 )
                 // merge the DNA
                 dnaRef.merge(newDNA)
+                // update the DNA mutatable amount
+                dnaRef.setValue("mutatableAmount", newDNA.getValue("mutatableAmount"))
             }
         }
     }
@@ -492,7 +504,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         )
 
         let retVault <- self.createEmptyVault()
-        retVault.initialize(<- change)
+        retVault.initialize(<- change, true)
 
         // emit the event
         emit TokensConvertedToStanard(
@@ -699,6 +711,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     access(all)
     fun getViews(): [Type] {
         return [
+            // Type<FungibleTokenMetadataViews.TotalSupply>(),
             Type<MetadataViews.ExternalURL>(),
             Type<FungibleTokenMetadataViews.FTView>(),
             Type<FungibleTokenMetadataViews.FTDisplay>(),

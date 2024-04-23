@@ -19,14 +19,33 @@ access(all) contract FixesTraits {
     ///
     access(all) struct interface MergeableData {
         /// Get the id of the data
-        access(all) view
-        fun getId(): String
-        /// Get the value of the data
-        access(all) view
-        fun getValue(): AnyStruct
+        access(all)
+        view fun getId(): String
         /// Get the string value of the data
-        access(all) view
-        fun toString(): String
+        access(all)
+        view fun toString(): String
+        /// Get the data keys
+        access(all)
+        view fun getKeys(): [String]
+        /// Get the value of the data
+        access(all)
+        view fun getValue(_ key: String): AnyStruct?
+        /// Get the writable keys
+        access(all)
+        view fun getWritableKeys(): [String] {
+            return []
+        }
+        /// Set the value of the data
+        access(all)
+        fun setValue(_ key: String, _ value: AnyStruct) {
+            pre {
+                self.getWritableKeys().contains(key): "The key is not writable"
+            }
+            let writableKeys = self.getWritableKeys()
+            if writableKeys.length == 0 {
+                panic("The gene data cannot be modified by set method")
+            }
+        }
         /// Split the data into another instance
         access(all)
         fun split(_ perc: UFix64): {MergeableData} {
