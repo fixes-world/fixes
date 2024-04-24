@@ -18,7 +18,6 @@ import "Fixes"
 import "FixesTraits"
 import "FixesAssetGenes"
 import "FRC20FTShared"
-import "FRC20Indexer"
 import "FRC20AccountsPool"
 
 /// This is the template source for a Fixes Fungible Token
@@ -42,12 +41,6 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
     /// The event that is emitted when tokens are deposited to a Vault
     access(all) event TokensDeposited(amount: UFix64, to: Address?)
 
-    /// The event that is emitted when new tokens are minted
-    access(all) event TokensConvertedToStanard(amount: UFix64, by: Address)
-
-    /// The event that is emitted when tokens are destroyed
-    access(all) event TokensConvertedToFRC20(amount: UFix64, by: Address)
-
     /// The event that is emitted when the metadata is updated
     access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
 
@@ -57,18 +50,9 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
     /// The event that is emitted when the dna metadata is updated
     access(all) event TokenDNAGenerated(identifier: String, value: String, owner: Address?)
 
-    /// The public interface for the FRC20 FT
+    /// The public interface for the Fungible Token
     ///
-    access(all) resource interface FRC20Metadata {
-        /// Is the vault valid
-        access(all) view
-        fun isValidVault(): Bool
-        /// Get the ticker name of the token
-        access(all) view
-        fun getTickerName(): String
-        /// Get the change's from address
-        access(all) view
-        fun getSourceAddress(): Address
+    access(all) resource interface Metadata {
         /// Get mergeable metadata keys
         access(all) view
         fun getMergeableKeys(): [Type]
@@ -87,13 +71,10 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    access(all) resource Vault: FRC20Metadata, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: Metadata, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
-        // The change should be inside the vault
-        access(self)
-        var change: @FRC20FTShared.Change?
         /// Metadata: Type of MergeableData => MergeableData
         access(self)
         let metadata: {Type: {FixesTraits.MergeableData}}
@@ -105,50 +86,17 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
             }
             // Initialize with a zero balance and nil change
             self.balance = balance
-            self.change <- nil
             self.metadata = {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            // You can not destroy a Change with a non-zero balance
-            pre {
-                self.balance == UFix64(0): "Balance must be zero for destroy"
-            }
-            destroy self.change
-        }
-
         /// ----- Internal Methods -----
-
-        /// Borrow the change reference
-        ///
-        access(contract)
-        fun borrowChangeRef(): &FRC20FTShared.Change? {
-            return &self.change as &FRC20FTShared.Change?
-        }
 
         /// The initialize method for the Vault, a Vault for FRC20 must be initialized with a Change
         ///
         access(contract)
         fun initialize(
-            _ change: @FRC20FTShared.Change,
-            _ isInitedFromIndexer: Bool
+            _ ins: &Fixes.Inscription?
         ) {
-            pre {
-                self.change == nil: "The change must be nil"
-                change.isBackedByVault() == false: "The change must not be backed by a vault"
-                change.isStakedTick() == false: "The change must not be staked"
-                change.isTreasuryLPVoucher() == false: "The change must not be a treasury LP voucher"
-                change.tick == FixesFungibleToken.getSymbol(): "The change must be backed by the same ticker"
-            }
-            post {
-                self.isValidVault(): "The vault must be valid"
-            }
-            let balance = change.getBalance()
-            let from = change.from
-            self.change <-! change
-            // update balance
-            self.syncBalance()
             /// init DNA to the metadata
             self.initializeMetadata(FixesAssetGenes.DNA(
                 self.getDNAIdentifier(),
@@ -202,17 +150,6 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
                 value: data.toString(),
                 owner: self.owner?.address
             )
-        }
-
-        /// The balance can be only updated by the change
-        ///
-        access(self)
-        fun syncBalance() {
-            if self.change == nil {
-                self.balance = 0.0
-            } else {
-                self.balance = (self.change?.getBalance())!
-            }
         }
 
         /// Borrow the mergeable data by key
@@ -723,9 +660,7 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
     ///
     access(all) view
     fun getTotalSupply(): UFix64 {
-        let frc20Indexer = FRC20Indexer.getIndexer()
-        let tokenMeta = frc20Indexer.getTokenMeta(tick: self.getSymbol())!
-        return tokenMeta.max
+        return self.totalSupply
     }
 
     /// Get the total supply of the standard fungible token
@@ -822,10 +757,10 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
         emit TokensInitialized(initialSupply: self.totalSupply)
 
         // Singleton resources
-        let frc20Indexer = FRC20Indexer.getIndexer()
+        let globalStore = FRC20FTShared.borrowGlobalStoreRef()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
-        let isSysmtemDeploy = self.account.address == frc20Indexer.owner?.address
+        let isSysmtemDeploy = self.account.address == globalStore.owner?.address
         if isSysmtemDeploy {
             // DO NOTHING, It will be a template contract for deploying new FRC20 Fungible tokens
             return
