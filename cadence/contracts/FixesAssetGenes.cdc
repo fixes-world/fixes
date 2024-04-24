@@ -84,12 +84,12 @@ access(all) contract FixesAssetGenes {
     access(all) struct Gene: FixesTraits.MergeableData {
         access(all) let id: [Character;4]
         access(all) var quality: GeneQuality
-        access(all) var quantity: UInt64
+        access(all) var exp: UInt64
 
         init(
             id: [Character;4]?,
             quality: GeneQuality?,
-            quantity: UInt64?
+            exp: UInt64?
         ) {
             if id != nil {
                 self.id = id!
@@ -103,7 +103,7 @@ access(all) contract FixesAssetGenes {
                 ]
             }
             self.quality = quality ?? GeneQuality.Nascent
-            self.quantity = quantity ?? 0
+            self.exp = exp ?? 0
         }
 
         /// Get the id of the data
@@ -122,14 +122,14 @@ access(all) contract FixesAssetGenes {
         view fun toString(): String {
             return self.getId().concat("|")
             .concat(self.quality.rawValue.toString()).concat("=")
-            .concat(self.quantity.toString())
+            .concat(self.exp.toString())
         }
 
         /// Get the data keys
         ///
         access(all)
         view fun getKeys(): [String] {
-            return ["id", "quality", "quantity"]
+            return ["id", "quality", "exp"]
         }
 
         /// Get the value of the data
@@ -140,8 +140,8 @@ access(all) contract FixesAssetGenes {
                 return self.getId()
             } else if key == "quality" {
                 return self.quality
-            } else if key == "quantity" {
-                return self.quantity
+            } else if key == "exp" {
+                return self.exp
             }
             return nil
         }
@@ -152,17 +152,17 @@ access(all) contract FixesAssetGenes {
             post {
                 self.getId() == result.getId(): "The gene id is not the same so cannot split"
             }
-            let withdrawQuantity = UInt64(UInt128(self.quantity) * UInt128(perc * 10000.0) / 10000)
+            let withdrawexp = UInt64(UInt128(self.exp) * UInt128(perc * 10000.0) / 10000)
             assert(
-                withdrawQuantity > 0,
-                message: "The quantity to split is zero"
+                withdrawexp > 0,
+                message: "The exp to split is zero"
             )
-            self.quantity = self.quantity - withdrawQuantity
+            self.exp = self.exp - withdrawexp
             // Create a new struct
             let newGenes: FixesAssetGenes.Gene = Gene(
                 id: self.id,
                 quality: self.quality, // same quality
-                quantity: withdrawQuantity, // splited the quantity
+                exp: withdrawexp, // splited the exp
             )
             return newGenes
         }
@@ -177,18 +177,18 @@ access(all) contract FixesAssetGenes {
             }
             let fromGenes = from as! Gene
             let convertRate = FixesAssetGenes.getGeneMergeLossOrGain(fromGenes.quality, self.quality)
-            let convertQuantity = UInt64(UInt128(fromGenes.quantity) * UInt128(convertRate * 10000.0) / 10000)
-            self.quantity = self.quantity + convertQuantity
+            let convertexp = UInt64(UInt128(fromGenes.exp) * UInt128(convertRate * 10000.0) / 10000)
+            self.exp = self.exp + convertexp
 
             // check if the quality can be upgraded
             var upgradeThreshold = FixesAssetGenes.getQualityLevelUpThreshold(self.quality)
-            var isUpgradable = upgradeThreshold <= self.quantity && self.quality.rawValue < GeneQuality.Eternal.rawValue
+            var isUpgradable = upgradeThreshold <= self.exp && self.quality.rawValue < GeneQuality.Eternal.rawValue
             while isUpgradable {
                 self.quality = GeneQuality(rawValue: self.quality.rawValue + 1)!
-                self.quantity = self.quantity - upgradeThreshold
+                self.exp = self.exp - upgradeThreshold
                 // check upgrade again
                 upgradeThreshold = FixesAssetGenes.getQualityLevelUpThreshold(self.quality)
-                isUpgradable = upgradeThreshold <= self.quantity && self.quality.rawValue < GeneQuality.Eternal.rawValue
+                isUpgradable = upgradeThreshold <= self.exp && self.quality.rawValue < GeneQuality.Eternal.rawValue
             }
         }
     }
@@ -386,7 +386,7 @@ access(all) contract FixesAssetGenes {
             return nil
         }
         let threshold = FixesAssetGenes.getQualityLevelUpThreshold(quality)
-        let quantity = revertibleRandom() % (threshold / 5) // random quantity from 20% of the threshold
-        return Gene(id: nil, quality: GeneQuality.Empowered, quantity: quantity)
+        let exp = revertibleRandom() % (threshold / 5) // random exp from 20% of the threshold
+        return Gene(id: nil, quality: GeneQuality.Empowered, exp: exp)
     }
 }
