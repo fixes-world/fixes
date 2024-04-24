@@ -3,7 +3,7 @@
 
 # FRC20 Fungible Token Manager
 
-This contract is used to manage the account and contract FRC20 Fungible Token
+This contract is used to manage the account and contract of Fixes' Fungible Tokens
 
 */
 // Third Party Imports
@@ -16,7 +16,9 @@ import "FRC20Indexer"
 import "FRC20AccountsPool"
 import "FRC20FungibleToken"
 
-access(all) contract FRC20FungibleTokenManager {
+/// The Manager contract for Fungible Token
+///
+access(all) contract FungibleTokenManager {
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -85,7 +87,7 @@ access(all) contract FRC20FungibleTokenManager {
             let dict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
             let ticks = dict.keys
             for tick in ticks {
-                FRC20FungibleTokenManager._updateFungibleTokenContractInAccount(tick)
+                FungibleTokenManager._updateFungibleTokenContractInAccount(tick)
             }
         }
     }
@@ -253,7 +255,7 @@ access(all) contract FRC20FungibleTokenManager {
     }
 
     init() {
-        let identifier = "FRC20FungibleTokenManager_".concat(self.account.address.toString())
+        let identifier = "FungibleTokenManager_".concat(self.account.address.toString())
         self.AdminStoragePath = StoragePath(identifier: identifier.concat("_admin"))!
         self.AdminPublicPath = PublicPath(identifier: identifier.concat("_admin"))!
 

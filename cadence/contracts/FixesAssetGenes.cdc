@@ -340,29 +340,53 @@ access(all) contract FixesAssetGenes {
     ///
     access(all)
     fun attemptToGenerateGene(): Gene? {
-        let randPercent = UInt8(revertibleRandom() % 100)
-        // - 2%: Empowered
-        // - 3%: Augmented
-        // - 5%: Enhanced
-        // - 7%: Basic
-        // - 13%: Nascent
-        // in total 30%
-        if randPercent < 2 {
-            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Empowered)
-            return Gene(id: nil, quality: GeneQuality.Empowered, quantity: revertibleRandom() % threshold)
-        } else if randPercent < 5 {
-            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Augmented)
-            return Gene(id: nil, quality: GeneQuality.Augmented, quantity: revertibleRandom() % threshold)
-        } else if randPercent < 10 {
-            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Enhanced)
-            return Gene(id: nil, quality: GeneQuality.Enhanced, quantity: revertibleRandom() % threshold)
-        } else if randPercent < 17 {
-            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Basic)
-            return Gene(id: nil, quality: GeneQuality.Basic, quantity: revertibleRandom() % threshold)
-        } else if randPercent < 30 {
-            let threshold = FixesAssetGenes.getQualityLevelUpThreshold(GeneQuality.Nascent)
-            return Gene(id: nil, quality: GeneQuality.Nascent, quantity: revertibleRandom() % threshold)
+        // 30% to generate a gene
+        let rand = UInt64(revertibleRandom() % 10000)
+        var quality = GeneQuality.Nascent
+        if rand < 2 {
+            // 0.02% to generate a gene with quality Miraculous
+            quality = GeneQuality.Miraculous
+        } else if rand < 5 {
+            // 0.03% to generate a gene with quality Arcane
+            quality = GeneQuality.Arcane
+        } else if rand < 10 {
+            // 0.05% to generate a gene with quality Mystic
+            quality = GeneQuality.Mystic
+        } else if rand < 20 {
+            // 0.10% to generate a gene with quality Evolution
+            quality = GeneQuality.Evolution
+        } else if rand < 40 {
+            // 0.20% to generate a gene with quality Exemplary
+            quality = GeneQuality.Exemplary
+        } else if rand < 70 {
+            // 0.30% to generate a gene with quality Potent
+            quality = GeneQuality.Potent
+        } else if rand < 120 {
+            // 0.50% to generate a gene with quality Advanced
+            quality = GeneQuality.Advanced
+        } else if rand < 200 {
+            // 0.80% to generate a gene with quality Breakthrough
+            quality = GeneQuality.Breakthrough
+        } else if rand < 350 {
+            // 1.50% to generate a gene with quality Empowered
+            quality = GeneQuality.Empowered
+        } else if rand < 600 {
+            // 2.50% to generate a gene with quality Augmented
+            quality = GeneQuality.Augmented
+        } else if rand < 1000 {
+            // 4.00% to generate a gene with quality Enhanced
+            quality = GeneQuality.Enhanced
+        } else if rand < 1800 {
+            // 8.00% to generate a gene with quality Basic
+            quality = GeneQuality.Basic
+        } else if rand < 3000 {
+            // 12.00% to generate a gene with quality Nascent
+            quality = GeneQuality.Nascent
+        } else {
+            return nil
         }
-        return nil
+        let threshold = FixesAssetGenes.getQualityLevelUpThreshold(quality)
+        let quantity = revertibleRandom() % (threshold / 5) // random quantity from 20% of the threshold
+        return Gene(id: nil, quality: GeneQuality.Empowered, quantity: quantity)
     }
 }

@@ -66,15 +66,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FIND": {
-			"source": "./imports/097bafa4e0b48eef/FIND.cdc",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
-		},
 		"FGameLottery": {
 			"source": "cadence/contracts/FGameLottery.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FGameLotteryFactory": {
+			"source": "cadence/contracts/FGameLotteryFactory.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -89,12 +90,11 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FGameLotteryFactory": {
-			"source": "cadence/contracts/FGameLotteryFactory.cdc",
+		"FIND": {
+			"source": "./imports/097bafa4e0b48eef/FIND.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
 			}
 		},
 		"FRC20AccountsPool": {
@@ -115,14 +115,6 @@
 		},
 		"FRC20FungibleToken": {
 			"source": "cadence/contracts/FRC20FungibleToken.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FRC20FungibleTokenManager": {
-			"source": "cadence/contracts/FRC20FungibleTokenManager.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -217,16 +209,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20Votes": {
-			"source": "cadence/contracts/FRC20Votes.cdc",
+		"FRC20VoteCommands": {
+			"source": "cadence/contracts/FRC20VoteCommands.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20VoteCommands": {
-			"source": "cadence/contracts/FRC20VoteCommands.cdc",
+		"FRC20Votes": {
+			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -248,6 +240,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesAssetGenes": {
+			"source": "cadence/contracts/FixesAssetGenes.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FixesAvatar": {
 			"source": "cadence/contracts/FixesAvatar.cdc",
 			"aliases": {
@@ -256,8 +256,8 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FixesAssetGenes": {
-			"source": "cadence/contracts/FixesAssetGenes.cdc",
+		"FixesFungibleToken": {
+			"source": "cadence/contracts/FixesFungibleToken.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -290,6 +290,14 @@
 		},
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FungibleTokenManager": {
+			"source": "cadence/contracts/FungibleTokenManager.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -395,6 +403,22 @@
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
 				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"SwapConfig": {
+			"source": "./imports/b78ef7afa52ff906/SwapConfig.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapInterfaces": {
+			"source": "./imports/b78ef7afa52ff906/SwapInterfaces.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
 			}
 		},
 		"ViewResolver": {
@@ -684,6 +708,24 @@
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
+		"SwapConfig": {
+			"source": "mainnet://b78ef7afa52ff906.SwapConfig",
+			"hash": "5680309531a1373e12086df8a3770afabbbeda0dc52f43a1fb231b626236fbc3",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapInterfaces": {
+			"source": "mainnet://b78ef7afa52ff906.SwapInterfaces",
+			"hash": "600b3a9eeee86cd44ef08b1263fb1b6f29ec5fb422d93d008d34d6cd1caea139",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
 		"ViewResolver": {
 			"source": "mainnet://1d7e57aa55817448.ViewResolver",
 			"hash": "9fa41186f38899625a6b4774f1a9addf8d16b76022d52a99174b4493499dc3de",
@@ -774,6 +816,8 @@
 				"CapabilityDelegator",
 				"CapabilityFilter",
 				"CapabilityFactory",
+				"SwapConfig",
+				"SwapInterfaces",
 				"ETHUtils",
 				"Fixes",
 				"FixesInscriptionFactory",
@@ -801,8 +845,9 @@
 				"FGameLotteryRegistry",
 				"FGameLotteryFactory",
 				"FixesAssetGenes",
+				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FRC20FungibleTokenManager"
+				"FungibleTokenManager"
 			]
 		},
 		"mainnet": {
