@@ -110,10 +110,7 @@ access(all) contract FixesAssetGenes {
         ///
         access(all)
         view fun getId(): String {
-            return self.id[0].toString()
-            .concat(self.id[1].toString())
-            .concat(self.id[2].toString())
-            .concat(self.id[3].toString())
+            return String.fromCharacters([self.id[0], self.id[1], self.id[2], self.id[3]])
         }
 
         /// Get the string value of the data

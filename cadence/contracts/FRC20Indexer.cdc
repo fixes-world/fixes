@@ -459,6 +459,12 @@ access(all) contract FRC20Indexer {
                 tick.length >= 3 && tick.length <= 10,
                 message: "The token tick should be between 3 and 10 characters"
             )
+            // ensure the first letter is lowercase a-z
+            let firstLetterUTF8 = tick[0].utf8
+            assert(
+                 firstLetterUTF8.length == 1 && firstLetterUTF8[0] >= 97 && firstLetterUTF8[0] <= 122,
+                message: "The token tick should start with a lowercase letter"
+            )
             assert(
                 self.tokens[tick] == nil && self.balances[tick] == nil && self.pool[tick] == nil,
                 message: "The token has already been deployed"
