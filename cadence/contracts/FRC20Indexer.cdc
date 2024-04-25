@@ -101,45 +101,45 @@ access(all) contract FRC20Indexer {
     access(all) resource interface IndexerPublic {
         /* --- read-only --- */
         /// Get all the tokens
-        access(all) view
-        fun getTokens(): [String]
+        access(all)
+        view fun getTokens(): [String]
         /// Get the meta-info of a token
-        access(all) view
-        fun getTokenMeta(tick: String): FRC20Meta?
+        access(all)
+        view fun getTokenMeta(tick: String): FRC20Meta?
         /// Get the token display info
-        access(all) view
-        fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay?
+        access(all)
+        view fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay?
         /// Check if an inscription is a valid FRC20 inscription
-        access(all) view
-        fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool
+        access(all)
+        view fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool
         /// Get the balance of a FRC20 token
-        access(all) view
-        fun getBalance(tick: String, addr: Address): UFix64
+        access(all)
+        view fun getBalance(tick: String, addr: Address): UFix64
         /// Get all balances of some address
-        access(all) view
-        fun getBalances(addr: Address): {String: UFix64}
+        access(all)
+        view fun getBalances(addr: Address): {String: UFix64}
         /// Get the holders of a FRC20 token
-        access(all) view
-        fun getHolders(tick: String): [Address]
+        access(all)
+        view fun getHolders(tick: String): [Address]
         /// Get the amount of holders of a FRC20 token
-        access(all) view
-        fun getHoldersAmount(tick: String): UInt64
+        access(all)
+        view fun getHoldersAmount(tick: String): UInt64
         /// Get the pool balance of a FRC20 token
-        access(all) view
-        fun getPoolBalance(tick: String): UFix64
+        access(all)
+        view fun getPoolBalance(tick: String): UFix64
         /// Get the benchmark value of a FRC20 token
-        access(all) view
-        fun getBenchmarkValue(tick: String): UFix64
+        access(all)
+        view fun getBenchmarkValue(tick: String): UFix64
         /// Get the pool balance of platform treasury
-        access(all) view
-        fun getPlatformTreasuryBalance(): UFix64
+        access(all)
+        view fun getPlatformTreasuryBalance(): UFix64
         /** ---- borrow public interface ---- */
         /// Borrow the token's treasury $FLOW receiver
         access(all)
-        fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}
+        view fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}
         /// Borrow the platform treasury $FLOW receiver
         access(all)
-        fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver}
+        view fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver}
         /* --- write --- */
         /// Deploy a new FRC20 token
         access(all)
@@ -155,8 +155,8 @@ access(all) contract FRC20Indexer {
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
         /** ---- Account Methods for readonly ---- */
         /// Parse the metadata of a FRC20 inscription
-        access(account) view
-        fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
+        access(account)
+        view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
         /** ---- Account Methods for listing ---- */
         /// Ensure the balance of an address exists
         access(account)
@@ -252,22 +252,22 @@ access(all) contract FRC20Indexer {
 
         /// Get all the tokens
         ///
-        access(all) view
-        fun getTokens(): [String] {
+        access(all)
+        view fun getTokens(): [String] {
             return self.tokens.keys
         }
 
         /// Get the meta-info of a token
         ///
-        access(all) view
-        fun getTokenMeta(tick: String): FRC20Meta? {
+        access(all)
+        view fun getTokenMeta(tick: String): FRC20Meta? {
             return self.tokens[tick.toLower()]
         }
 
         /// Get the token display info
         ///
-        access(all) view
-        fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay? {
+        access(all)
+        view fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay? {
             let ticker = tick.toLower()
             if self.tokens[ticker] == nil {
                 return nil
@@ -298,16 +298,16 @@ access(all) contract FRC20Indexer {
 
         /// Get the balance of a FRC20 token
         ///
-        access(all) view
-        fun getBalance(tick: String, addr: Address): UFix64 {
+        access(all)
+        view fun getBalance(tick: String, addr: Address): UFix64 {
             let balancesRef = self._borrowBalancesRef(tick: tick)
             return balancesRef[addr] ?? 0.0
         }
 
         /// Get all balances of some address
         ///
-        access(all) view
-        fun getBalances(addr: Address): {String: UFix64} {
+        access(all)
+        view fun getBalances(addr: Address): {String: UFix64} {
             let ret: {String: UFix64} = {}
             for tick in self.tokens.keys {
                 let balancesRef = self._borrowBalancesRef(tick: tick)
@@ -320,29 +320,29 @@ access(all) contract FRC20Indexer {
         }
 
         /// Get the holders of a FRC20 token
-        access(all) view
-        fun getHolders(tick: String): [Address] {
+        access(all)
+        view fun getHolders(tick: String): [Address] {
             let balancesRef = self._borrowBalancesRef(tick: tick)
             return balancesRef.keys
         }
 
         /// Get the amount of holders of a FRC20 token
-        access(all) view
-        fun getHoldersAmount(tick: String): UInt64 {
+        access(all)
+        view fun getHoldersAmount(tick: String): UInt64 {
             return UInt64(self.getHolders(tick: tick.toLower()).length)
         }
 
         /// Get the pool balance of a FRC20 token
         ///
-        access(all) view
-        fun getPoolBalance(tick: String): UFix64 {
+        access(all)
+        view fun getPoolBalance(tick: String): UFix64 {
             let pool = self._borrowTokenTreasury(tick: tick)
             return pool.balance
         }
 
         /// Get the benchmark value of a FRC20 token
-        access(all) view
-        fun getBenchmarkValue(tick: String): UFix64 {
+        access(all)
+        view fun getBenchmarkValue(tick: String): UFix64 {
             let pool = self._borrowTokenTreasury(tick: tick)
             let meta = self.borrowTokenMeta(tick: tick)
             let totalExisting = meta.supplied.saturatingSubtract(meta.burned)
@@ -355,15 +355,15 @@ access(all) contract FRC20Indexer {
 
         /// Get the pool balance of global
         ///
-        access(all) view
-        fun getPlatformTreasuryBalance(): UFix64 {
+        access(all)
+        view fun getPlatformTreasuryBalance(): UFix64 {
             return self.treasury.balance
         }
 
         /// Check if an inscription is a valid FRC20 inscription
         ///
-        access(all) view
-        fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
+        access(all)
+        view fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
             let p = ins.getMetaProtocol()
             return ins.getMimeType() == "text/plain" &&
                 (p == "FRC20" || p == "frc20" || p == "frc-20" || p == "FRC-20")
@@ -374,7 +374,7 @@ access(all) contract FRC20Indexer {
         /// Borrow the token's treasury $FLOW receiver
         ///
         access(all)
-        fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver} {
+        view fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver} {
             let pool = self._borrowTokenTreasury(tick: tick)
             // Force cast to FungibleToken.Receiver, don't care about the warning, just for avoiding some mistakes
             return pool as &FlowToken.Vault{FungibleToken.Receiver}
@@ -383,7 +383,7 @@ access(all) contract FRC20Indexer {
         /// Borrow the platform treasury $FLOW receiver
         ///
         access(all)
-        fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver} {
+        view fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver} {
             let pool = self._borrowPlatformTreasury()
             // Force cast to FungibleToken.Receiver, don't care about the warning, just for avoiding some mistakes
             return pool as &FlowToken.Vault{FungibleToken.Receiver}
@@ -650,8 +650,8 @@ access(all) contract FRC20Indexer {
 
         /// Parse the metadata of a FRC20 inscription
         ///
-        access(account) view
-        fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
+        access(account)
+        view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
             let ret: {String: String} = {}
             if data.encoding != nil && data.encoding != "utf8" {
                 panic("The inscription is not encoded in utf8")
@@ -1536,15 +1536,15 @@ access(all) contract FRC20Indexer {
 
         /// Check if an inscription is owned by the indexer
         ///
-        access(self) view
-        fun _isOwnedByIndexer(_ ins: &Fixes.Inscription): Bool {
+        access(self)
+        view fun _isOwnedByIndexer(_ ins: &Fixes.Inscription): Bool {
             return ins.owner?.address == FRC20Indexer.getAddress()
         }
 
         /// Parse the ticker name from the meta-info of a FRC20 inscription
         ///
         access(self)
-        fun _parseTickerName(_ meta: {String: String}): String {
+        view fun _parseTickerName(_ meta: {String: String}): String {
             let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
             assert(
                 self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,

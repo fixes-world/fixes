@@ -125,13 +125,13 @@ access(all) contract FRC20FTShared {
 
         /// Check if this Change is a staked tick's change
         ///
-        access(all) view
-        fun isStakedTick(): Bool {
+        access(all)
+        view fun isStakedTick(): Bool {
             return self.isBackedByVault() == false && self.tick[0] == "!"
         }
 
-        access(all) view
-        fun getOriginalTick(): String {
+        access(all)
+        view fun getOriginalTick(): String {
             // if the tick is a staked tick, remove the first character
             if self.isStakedTick() {
                 return self.tick.slice(from: 1, upTo: self.tick.length)
@@ -142,36 +142,36 @@ access(all) contract FRC20FTShared {
 
         /// Get the balance of this Change
         ///
-        access(all) view
-        fun getBalance(): UFix64 {
+        access(all)
+        view fun getBalance(): UFix64 {
             return self.ftVault?.balance ?? self.balance!
         }
 
         /// Check if this Change is empty
         ///
-        access(all) view
-        fun isEmpty(): Bool {
+        access(all)
+        view fun isEmpty(): Bool {
             return self.getBalance() == 0.0
         }
 
         /// Check if this Change is backed by a Vault
         ///
-        access(all) view
-        fun isBackedByVault(): Bool {
+        access(all)
+        view fun isBackedByVault(): Bool {
             return self.ftVault != nil
         }
 
         /// Check if this Change is backed by a FlowToken Vault
         ///
-        access(all) view
-        fun isBackedByFlowTokenVault(): Bool {
+        access(all)
+        view fun isBackedByFlowTokenVault(): Bool {
             return self.tick == "" && self.isBackedByVault()
         }
 
         /// Get the type of the Vault
         ///
-        access(all) view
-        fun getVaultType(): Type? {
+        access(all)
+        view fun getVaultType(): Type? {
             return self.ftVault?.getType()
         }
     }
@@ -741,8 +741,8 @@ access(all) contract FRC20FTShared {
     access(all) resource interface SharedStorePublic {
         /// Get the key by type
         ///
-        access(all) view
-        fun getKeyByEnum(_ type: ConfigType): String? {
+        access(all)
+        view fun getKeyByEnum(_ type: ConfigType): String? {
             var key: String? = nil
             // get the key by type
             switch type {
