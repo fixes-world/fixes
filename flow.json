@@ -105,6 +105,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20Agents": {
+			"source": "cadence/contracts/FRC20Agents.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20FTShared": {
 			"source": "cadence/contracts/FRC20FTShared.cdc",
 			"aliases": {
@@ -844,6 +852,7 @@
 				"FGameLottery",
 				"FGameLotteryRegistry",
 				"FGameLotteryFactory",
+				"FRC20Agents",
 				"FixesAssetGenes",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",

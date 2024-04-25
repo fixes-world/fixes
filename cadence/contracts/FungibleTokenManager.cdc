@@ -14,6 +14,7 @@ import "Fixes"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
+import "FRC20Agents"
 import "FRC20FungibleToken"
 
 /// The Manager contract for Fungible Token
@@ -213,6 +214,15 @@ access(all) contract FungibleTokenManager {
             ?? panic("The shared store was not created")
         if store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) == nil {
             store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol, value: tick)
+
+            isUpdated = true || isUpdated
+        }
+
+        // Create the FRC20Agents.IndexerController and save it in the account
+        let ctrlStoragePath = FRC20Agents.getIndexerControllerStoragePath()
+        if childAcctRef.borrow<&AnyResource>(from: ctrlStoragePath) == nil {
+            let indexerController <- FRC20Agents.createIndexerController([tick])
+            childAcctRef.save(<- indexerController, to: ctrlStoragePath)
 
             isUpdated = true || isUpdated
         }

@@ -19,19 +19,14 @@ import "FixesAssetGenes"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
+import "FRC20Agents"
 
 /// This is the template source for a FRC20 Fungible Token
-/// The contract is deployed in the child account of the FRC20Indexer
+/// The contract is deployed in the child account of the FRC20AccountsPool
 /// All real FRC20 tokens are deployed in the FRC20Indexer, and
 /// the FT Token issued by the FRC20FTShared.Change
 access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
-
-    /// Total supply of FRC20FungibleToken in existence
-    /// This value is only a record of the quantity existing in the form of Flow Fungible Tokens.
-    /// It does not represent the total quantity of the token that has been minted.
-    /// The total quantity of the token that has been minted is loaded from the FRC20Indexer.
-    access(all)
-    var totalSupply: UFix64
+    // ------ Events -------
 
     /// The event that is emitted when the contract is created
     access(all) event TokensInitialized(initialSupply: UFix64)
@@ -57,24 +52,37 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     /// The event that is emitted when the dna metadata is updated
     access(all) event TokenDNAGenerated(identifier: String, value: String, owner: Address?)
 
+    /// -------- Parameters --------
+
+    /// Total supply of FRC20FungibleToken in existence
+    /// This value is only a record of the quantity existing in the form of Flow Fungible Tokens.
+    /// It does not represent the total quantity of the token that has been minted.
+    /// The total quantity of the token that has been minted is loaded from the FRC20Indexer.
+    access(all)
+    var totalSupply: UFix64
+    access(all)
+    var totalFungibleTokenSupply: UFix64
+
+    /// -------- Resources and Interfaces --------
+
     /// The public interface for the FRC20 FT
     ///
     access(all) resource interface FRC20Metadata {
         /// Is the vault valid
-        access(all) view
-        fun isValidVault(): Bool
+        access(all)
+        view fun isValidVault(): Bool
         /// Get the ticker name of the token
-        access(all) view
-        fun getTickerName(): String
+        access(all)
+        view fun getTickerName(): String
         /// Get the change's from address
-        access(all) view
-        fun getSourceAddress(): Address
+        access(all)
+        view fun getSourceAddress(): Address
         /// Get mergeable metadata keys
-        access(all) view
-        fun getMergeableKeys(): [Type]
+        access(all)
+        view fun getMergeableKeys(): [Type]
         /// Get the mergeable metadata by key
-        access(all) view
-        fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}?
+        access(all)
+        view fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}?
     }
 
     /// Each user stores an instance of only the Vault in their storage
@@ -225,36 +233,36 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// --------- Implement FRC20Metadata --------- ///
 
         /// Is the vault valid
-        access(all) view
-        fun isValidVault(): Bool {
+        access(all)
+        view fun isValidVault(): Bool {
             return self.change != nil
         }
 
         /// Get the ticker name of the token
         ///
-        access(all) view
-        fun getTickerName(): String {
+        access(all)
+        view fun getTickerName(): String {
             return self.change?.tick ?? panic("The change must be initialized")
         }
 
         /// Get the change's from address
         ///
-        access(all) view
-        fun getSourceAddress(): Address {
+        access(all)
+        view fun getSourceAddress(): Address {
             return self.change?.from ?? panic("The change must be initialized")
         }
 
         /// Get mergeable metadata keys
         ///
-        access(all) view
-        fun getMergeableKeys(): [Type] {
+        access(all)
+        view fun getMergeableKeys(): [Type] {
             return self.metadata.keys
         }
 
         /// Get the mergeable metadata by key
         ///
-        access(all) view
-        fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}? {
+        access(all)
+        view fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}? {
             return self.metadata[key]
         }
 
@@ -358,8 +366,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             // ensure that there is a record in the FRC20 Indexer
             let ownerAddr = self.owner?.address
             if ownerAddr != nil {
-                let frc20Indexer = FRC20Indexer.getIndexer()
-                frc20Indexer.ensureBalanceExists(tick: self.getTickerName(), addr: ownerAddr!)
+                let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
+                frc20CtrlRef.ensureBalanceExists(tick: self.getTickerName(), addr: ownerAddr!)
             }
 
             // when change extracted, the balance is updated and vault is useless
@@ -464,6 +472,37 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         }
     }
 
+    /// The admin interface for the FRC20 FT
+    ///
+    access(all) resource interface AdminInterface {
+        // Only access by the contract
+        access(contract)
+        fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}
+    }
+
+    /// The admin resource for the FRC20 FT
+    ///
+    access(all) resource FungibleTokenAdmin: AdminInterface {
+        access(contract)
+        var frc20IndexerController: Capability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>
+
+        init(
+            cap: Capability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>
+        ) {
+            pre {
+                cap.check(): "The capability must be valid"
+            }
+            self.frc20IndexerController = cap
+        }
+
+        /// Borrow the FRC20 Indexer Controller
+        ///
+        access(contract)
+        fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
+            return self.frc20IndexerController.borrow() ?? panic("The FRC20 Indexer Controller is not found")
+        }
+    }
+
     /// ------------ FRC20 <> FungibleToken Methods ------------
 
     /// Issue new Fungible Tokens from a FRC20 FT Change
@@ -474,8 +513,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             ins.isExtractable(): "The inscription must be extractable"
         }
 
-        let frc20Indexer = FRC20Indexer.getIndexer()
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
+        let meta = frc20CtrlRef.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         // ensure tick is the same
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
         assert(
@@ -491,12 +530,12 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         )
 
         let insOwner = ins.owner?.address ?? panic("The owner of the inscription is not found")
-        let beforeBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+        let beforeBalance = FRC20FungibleToken.getFRC20Balance(insOwner)
 
         // withdraw the change from indexer
-        let change <- frc20Indexer.withdrawChange(ins: ins)
+        let change <- frc20CtrlRef.withdrawChange(ins: ins)
 
-        let afterBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+        let afterBalance = FRC20FungibleToken.getFRC20Balance(insOwner)
         // ensure the balance is matched
         assert(
             beforeBalance - afterBalance == change.getBalance(),
@@ -513,7 +552,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         )
 
         // update the total supply
-        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply + retVault.balance
+        FRC20FungibleToken.totalFungibleTokenSupply = FRC20FungibleToken.totalFungibleTokenSupply + retVault.balance
+        self._syncTotalSupply()
 
         // return the new vault
         return <- retVault
@@ -528,8 +568,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             vault.isInstance(Type<@FRC20FungibleToken.Vault>()): "The vault must be of the same type as the token"
         }
 
-        let frc20Indexer = FRC20Indexer.getIndexer()
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
+        let meta = frc20CtrlRef.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         // ensure tick is the same
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
         assert(
@@ -546,12 +586,12 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
         // before balance
         let insOwner = ins.owner?.address ?? panic("The owner of the inscription is not found")
-        let beforeBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+        let beforeBalance = FRC20FungibleToken.getFRC20Balance(insOwner)
 
-        frc20Indexer.depositChange(ins: ins, change: <- retChange)
+        frc20CtrlRef.depositChange(ins: ins, change: <- retChange)
 
         // after balance
-        let afterBalance = frc20Indexer.getBalance(tick: tick, addr: insOwner)
+        let afterBalance = FRC20FungibleToken.getFRC20Balance(insOwner)
         // ensure the balance is matched
         assert(
             afterBalance - beforeBalance == convertBalance,
@@ -565,7 +605,32 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         )
 
         // update the total supply
-        FRC20FungibleToken.totalSupply = FRC20FungibleToken.totalSupply - convertBalance
+        FRC20FungibleToken.totalFungibleTokenSupply = FRC20FungibleToken.totalFungibleTokenSupply - convertBalance
+        self._syncTotalSupply()
+    }
+
+    /// ------------ Internal Methods ------------
+
+    /// Sync the total supply with the real total supply
+    ///
+    access(self)
+    fun _syncTotalSupply() {
+        let realSupply = self.getTotalSupply()
+        if self.totalSupply != realSupply {
+            self.totalSupply = realSupply
+        }
+    }
+
+    /// Borrow the FRC20 Indexer Controller
+    ///
+    access(contract)
+    fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
+        if let adminRef = getAccount(self.account.address)
+            .getCapability<&FungibleTokenAdmin{AdminInterface}>(self.getAdminPublicPath())
+            .borrow() {
+            return adminRef.borrowFRC20Controller()
+        }
+        panic("The FRC20 Indexer Controller is not found")
     }
 
     /// ------------ General Functions ------------
@@ -585,7 +650,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     /// Borrow the shared store
     ///
     access(all)
-    fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
+    view fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
         let addr = self.account.address
         return FRC20FTShared.borrowStoreRef(addr) ?? panic("Config store not found")
     }
@@ -709,7 +774,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     ///         developers to know which parameter to pass to the resolveView() method.
     ///
     access(all)
-    fun getViews(): [Type] {
+    view fun getViews(): [Type] {
         return [
             // Type<FungibleTokenMetadataViews.TotalSupply>(),
             Type<MetadataViews.ExternalURL>(),
@@ -721,24 +786,24 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
     /// the real total supply is loaded from the FRC20Indexer
     ///
-    access(all) view
-    fun getTotalSupply(): UFix64 {
+    access(all)
+    view fun getTotalSupply(): UFix64 {
         let frc20Indexer = FRC20Indexer.getIndexer()
         let tokenMeta = frc20Indexer.getTokenMeta(tick: self.getSymbol())!
-        return tokenMeta.max
+        return tokenMeta.supplied - tokenMeta.burned
     }
 
     /// Get the total supply of the standard fungible token
     ///
-    access(all) view
-    fun getStandardFungibleTokenTotalSupply(): UFix64 {
-        return self.totalSupply
+    access(all)
+    view fun getStandardFungibleTokenTotalSupply(): UFix64 {
+        return self.totalFungibleTokenSupply
     }
 
     /// Get the ticker name of the token
     ///
-    access(all) view
-    fun getSymbol(): String {
+    access(all)
+    view fun getSymbol(): String {
         let store = self.borrowSharedStore()
         let tick = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
         return tick ?? panic("Ticker name not found")
@@ -746,32 +811,32 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
     /// Get the display name of the token
     ///
-    access(all) view
-    fun getDisplayName(): String? {
+    access(all)
+    view fun getDisplayName(): String? {
         let store = self.borrowSharedStore()
         return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDisplayName) as! String?
     }
 
     /// Get the token description
     ///
-    access(all) view
-    fun getTokenDescription(): String? {
+    access(all)
+    view fun getTokenDescription(): String? {
         let store = self.borrowSharedStore()
         return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDescription) as! String?
     }
 
     /// Get the external URL of the token
     ///
-    access(all) view
-    fun getExternalUrl(): String? {
+    access(all)
+    view fun getExternalUrl(): String? {
         let store = self.borrowSharedStore()
         return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenExternalUrl) as! String?
     }
 
     /// Get the icon URL of the token
     ///
-    access(all) view
-    fun getLogoUrl(): String? {
+    access(all)
+    view fun getLogoUrl(): String? {
         let store = self.borrowSharedStore()
         let key = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenLogoPrefix)!
         let iconDefault = store.get(key) as! String?
@@ -781,45 +846,89 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         return iconPng ?? iconSvg ?? iconJpg ?? iconDefault
     }
 
+    /// Get the Token Balance of the address
+    /// Including FRC20 and FungibleToken
+    ///
+    access(all)
+    view fun getTotalBalance(_ addr: Address): UFix64 {
+        return self.getFRC20Balance(addr) + self.getTokenBalance(addr)
+    }
+
+    /// Get the fungible token balance of the address
+    ///
+    access(all)
+    view fun getTokenBalance(_ addr: Address): UFix64 {
+        if let ref = getAccount(addr)
+            .getCapability<&FRC20FungibleToken.Vault{FungibleToken.Balance}>(self.getVaultPublicPath())
+            .borrow() {
+            return ref.balance
+        }
+        return 0.0
+    }
+
+    /// Get the FRC20 Balance of the address
+    ///
+    access(all)
+    view fun getFRC20Balance(_ addr: Address): UFix64 {
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        return frc20Indexer.getBalance(tick: self.getSymbol(), addr: addr)
+    }
+
     /// Get the prefix for the storage paths
     ///
-    access(all) view
-    fun getPathPrefix(): String {
+    access(all)
+    view fun getPathPrefix(): String {
         return "FRC20FT_".concat(self.account.address.toString()).concat(self.getSymbol()).concat("_")
     }
 
     /// Get the storage path for the Vault
     ///
-    access(all) view
-    fun getVaultStoragePath(): StoragePath {
+    access(all)
+    view fun getVaultStoragePath(): StoragePath {
         let prefix = FRC20FungibleToken.getPathPrefix()
         return StoragePath(identifier: prefix.concat("Vault"))!
     }
 
     /// Get the public path for the Vault
     ///
-    access(all) view
-    fun getVaultPublicPath(): PublicPath {
+    access(all)
+    view fun getVaultPublicPath(): PublicPath {
         let prefix = FRC20FungibleToken.getPathPrefix()
         return PublicPath(identifier: prefix.concat("Metadata"))!
     }
 
     /// Get the public path for the Receiver
     ///
-    access(all) view
-    fun getReceiverPublicPath(): PublicPath {
+    access(all)
+    view fun getReceiverPublicPath(): PublicPath {
         let prefix = FRC20FungibleToken.getPathPrefix()
         return PublicPath(identifier: prefix.concat("Receiver"))!
     }
 
+    /// Get the admin storage path
+    ///
+    access(all)
+    view fun getAdminStoragePath(): StoragePath {
+        let prefix = FRC20FungibleToken.getPathPrefix()
+        return StoragePath(identifier: prefix.concat("Admin"))!
+    }
+
+    /// Get the admin public path
+    ///
+    access(all)
+    view fun getAdminPublicPath(): PublicPath {
+        let prefix = FRC20FungibleToken.getPathPrefix()
+        return PublicPath(identifier: prefix.concat("Admin"))!
+    }
+
+    /// ----- Internal Methods -----
+
     /// Initialize the contract with ticker name
     ///
     init() {
-        // Initialize the total supply to zero
+        // Initialize
         self.totalSupply = 0.0
-
-        // Emit an event that shows that the contract was initialized
-        emit TokensInitialized(initialSupply: self.totalSupply)
+        self.totalFungibleTokenSupply = 0.0
 
         // Singleton resources
         let frc20Indexer = FRC20Indexer.getIndexer()
@@ -877,6 +986,44 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             message: "The FRC20 token does not exist"
         )
 
+        // set the total supply
+        self._syncTotalSupply()
+
+        // Emit an event that shows that the contract was initialized
+        emit TokensInitialized(initialSupply: self.totalSupply)
+
+        // setup the indexer controller
+        let controlerPath = FRC20Agents.getIndexerControllerStoragePath()
+        assert(
+            self.account.check<&FRC20Agents.IndexerController>(from: controlerPath),
+            message: "The FRC20 Indexer Controller is not found"
+        )
+        // @deprecated in Cadence 1.0
+        let privPath = /private/FRC20IndxerController
+        self.account.link<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>(
+            privPath,
+            target: controlerPath
+        )
+
+        // setup admin resource
+        let cap = self.account.getCapability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>(privPath)
+        let admin <- create FungibleTokenAdmin(cap: cap)
+        let adminStoragePath = self.getAdminStoragePath()
+        self.account.save(<-admin, to: adminStoragePath)
+        // link the admin resource to the public path
+        // @deprecated after Cadence 1.0
+        self.account.link<&FRC20FungibleToken.FungibleTokenAdmin{FRC20FungibleToken.AdminInterface}>(
+            self.getAdminPublicPath(),
+            target: adminStoragePath
+        )
+
+        // Ensure frc20 controller exists
+        let ctrlRef = self.borrowFRC20Controller()
+        assert(
+            ctrlRef.isTickAccepted(tick: tickerName!),
+            message: "The FRC20 token is not accepted by the controller"
+        )
+
         // Step.2 Setup the vault and receiver for the contract account
 
         let storagePath = self.getVaultStoragePath()
@@ -893,6 +1040,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         self.account.link<&{FungibleToken.Receiver}>(receiverPath, target: storagePath)
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field and the `resolveView` method through the `Balance` interface
-        self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance}>(publicPath, target: storagePath)
+        self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver}>(publicPath, target: storagePath)
     }
 }
