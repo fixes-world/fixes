@@ -50,7 +50,10 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
     access(all) event TokensMetadataUpdated(typeIdentifier: String, id: String, value: String, owner: Address?)
 
     /// The event that is emitted when the dna metadata is updated
-    access(all) event TokenDNAGenerated(identifier: String, value: String, owner: Address?)
+    access(all) event TokenDNAGenerated(identifier: String, value: String, mutatableAmount: UInt64, owner: Address?)
+
+    /// The event that is emitted when the dna mutatable is updated
+    access(all) event TokenDNAMutatableCharged(identifier: String, mutatableAmount: UInt64, owner: Address?)
 
     /// -------- Parameters --------
 
@@ -83,6 +86,15 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Get the mergeable metadata by key
         access(all)
         view fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}?
+        /// Get DNA identifier
+        access(all)
+        view fun getDNAIdentifier(): String
+        /// Get the total mutatable amount of DNA
+        access(all)
+        view fun getDNAMutatableAmount(): UInt64
+        /// DNA charging
+        access(all)
+        fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription)
     }
 
     /// Each user stores an instance of only the Vault in their storage
@@ -160,8 +172,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             self.initializeMetadata(FixesAssetGenes.DNA(
                 self.getDNAIdentifier(),
                 from,
-                // Only FungibleTokens initialized from the Indexer can have 10 mutation attempts.
-                isInitedFromIndexer ? 10 : 0
+                // Only FungibleTokens initialized from the Indexer can have 5 mutation attempts.
+                isInitedFromIndexer ? 5 : 0
             ))
         }
 
@@ -265,6 +277,72 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             return self.metadata[key]
         }
 
+        /// Get the DNA identifier
+        ///
+        access(all)
+        view fun getDNAIdentifier(): String {
+            return self.getType().identifier.concat("-").concat(self.getTickerName())
+        }
+
+        /// Get the total mutatable amount of DNA
+        ///
+        access(all)
+        view fun getDNAMutatableAmount(): UInt64 {
+            let dnaRef = self._borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+                ?? panic("The DNA metadata is not found")
+            return dnaRef.getValue("mutatableAmount") as! UInt64
+        }
+
+        /// DNA charging
+        /// One inscription can activate 5 DNA mutatable attempts.
+        ///
+        access(all)
+        fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription) {
+            pre {
+                ins.isExtractable(): "The inscription must be extractable"
+            }
+
+            let insOwner = ins.owner?.address ?? panic("The owner of the inscription is not found")
+            assert(
+                insOwner == self.owner?.address,
+                message: "The owner of the inscription is not matched"
+            )
+            let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
+            let meta = frc20CtrlRef.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["tick"]?.toLower() == self.getTickerName(),
+                message: "The token tick is not matched"
+            )
+            assert(
+                meta["amt"] == "0.0",
+                message: "The inscription amount must be zero"
+            )
+            assert(
+                meta["usage"] == "empty",
+                message: "The inscription usage must be empty"
+            )
+            let ret <- frc20CtrlRef.withdrawChange(ins: ins)
+            assert(
+                ret.getBalance() == 0.0,
+                message: "The returned change balance must be zero"
+            )
+            destroy ret
+
+            // borrow the DNA metadata
+            let dnaRef = self._borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+                ?? panic("The DNA metadata is not found")
+            let oldValue = dnaRef.getValue("mutatableAmount") as! UInt64
+            // update the DNA mutatable amount
+            dnaRef.setValue("mutatableAmount", oldValue + 5)
+
+            // emit the event
+            emit TokenDNAMutatableCharged(
+                identifier: self.getDNAIdentifier(),
+                mutatableAmount: oldValue + 5,
+                owner: self.owner?.address
+            )
+        }
+
         /// --------- Implement FungibleToken.Provider --------- ///
 
         /// Function that takes an amount as an argument
@@ -310,8 +388,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 }
             }
 
-            // every 5% of balance change will get a new attempt to mutate the DNA
-            var attempt = UInt64(UFix64(amount) / UFix64(oldBalance) / 0.05)
+            // every 10% of balance change will get a new attempt to mutate the DNA
+            var attempt = UInt64(UFix64(amount) / UFix64(oldBalance) / 0.1)
             self._attemptGenerateGene(attempt)
 
             // emit the event
@@ -382,8 +460,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             // update balance
             self.syncBalance()
 
-            // every 5% of balance change will get a new attempt to mutate the DNA
-            let attempt = UInt64(UFix64(depositedBalance) / UFix64(self.balance) / 0.05)
+            // every 10% of balance change will get a new attempt to mutate the DNA
+            let attempt = UInt64(UFix64(depositedBalance) / UFix64(self.balance) / 0.1)
             self._attemptGenerateGene(attempt)
 
             emit TokensDeposited(
@@ -417,24 +495,19 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
         /// --------- Internal Methods --------- ///
 
-        access(self)
-        view fun getDNAIdentifier(): String {
-            return self.getType().identifier.concat("-").concat(self.getTickerName())
-        }
-
-        /// Attempt to generate a new gene, Max attempts is 10
+        /// Attempt to generate a new gene, max 5 attempts for each action
         ///
         access(self)
         fun _attemptGenerateGene(_ attempt: UInt64) {
             var max = attempt
-            if max > 10 {
-                max = 10
+            if max > 5 {
+                max = 5
             }
             if max == 0 {
                 return
             }
 
-            let dnaRef = &self.metadata[Type<FixesAssetGenes.DNA>()] as &{FixesTraits.MergeableData}?
+            let dnaRef = self._borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
                 ?? panic("The DNA metadata is not found")
             let mutatableAmt = dnaRef.getValue("mutatableAmount")
             if mutatableAmt == nil {
@@ -457,16 +530,20 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             }
 
             if anyAdded {
-                // emit the event
-                emit TokenDNAGenerated(
-                    identifier: newDNA.identifier,
-                    value: newDNA.toString(),
-                    owner: self.owner?.address
-                )
                 // merge the DNA
                 dnaRef.merge(newDNA)
+
                 // update the DNA mutatable amount
-                dnaRef.setValue("mutatableAmount", newDNA.getValue("mutatableAmount"))
+                let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64
+                dnaRef.setValue("mutatableAmount", newMutatableAmt)
+
+                // emit the event
+                emit TokenDNAGenerated(
+                    identifier: self.getDNAIdentifier(),
+                    value: newDNA.toString(),
+                    mutatableAmount: newMutatableAmt,
+                    owner: self.owner?.address
+                )
             }
         }
     }
