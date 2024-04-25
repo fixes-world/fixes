@@ -120,6 +120,9 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         fun isStakedTick(): Bool
 
         access(all) view
+        fun isBackedByVault(): Bool
+
+        access(all) view
         fun getVaultType(): Type?
 
         access(all) view
@@ -311,6 +314,11 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(all) view
         fun isStakedTick(): Bool {
             return self.wrappedChange.isStakedTick()
+        }
+
+        access(all) view
+        fun isBackedByVault(): Bool {
+            return self.wrappedChange.isBackedByVault()
         }
 
         access(all) view
