@@ -1190,24 +1190,38 @@ access(all) contract FRC20Indexer {
 
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
-            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let usage = meta["usage"]!
             assert(
-                usage == "staking" || usage == "donate" || usage == "lottery" || usage == "convert",
-                message: "The usage should be 'staking' or 'donate' or 'lottery'"
+                usage == "staking" || usage == "donate" || usage == "lottery" || usage == "convert" || usage == "empty",
+                message: "The usage should be 'staking', 'donate', 'lottery', 'convert' or 'command'"
             )
+
+            // The from address: the owner of the inscription
             let fromAddr = ins.owner!.address
 
-            let retChange <- self._withdrawToTokenChange(
-                tick: tick,
-                fromAddr: fromAddr,
-                amt: amt
-            )
+            // amount can be zero, which means withdraw nothing, just execute the inscription
+            var retChange: @FRC20FTShared.Change? <- nil
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            if amt == 0.0 {
+                // ensure usage is empty
+                assert(
+                    usage == "empty",
+                    message: "The usage should be 'empty' if the amount is zero"
+                )
+                retChange <-! FRC20FTShared.createEmptyChange(tick: tick, from: fromAddr)
+            } else {
+                // withdraw the token to change
+                retChange <-! self._withdrawToTokenChange(
+                    tick: tick,
+                    fromAddr: fromAddr,
+                    amt: amt
+                )
+            }
 
             // extract inscription
             self._extractInscription(tick: tick, ins: ins)
 
-            return <- retChange
+            return <- retChange!
         }
 
         /// Deposit a FRC20 token change to indexer
