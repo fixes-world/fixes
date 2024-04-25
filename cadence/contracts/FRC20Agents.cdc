@@ -8,6 +8,7 @@ This the agent controller for FRC20Indexer.
 */
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20FTShared"
 import "FRC20Indexer"
 
@@ -32,7 +33,7 @@ access(all) contract FRC20Agents {
         /// Check if the inscription is accepted.
         access(all)
         view fun isInscriptionAccepted(ins: &Fixes.Inscription): Bool {
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             if let tick = meta["tick"]?.toLower() {
                 return self.isTickAccepted(tick: tick)
             }
@@ -40,10 +41,6 @@ access(all) contract FRC20Agents {
         }
 
         // ------ FRC20Indexer methods -------
-
-        /// Parse the metadata of a FRC20 inscription
-        access(account)
-        view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
 
         /// Ensure the balance of an address exists
         access(all)
@@ -96,12 +93,6 @@ access(all) contract FRC20Agents {
         }
 
         /// ------- Public methods for some access(account) methods of FRC20Indexer -------
-
-        access(account)
-        view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
-            let indexer = FRC20Indexer.getIndexer()
-            return indexer.parseMetadata(data)
-        }
 
         access(all)
         fun ensureBalanceExists(tick: String, addr: Address) {

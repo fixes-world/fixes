@@ -13,6 +13,7 @@ import "NonFungibleToken"
 import "MetadataViews"
 // Fixes Imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesHeartbeat"
 import "FRC20Indexer"
 import "FRC20FTShared"
@@ -542,7 +543,7 @@ access(all) contract FRC20StakingManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "withdraw",
@@ -617,7 +618,7 @@ access(all) contract FRC20StakingManager {
         )
 
         // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "deposit",
@@ -762,7 +763,7 @@ access(all) contract FRC20StakingManager {
             ?? panic("The staking pool is not found")
 
         // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "withdraw",

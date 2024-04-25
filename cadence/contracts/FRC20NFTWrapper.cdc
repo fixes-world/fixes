@@ -10,6 +10,7 @@ import "MetadataViews"
 import "NonFungibleToken"
 import "FlowToken"
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesWrappedNFT"
 import "FRC20Indexer"
 import "StringUtils"
@@ -297,7 +298,7 @@ access(all) contract FRC20NFTWrapper {
                 message: "The inscription is not a valid FRC20 inscription"
             )
             let fromAddr = ins.owner?.address ?? panic("Inscription owner is nil")
-            let data = indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let data = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 data["op"] == "transfer" && data["tick"] != nil && data["amt"] != nil && data["to"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for transfer"

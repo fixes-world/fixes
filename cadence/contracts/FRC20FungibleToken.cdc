@@ -14,6 +14,7 @@ import "MetadataViews"
 import "FungibleTokenMetadataViews"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesTraits"
 import "FixesAssetGenes"
 import "FRC20FTShared"
@@ -74,9 +75,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Is the vault valid
         access(all)
         view fun isValidVault(): Bool
-        /// Get the ticker name of the token
-        access(all)
-        view fun getTickerName(): String
         /// Get the change's from address
         access(all)
         view fun getSourceAddress(): Address
@@ -136,6 +134,26 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 self.balance == UFix64(0): "Balance must be zero for destroy"
             }
             destroy self.change
+        }
+
+        /// Called when a fungible token is burned via the `Burner.burn()` method
+        access(contract) fun burnCallback() {
+            if self.balance > 0.0 {
+                // update the total supply for the FungibleToken
+                FRC20FungibleToken.totalFungibleTokenSupply = FRC20FungibleToken.totalFungibleTokenSupply - self.balance
+            }
+            self.balance = 0.0
+        }
+
+        /// createEmptyVault
+        ///
+        /// Function that creates a new Vault with a balance of zero
+        /// and returns it to the calling context. A user must call this function
+        /// and store the returned Vault in their storage in order to allow their
+        /// account to be able to receive deposits of this token type.
+        ///
+        access(all) fun createEmptyVault(): @Vault {
+            return <- FRC20FungibleToken.createEmptyVault()
         }
 
         /// ----- Internal Methods -----
@@ -249,13 +267,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             return self.change != nil
         }
 
-        /// Get the ticker name of the token
-        ///
-        access(all)
-        view fun getTickerName(): String {
-            return self.change?.tick ?? panic("The change must be initialized")
-        }
-
         /// Get the change's from address
         ///
         access(all)
@@ -281,7 +292,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         ///
         access(all)
         view fun getDNAIdentifier(): String {
-            return self.getType().identifier.concat("-").concat(self.getTickerName())
+            return self.getType().identifier.concat("-").concat(FRC20FungibleToken.getSymbol())
         }
 
         /// Get the total mutatable amount of DNA
@@ -308,9 +319,9 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 message: "The owner of the inscription is not matched"
             )
             let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
-            let meta = frc20CtrlRef.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
-                meta["tick"]?.toLower() == self.getTickerName(),
+                meta["tick"]?.toLower() == FRC20FungibleToken.getSymbol(),
                 message: "The token tick is not matched"
             )
             assert(
@@ -444,7 +455,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             let ownerAddr = self.owner?.address
             if ownerAddr != nil {
                 let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
-                frc20CtrlRef.ensureBalanceExists(tick: self.getTickerName(), addr: ownerAddr!)
+                frc20CtrlRef.ensureBalanceExists(tick: FRC20FungibleToken.getSymbol(), addr: ownerAddr!)
             }
 
             // when change extracted, the balance is updated and vault is useless
@@ -590,7 +601,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         }
 
         let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
-        let meta = frc20CtrlRef.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         // ensure tick is the same
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
         assert(
@@ -645,7 +656,7 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         }
 
         let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
-        let meta = frc20CtrlRef.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         // ensure tick is the same
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
         assert(
@@ -655,6 +666,8 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
 
         let fromVault <- vault as! @FRC20FungibleToken.Vault
         let retChange <- fromVault.extract()
+        // burn the fungible token
+        fromVault.burnCallback()
         // no need to emit the event, it is emitted in the extract function
         destroy fromVault
 
@@ -680,8 +693,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             by: insOwner,
         )
 
-        // update the total supply
-        FRC20FungibleToken.totalFungibleTokenSupply = FRC20FungibleToken.totalFungibleTokenSupply - convertBalance
         self._syncTotalSupply()
     }
 

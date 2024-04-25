@@ -11,6 +11,7 @@ import "FungibleToken"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
@@ -364,7 +365,7 @@ access(all) contract FRC20Storefront {
             // Analyze the listing inscription and build the details
             let indexer = FRC20Indexer.getIndexer()
             // find the op first
-            let meta = indexer.parseMetadata(&listIns.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&listIns.getData() as &Fixes.InscriptionData)
             let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
 
             var order: @FRC20FTShared.ValidFrozenOrder? <- nil
@@ -1313,7 +1314,7 @@ access(all) contract FRC20Storefront {
         if !indexer.isValidFRC20Inscription(ins: ins) {
             return false
         }
-        let meta = indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower()
         if op == nil || op!.slice(from: 0, upTo: 5) != "list-" {
             return false

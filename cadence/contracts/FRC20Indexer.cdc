@@ -7,13 +7,13 @@ This the main contract of FRC20, it is used to deploy and manage the FRC20 token
 
 */
 // Third-party imports
-import "StringUtils"
 import "MetadataViews"
 import "FungibleToken"
 import "FungibleTokenMetadataViews"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20FTShared"
 
 access(all) contract FRC20Indexer {
@@ -153,10 +153,6 @@ access(all) contract FRC20Indexer {
         /// Burn a FRC20 token
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
-        /** ---- Account Methods for readonly ---- */
-        /// Parse the metadata of a FRC20 inscription
-        access(account)
-        view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
         /** ---- Account Methods for listing ---- */
         /// Ensure the balance of an address exists
         access(account)
@@ -448,7 +444,7 @@ access(all) contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "deploy" && meta["tick"] != nil && meta["max"] != nil && meta["lim"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for deployment"
@@ -506,7 +502,7 @@ access(all) contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "mint" && meta["tick"] != nil && meta["amt"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for minting"
@@ -564,7 +560,7 @@ access(all) contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "transfer" && meta["tick"] != nil && meta["amt"] != nil && meta["to"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for transfer"
@@ -591,7 +587,7 @@ access(all) contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "burn" && meta["tick"] != nil && meta["amt"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for burning"
@@ -646,33 +642,6 @@ access(all) contract FRC20Indexer {
             }
         }
 
-        // ---- Account Methods ----
-
-        /// Parse the metadata of a FRC20 inscription
-        ///
-        access(account)
-        view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
-            let ret: {String: String} = {}
-            if data.encoding != nil && data.encoding != "utf8" {
-                panic("The inscription is not encoded in utf8")
-            }
-            // parse the body
-            if let body = String.fromUTF8(data.metadata) {
-                // split the pairs
-                let pairs = StringUtils.split(body, ",")
-                for pair in pairs {
-                    // split the key and value
-                    let kv = StringUtils.split(pair, "=")
-                    if kv.length == 2 {
-                        ret[kv[0]] = kv[1]
-                    }
-                }
-            } else {
-                panic("The inscription is not encoded in utf8")
-            }
-            return ret
-        }
-
         // ---- Account Methods for command inscriptions ----
 
         /// Set a FRC20 token to be burnable
@@ -685,7 +654,7 @@ access(all) contract FRC20Indexer {
                 // The command inscriptions should be only executed by the indexer
                 self._isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for setting burnable"
@@ -716,7 +685,7 @@ access(all) contract FRC20Indexer {
                 // The command inscriptions should be only executed by the indexer
                 self._isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for burning unsupplied tokens"
@@ -774,7 +743,7 @@ access(all) contract FRC20Indexer {
                 result.getBalance() > 0.0: "The result should have a positive balance"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "withdrawFromTreasury" && meta["tick"] != nil && meta["amt"] != nil && meta["usage"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for withdrawing from treasury"
@@ -828,7 +797,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "alloc" && meta["tick"] != nil && meta["amt"] != nil && meta["to"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for allocating"
@@ -855,7 +824,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             // only check the tick property
             assert(
                 meta["tick"] != nil,
@@ -888,7 +857,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "list-buynow" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
@@ -943,7 +912,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "list-sellnow" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
@@ -1004,8 +973,8 @@ access(all) contract FRC20Indexer {
                 maxAmount <= change.getBalance(): "The max amount should be less than or equal to the change balance"
             }
 
-            let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
-            let takerMeta = self.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
+            let makerMeta = FixesInscriptionFactory.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
+            let takerMeta = FixesInscriptionFactory.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
 
             assert(
                 makerMeta["op"] == "list-buynow" && makerMeta["tick"] != nil && makerMeta["amt"] != nil && makerMeta["price"] != nil,
@@ -1080,8 +1049,8 @@ access(all) contract FRC20Indexer {
                 change.isBackedByFlowTokenVault() == true: "The change should be backed by a flow vault"
             }
 
-            let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
-            let takerMeta = self.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
+            let makerMeta = FixesInscriptionFactory.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
+            let takerMeta = FixesInscriptionFactory.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
 
             assert(
                 makerMeta["op"] == "list-sellnow" && makerMeta["tick"] != nil && makerMeta["amt"] != nil && makerMeta["price"] != nil,
@@ -1147,7 +1116,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: listedIns): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&listedIns.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&listedIns.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"]?.slice(from: 0, upTo: 5) == "list-" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
@@ -1182,7 +1151,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "withdraw" && meta["tick"] != nil && meta["amt"] != nil && meta["usage"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for transfer"
@@ -1234,7 +1203,7 @@ access(all) contract FRC20Indexer {
                 change.isBackedByVault() == false: "The change should not be backed by a vault"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "deposit" && meta["tick"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for transfer"

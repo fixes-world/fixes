@@ -159,14 +159,13 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = false
             isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil
             }
@@ -210,13 +209,12 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil
             }
@@ -260,13 +258,12 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "lottery" && meta["tick"] != nil && meta["amt"] != nil
             }
@@ -319,13 +316,12 @@ access(all) contract FRC20VoteCommands {
         access(all) view
         fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "staking"
                     && meta["tick"] != nil && meta["amt"] != nil
@@ -346,7 +342,7 @@ access(all) contract FRC20VoteCommands {
                 return false
             }
             let ins = insRefArr[0]
-            let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
 
             // singleton resources
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()

@@ -13,6 +13,7 @@ import "StringUtils"
 // Fixes Imports
 import "ETHUtils"
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20Indexer"
 import "FRC20Staking"
 import "FRC20AccountsPool"
@@ -630,7 +631,7 @@ access(all) contract EVMAgent {
             let frc20Indexer = FRC20Indexer.getIndexer()
 
             // inscription data
-            let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
             assert(
                 op == "create-evm-agency",
