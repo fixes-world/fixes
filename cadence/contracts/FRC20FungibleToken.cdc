@@ -87,6 +87,9 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         /// Get DNA identifier
         access(all)
         view fun getDNAIdentifier(): String
+        /// Get DNA owner
+        access(all)
+        view fun getDNAOwner(): Address
         /// Get the total mutatable amount of DNA
         access(all)
         view fun getDNAMutatableAmount(): UInt64
@@ -295,6 +298,15 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
             return self.getType().identifier.concat("-").concat(FRC20FungibleToken.getSymbol())
         }
 
+        /// Get DNA owner
+        ///
+        access(all)
+        view fun getDNAOwner(): Address {
+            let dnaRef = self._borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+                ?? panic("The DNA metadata is not found")
+            return dnaRef.getValue("owner") as! Address
+        }
+
         /// Get the total mutatable amount of DNA
         ///
         access(all)
@@ -355,6 +367,12 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
         }
 
         /// --------- Implement FungibleToken.Provider --------- ///
+
+        /// Asks if the amount can be withdrawn from this vault
+        ///
+        access(all) view fun isAvailableToWithdraw(amount: UFix64): Bool {
+            return amount <= self.balance
+        }
 
         /// Function that takes an amount as an argument
         /// and withdraws that amount from the Vault.
