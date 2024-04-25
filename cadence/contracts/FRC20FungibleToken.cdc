@@ -146,7 +146,6 @@ access(all) contract FRC20FungibleToken: FungibleToken, ViewResolver {
                 self.change == nil: "The change must be nil"
                 change.isBackedByVault() == false: "The change must not be backed by a vault"
                 change.isStakedTick() == false: "The change must not be staked"
-                change.isTreasuryLPVoucher() == false: "The change must not be a treasury LP voucher"
                 change.tick == FRC20FungibleToken.getSymbol(): "The change must be backed by the same ticker"
             }
             post {

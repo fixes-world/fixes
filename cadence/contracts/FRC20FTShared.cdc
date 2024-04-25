@@ -130,13 +130,6 @@ access(all) contract FRC20FTShared {
             return self.isBackedByVault() == false && self.tick[0] == "!"
         }
 
-        /// Check if this Change is a LP Voucher change
-        ///
-        access(all) view
-        fun isTreasuryLPVoucher(): Bool {
-            return self.isBackedByVault() == false && self.tick[0] == "^"
-        }
-
         access(all) view
         fun getOriginalTick(): String {
             // if the tick is a staked tick, remove the first character
@@ -530,7 +523,6 @@ access(all) contract FRC20FTShared {
     ): @Change {
         pre {
             ref.isStakedTick() == false: "The input Change must not be a staked tick"
-            ref.isTreasuryLPVoucher() == false: "The input Change must not be a LP Voucher"
             ref.isBackedByVault() == false: "The input Change must not be backed by a Vault"
         }
         post {
@@ -558,43 +550,6 @@ access(all) contract FRC20FTShared {
         }
         return <- self.createEmptyChange(
             tick: "!".concat(tick), // staked tick is prefixed with "!"
-            from: from
-        )
-    }
-
-    /// Create a new Change for LP Voucher
-    ///
-    access(account)
-    fun createTreasuryLPVoucher(
-        tick: String,
-        issuer: Address,
-        balance: UFix64,
-    ): @Change {
-        post {
-            result.tick == "^".concat(tick): "Tick must be equal to the provided tick"
-            result.getBalance() == balance: "Balance must be equal to the provided balance"
-            result.from == issuer: "The owner of the Change must be the same as the issuer"
-        }
-        return <- create Change(
-            tick: "^".concat(tick), // LP Voucher is prefixed with "^"
-            from: issuer, // all LP Vouchers are from issuer
-            balance: balance,
-            ftVault: nil
-        )
-    }
-
-    /// Create a new Change for LP Voucher
-    ///
-    access(account)
-    fun createEmptyTreasuryLPVoucher(
-        tick: String,
-        from: Address,
-    ): @Change {
-        pre {
-            tick != "": "Tick must not be empty"
-        }
-        return <- self.createEmptyChange(
-            tick: "^".concat(tick), // LP Voucher is prefixed with "^"
             from: from
         )
     }

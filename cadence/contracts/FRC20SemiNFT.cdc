@@ -120,9 +120,6 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         fun isStakedTick(): Bool
 
         access(all) view
-        fun isTreasuryLPVoucher(): Bool
-
-        access(all) view
         fun getVaultType(): Type?
 
         access(all) view
@@ -314,11 +311,6 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(all) view
         fun isStakedTick(): Bool {
             return self.wrappedChange.isStakedTick()
-        }
-
-        access(all) view
-        fun isTreasuryLPVoucher(): Bool {
-            return self.wrappedChange.isTreasuryLPVoucher()
         }
 
         access(all) view
@@ -838,8 +830,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         initialYieldRates: {String: UFix64}
     ): UInt64 {
         pre {
-            change.isStakedTick() || change.isTreasuryLPVoucher(): "The tick must be a staked 𝔉rc20 token or a treasury LP voucher"
-            change.isBackedByVault() == false: "Cannot wrap a vault backed FRC20 change"
+            change.isStakedTick(): "The tick must be a staked 𝔉rc20 token"
+            change.isBackedByVault() == false: "Cannot wrap a vault backed 𝔉rc20 change"
         }
         let poolAddress = change.from
         let tick = change.tick
@@ -852,19 +844,6 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         // deposit it in the recipient's account using their reference
         recipient.deposit(token: <-newNFT)
         return nftId
-    }
-
-    /// Unwraps an NFT and deposits it in the recipients collection
-    /// using their collection reference
-    ///
-    access(account)
-    fun unwrapTreasuryLPVoucherFRC20(
-        nftToUnwrap: @FRC20SemiNFT.NFT,
-    ): @FRC20FTShared.Change {
-        pre {
-            nftToUnwrap.isTreasuryLPVoucher() == true: "Cannot unwrap a non-treasury LP voucher 𝔉rc20 token by this method."
-        }
-        return <- self._unwrap(<- nftToUnwrap)
     }
 
     /// Unwraps the SemiNFT and returns the wrapped FRC20FTShared.Change
