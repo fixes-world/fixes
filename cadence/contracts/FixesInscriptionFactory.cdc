@@ -347,4 +347,15 @@ access(all) contract FixesInscriptionFactory {
     ): String {
         return "op=deposit,tick=".concat(tick)
     }
+
+    /// Build the inscription for pure executing methods
+    ///
+    access(all)
+    view fun buildPureExecuting(
+        tick: String,
+        usage: String?
+    ): String {
+        return "op=exec,tick=".concat(tick)
+            .concat(",usage=".concat(usage ?? "*"))
+    }
 }

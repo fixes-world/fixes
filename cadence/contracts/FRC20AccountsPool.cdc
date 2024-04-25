@@ -3,7 +3,7 @@
 
 # FRC20 Accounts Pool
 
-TODO: Add description
+The Hybrid Custody Account Pool
 
 */
 
@@ -13,8 +13,8 @@ import "FungibleToken"
 import "FlowToken"
 import "HybridCustody"
 // Fixes imports
-// import "Fixes"
-// import "FRC20FTShared"
+import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20Indexer"
 
 access(all) contract FRC20AccountsPool {
@@ -99,6 +99,10 @@ access(all) contract FRC20AccountsPool {
         /// Returns the flow token receiver for the given tick
         access(all)
         view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}?
+
+        /// Execute inscription and extract FlowToken in the inscription
+        access(all)
+        fun executeInscription(type: ChildAccountType, _ ins: &Fixes.Inscription)
 
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
@@ -293,6 +297,49 @@ access(all) contract FRC20AccountsPool {
                 return FRC20Indexer.borrowFlowTokenReceiver(addr)
             }
             return nil
+        }
+
+        /// Execute inscription and extract FlowToken in the inscription
+        ///
+        access(all)
+        fun executeInscription(type: ChildAccountType, _ ins: &Fixes.Inscription) {
+            pre {
+                ins.isExtractable(): "The inscription must be extractable"
+            }
+            post {
+                ins.isExtracted(): "The inscription must be extracted"
+            }
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "exec",
+                message: "The inscription operation must be 'exec'"
+            )
+            assert(
+                meta["usage"] != nil,
+                message: "The usage is not found"
+            )
+            let tick = meta["tick"] ?? panic("The ticker name is not found")
+
+            // extract the tokens
+            let extractedToken <- ins.extract()
+
+            // deposit the tokens to pool and treasury
+            if let tickDict = self.borrowDict(type: type) {
+                if let addr = tickDict[tick] {
+                    if let tickRelatedFlowReciever = FRC20Indexer.borrowFlowTokenReceiver(addr) {
+                        // 5% of the extracted tokens will be sent to the system account
+                        let amtToTarget = extractedToken.balance * 0.95
+                        // withdraw the tokens to the treasury
+                        let tokenToTarget <- extractedToken.withdraw(amount: amtToTarget)
+                        // the target account
+                        tickRelatedFlowReciever.deposit(from: <- tokenToTarget)
+                    }
+                }
+            }
+            let systemFlowReciever = FRC20Indexer.borrowFlowTokenReceiver(self.owner?.address!)
+                ?? panic("Failed to borrow system flow token receiver")
+            // remaining 5% of the extracted tokens will be sent to the system account
+            systemFlowReciever.deposit(from: <- extractedToken)
         }
 
         /// ----- Access account methods -----
