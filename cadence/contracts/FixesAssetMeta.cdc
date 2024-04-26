@@ -16,6 +16,8 @@ import "FixesTraits"
 ///
 access(all) contract FixesAssetMeta {
 
+    // ----------------- DNA and Gene -----------------
+
     /// The gene quality level
     ///
     access(all) enum GeneQuality: UInt8 {
@@ -386,4 +388,97 @@ access(all) contract FixesAssetMeta {
         let exp = revertibleRandom() % (threshold / 5) // random exp from 20% of the threshold
         return Gene(id: nil, quality: GeneQuality.Empowered, exp: exp)
     }
+
+    // ----------------- End of DNA and Gene -----------------
+
+    // ----------------- Deposit Tax -----------------
+
+    /// The DNA data structure
+    ///
+    access(all) struct DepositTax: FixesTraits.MergeableData {
+        access(all) var enabled: Bool
+        access(all) var flags: {String: Bool}
+
+        init(
+            _ enabled: Bool?,
+            _ flags: {String: Bool}?,
+        ) {
+            self.enabled = enabled ?? false
+            self.flags = flags ?? {}
+        }
+
+        /// Get the id of the data
+        ///
+        access(all)
+        view fun getId(): String {
+            return "DepositTax"
+        }
+
+        /// Get the string value of the data
+        ///
+        access(all)
+        view fun toString(): String {
+            var flags: [String] = []
+            for key in self.flags.keys {
+                flags.append(key.concat("=").concat(self.flags[key] == true ? "1" : "0"))
+            }
+            return StringUtils.join([
+                "enabled=".concat(self.enabled ? "1" : "0")
+            ].concat(flags), ",")
+        }
+
+        /// Get the data keys
+        ///
+        access(all)
+        view fun getKeys(): [String] {
+            return ["enabled"]
+        }
+
+        /// Get the value of the data
+        /// It means genes keys of the DNA
+        ///
+        access(all)
+        view fun getValue(_ key: String): AnyStruct? {
+            if key == "enabled" {
+                return self.enabled
+            }
+            return nil
+        }
+
+        /// Get the writable keys
+        ///
+        access(all)
+        view fun getWritableKeys(): [String] {
+            return ["enabled"]
+        }
+
+        /// Set the value of the data
+        ///
+        access(all)
+        fun setValue(_ key: String, _ value: AnyStruct) {
+            if key == "enabled" {
+                self.enabled = value as! Bool
+            }
+        }
+
+        /// Split the data into another instance
+        ///
+        access(all)
+        fun split(_ perc: UFix64): {FixesTraits.MergeableData} {
+            post {
+                self.getId() == result.getId(): "The result id is not the same so cannot split"
+            }
+            return DepositTax(self.enabled, self.flags)
+        }
+
+        /// Merge the data from another instance
+        /// The type of the data must be the same(Ensured by interface)
+        ///
+        access(all)
+        fun merge(_ from: {FixesTraits.MergeableData}): Void {
+            // Nothing to merge
+        }
+    }
+
+    // ----------------- End of Deposit Tax -----------------
 }

@@ -312,14 +312,6 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FungibleTokenManager": {
-			"source": "cadence/contracts/FungibleTokenManager.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
 		"FlowToken": {
 			"source": "./imports/1654653399040a61/FlowToken.cdc",
 			"aliases": {
@@ -334,6 +326,14 @@
 				"emulator": "ee82856bf20e2aa6",
 				"mainnet": "f233dcee88fe0abe",
 				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"FungibleTokenManager": {
+			"source": "cadence/contracts/FungibleTokenManager.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
 			}
 		},
 		"FungibleTokenMetadataViews": {
@@ -465,6 +465,15 @@
 				"testnet": "31ad40c07a2a9788"
 			}
 		},
+		"BlackHole": {
+			"source": "mainnet://4396883a58c3a2d1.BlackHole",
+			"hash": "d45cf1a3a5468bd502ee4e3b94bc81c968e9bb91a56dcefcb1bcbb3ad32fd904",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "4396883a58c3a2d1",
+				"testnet": "ad26718c4b6b921b"
+			}
+		},
 		"CapabilityDelegator": {
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityDelegator",
 			"hash": "026019cb04d32e65fca7f40f700f2d46d16a41521f38db27bbf5963816b5d971",
@@ -540,6 +549,15 @@
 			"aliases": {
 				"mainnet": "233eb012d34b0070",
 				"testnet": "b05b2abb42335e88"
+			}
+		},
+		"FTViewUtils": {
+			"source": "mainnet://15a918087ab12d86.FTViewUtils",
+			"hash": "9ed7d0e8cf849d6603228a52cb91cc9de5d997abb4f2bb65b3f4ff49ec48e50a",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "15a918087ab12d86",
+				"testnet": "0b86f928a1fa7798"
 			}
 		},
 		"FUSD": {
@@ -742,6 +760,15 @@
 				"testnet": "ddb929038d45d4b3"
 			}
 		},
+		"TokenList": {
+			"source": "mainnet://15a918087ab12d86.TokenList",
+			"hash": "b0569e11763c23e97fd073baeffaa6539c7d7035b6c5c6180243285bc5c92f1c",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "15a918087ab12d86",
+				"testnet": "b86f928a1fa7798e"
+			}
+		},
 		"ViewResolver": {
 			"source": "mainnet://1d7e57aa55817448.ViewResolver",
 			"hash": "9fa41186f38899625a6b4774f1a9addf8d16b76022d52a99174b4493499dc3de",
@@ -749,6 +776,15 @@
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
 				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"ViewResolvers": {
+			"source": "mainnet://15a918087ab12d86.ViewResolvers",
+			"hash": "e5ec455d8d71a03e7bd50d72031594cf3a452b138c4f8b4348ea45bc066d6fca",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "15a918087ab12d86",
+				"testnet": "0b86f928a1fa7798"
 			}
 		}
 	},
@@ -834,6 +870,10 @@
 				"CapabilityFactory",
 				"SwapConfig",
 				"SwapInterfaces",
+				"BlackHole",
+				"ViewResolvers",
+				"FTViewUtils",
+				"TokenList",
 				"ETHUtils",
 				"Fixes",
 				"FixesInscriptionFactory",

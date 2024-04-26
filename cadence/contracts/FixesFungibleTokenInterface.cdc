@@ -218,6 +218,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     ///
     access(all)
     view fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
+        log("Borrowing shared store: ".concat(self.account.address.toString()))
         return FRC20FTShared.borrowStoreRef(self.account.address) ?? panic("Config store not found")
     }
 
@@ -266,6 +267,35 @@ access(all) contract interface FixesFungibleTokenInterface {
         let iconJpg = store.get(key.concat("jpg")) as! String?
         return iconPng ?? iconSvg ?? iconJpg ?? iconDefault
     }
+
+    /// Get the deposit tax of the Fungible Token
+    ///
+    access(all)
+    view fun getDepositTaxRatio(): UFix64 {
+        post {
+            result >= 0.0: "The deposit tax ratio must be greater than or equal to 0"
+            result < 1.0: "The deposit tax ratio must be less than 1"
+        }
+        let store = self.borrowSharedStore()
+        if let tax = store.get("fungibleToken:Settings:DepositTax") {
+            return tax as? UFix64 ?? 0.0
+        }
+        return 0.0
+    }
+
+    /// Get the deposit tax recepient
+    ///
+    access(all)
+    view fun getDepositTaxRecepient(): Address? {
+        let store = self.borrowSharedStore()
+        if let addr = store.get("fungibleToken:Settings:DepositTaxRecepient") {
+            return addr as? Address
+        }
+        return self.account.address
+    }
+
+    // access(all)
+    // view fun getDepositTaxMode():
 
     /// Get the fungible token balance of the address
     ///
