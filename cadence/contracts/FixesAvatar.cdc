@@ -35,20 +35,20 @@ access(all) contract FixesAvatar {
     /* --- Interfaces & Resources --- */
 
     access(all) resource interface ProfilePublic {
-        access(all) view
-        fun getProperty(_ name: String): String?
+        access(all)
+        view fun getProperty(_ name: String): String?
 
-        access(all) view
-        fun getEnabledTraits(): [MetadataViews.Trait]
+        access(all)
+        view fun getEnabledTraits(): [MetadataViews.Trait]
 
-        access(all) view
-        fun getOwnedTraitIDs(): [UInt64]
+        access(all)
+        view fun getOwnedTraitIDs(): [UInt64]
 
-        access(all) view
-        fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset?
+        access(all)
+        view fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset?
 
-        access(all) view
-        fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait?
+        access(all)
+        view fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait?
     }
 
     /// The resource that stores the metadata for this contract
@@ -132,13 +132,13 @@ access(all) contract FixesAvatar {
 
         /// Get the property with the given name
         ///
-        access(all) view
-        fun getProperty(_ name: String): String? {
+        access(all)
+        view fun getProperty(_ name: String): String? {
             return self.properties[name]
         }
 
-        access(all) view
-        fun getEnabledTraits(): [MetadataViews.Trait] {
+        access(all)
+        view fun getEnabledTraits(): [MetadataViews.Trait] {
             let traits: [MetadataViews.Trait] = []
             for traitId in self.enabledEntities {
                 if let entry = self.borrowEntry(traitId) {
@@ -150,21 +150,21 @@ access(all) contract FixesAvatar {
             return traits
         }
 
-        access(all) view
-        fun getOwnedTraitIDs(): [UInt64] {
+        access(all)
+        view fun getOwnedTraitIDs(): [UInt64] {
             return self.ownedEntities.keys
         }
 
-        access(all) view
-        fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset? {
+        access(all)
+        view fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset? {
             if let entry = self.borrowEntry(id) {
                 return entry.getTrait()
             }
             return nil
         }
 
-        access(all) view
-        fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait? {
+        access(all)
+        view fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait? {
             if let entry = self.borrowEntry(id) {
                 return entry.resolveView(Type<MetadataViews.Trait>()) as! MetadataViews.Trait?
             }

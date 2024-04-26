@@ -120,32 +120,32 @@ access(all) contract FRC20NFTWrapper {
 
         /// Get the internal flow vault balance
         ///
-        access(all) view
-        fun getInternalFlowBalance(): UFix64
+        access(all)
+        view fun getInternalFlowBalance(): UFix64
 
-        access(all) view
-        fun isFRC20NFTWrappered(nft: &NonFungibleToken.NFT): Bool
+        access(all)
+        view fun isFRC20NFTWrappered(nft: &NonFungibleToken.NFT): Bool
 
-        access(all) view
-        fun hasFRC20Strategy(_ collectionType: Type): Bool
+        access(all)
+        view fun hasFRC20Strategy(_ collectionType: Type): Bool
 
-        access(all) view
-        fun getStrategiesAmount(all: Bool): UInt64
+        access(all)
+        view fun getStrategiesAmount(all: Bool): UInt64
 
-        access(all) view
-        fun getStrategies(all: Bool): [FRC20Strategy]
+        access(all)
+        view fun getStrategies(all: Bool): [FRC20Strategy]
 
-        access(all) view
-        fun isAuthorizedToRegister(addr: Address): Bool
+        access(all)
+        view fun isAuthorizedToRegister(addr: Address): Bool
 
-        access(all) view
-        fun getWhitelistedAddresses(): [Address]
+        access(all)
+        view fun getWhitelistedAddresses(): [Address]
 
-        access(all) view
-        fun getOption(key: String): AnyStruct?
+        access(all)
+        view fun getOption(key: String): AnyStruct?
 
-        access(all) view
-        fun getOptions(): {String: AnyStruct}
+        access(all)
+        view fun getOptions(): {String: AnyStruct}
 
         // write methods ----
 
@@ -203,13 +203,13 @@ access(all) contract FRC20NFTWrapper {
 
         // public methods
 
-        access(all) view
-        fun getInternalFlowBalance(): UFix64 {
+        access(all)
+        view fun getInternalFlowBalance(): UFix64 {
             return self.internalFlowVault.balance
         }
 
-        access(all) view
-        fun isFRC20NFTWrappered(nft: &NonFungibleToken.NFT): Bool {
+        access(all)
+        view fun isFRC20NFTWrappered(nft: &NonFungibleToken.NFT): Bool {
             let collectionType = FRC20NFTWrapper.asCollectionType(nft.getType().identifier)
             if let nftHistories = &self.histories[collectionType] as &{UInt64: Bool}? {
                 return nftHistories[nft.id] ?? false
@@ -217,13 +217,13 @@ access(all) contract FRC20NFTWrapper {
             return false
         }
 
-        access(all) view
-        fun hasFRC20Strategy(_ collectionType: Type): Bool {
+        access(all)
+        view fun hasFRC20Strategy(_ collectionType: Type): Bool {
             return self.strategies[collectionType] != nil
         }
 
-        access(all) view
-        fun getStrategiesAmount(all: Bool): UInt64 {
+        access(all)
+        view fun getStrategiesAmount(all: Bool): UInt64 {
             if all {
                 return UInt64(self.strategies.keys.length)
             }
@@ -232,8 +232,8 @@ access(all) contract FRC20NFTWrapper {
             }).length)
         }
 
-        access(all) view
-        fun getStrategies(all: Bool): [FRC20Strategy] {
+        access(all)
+        view fun getStrategies(all: Bool): [FRC20Strategy] {
             if all {
                 return self.strategies.values
             }
@@ -242,13 +242,13 @@ access(all) contract FRC20NFTWrapper {
             })
         }
 
-        access(all) view
-        fun isAuthorizedToRegister(addr: Address): Bool {
+        access(all)
+        view fun isAuthorizedToRegister(addr: Address): Bool {
             return addr == self.owner?.address || (self.whitelist[addr] ?? false)
         }
 
-        access(all) view
-        fun getWhitelistedAddresses(): [Address] {
+        access(all)
+        view fun getWhitelistedAddresses(): [Address] {
             let ret: [Address] = []
             for addr in self.whitelist.keys {
                 if self.whitelist[addr]! {
@@ -258,13 +258,13 @@ access(all) contract FRC20NFTWrapper {
             return ret
         }
 
-        access(all) view
-        fun getOption(key: String): AnyStruct? {
+        access(all)
+        view fun getOption(key: String): AnyStruct? {
             return self.options[key]
         }
 
-        access(all) view
-        fun getOptions(): {String: AnyStruct} {
+        access(all)
+        view fun getOptions(): {String: AnyStruct} {
             return self.options
         }
 
@@ -573,12 +573,12 @@ access(all) contract FRC20NFTWrapper {
 
         /// Check if the wrapper is registered
         ///
-        access(all) view
-        fun hasRegisteredWrapper(addr: Address): Bool
+        access(all)
+        view fun hasRegisteredWrapper(addr: Address): Bool
 
         /// Get all the wrappers
-        access(all) view
-        fun getAllWrappers(_ includeNoStrategy: Bool, _ includeFinished: Bool): [Address]
+        access(all)
+        view fun getAllWrappers(_ includeNoStrategy: Bool, _ includeFinished: Bool): [Address]
 
         /// Get the public reference to the Wrapper resource
         ///
@@ -589,8 +589,8 @@ access(all) contract FRC20NFTWrapper {
 
         /// Get the NFT collection display
         ///
-        access(all) view
-        fun getNFTCollectionDisplay(
+        access(all)
+        view fun getNFTCollectionDisplay(
             nftType: Type,
         ): MetadataViews.NFTCollectionDisplay
 
@@ -619,15 +619,15 @@ access(all) contract FRC20NFTWrapper {
 
         /// Check if the wrapper is registered
         ///
-        access(all) view
-        fun hasRegisteredWrapper(addr: Address): Bool {
+        access(all)
+        view fun hasRegisteredWrapper(addr: Address): Bool {
             return self.wrappers[addr] != nil
         }
 
         /// Get all the wrappers
         ///
-        access(all) view
-        fun getAllWrappers(
+        access(all)
+        view fun getAllWrappers(
             _ includeNoStrategy: Bool,
             _ includeFinished: Bool,
         ): [Address] {
@@ -642,8 +642,8 @@ access(all) contract FRC20NFTWrapper {
 
         /// Get the extra NFT collection display
         ///
-        access(all) view
-        fun getNFTCollectionDisplay(
+        access(all)
+        view fun getNFTCollectionDisplay(
             nftType: Type,
         ): MetadataViews.NFTCollectionDisplay {
             let collectionType = FRC20NFTWrapper.asCollectionType(nftType.identifier)
@@ -766,8 +766,8 @@ access(all) contract FRC20NFTWrapper {
 
     /// Get the NFT collection display
     ///
-    access(all) view
-    fun getNFTCollectionDisplay(
+    access(all)
+    view fun getNFTCollectionDisplay(
         nftType: Type,
     ): MetadataViews.NFTCollectionDisplay {
         return self.borrowWrapperIndexerPublic().getNFTCollectionDisplay(nftType: nftType)

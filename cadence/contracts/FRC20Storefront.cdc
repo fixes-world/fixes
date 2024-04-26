@@ -200,40 +200,40 @@ access(all) contract FRC20Storefront {
 
         /// Get the price per token
         ///
-        access(all) view
-        fun pricePerToken(): UFix64 {
+        access(all)
+        view fun pricePerToken(): UFix64 {
             return self.totalPrice / self.amount
         }
 
         /// Get the price rank
-        access(all) view
-        fun priceRank(): UInt64 {
+        access(all)
+        view fun priceRank(): UInt64 {
             return UInt64(100000.0 / self.amount * self.totalPrice)
         }
 
         /// Return if the listing is completed.
         ///
-        access(all) view
-        fun isCompleted(): Bool {
+        access(all)
+        view fun isCompleted(): Bool {
             return self.status == ListingStatus.Completed
         }
 
         /// Return if the listing is cancelled.
         ///
-        access(all) view
-        fun isCancelled(): Bool {
+        access(all)
+        view fun isCancelled(): Bool {
             return self.status == ListingStatus.Cancelled
         }
 
         /// Return if the listing is fully transacted.
         ///
-        access(all) view
-        fun isFullyTransacted(): Bool {
+        access(all)
+        view fun isFullyTransacted(): Bool {
             return self.transactedAmount == self.amount
         }
 
-        access(all) view
-        fun getPriceByTransactedAmount(_ transactedAmount: UFix64): UFix64 {
+        access(all)
+        view fun getPriceByTransactedAmount(_ transactedAmount: UFix64): UFix64 {
             pre {
                 transactedAmount <= self.amount: "Transacted amount should not exceed the total amount"
             }
@@ -286,29 +286,29 @@ access(all) contract FRC20Storefront {
         /** ---- Public Methods ---- */
 
         /// Get the address of the owner of the NFT that is being sold.
-        access(all) view
-        fun getOwnerAddress(): Address
+        access(all)
+        view fun getOwnerAddress(): Address
 
         /// The listing frc20 token name
-        access(all) view
-        fun getTickName(): String
+        access(all)
+        view fun getTickName(): String
 
         /// Borrow the listing token Meta for the selling FRC20 token
-        access(all) view
-        fun getTickMeta(): FRC20Indexer.FRC20Meta
+        access(all)
+        view fun getTickMeta(): FRC20Indexer.FRC20Meta
 
         /// Fetches the details of the listing.
-        access(all) view
-        fun getDetails(): ListingDetails
+        access(all)
+        view fun getDetails(): ListingDetails
 
         /// Fetches the status
-        access(all) view
-        fun getStatus(): ListingStatus
+        access(all)
+        view fun getStatus(): ListingStatus
 
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
-        access(all) view
-        fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
+        access(all)
+        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
 
         /// Purchase the listing, buying the token.
         /// This pays the beneficiaries and returns the token to the buyer.
@@ -419,22 +419,22 @@ access(all) contract FRC20Storefront {
         /// getOwnerAddress
         /// Fetches the address of the owner of the NFT that is being sold.
         ///
-        access(all) view
-        fun getOwnerAddress(): Address {
+        access(all)
+        view fun getOwnerAddress(): Address {
             return self.owner?.address ?? panic("Get owner address failed")
         }
 
         /// The listing frc20 token name
         ///
-        access(all) view
-        fun getTickName(): String {
+        access(all)
+        view fun getTickName(): String {
             return self.details.tick
         }
 
         /// borrow the Token Meta for the selling FRC20 token
         ///
-        access(all) view
-        fun getTickMeta(): FRC20Indexer.FRC20Meta {
+        access(all)
+        view fun getTickMeta(): FRC20Indexer.FRC20Meta {
             let indexer = FRC20Indexer.getIndexer()
             return indexer.getTokenMeta(tick: self.details.tick)
                 ?? panic("Unable to fetch the token meta")
@@ -442,23 +442,23 @@ access(all) contract FRC20Storefront {
 
         /// Fetches the status
         ///
-        access(all) view
-        fun getStatus(): ListingStatus {
+        access(all)
+        view fun getStatus(): ListingStatus {
             return self.details.status
         }
 
         /// Get the details of listing.
         ///
-        access(all) view
-        fun getDetails(): ListingDetails {
+        access(all)
+        view fun getDetails(): ListingDetails {
             return self.details
         }
 
         /// getAllowedCommissionReceivers
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
-        access(all) view
-        fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]? {
+        access(all)
+        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]? {
             return self.commissionRecipientCaps
         }
 

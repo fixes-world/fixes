@@ -110,35 +110,35 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// The unique ID that each NFT has
         access(all) let id: UInt64
 
-        access(all) view
-        fun getOriginalTick(): String
+        access(all)
+        view fun getOriginalTick(): String
 
-        access(all) view
-        fun getTickerName(): String
+        access(all)
+        view fun getTickerName(): String
 
-        access(all) view
-        fun isStakedTick(): Bool
+        access(all)
+        view fun isStakedTick(): Bool
 
-        access(all) view
-        fun isBackedByVault(): Bool
+        access(all)
+        view fun isBackedByVault(): Bool
 
-        access(all) view
-        fun getVaultType(): Type?
+        access(all)
+        view fun getVaultType(): Type?
 
-        access(all) view
-        fun getFromAddress(): Address
+        access(all)
+        view fun getFromAddress(): Address
 
-        access(all) view
-        fun getBalance(): UFix64
+        access(all)
+        view fun getBalance(): UFix64
 
-        access(all) view
-        fun getRewardStrategies(): [String]
+        access(all)
+        view fun getRewardStrategies(): [String]
 
-        access(all) view
-        fun getClaimingRecord(_ uniqueName: String): RewardClaimRecord?
+        access(all)
+        view fun getClaimingRecord(_ uniqueName: String): RewardClaimRecord?
 
-        access(all) view
-        fun buildUniqueName(_ addr: Address, _ strategy: String): String
+        access(all)
+        view fun buildUniqueName(_ addr: Address, _ strategy: String): String
     }
 
     /// The core resource that represents a Non Fungible Token.
@@ -301,52 +301,52 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
         /** ----- Semi-NFT Methods ----- */
 
-        access(all) view
-        fun getOriginalTick(): String {
+        access(all)
+        view fun getOriginalTick(): String {
             return self.wrappedChange.getOriginalTick()
         }
 
-        access(all) view
-        fun getTickerName(): String {
+        access(all)
+        view fun getTickerName(): String {
             return self.wrappedChange.tick
         }
 
-        access(all) view
-        fun isStakedTick(): Bool {
+        access(all)
+        view fun isStakedTick(): Bool {
             return self.wrappedChange.isStakedTick()
         }
 
-        access(all) view
-        fun isBackedByVault(): Bool {
+        access(all)
+        view fun isBackedByVault(): Bool {
             return self.wrappedChange.isBackedByVault()
         }
 
-        access(all) view
-        fun getVaultType(): Type? {
+        access(all)
+        view fun getVaultType(): Type? {
             return self.wrappedChange.getVaultType()
         }
 
-        access(all) view
-        fun getFromAddress(): Address {
+        access(all)
+        view fun getFromAddress(): Address {
             return self.wrappedChange.from
         }
 
-        access(all) view
-        fun getBalance(): UFix64 {
+        access(all)
+        view fun getBalance(): UFix64 {
             return self.wrappedChange.getBalance()
         }
 
         /// Get the reward strategies
         ///
-        access(all) view
-        fun getRewardStrategies(): [String] {
+        access(all)
+        view fun getRewardStrategies(): [String] {
             return self.claimingRecords.keys
         }
 
         /// Get the the claiming record(copy) by the unique name
         ///
-        access(all) view
-        fun getClaimingRecord(_ uniqueName: String): RewardClaimRecord? {
+        access(all)
+        view fun getClaimingRecord(_ uniqueName: String): RewardClaimRecord? {
             pre {
                 self.isStakedTick(): "The tick must be a staked 𝔉rc20 token"
             }
@@ -492,8 +492,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
         /// Get the unique name of the reward strategy
         ///
-        access(all) view
-        fun buildUniqueName(_ addr: Address, _ strategy: String): String {
+        access(all)
+        view fun buildUniqueName(_ addr: Address, _ strategy: String): String {
             let ref = self.borrowChange()
             return addr.toString().concat("_").concat(ref.getOriginalTick()).concat("_").concat(strategy)
         }
@@ -596,17 +596,17 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         access(all)
         fun deposit(token: @NonFungibleToken.NFT)
         access(all)
-        fun getIDs(): [UInt64]
+        view fun getIDs(): [UInt64]
         access(all)
         fun borrowNFT(id: UInt64): &NonFungibleToken.NFT
         access(all)
         fun borrowNFTSafe(id: UInt64): &NonFungibleToken.NFT?
         /** ----- Specific Methods For SemiNFT ----- */
-        access(all) view
-        fun getIDsByTick(tick: String): [UInt64]
+        access(all)
+        view fun getIDsByTick(tick: String): [UInt64]
         /// Gets the staked balance of the tick
-        access(all) view
-        fun getStakedBalance(tick: String): UFix64
+        access(all)
+        view fun getStakedBalance(tick: String): UFix64
         /// Borrow the FRC20SemiNFT reference by the ID
         access(all)
         fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT{IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver}? {
@@ -621,8 +621,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     ///
     access(all) resource interface FRC20SemiNFTBorrowable {
         /** ----- Specific Methods For SemiNFT ----- */
-        access(all) view
-        fun getIDsByTick(tick: String): [UInt64]
+        access(all)
+        view fun getIDsByTick(tick: String): [UInt64]
         access(all)
         fun borrowFRC20SemiNFT(id: UInt64): &FRC20SemiNFT.NFT? {
             post {
@@ -704,7 +704,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// @return An array containing the IDs of the NFTs in the collection
         ///
         access(all)
-        fun getIDs(): [UInt64] {
+        view fun getIDs(): [UInt64] {
             return self.ownedNFTs.keys
         }
 
@@ -732,8 +732,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
         /// Gets an array of NFT IDs in the collection by the tick
         ///
-        access(all) view
-        fun getIDsByTick(tick: String): [UInt64] {
+        access(all)
+        view fun getIDsByTick(tick: String): [UInt64] {
             if let ids = self.tickIDsMapping[tick] {
                 return ids
             }
@@ -742,8 +742,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
         /// Gets the staked balance of the tick
         ///
-        access(all) view
-        fun getStakedBalance(tick: String): UFix64 {
+        access(all)
+        view fun getStakedBalance(tick: String): UFix64 {
             let tickIds = self.getIDsByTick(tick: tick)
             if tickIds.length > 0 {
                 var totalBalance = 0.0

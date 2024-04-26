@@ -44,15 +44,15 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Readonly Mehtods -----
 
-        access(all) view
-        fun getCommandType(): CommandType
-        access(all) view
-        fun verifyVoteCommands(): Bool
+        access(all)
+        view fun getCommandType(): CommandType
+        access(all)
+        view fun verifyVoteCommands(): Bool
 
         /// Check if all inscriptions are extracted.
         ///
-        access(all) view
-        fun isAllInscriptionsExtracted(): Bool {
+        access(all)
+        view fun isAllInscriptionsExtracted(): Bool {
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
             for insRef in insRefArr {
                 if !insRef.isExtracted() {
@@ -120,13 +120,13 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.None
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             return true
         }
 
@@ -151,13 +151,13 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.SetBurnable
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
@@ -201,13 +201,13 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.BurnUnsupplied
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
@@ -250,13 +250,13 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.MoveTreasuryToLotteryJackpot
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
@@ -308,13 +308,13 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.MoveTreasuryToStakingReward
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 

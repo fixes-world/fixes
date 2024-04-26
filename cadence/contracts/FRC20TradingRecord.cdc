@@ -145,8 +145,8 @@ access(all) contract FRC20TradingRecord {
     /// The interface for viewing the trading status
     ///
     access(all) resource interface TradingStatusViewer {
-        access(all) view
-        fun getStatus(): TradingStatus
+        access(all)
+        view fun getStatus(): TradingStatus
     }
 
     /// The resource containing the trading status
@@ -159,8 +159,8 @@ access(all) contract FRC20TradingRecord {
             self.status = TradingStatus()
         }
 
-        access(all) view
-        fun getStatus(): TradingStatus {
+        access(all)
+        view fun getStatus(): TradingStatus {
             return self.status
         }
 
@@ -176,29 +176,29 @@ access(all) contract FRC20TradingRecord {
     ///
     access(all) resource interface DailyRecordsPublic {
         /// Get the length of the records
-        access(all) view
-        fun getRecordLength(): UInt64
+        access(all)
+        view fun getRecordLength(): UInt64
         /// Get the records of the page
-        access(all) view
-        fun getRecords(page: Int, pageSize: Int): [TransactionRecord]
+        access(all)
+        view fun getRecords(page: Int, pageSize: Int): [TransactionRecord]
         /// Available minutes
-        access(all) view
-        fun getMintesWithStatus(): [UInt64]
+        access(all)
+        view fun getMintesWithStatus(): [UInt64]
         /// Get the trading status
-        access(all) view
-        fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}?
+        access(all)
+        view fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}?
         /// Get the buyer addresses
-        access(all) view
-        fun getBuyerAddresses(): [Address]
+        access(all)
+        view fun getBuyerAddresses(): [Address]
         /// Get the trading volume of the address
-        access(all) view
-        fun getAddressBuyVolume(_ addr: Address): UFix64?
+        access(all)
+        view fun getAddressBuyVolume(_ addr: Address): UFix64?
         /// Get the seller addresses
-        access(all) view
-        fun getSellerAddresses(): [Address]
+        access(all)
+        view fun getSellerAddresses(): [Address]
         /// Get the trading volume of the address
-        access(all) view
-        fun getAddressSellVolume(_ addr: Address): UFix64?
+        access(all)
+        view fun getAddressSellVolume(_ addr: Address): UFix64?
     }
 
     /// The resource containing the daily records
@@ -239,13 +239,13 @@ access(all) contract FRC20TradingRecord {
 
         /** Public methods */
 
-        access(all) view
-        fun getRecordLength(): UInt64 {
+        access(all)
+        view fun getRecordLength(): UInt64 {
             return UInt64(self.records.length)
         }
 
-        access(all) view
-        fun getRecords(page: Int, pageSize: Int): [TransactionRecord] {
+        access(all)
+        view fun getRecords(page: Int, pageSize: Int): [TransactionRecord] {
             var start = page * pageSize
             if start < 0 {
                 start = 0
@@ -259,47 +259,47 @@ access(all) contract FRC20TradingRecord {
             return self.records.slice(from: start, upTo: end)
         }
 
-        access(all) view
-        fun getStatus(): TradingStatus {
+        access(all)
+        view fun getStatus(): TradingStatus {
             return self.status
         }
 
         /// Available minutes
         ///
-        access(all) view
-        fun getMintesWithStatus(): [UInt64] {
+        access(all)
+        view fun getMintesWithStatus(): [UInt64] {
             return self.minutes.keys
         }
 
         /// Get the trading status
         ///
-        access(all) view
-        fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}? {
+        access(all)
+        view fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}? {
             let minuteTime = self.convertToMinute(time)
             return &self.minutes[minuteTime] as &BasicRecord{TradingStatusViewer}?
         }
 
         /// Get the buyer addresses
-        access(all) view
-        fun getBuyerAddresses(): [Address] {
+        access(all)
+        view fun getBuyerAddresses(): [Address] {
             return self.buyerVolumes.keys
         }
 
         /// Get the trading volume of the address
-        access(all) view
-        fun getAddressBuyVolume(_ addr: Address): UFix64? {
+        access(all)
+        view fun getAddressBuyVolume(_ addr: Address): UFix64? {
             return self.buyerVolumes[addr]
         }
 
         /// Get the seller addresses
-        access(all) view
-        fun getSellerAddresses(): [Address] {
+        access(all)
+        view fun getSellerAddresses(): [Address] {
             return self.sellerVolumes.keys
         }
 
         /// Get the trading volume of the address
-        access(all) view
-        fun getAddressSellVolume(_ addr: Address): UFix64? {
+        access(all)
+        view fun getAddressSellVolume(_ addr: Address): UFix64? {
             return self.sellerVolumes[addr]
         }
 
@@ -372,32 +372,32 @@ access(all) contract FRC20TradingRecord {
 
     access(all) resource interface TradingRecordsPublic {
         // ---- Public Methods ----
-        access(all) view
-        fun isSharedRecrds(): Bool
+        access(all)
+        view fun isSharedRecrds(): Bool
 
-        access(all) view
-        fun getTickerName(): String?
+        access(all)
+        view fun getTickerName(): String?
 
-        access(all) view
-        fun getMarketCap(): UFix64?
+        access(all)
+        view fun getMarketCap(): UFix64?
 
         access(all)
         fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
         // ---- 2x Traders Points ----
-        access(all) view
-        fun getTraders(): [Address]
-        access(all) view
-        fun getTradersPoints(_ addr: Address): UFix64
+        access(all)
+        view fun getTraders(): [Address]
+        access(all)
+        view fun getTradersPoints(_ addr: Address): UFix64
         // ---- 10x Traders Points ----
-        access(all) view
-        fun get10xTraders(): [Address]
-        access(all) view
-        fun get10xTradersPoints(_ addr: Address): UFix64
+        access(all)
+        view fun get10xTraders(): [Address]
+        access(all)
+        view fun get10xTradersPoints(_ addr: Address): UFix64
         // ---- 100x Traders  Points ----
-        access(all) view
-        fun get100xTraders(): [Address]
-        access(all) view
-        fun get100xTradersPoints(_ addr: Address): UFix64
+        access(all)
+        view fun get100xTraders(): [Address]
+        access(all)
+        view fun get100xTradersPoints(_ addr: Address): UFix64
     }
 
     /// The resource containing the trading volume
@@ -437,26 +437,26 @@ access(all) contract FRC20TradingRecord {
             destroy self.dailyRecords
         }
 
-        access(all) view
-        fun getStatus(): TradingStatus {
+        access(all)
+        view fun getStatus(): TradingStatus {
             return self.status
         }
 
-        access(all) view
-        fun isSharedRecrds(): Bool {
+        access(all)
+        view fun isSharedRecrds(): Bool {
             return self.tick == nil
         }
 
         /// Get the ticker name
         ///
-        access(all) view
-        fun getTickerName(): String? {
+        access(all)
+        view fun getTickerName(): String? {
             return self.tick
         }
 
         /// @deprecated
-        access(all) view
-        fun getMarketCap(): UFix64? {
+        access(all)
+        view fun getMarketCap(): UFix64? {
             return nil
         }
 
@@ -471,43 +471,43 @@ access(all) contract FRC20TradingRecord {
 
         /// Get the 2x traders
         ///
-        access(all) view
-        fun getTraders(): [Address] {
+        access(all)
+        view fun getTraders(): [Address] {
             return self.traderPoints.keys
         }
 
         /// Get the 2x traders points
         ///
-        access(all) view
-        fun getTradersPoints(_ addr: Address): UFix64 {
+        access(all)
+        view fun getTradersPoints(_ addr: Address): UFix64 {
             return self.traderPoints[addr] ?? 0.0
         }
 
         /// Get the 10x traders
         ///
-        access(all) view
-        fun get10xTraders(): [Address] {
+        access(all)
+        view fun get10xTraders(): [Address] {
             return self.traders10xBenchmark.keys
         }
 
         /// Get the 10x traders points
         ///
-        access(all) view
-        fun get10xTradersPoints(_ addr: Address): UFix64 {
+        access(all)
+        view fun get10xTradersPoints(_ addr: Address): UFix64 {
             return self.traders10xBenchmark[addr] ?? 0.0
         }
 
         /// Get the 100x traders
         ///
-        access(all) view
-        fun get100xTraders(): [Address] {
+        access(all)
+        view fun get100xTraders(): [Address] {
             return self.traders100xBenchmark.keys
         }
 
         /// Get the 100x traders points
         ///
-        access(all) view
-        fun get100xTradersPoints(_ addr: Address): UFix64 {
+        access(all)
+        view fun get100xTradersPoints(_ addr: Address): UFix64 {
             return self.traders100xBenchmark[addr] ?? 0.0
         }
 

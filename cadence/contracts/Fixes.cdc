@@ -109,32 +109,32 @@ access(all) contract Fixes {
     ///
     access(all) resource interface InscriptionPublic {
         // identifiers
-        access(all) view
-        fun getId(): UInt64
-        access(all) view
-        fun getParentId(): UInt64?
+        access(all)
+        view fun getId(): UInt64
+        access(all)
+        view fun getParentId(): UInt64?
         // data
-        access(all) view
-        fun getData(): InscriptionData
-        access(all) view
-        fun getMimeType(): String
-        access(all) view
-        fun getMetadata(): [UInt8]
-        access(all) view
-        fun getMetaProtocol(): String?
-        access(all) view
-        fun getContentEncoding(): String?
+        access(all)
+        view fun getData(): InscriptionData
+        access(all)
+        view fun getMimeType(): String
+        access(all)
+        view fun getMetadata(): [UInt8]
+        access(all)
+        view fun getMetaProtocol(): String?
+        access(all)
+        view fun getContentEncoding(): String?
         // attributes
-        access(all) view
-        fun getMinCost(): UFix64
-        access(all) view
-        fun getInscriptionValue(): UFix64
-        access(all) view
-        fun getInscriptionRarity(): ValueRarity
-        access(all) view
-        fun isExtracted(): Bool
-        access(all) view
-        fun isExtractable(): Bool
+        access(all)
+        view fun getMinCost(): UFix64
+        access(all)
+        view fun getInscriptionValue(): UFix64
+        access(all)
+        view fun getInscriptionRarity(): ValueRarity
+        access(all)
+        view fun isExtracted(): Bool
+        access(all)
+        view fun isExtractable(): Bool
     }
 
     /// The resource that stores the inscriptions
@@ -178,22 +178,22 @@ access(all) contract Fixes {
 
         /// Check if the inscription is extracted
         ///
-        access(all) view
-        fun isExtracted(): Bool {
+        access(all)
+        view fun isExtracted(): Bool {
             return self.value == nil
         }
 
         /// Check if the inscription is not extracted and has an owner
         ///
-        access(all) view
-        fun isExtractable(): Bool {
+        access(all)
+        view fun isExtractable(): Bool {
             return !self.isExtracted() && self.owner != nil
         }
 
         /// Check if the inscription value is valid
         ///
-        access(all) view
-        fun isValueValid(): Bool {
+        access(all)
+        view fun isValueValid(): Bool {
             return self.value?.balance ?? panic("No value") >= self.getMinCost()
         }
 
@@ -275,8 +275,8 @@ access(all) contract Fixes {
 
         /// Get the minimum value of the inscription
         ///
-        access(all) view
-        fun getMinCost(): UFix64 {
+        access(all)
+        view fun getMinCost(): UFix64 {
             let data = self.data
             return Fixes.estimateValue(
                 index: self.getId(),
@@ -289,15 +289,15 @@ access(all) contract Fixes {
 
         /// Get the value of the inscription
         ///
-        access(all) view
-        fun getInscriptionValue(): UFix64 {
+        access(all)
+        view fun getInscriptionValue(): UFix64 {
             return self.value?.balance ?? 0.0
         }
 
         /// Get the rarity of the inscription
         ///
-        access(all) view
-        fun getInscriptionRarity(): ValueRarity {
+        access(all)
+        view fun getInscriptionRarity(): ValueRarity {
             let value = self.value?.balance ??  0.0
             if value <= 0.1 { // 0.001 ~ 0.1
                 return ValueRarity.Common
@@ -316,38 +316,38 @@ access(all) contract Fixes {
 
         /** ---- Implementation of InscriptionPublic ---- */
 
-        access(all) view
-        fun getId(): UInt64 {
+        access(all)
+        view fun getId(): UInt64 {
             return self.id
         }
 
-        access(all) view
-        fun getParentId(): UInt64? {
+        access(all)
+        view fun getParentId(): UInt64? {
             return self.parentId
         }
 
-        access(all) view
-        fun getData(): InscriptionData {
+        access(all)
+        view fun getData(): InscriptionData {
             return self.data
         }
 
-        access(all) view
-        fun getMimeType(): String {
+        access(all)
+        view fun getMimeType(): String {
             return self.data.mimeType
         }
 
-        access(all) view
-        fun getMetadata(): [UInt8] {
+        access(all)
+        view fun getMetadata(): [UInt8] {
             return self.data.metadata
         }
 
-        access(all) view
-        fun getMetaProtocol(): String? {
+        access(all)
+        view fun getMetaProtocol(): String? {
             return self.data.metaProtocol
         }
 
-        access(all) view
-        fun getContentEncoding(): String? {
+        access(all)
+        view fun getContentEncoding(): String? {
             return self.data.encoding
         }
 
@@ -433,14 +433,14 @@ access(all) contract Fixes {
     ///
     access(all) resource interface InscriptionsPublic {
         // returns the ids of the archived inscriptions
-        access(all) view
-        fun getIDs(): [UInt64]
+        access(all)
+        view fun getIDs(): [UInt64]
         // returns the amount of the archived inscriptions
-        access(all) view
-        fun getLength(): Int
+        access(all)
+        view fun getLength(): Int
         // returns the inscription with the given id
-        access(all) view
-        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
+        access(all)
+        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
     }
 
     /// The private interface to the inscriptions collection
@@ -455,8 +455,8 @@ access(all) contract Fixes {
     ///
     access(all) resource interface ArchivedInscriptionsPublic {
         // returns true if the archived inscriptions reached the 10000 amount
-        access(all) view
-        fun isFull(): Bool
+        access(all)
+        view fun isFull(): Bool
         // archive the inscription
         access(contract)
         fun archive(_ ins: @Fixes.Inscription)
@@ -487,23 +487,23 @@ access(all) contract Fixes {
 
         // --- Public Methods ---
 
-        access(all) view
-        fun isFull(): Bool {
+        access(all)
+        view fun isFull(): Bool {
             return self.inscriptions.keys.length >= 8000
         }
 
-        access(all) view
-        fun getIDs(): [UInt64] {
+        access(all)
+        view fun getIDs(): [UInt64] {
             return self.inscriptions.keys
         }
 
-        access(all) view
-        fun getLength(): Int {
+        access(all)
+        view fun getLength(): Int {
             return self.inscriptions.keys.length
         }
 
-        access(all) view
-        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+        access(all)
+        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
             return self.borrowInscriptionWritableRef(id)
         }
 
@@ -576,18 +576,18 @@ access(all) contract Fixes {
 
         // --- Public Methods ---
 
-        access(all) view
-        fun getIDs(): [UInt64] {
+        access(all)
+        view fun getIDs(): [UInt64] {
             return self.inscriptions.keys
         }
 
-        access(all) view
-        fun getLength(): Int {
+        access(all)
+        view fun getLength(): Int {
             return self.inscriptions.keys.length
         }
 
-        access(all) view
-        fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+        access(all)
+        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
             return self.borrowInscriptionWritableRef(id)
         }
 
@@ -682,8 +682,8 @@ access(all) contract Fixes {
 
     /// Estimate the value of an inscription
     ///
-    access(all) view
-    fun estimateValue(
+    access(all)
+    view fun estimateValue(
         index: UInt64,
         mimeType: String,
         data: [UInt8],
@@ -702,15 +702,15 @@ access(all) contract Fixes {
 
     /// Estimate the value of a string
     ///
-    access(all) view
-    fun estimateStringValue(_ str: String): UFix64 {
+    access(all)
+    view fun estimateStringValue(_ str: String): UFix64 {
         return UFix64(str.utf8.length) * 0.0002
     }
 
     /// Get the storage path of a inscription
     ///
-    access(all) view
-    fun getFixesStoragePath(index: UInt64): StoragePath {
+    access(all)
+    view fun getFixesStoragePath(index: UInt64): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
             identifier: prefix.concat("_").concat(index.toString())
@@ -719,8 +719,8 @@ access(all) contract Fixes {
 
     /// Get the storage path of the archived inscriptions
     ///
-    access(all) view
-    fun getArchivedFixesStoragePath(_ index: UInt64?): StoragePath {
+    access(all)
+    view fun getArchivedFixesStoragePath(_ index: UInt64?): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
             identifier: prefix.concat(index == nil ? "_archived" : "_archived_".concat(index!.toString()))
@@ -729,8 +729,8 @@ access(all) contract Fixes {
 
     /// Get the storage path of the archived inscriptions max index
     ///
-    access(all) view
-    fun getArchivedFixesMaxIndexStoragePath(): StoragePath {
+    access(all)
+    view fun getArchivedFixesMaxIndexStoragePath(): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
             identifier: prefix.concat("_archived_max_index")
@@ -739,8 +739,8 @@ access(all) contract Fixes {
 
     /// Get the storage path of the inscriptions store
     ///
-    access(all) view
-    fun getFixesStoreStoragePath(): StoragePath {
+    access(all)
+    view fun getFixesStoreStoragePath(): StoragePath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return StoragePath(
             identifier: prefix.concat("_collection_store")
@@ -749,8 +749,8 @@ access(all) contract Fixes {
 
     /// Get the public path of the inscriptions store
     ///
-    access(all) view
-    fun getFixesStorePublicPath(): PublicPath {
+    access(all)
+    view fun getFixesStorePublicPath(): PublicPath {
         let prefix = "Fixes_".concat(self.account.address.toString())
         return PublicPath(
             identifier: prefix.concat("_collection_store")

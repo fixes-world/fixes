@@ -204,13 +204,13 @@ access(all) contract FRC20Votes {
             return self.lockedSemiNFTCollection.borrowNFTSafe(id: id)
         }
 
-        access(all) view
-        fun getIDsByTick(tick: String): [UInt64] {
+        access(all)
+        view fun getIDsByTick(tick: String): [UInt64] {
             return self.lockedSemiNFTCollection.getIDsByTick(tick: tick)
         }
 
-        access(all) view
-        fun getStakedBalance(tick: String): UFix64 {
+        access(all)
+        view fun getStakedBalance(tick: String): UFix64 {
             return self.lockedSemiNFTCollection.getStakedBalance(tick: tick)
         }
 
@@ -428,15 +428,15 @@ access(all) contract FRC20Votes {
 
         /** ----- Read ----- */
 
-        access(all) view
-        fun isStarted(): Bool {
+        access(all)
+        view fun isStarted(): Bool {
             return self.beginningTime <= getCurrentBlock().timestamp
         }
 
         /// The Proposal is ended if the endAt is not nil.
         ///
-        access(all) view
-        fun isEnded(): Bool {
+        access(all)
+        view fun isEnded(): Bool {
             return self.endingTime <= getCurrentBlock().timestamp
         }
 
@@ -481,40 +481,40 @@ access(all) contract FRC20Votes {
 
     access(all) resource interface ProposalPublic {
         // --- Read Methods ---
-        access(all) view
-        fun getProposer(): Address
-        access(all) view
-        fun isEditable(): Bool
-        access(all) view
-        fun isFinalized(): Bool
-        access(all) view
-        fun getStatus(): ProposalStatus
-        access(all) view
-        fun getDetails(): ProposalDetails
-        access(all) view
-        fun getLogs(): [StatusLog]
-        access(all) view
-        fun getVotersAmount(): Int
-        access(all) view
-        fun getVoters(): [Address]
-        access(all) view
-        fun getTotalVotedPoints(): UFix64
-        access(all) view
-        fun getVotingChoices(): {Int: UFix64}
-        access(all) view
-        fun getWinningChoice(): Int?
-        access(all) view
-        fun isValidateForThreshold(): Bool
-        access(all) view
-        fun isVotingAllowed(): Bool
-        access(all) view
-        fun isVoteCommandsExecutable(): Bool
-        access(all) view
-        fun isWinningInscriptionsExecuted(): Bool
-        access(all) view
-        fun isChoiceInscriptionsExtracted(choice: Int): Bool
-        access(all) view
-        fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool
+        access(all)
+        view fun getProposer(): Address
+        access(all)
+        view fun isEditable(): Bool
+        access(all)
+        view fun isFinalized(): Bool
+        access(all)
+        view fun getStatus(): ProposalStatus
+        access(all)
+        view fun getDetails(): ProposalDetails
+        access(all)
+        view fun getLogs(): [StatusLog]
+        access(all)
+        view fun getVotersAmount(): Int
+        access(all)
+        view fun getVoters(): [Address]
+        access(all)
+        view fun getTotalVotedPoints(): UFix64
+        access(all)
+        view fun getVotingChoices(): {Int: UFix64}
+        access(all)
+        view fun getWinningChoice(): Int?
+        access(all)
+        view fun isValidateForThreshold(): Bool
+        access(all)
+        view fun isVotingAllowed(): Bool
+        access(all)
+        view fun isVoteCommandsExecutable(): Bool
+        access(all)
+        view fun isWinningInscriptionsExecuted(): Bool
+        access(all)
+        view fun isChoiceInscriptionsExtracted(choice: Int): Bool
+        access(all)
+        view fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool
         // --- Write Methods ---
         access(contract)
         fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT})
@@ -596,28 +596,28 @@ access(all) contract FRC20Votes {
 
         /** ------ Public Methods ------ */
 
-        access(all) view
-        fun getProposer(): Address {
+        access(all)
+        view fun getProposer(): Address {
             return self.proposer
         }
 
-        access(all) view
-        fun isEditable(): Bool {
+        access(all)
+        view fun isEditable(): Bool {
             let status = self.getStatus()
             return status == ProposalStatus.Created || status == ProposalStatus.Activated ||
                 (status == ProposalStatus.Successed && !self.isWinningInscriptionsExecuted())
         }
 
-        access(all) view
-        fun isFinalized(): Bool {
+        access(all)
+        view fun isFinalized(): Bool {
             let status = self.getStatus()
             return status == ProposalStatus.Failed || status == ProposalStatus.Cancelled || status == ProposalStatus.Executed
         }
 
         /// Get current status.
         ///
-        access(all) view
-        fun getStatus(): ProposalStatus {
+        access(all)
+        view fun getStatus(): ProposalStatus {
             let now = getCurrentBlock().timestamp
             if self.details.isCancelled {
                 return ProposalStatus.Cancelled
@@ -637,34 +637,34 @@ access(all) contract FRC20Votes {
             }
         }
 
-        access(all) view
-        fun getDetails(): ProposalDetails {
+        access(all)
+        view fun getDetails(): ProposalDetails {
             return self.details
         }
 
-        access(all) view
-        fun getLogs(): [StatusLog] {
+        access(all)
+        view fun getLogs(): [StatusLog] {
             return self.statusLog
         }
 
         /// Get the voters amount.
         ///
-        access(all) view
-        fun getVotersAmount(): Int {
+        access(all)
+        view fun getVotersAmount(): Int {
             return self.votedAccounts.keys.length
         }
 
         /// Get the voters.
         ///
-        access(all) view
-        fun getVoters(): [Address] {
+        access(all)
+        view fun getVoters(): [Address] {
             return self.votedAccounts.keys
         }
 
         /// Get the total voted points.
         ///
-        access(all) view
-        fun getTotalVotedPoints(): UFix64 {
+        access(all)
+        view fun getTotalVotedPoints(): UFix64 {
             var total = 0.0
             for k in self.votes.keys {
                 total = total + self.votes[k]!
@@ -674,15 +674,15 @@ access(all) contract FRC20Votes {
 
         /// Get the voting choices.
         ///
-        access(all) view
-        fun getVotingChoices(): {Int: UFix64} {
+        access(all)
+        view fun getVotingChoices(): {Int: UFix64} {
             return self.votes
         }
 
         /// Get the winning choice.
         ///
-        access(all) view
-        fun getWinningChoice(): Int? {
+        access(all)
+        view fun getWinningChoice(): Int? {
             if !self.details.isEnded() {
                 return nil
             }
@@ -702,8 +702,8 @@ access(all) contract FRC20Votes {
 
         /// WHether the proposal is validate for the threshold.
         ///
-        access(all) view
-        fun isValidateForThreshold(): Bool {
+        access(all)
+        view fun isValidateForThreshold(): Bool {
             if !self.details.isEnded() {
                 return false
             }
@@ -714,8 +714,8 @@ access(all) contract FRC20Votes {
 
         /// Check whether the inscriptions are all executed
         ///
-        access(all) view
-        fun isWinningInscriptionsExecuted(): Bool {
+        access(all)
+        view fun isWinningInscriptionsExecuted(): Bool {
             if !self.details.isEnded() {
                 return false
             }
@@ -727,23 +727,23 @@ access(all) contract FRC20Votes {
 
         /// check whether the choice inscriptions are all executed
         ///
-        access(all) view
-        fun isChoiceInscriptionsExtracted(choice: Int): Bool {
+        access(all)
+        view fun isChoiceInscriptionsExtracted(choice: Int): Bool {
             let slotInfoRef = self.details.slots[choice]
             return slotInfoRef.command.isAllInscriptionsExtracted()
         }
 
         /// Check whether the voting is allowed.
         ///
-        access(all) view
-        fun isVotingAllowed(): Bool {
+        access(all)
+        view fun isVotingAllowed(): Bool {
             return self.details.isStarted() && !self.details.isEnded()
         }
 
         /// Check whether the proposal is executable.
         ///
-        access(all) view
-        fun isVoteCommandsExecutable(): Bool {
+        access(all)
+        view fun isVoteCommandsExecutable(): Bool {
             if self.getStatus() != ProposalStatus.Successed {
                 return false
             }
@@ -759,8 +759,8 @@ access(all) contract FRC20Votes {
 
         /// Check whether the NFT is voted.
         ///
-        access(all) view
-        fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool {
+        access(all)
+        view fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool {
             return self.votedNFTs[semiNFT.id] != nil
         }
 
@@ -938,17 +938,17 @@ access(all) contract FRC20Votes {
     ///
     access(all) resource interface VotesManagerPublic {
         /// Check whether the proposer is valid.
-        access(all) view
-        fun isValidProposer(_ voterAddr: Address): Bool
+        access(all)
+        view fun isValidProposer(_ voterAddr: Address): Bool
         /** ------ Proposal Getter ------ */
-        access(all) view
-        fun getProposalLength(): Int
-        access(all) view
-        fun getProposalIds(): [UInt64]
-        access(all) view
-        fun getActiveProposalIds(): [UInt64]
-        access(all) view
-        fun getProposalIdsByTick(tick: String): [UInt64]
+        access(all)
+        view fun getProposalLength(): Int
+        access(all)
+        view fun getProposalIds(): [UInt64]
+        access(all)
+        view fun getActiveProposalIds(): [UInt64]
+        access(all)
+        view fun getProposalIdsByTick(tick: String): [UInt64]
         /// Borrow the proposal.
         access(all)
         fun borrowProposal(_ proposalId: UInt64): &Proposal{ProposalPublic}?
@@ -1012,8 +1012,8 @@ access(all) contract FRC20Votes {
 
         /// Check whether the proposer is valid.
         ///
-        access(all) view
-        fun isValidProposer(_ voterAddr: Address): Bool {
+        access(all)
+        view fun isValidProposer(_ voterAddr: Address): Bool {
             if let whitelist = self.whitelisted[voterAddr] {
                 if whitelist {
                     return true
@@ -1033,23 +1033,23 @@ access(all) contract FRC20Votes {
             return false
         }
 
-        access(all) view
-        fun getProposalLength(): Int {
+        access(all)
+        view fun getProposalLength(): Int {
             return self.proposals.keys.length
         }
 
-        access(all) view
-        fun getProposalIds(): [UInt64] {
+        access(all)
+        view fun getProposalIds(): [UInt64] {
             return self.proposals.keys
         }
 
-        access(all) view
-        fun getActiveProposalIds(): [UInt64] {
+        access(all)
+        view fun getActiveProposalIds(): [UInt64] {
             return self.activeProposalIds
         }
 
-        access(all) view
-        fun getProposalIdsByTick(tick: String): [UInt64] {
+        access(all)
+        view fun getProposalIdsByTick(tick: String): [UInt64] {
             return self.proposalIdsByTick[tick] ?? []
         }
 
@@ -1285,15 +1285,15 @@ access(all) contract FRC20Votes {
 
     /// Get the proposer staking threshold.
     ///
-    access(all) view
-    fun getProposerStakingThreshold(): UFix64 {
+    access(all)
+    view fun getProposerStakingThreshold(): UFix64 {
         return 0.15
     }
 
     /// Get the total staked amount.
     ///
-    access(all) view
-    fun getTotalStakedAmount(): UFix64 {
+    access(all)
+    view fun getTotalStakedAmount(): UFix64 {
         let pool = FRC20StakingManager.borrowPlatformStakingPool()
         return pool.getDetails().totalStaked
     }

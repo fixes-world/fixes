@@ -79,15 +79,15 @@ access(all) contract FRC20Marketplace {
         }
 
         /// Get the listing details
-        access(all) view
-        fun getDetails(): FRC20Storefront.ListingDetails? {
+        access(all)
+        view fun getDetails(): FRC20Storefront.ListingDetails? {
             let listingRef = self.borrowListing()
             return listingRef?.getDetails()
         }
 
         /// Borrow the listing resource
-        access(all) view
-        fun borrowListing(): &FRC20Storefront.Listing{FRC20Storefront.ListingPublic}? {
+        access(all)
+        view fun borrowListing(): &FRC20Storefront.Listing{FRC20Storefront.ListingPublic}? {
             if let storefront = self.borrowStorefront() {
                 return storefront.borrowListing(self.id)
             }
@@ -95,8 +95,8 @@ access(all) contract FRC20Marketplace {
         }
 
         /// Borrow the storefront resource
-        access(all) view
-        fun borrowStorefront(): &FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}? {
+        access(all)
+        view fun borrowStorefront(): &FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}? {
             return FRC20Storefront.borrowStorefront(address: self.storefront)
         }
     }
@@ -182,28 +182,28 @@ access(all) contract FRC20Marketplace {
     ///
     access(all) resource interface MarketPublic {
         // ---- Public read methods ----
-        access(all) view
-        fun getTickerName(): String
+        access(all)
+        view fun getTickerName(): String
 
-        access(all) view
-        fun getSuperAdmin(): Address
+        access(all)
+        view fun getSuperAdmin(): Address
 
-        access(all) view
-        fun getPriceRanks(type: FRC20Storefront.ListingType): [UInt64]
+        access(all)
+        view fun getPriceRanks(type: FRC20Storefront.ListingType): [UInt64]
 
-        access(all) view
-        fun getListedIds(type: FRC20Storefront.ListingType, rank: UInt64): [UInt64]
+        access(all)
+        view fun getListedIds(type: FRC20Storefront.ListingType, rank: UInt64): [UInt64]
 
-        access(all) view
-        fun getListedItem(type: FRC20Storefront.ListingType, rank: UInt64, id: UInt64): ListedItem?
+        access(all)
+        view fun getListedItem(type: FRC20Storefront.ListingType, rank: UInt64, id: UInt64): ListedItem?
 
         /// Get the listing item
-        access(all) view
-        fun getListedItemByRankdedId(rankedId: String): ListedItem?
+        access(all)
+        view fun getListedItemByRankdedId(rankedId: String): ListedItem?
 
         /// Get the listed item amount
-        access(all) view
-        fun getListedAmount(): UInt64
+        access(all)
+        view fun getListedAmount(): UInt64
 
         // ---- Market operations ----
 
@@ -218,24 +218,24 @@ access(all) contract FRC20Marketplace {
         // ---- Accessible settings ----
 
         /// Check if the address is in the whitelist or admin whitelist or the market is Accessible
-        access(all) view
-        fun canAccess(addr: Address): Bool
+        access(all)
+        view fun canAccess(addr: Address): Bool
 
         /// Check if the market is Accessible
-        access(all) view
-        fun isAccessible(): Bool
+        access(all)
+        view fun isAccessible(): Bool
 
         /// The Accessible after timestamp
-        access(all) view
-        fun accessibleAfter(): UInt64?
+        access(all)
+        view fun accessibleAfter(): UInt64?
 
         /// The Accessible conditions: tick => amount, the conditions are OR relationship
-        access(all) view
-        fun whitelistClaimingConditions(): {String: UFix64}
+        access(all)
+        view fun whitelistClaimingConditions(): {String: UFix64}
 
         /// Check if the address is valid to claim Accessible
-        access(all) view
-        fun isValidToClaimAccess(addr: Address): Bool
+        access(all)
+        view fun isValidToClaimAccess(addr: Address): Bool
 
         /// Claim the address to the whitelist before the Accessible timestamp
         access(all)
@@ -244,8 +244,8 @@ access(all) contract FRC20Marketplace {
         // --- Admin operations ---
 
         /// Check if the address is in the admin whitelist
-        access(all) view
-        fun isInAdminWhitelist(_ addr: Address): Bool
+        access(all)
+        view fun isInAdminWhitelist(_ addr: Address): Bool
 
         /// Update the admin whitelist
         access(account)
@@ -304,15 +304,15 @@ access(all) contract FRC20Marketplace {
 
         /// The ticker name of the FRC20 market
         ///
-        access(all) view
-        fun getTickerName(): String {
+        access(all)
+        view fun getTickerName(): String {
             return self.tick
         }
 
         /// Get the super admin address
         ///
-        access(all) view
-        fun getSuperAdmin(): Address {
+        access(all)
+        view fun getSuperAdmin(): Address {
             let meta = FRC20Indexer.getIndexer().getTokenMeta(tick: self.tick)
                 ?? panic("Invalid tick")
             return meta.deployer
@@ -320,23 +320,23 @@ access(all) contract FRC20Marketplace {
 
         /// Get the price ranks
         ///
-        access(all) view
-        fun getPriceRanks(type: FRC20Storefront.ListingType): [UInt64] {
+        access(all)
+        view fun getPriceRanks(type: FRC20Storefront.ListingType): [UInt64] {
             return self.sortedPriceRanks[type] ?? []
         }
 
         /// Get the listed ids
         ///
-        access(all) view
-        fun getListedIds(type: FRC20Storefront.ListingType, rank: UInt64): [UInt64] {
+        access(all)
+        view fun getListedIds(type: FRC20Storefront.ListingType, rank: UInt64): [UInt64] {
             let colRef = self.borrowCollection(type, rank)
             return colRef?.getListedIds() ?? []
         }
 
         /// Get the listing item
         ///
-        access(all) view
-        fun getListedItem(type: FRC20Storefront.ListingType, rank: UInt64, id: UInt64): ListedItem? {
+        access(all)
+        view fun getListedItem(type: FRC20Storefront.ListingType, rank: UInt64, id: UInt64): ListedItem? {
             if let colRef = self.borrowCollection(type, rank) {
                 return colRef.getListedItem(id)
             }
@@ -345,14 +345,14 @@ access(all) contract FRC20Marketplace {
 
         /// Get the listing item
         ///
-        access(all) view
-        fun getListedItemByRankdedId(rankedId: String): ListedItem? {
+        access(all)
+        view fun getListedItemByRankdedId(rankedId: String): ListedItem? {
             let ret = self.parseRankedId(rankedId: rankedId)
             return self.getListedItem(type: ret.type, rank: ret.rank, id: ret.listingId)
         }
 
-        access(all) view
-        fun getListedAmount(): UInt64 {
+        access(all)
+        view fun getListedAmount(): UInt64 {
             return self.listedItemAmount
         }
 
@@ -463,8 +463,8 @@ access(all) contract FRC20Marketplace {
         // ---- Admin operations ----
 
         /// Check if the address is in the admin whitelist
-        access(all) view
-        fun isInAdminWhitelist(_ addr: Address): Bool {
+        access(all)
+        view fun isInAdminWhitelist(_ addr: Address): Bool {
             return self.adminWhitelist[addr] ?? false
         }
 
@@ -547,8 +547,8 @@ access(all) contract FRC20Marketplace {
 
         /// Check if the address is in the whitelist or admin whitelist or the market is Accessible
         ///
-        access(all) view
-        fun canAccess(addr: Address): Bool {
+        access(all)
+        view fun canAccess(addr: Address): Bool {
             let isAccessibleNow = self.isAccessible()
             if isAccessibleNow {
                 return true
@@ -568,8 +568,8 @@ access(all) contract FRC20Marketplace {
 
         /// Check if the market is Accessible
         ///
-        access(all) view
-        fun isAccessible(): Bool {
+        access(all)
+        view fun isAccessible(): Bool {
             if let after = self.accessibleAfter() {
                 return UInt64(getCurrentBlock().timestamp) >= (after / 1000)
             }
@@ -578,8 +578,8 @@ access(all) contract FRC20Marketplace {
 
         /// The Accessible after timestamp
         ///
-        access(all) view
-        fun accessibleAfter(): UInt64? {
+        access(all)
+        view fun accessibleAfter(): UInt64? {
             if let storeRef = self.borrowSharedStore() {
                 return storeRef.getByEnum(FRC20FTShared.ConfigType.MarketAccessibleAfter) as! UInt64?
             }
@@ -588,8 +588,8 @@ access(all) contract FRC20Marketplace {
 
         /// The Accessible conditions: tick => amount, the conditions are OR relationship
         ///
-        access(all) view
-        fun whitelistClaimingConditions(): {String: UFix64} {
+        access(all)
+        view fun whitelistClaimingConditions(): {String: UFix64} {
             let ret: {String: UFix64} = {}
             if let storeRef = self.borrowSharedStore() {
                 let name = storeRef.getByEnum(FRC20FTShared.ConfigType.MarketWhitelistClaimingToken) as! String?
@@ -603,8 +603,8 @@ access(all) contract FRC20Marketplace {
 
         /// Check if the address is valid to claim Accessible
         ///
-        access(all) view
-        fun isValidToClaimAccess(addr: Address): Bool {
+        access(all)
+        view fun isValidToClaimAccess(addr: Address): Bool {
             let isAccessibleNow = self.isAccessible()
             if isAccessibleNow {
                 return false
@@ -650,8 +650,8 @@ access(all) contract FRC20Marketplace {
 
         /// Parse the ranked id
         ///
-        access(self) view
-        fun parseRankedId(rankedId: String): ItemIdentifier {
+        access(self)
+        view fun parseRankedId(rankedId: String): ItemIdentifier {
             let parts = StringUtils.split(rankedId, "-")
             assert(
                 parts.length == 3,

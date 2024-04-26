@@ -53,8 +53,8 @@ access(all) contract FRC20StakingManager {
     /// Staking Admin Public Resource interface
     ///
     access(all) resource interface StakingAdminPublic {
-        access(all) view
-        fun isWhitelisted(address: Address): Bool
+        access(all)
+        view fun isWhitelisted(address: Address): Bool
     }
 
     /// Staking Admin Resource, represents a staking admin and store in admin's account
@@ -67,8 +67,8 @@ access(all) contract FRC20StakingManager {
             self.whitelist = {}
         }
 
-        access(all) view
-        fun isWhitelisted(address: Address): Bool {
+        access(all)
+        view fun isWhitelisted(address: Address): Bool {
             return self.whitelist[address] ?? false
         }
 
@@ -464,8 +464,8 @@ access(all) contract FRC20StakingManager {
 
     /// Check if the given address is whitelisted
     ///
-    access(all) view
-    fun isWhitelisted(_ address: Address): Bool {
+    access(all)
+    view fun isWhitelisted(_ address: Address): Bool {
         if address == self.account.address {
             return true
         }
@@ -478,8 +478,8 @@ access(all) contract FRC20StakingManager {
 
     /// Check if the given address is eligible for registering
     ///
-    access(all) view
-    fun isEligibleForRegistering(stakeTick: String, addr: Address): Bool {
+    access(all)
+    view fun isEligibleForRegistering(stakeTick: String, addr: Address): Bool {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         // Get the staking pool address
@@ -513,8 +513,8 @@ access(all) contract FRC20StakingManager {
 
     /// Get the staking ticker name.
     ///
-    access(all) view
-    fun getPlatformStakingTickerName(): String {
+    access(all)
+    view fun getPlatformStakingTickerName(): String {
         let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
         let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
         return stakingToken ?? "flows"

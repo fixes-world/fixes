@@ -161,8 +161,8 @@ access(all) contract FGameLottery {
         }
 
         /// Get the ticket numbers
-        access(all) view
-        fun getNumbers(): [UInt8;6] {
+        access(all)
+        view fun getNumbers(): [UInt8;6] {
             return [
                 self.white[0],
                 self.white[1],
@@ -307,50 +307,50 @@ access(all) contract FGameLottery {
 
         /// Get the ticket ID
         ///
-        access(all) view
-        fun getTicketId(): UInt64 {
+        access(all)
+        view fun getTicketId(): UInt64 {
             return self.uuid
         }
 
         /// Get the ticket owner
         ///
-        access(all) view
-        fun getTicketOwner(): Address {
+        access(all)
+        view fun getTicketOwner(): Address {
             return self.owner?.address ?? panic("Ticket owner is missing")
         }
 
         /// Get the ticket numbers
         ///
-        access(all) view
-        fun getNumbers(): [UInt8;6] {
+        access(all)
+        view fun getNumbers(): [UInt8;6] {
             return self.numbers.getNumbers()
         }
 
         /// Get the ticket powerup
         ///
-        access(all) view
-        fun getPowerup(): UFix64 {
+        access(all)
+        view fun getPowerup(): UFix64 {
             return self.powerup
         }
 
         /// Get the ticket status
         ///
-        access(all) view
-        fun getStatus(): TicketStatus {
+        access(all)
+        view fun getStatus(): TicketStatus {
             return self.status
         }
 
         /// Get the winner prize rank
         ///
-        access(all) view
-        fun getWinPrizeRank(): PrizeRank? {
+        access(all)
+        view fun getWinPrizeRank(): PrizeRank? {
             return self.winPrizeRank
         }
 
         /// Get the estimated prize amount
         ///
-        access(all) view
-        fun getEstimatedPrizeAmount(): UFix64? {
+        access(all)
+        view fun getEstimatedPrizeAmount(): UFix64? {
             let prizeRank = self.getWinPrizeRank()
             if prizeRank == nil {
                 return nil
@@ -539,11 +539,11 @@ access(all) contract FGameLottery {
     ///
     access(all) resource interface TicketCollectionPublic {
         // --- read methods ---
-        access(all) view
-        fun getIDs(): [UInt64]
+        access(all)
+        view fun getIDs(): [UInt64]
 
-        access(all) view
-        fun getTicketAmount(): Int
+        access(all)
+        view fun getTicketAmount(): Int
 
         access(all)
         fun borrowTicket(ticketId: UInt64): &TicketEntry{TicketEntryPublic}?
@@ -575,15 +575,15 @@ access(all) contract FGameLottery {
 
         /// Get the ticket IDs
         ///
-        access(all) view
-        fun getIDs(): [UInt64] {
+        access(all)
+        view fun getIDs(): [UInt64] {
             return self.dscSortedIDs
         }
 
         /// Get the ticket amount
         ///
-        access(all) view
-        fun getTicketAmount(): Int {
+        access(all)
+        view fun getTicketAmount(): Int {
             return self.dscSortedIDs.length
         }
 
@@ -785,26 +785,26 @@ access(all) contract FGameLottery {
     ///
     access(all) resource interface LotteryPublic {
         /// Lottery info - public view
-        access(all) view
-        fun getInfo(): LotteryBasicInfo
+        access(all)
+        view fun getInfo(): LotteryBasicInfo
         /// Lottery status
-        access(all) view
-        fun getStatus(): LotteryStatus
+        access(all)
+        view fun getStatus(): LotteryStatus
         /// Lotter result
-        access(all) view
-        fun getResult(): LotteryResult?
+        access(all)
+        view fun getResult(): LotteryResult?
         /// Return the participant addresses
-        access(all) view
-        fun getParticipants(): [Address]
+        access(all)
+        view fun getParticipants(): [Address]
         /// Return the participant amount
-        access(all) view
-        fun getParticipantAmount(): UInt64
+        access(all)
+        view fun getParticipantAmount(): UInt64
         /// Get the total bought balance
-        access(all) view
-        fun getCurrentLotteryBalance(): UFix64
+        access(all)
+        view fun getCurrentLotteryBalance(): UFix64
         /// Check if the lottery is disbursing prizes
-        access(all) view
-        fun isDisbursing(): Bool
+        access(all)
+        view fun isDisbursing(): Bool
     }
 
     /// Lottery resource
@@ -860,8 +860,8 @@ access(all) contract FGameLottery {
 
         /// Lottery info - public view
         ///
-        access(all) view
-        fun getInfo(): LotteryBasicInfo {
+        access(all)
+        view fun getInfo(): LotteryBasicInfo {
             return LotteryBasicInfo(
                 epochIndex: self.epochIndex,
                 epochStartAt: self.epochStartAt,
@@ -874,8 +874,8 @@ access(all) contract FGameLottery {
 
         /// Get the lottery status
         ///
-        access(all) view
-        fun getStatus(): LotteryStatus {
+        access(all)
+        view fun getStatus(): LotteryStatus {
             let now = getCurrentBlock().timestamp
             let poolRef = self.borrowLotteryPool()
             let interval = poolRef.getEpochInterval()
@@ -893,36 +893,36 @@ access(all) contract FGameLottery {
 
         /// Lotter result
         ///
-        access(all) view
-        fun getResult(): LotteryResult? {
+        access(all)
+        view fun getResult(): LotteryResult? {
             return self.drawnResult
         }
 
         /// Return the participant addresses
         ///
-        access(all) view
-        fun getParticipants(): [Address] {
+        access(all)
+        view fun getParticipants(): [Address] {
             return self.participants.keys
         }
 
         /// Return the participant amount
         ///
-        access(all) view
-        fun getParticipantAmount(): UInt64 {
+        access(all)
+        view fun getParticipantAmount(): UInt64 {
             return UInt64(self.participants.keys.length)
         }
 
         /// Get the total bought balance
         ///
-        access(all) view
-        fun getCurrentLotteryBalance(): UFix64 {
+        access(all)
+        view fun getCurrentLotteryBalance(): UFix64 {
             return self.current.getBalance()
         }
 
         /// Check if the lottery is disbursing prizes
         ///
-        access(all) view
-        fun isDisbursing(): Bool {
+        access(all)
+        view fun isDisbursing(): Bool {
             let status = self.getStatus()
             return status == LotteryStatus.DRAWN_AND_VERIFIED && self.disbursingQueque.length > 0
         }
@@ -1392,47 +1392,47 @@ access(all) contract FGameLottery {
 
     access(all) resource interface LotteryPoolPublic {
         // --- read methods ---
-        access(all) view
-        fun getName(): String
-        access(all) view
-        fun getAddress(): Address
-        access(all) view
-        fun getCurrentEpochIndex(): UInt64
-        access(all) view
-        fun getEpochInterval(): UFix64
-        access(all) view
-        fun getLotteryToken(): String
-        access(all) view
-        fun getTicketPrice(): UFix64
-        access(all) view
-        fun getJackpotPoolBalance(): UFix64
-        access(all) view
-        fun getServiceFee(): UFix64
-        access(all) view
-        fun isEpochAutoStart(): Bool
-        access(all) view
-        fun getWinnerPrizeByRank(_ rank: PrizeRank): UFix64
+        access(all)
+        view fun getName(): String
+        access(all)
+        view fun getAddress(): Address
+        access(all)
+        view fun getCurrentEpochIndex(): UInt64
+        access(all)
+        view fun getEpochInterval(): UFix64
+        access(all)
+        view fun getLotteryToken(): String
+        access(all)
+        view fun getTicketPrice(): UFix64
+        access(all)
+        view fun getJackpotPoolBalance(): UFix64
+        access(all)
+        view fun getServiceFee(): UFix64
+        access(all)
+        view fun isEpochAutoStart(): Bool
+        access(all)
+        view fun getWinnerPrizeByRank(_ rank: PrizeRank): UFix64
 
         // --- read methods: default implement ---
 
         /// Check if the current lottery is active
-        access(all) view
-        fun isCurrentLotteryActive(): Bool {
+        access(all)
+        view fun isCurrentLotteryActive(): Bool {
             let currentLotteryRef = self.borrowCurrentLottery()
             return currentLotteryRef != nil && currentLotteryRef!.getStatus() == LotteryStatus.ACTIVE
         }
 
         /// Check if the current lottery is ready to draw
-        access(all) view
-        fun isCurrentLotteryReadyToDraw(): Bool {
+        access(all)
+        view fun isCurrentLotteryReadyToDraw(): Bool {
             let currentLotteryRef = self.borrowCurrentLottery()
             let status = currentLotteryRef?.getStatus()
             return currentLotteryRef != nil && status == LotteryStatus.READY_TO_DRAW
         }
 
         /// Check if the current lottery is finished
-        access(all) view
-        fun isCurrentLotteryFinished(): Bool {
+        access(all)
+        view fun isCurrentLotteryFinished(): Bool {
             let currentLotteryRef = self.borrowCurrentLottery()
             let status = currentLotteryRef?.getStatus()
             return currentLotteryRef == nil || status == LotteryStatus.DRAWN || status == LotteryStatus.DRAWN_AND_VERIFIED
@@ -1528,61 +1528,61 @@ access(all) contract FGameLottery {
 
         /** ---- Public Methods ---- */
 
-        access(all) view
-        fun getName(): String {
+        access(all)
+        view fun getName(): String {
             return self.name
         }
 
-        access(all) view
-        fun getAddress(): Address {
+        access(all)
+        view fun getAddress(): Address {
             return self.owner?.address ?? panic("Owner is missing")
         }
 
-        access(all) view
-        fun getCurrentEpochIndex(): UInt64 {
+        access(all)
+        view fun getCurrentEpochIndex(): UInt64 {
             return self.currentEpochIndex
         }
 
-        access(all) view
-        fun getEpochInterval(): UFix64 {
+        access(all)
+        view fun getEpochInterval(): UFix64 {
             let store = self.borrowConfigStore()
             let interval = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryEpochInterval) as! UFix64?
             return interval ?? self.initEpochInterval
         }
 
-        access(all) view
-        fun getTicketPrice(): UFix64 {
+        access(all)
+        view fun getTicketPrice(): UFix64 {
             let store = self.borrowConfigStore()
             let price = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryTicketPrice) as! UFix64?
             return price ?? self.initTicketPrice
         }
 
-        access(all) view
-        fun getServiceFee(): UFix64 {
+        access(all)
+        view fun getServiceFee(): UFix64 {
             let store = self.borrowConfigStore()
             let fee = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryServiceFee) as!  UFix64?
             return fee ?? 0.16
         }
 
-        access(all) view
-        fun isEpochAutoStart(): Bool {
+        access(all)
+        view fun isEpochAutoStart(): Bool {
             let store = self.borrowConfigStore()
             let autoStart = store.getByEnum(FRC20FTShared.ConfigType.GameLotteryAutoStart) as! Bool?
             return autoStart ?? true
         }
 
-        access(all) view
-        fun getLotteryToken(): String {
+        access(all)
+        view fun getLotteryToken(): String {
             return self.jackpotPool.getOriginalTick()
         }
 
-        access(all) view
-        fun getJackpotPoolBalance(): UFix64 {
+        access(all)
+        view fun getJackpotPoolBalance(): UFix64 {
             return self.jackpotPool.getBalance()
         }
 
-        access(all) view
-        fun getWinnerPrizeByRank(_ rank: PrizeRank): UFix64 {
+        access(all)
+        view fun getWinnerPrizeByRank(_ rank: PrizeRank): UFix64 {
             // Get the ticket price
             let ticketPrice = self.getTicketPrice()
             // Calculate the winner prize

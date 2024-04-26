@@ -3,7 +3,10 @@
 
 # FixesHeartbeat
 
-TODO: Add description
+The `FixesHeartbeat` contract is a contract that provides a heartbeat mechanism for the Flow blockchain.
+It allows developers to add hooks to the contract and execute them periodically.
+The contract is designed to be simple and easy to use.
+It is suitable for various use cases, such as updating the contract state, sending notifications, and more.
 
 */
 

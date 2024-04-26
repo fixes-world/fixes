@@ -47,8 +47,8 @@ access(all) contract FRC20StakingForwarder {
 
         /// Helper function to check whether set `pool` capability
         /// is not latent or the capability tied to a type is valid.
-        access(all) view
-        fun check(): Bool {
+        access(all)
+        view fun check(): Bool {
             return self.pool.check()
         }
 
@@ -65,8 +65,8 @@ access(all) contract FRC20StakingForwarder {
         /// which can be deposited using the 'deposit' function.
         ///
         /// @return Array of FT types that can be deposited.
-        access(all) view
-        fun getSupportedVaultTypes(): {Type: Bool} {
+        access(all)
+        view fun getSupportedVaultTypes(): {Type: Bool} {
             pre {
                 self.check(): "Forwarder capability is not valid"
             }

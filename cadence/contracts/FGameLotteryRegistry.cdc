@@ -38,14 +38,14 @@ access(all) contract FGameLotteryRegistry {
     /// Resource inferface for the Lottery registry
     ///
     access(all) resource interface RegistryPublic {
-        access(all) view
-        fun isWhitelisted(address: Address): Bool
-        access(all) view
-        fun getLotteryPoolNames(): [String]
-        access(all) view
-        fun getGameWorldKey(_ name: String): String
-        access(all) view
-        fun getLotteryPoolAddress(_ name: String): Address?
+        access(all)
+        view fun isWhitelisted(address: Address): Bool
+        access(all)
+        view fun getLotteryPoolNames(): [String]
+        access(all)
+        view fun getGameWorldKey(_ name: String): String
+        access(all)
+        view fun getLotteryPoolAddress(_ name: String): Address?
         // --- Write methods ---
         access(contract)
         fun onRegisterLotteryPool(_ name: String)
@@ -66,23 +66,23 @@ access(all) contract FGameLotteryRegistry {
 
         // --- Public methods ---
 
-        access(all) view
-        fun isWhitelisted(address: Address): Bool {
+        access(all)
+        view fun isWhitelisted(address: Address): Bool {
             return self.whitelist[address] ?? false
         }
 
-        access(all) view
-        fun getLotteryPoolNames(): [String] {
+        access(all)
+        view fun getLotteryPoolNames(): [String] {
             return self.registered
         }
 
-        access(all) view
-        fun getGameWorldKey(_ name: String): String {
+        access(all)
+        view fun getGameWorldKey(_ name: String): String {
             return "Lottery_".concat(name)
         }
 
-        access(all) view
-        fun getLotteryPoolAddress(_ name: String): Address? {
+        access(all)
+        view fun getLotteryPoolAddress(_ name: String): Address? {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let key = self.getGameWorldKey(name)
             return acctsPool.getGameWorldAddress(key)
@@ -296,8 +296,8 @@ access(all) contract FGameLotteryRegistry {
 
     /// Check if the given address is whitelisted
     ///
-    access(all) view
-    fun isWhitelisted(_ address: Address): Bool {
+    access(all)
+    view fun isWhitelisted(_ address: Address): Bool {
         if address == self.account.address {
             return true
         }

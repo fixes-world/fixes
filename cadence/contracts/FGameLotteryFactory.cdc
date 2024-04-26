@@ -19,13 +19,13 @@ access(all) contract FGameLotteryFactory {
 
     /* --- Public Methods - Controller --- */
 
-    access(all) view
-    fun getFIXESLotteryPoolName(): String {
+    access(all)
+    view fun getFIXESLotteryPoolName(): String {
         return "FIXES_BASIS_LOTTERY_POOL"
     }
 
-    access(all) view
-    fun getFIXESMintingLotteryPoolName(): String {
+    access(all)
+    view fun getFIXESMintingLotteryPoolName(): String {
         return "FIXES_MINTING_LOTTERY_POOL"
     }
 
@@ -124,8 +124,8 @@ access(all) contract FGameLotteryFactory {
 
     /// Get the value of the PowerUp
     ///
-    access(all) view
-    fun getPowerUpValue(_ type: PowerUpType): UFix64 {
+    access(all)
+    view fun getPowerUpValue(_ type: PowerUpType): UFix64 {
         switch type {
         case PowerUpType.x2:
             return 2.0
@@ -144,8 +144,8 @@ access(all) contract FGameLotteryFactory {
 
     /// Check if the FIXES Minting is available
     ///
-    access(all) view
-    fun isFIXESMintingAvailable(): Bool {
+    access(all)
+    view fun isFIXESMintingAvailable(): Bool {
         // Singleton Resource
         let frc20Indexer = FRC20Indexer.getIndexer()
         if let tokenMeta = frc20Indexer.getTokenMeta(tick: "fixes") {
@@ -156,8 +156,8 @@ access(all) contract FGameLotteryFactory {
 
     /// Get the cost of buying FIXES Minting Lottery Tickets
     ///
-    access(all) view
-    fun getFIXESMintingLotteryFlowCost(_ ticketAmount: UInt64, _ powerup: PowerUpType, _ withMinting: Bool): UFix64 {
+    access(all)
+    view fun getFIXESMintingLotteryFlowCost(_ ticketAmount: UInt64, _ powerup: PowerUpType, _ withMinting: Bool): UFix64 {
         let powerupValue: UFix64 = self.getPowerUpValue(powerup)
         // singleton resource
         let registry = FGameLotteryRegistry.borrowRegistry()
@@ -270,8 +270,8 @@ access(all) contract FGameLotteryFactory {
 
     /// Get the cost of buying FIXES Lottery Tickets
     ///
-    access(all) view
-    fun getFIXESLotteryFlowCost(_ ticketAmount: UInt64, _ powerup: PowerUpType, _ recipient: Address): UFix64 {
+    access(all)
+    view fun getFIXESLotteryFlowCost(_ ticketAmount: UInt64, _ powerup: PowerUpType, _ recipient: Address): UFix64 {
         // check if the FLOW balance is sufficient
         let ticketPrice = FixesInscriptionFactory.estimateLotteryFIXESTicketsCost(1, nil)
         let powerupValue: UFix64 = self.getPowerUpValue(powerup)
