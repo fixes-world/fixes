@@ -4,7 +4,7 @@
 
 # FixesFungibleToken
 
-This is the fungible token contract for a Mintable Fungible tokens with FixesAssetGenes.
+This is the fungible token contract for a Mintable Fungible tokens with FixesAssetMeta.
 It is the template contract that is used to deploy.
 
 */
@@ -18,7 +18,7 @@ import "Fixes"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FixesTraits"
-import "FixesAssetGenes"
+import "FixesAssetMeta"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 
@@ -129,7 +129,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             let from = (ins != nil ? ins!.owner?.address : owner)
                 ?? panic("Failed to get the owner address")
             /// init DNA to the metadata
-            self.initializeMetadata(FixesAssetGenes.DNA(
+            self.initializeMetadata(FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
                 from,
                 // if inscription exists, init the DNA with 5 mutatable attempts
@@ -175,7 +175,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             FixesFungibleToken.executeInscription(ins: ins, usage: "charge")
 
             // borrow the DNA metadata
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
                 ?? panic("The DNA metadata is not found")
             let oldValue = dnaRef.getValue("mutatableAmount") as! UInt64
             // update the DNA mutatable amount

@@ -14,7 +14,7 @@ import "FixesTraits"
 
 /// The Fixes Asset Genes contract
 ///
-access(all) contract FixesAssetGenes {
+access(all) contract FixesAssetMeta {
 
     /// The gene quality level
     ///
@@ -156,7 +156,7 @@ access(all) contract FixesAssetGenes {
             )
             self.exp = self.exp - withdrawexp
             // Create a new struct
-            let newGenes: FixesAssetGenes.Gene = Gene(
+            let newGenes: FixesAssetMeta.Gene = Gene(
                 id: self.id,
                 quality: self.quality, // same quality
                 exp: withdrawexp, // splited the exp
@@ -173,18 +173,18 @@ access(all) contract FixesAssetGenes {
                 self.getId() == from.getId(): "The gene id is not the same so cannot merge"
             }
             let fromGenes = from as! Gene
-            let convertRate = FixesAssetGenes.getGeneMergeLossOrGain(fromGenes.quality, self.quality)
+            let convertRate = FixesAssetMeta.getGeneMergeLossOrGain(fromGenes.quality, self.quality)
             let convertexp = UInt64(UInt128(fromGenes.exp) * UInt128(convertRate * 10000.0) / 10000)
             self.exp = self.exp + convertexp
 
             // check if the quality can be upgraded
-            var upgradeThreshold = FixesAssetGenes.getQualityLevelUpThreshold(self.quality)
+            var upgradeThreshold = FixesAssetMeta.getQualityLevelUpThreshold(self.quality)
             var isUpgradable = upgradeThreshold <= self.exp && self.quality.rawValue < GeneQuality.Eternal.rawValue
             while isUpgradable {
                 self.quality = GeneQuality(rawValue: self.quality.rawValue + 1)!
                 self.exp = self.exp - upgradeThreshold
                 // check upgrade again
-                upgradeThreshold = FixesAssetGenes.getQualityLevelUpThreshold(self.quality)
+                upgradeThreshold = FixesAssetMeta.getQualityLevelUpThreshold(self.quality)
                 isUpgradable = upgradeThreshold <= self.exp && self.quality.rawValue < GeneQuality.Eternal.rawValue
             }
         }
@@ -382,7 +382,7 @@ access(all) contract FixesAssetGenes {
         } else {
             return nil
         }
-        let threshold = FixesAssetGenes.getQualityLevelUpThreshold(quality)
+        let threshold = FixesAssetMeta.getQualityLevelUpThreshold(quality)
         let exp = revertibleRandom() % (threshold / 5) // random exp from 20% of the threshold
         return Gene(id: nil, quality: GeneQuality.Empowered, exp: exp)
     }

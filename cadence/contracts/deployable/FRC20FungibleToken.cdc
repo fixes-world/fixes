@@ -17,7 +17,7 @@ import "Fixes"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FixesTraits"
-import "FixesAssetGenes"
+import "FixesAssetMeta"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
@@ -162,7 +162,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             // update balance
             self.syncBalance()
             /// init DNA to the metadata
-            self.initializeMetadata(FixesAssetGenes.DNA(
+            self.initializeMetadata(FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
                 from,
                 // Only FungibleTokens initialized from the Indexer can have 5 mutation attempts.
@@ -227,7 +227,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Is the vault valid
         access(all)
         view fun isValidVault(): Bool {
-            return self.change != nil && self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>()) != nil
+            return self.change != nil && self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>()) != nil
         }
 
         /// Get the symbol of the token
@@ -272,7 +272,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             destroy ret
 
             // borrow the DNA metadata
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
                 ?? panic("The DNA metadata is not found")
             let oldValue = dnaRef.getValue("mutatableAmount") as! UInt64
             // update the DNA mutatable amount

@@ -248,8 +248,8 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FixesAssetGenes": {
-			"source": "cadence/contracts/FixesAssetGenes.cdc",
+		"FixesAssetMeta": {
+			"source": "cadence/contracts/FixesAssetMeta.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -861,7 +861,7 @@
 				"FGameLotteryRegistry",
 				"FGameLotteryFactory",
 				"FRC20Agents",
-				"FixesAssetGenes",
+				"FixesAssetMeta",
 				"FixesFungibleTokenInterface",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",

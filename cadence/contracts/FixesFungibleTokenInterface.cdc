@@ -4,7 +4,7 @@
 
 # FixesFungibleTokenInterface
 
-This is the fungible token contract interface for a Fungible tokens with FixesAssetGenes.DNA metadata.
+This is the fungible token contract interface for a Fungible tokens with FixesAssetMeta.DNA metadata.
 
 */
 
@@ -12,7 +12,7 @@ import "FungibleToken"
 // Fixes imports
 import "Fixes"
 import "FixesTraits"
-import "FixesAssetGenes"
+import "FixesAssetMeta"
 import "FRC20FTShared"
 
 /// This is the contract interface for all Fixes Fungible Token
@@ -56,7 +56,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Check if the vault is valid
         access(all)
         view fun isValidVault(): Bool {
-            return self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>()) != nil
+            return self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>()) != nil
         }
 
         /// Get mergeable metadata keys
@@ -84,7 +84,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         ///
         access(all)
         view fun getDNAOwner(): Address {
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
                 ?? panic("The DNA metadata is not found")
             return dnaRef.getValue("owner") as! Address
         }
@@ -93,7 +93,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         ///
         access(all)
         view fun getDNAMutatableAmount(): UInt64 {
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
                 ?? panic("The DNA metadata is not found")
             return dnaRef.getValue("mutatableAmount") as! UInt64
         }
@@ -131,7 +131,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Attempt to generate a new gene
         ///
         access(all)
-        fun attemptGenerateGene(_ attempt: UInt64): FixesAssetGenes.DNA?
+        fun attemptGenerateGene(_ attempt: UInt64): FixesAssetMeta.DNA?
     }
 
     /// The Implementation some method for the Metadata
@@ -140,7 +140,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Attempt to generate a new gene
         ///
         access(all)
-        fun attemptGenerateGene(_ attempt: UInt64): FixesAssetGenes.DNA? {
+        fun attemptGenerateGene(_ attempt: UInt64): FixesAssetMeta.DNA? {
             var max = attempt
             if max == 0 {
                 return nil
@@ -151,14 +151,14 @@ access(all) contract interface FixesFungibleTokenInterface {
                 max = maxLimit
             }
 
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
                 ?? panic("The DNA metadata is not found")
             let mutatableAmt = dnaRef.getValue("mutatableAmount")
             if mutatableAmt == nil {
                 return nil
             }
             // create a new DNA
-            let newDNA = FixesAssetGenes.DNA(
+            let newDNA = FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
                 dnaRef.getValue("owner") as! Address,
                 mutatableAmt! as! UInt64,
@@ -166,7 +166,7 @@ access(all) contract interface FixesFungibleTokenInterface {
             var anyAdded = false
             var i: UInt64 = 0
             while i < max && newDNA.isMutatable() {
-                if let gene = FixesAssetGenes.attemptToGenerateGene() {
+                if let gene = FixesAssetMeta.attemptToGenerateGene() {
                     newDNA.addGene(gene)
                     anyAdded = true
                 }
