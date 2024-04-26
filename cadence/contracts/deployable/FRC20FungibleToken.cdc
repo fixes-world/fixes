@@ -80,7 +80,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    access(all) resource Vault: FixesFungibleTokenInterface.Metadata, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: FixesFungibleTokenInterface.Metadata, FixesFungibleTokenInterface.MetadataGenerator, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
@@ -445,6 +445,13 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// --------- Internal Methods --------- ///
 
+        /// Borrow the mergeable data by key
+        ///
+        access(contract)
+        view fun borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
+            return &self.metadata[type] as &{FixesTraits.MergeableData}?
+        }
+
         /// Attempt to generate a new gene, max 5 attempts for each action
         ///
         access(self)
@@ -729,7 +736,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                     metadataPath: FRC20FungibleToken.getVaultPublicPath(),
                     providerPath: PrivatePath(identifier: prefix.concat("Vault"))!,
                     receiverLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Receiver}>(),
-                    metadataLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver}>(),
+                    metadataLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(),
                     providerLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Provider}>(),
                     createEmptyVaultFunction: (fun (): @FRC20FungibleToken.Vault {
                         return <-FRC20FungibleToken.createEmptyVault()
@@ -923,6 +930,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         self.account.link<&{FungibleToken.Receiver}>(receiverPath, target: storagePath)
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field and the `resolveView` method through the `Balance` interface
-        self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver}>(publicPath, target: storagePath)
+        self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(publicPath, target: storagePath)
     }
 }

@@ -79,7 +79,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    access(all) resource Vault: FixesFungibleTokenInterface.Metadata, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: FixesFungibleTokenInterface.Metadata, FixesFungibleTokenInterface.MetadataGenerator, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
@@ -336,6 +336,13 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// --------- Internal Methods --------- ///
 
+        /// Borrow the mergeable data by key
+        ///
+        access(contract)
+        view fun borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
+            return &self.metadata[type] as &{FixesTraits.MergeableData}?
+        }
+
         /// Attempt to generate a new gene, Max attempts is 10
         ///
         access(self)
@@ -556,7 +563,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                     metadataPath: FixesFungibleToken.getVaultPublicPath(),
                     providerPath: PrivatePath(identifier: prefix.concat("Vault"))!,
                     receiverLinkedType: Type<&FixesFungibleToken.Vault{FungibleToken.Receiver}>(),
-                    metadataLinkedType: Type<&FixesFungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver}>(),
+                    metadataLinkedType: Type<&FixesFungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(),
                     providerLinkedType: Type<&FixesFungibleToken.Vault{FungibleToken.Provider}>(),
                     createEmptyVaultFunction: (fun (): @FixesFungibleToken.Vault {
                         return <-FixesFungibleToken.createEmptyVault()
@@ -705,6 +712,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         self.account.link<&{FungibleToken.Receiver}>(receiverPath, target: storagePath)
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field and the `resolveView` method through the `Balance` interface
-        self.account.link<&FixesFungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver}>(publicPath, target: storagePath)
+        self.account.link<&FixesFungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(publicPath, target: storagePath)
     }
 }

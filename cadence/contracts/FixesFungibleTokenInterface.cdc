@@ -98,6 +98,13 @@ access(all) contract interface FixesFungibleTokenInterface {
             return dnaRef.getValue("mutatableAmount") as! UInt64
         }
 
+        /// get the max mutatable amount
+        ///
+        access(all)
+        view fun getMaxGenerateGeneAttempts(): UInt64 {
+            return 5
+        }
+
         // ---- Internal methods - implement required ----
 
         /// Set the metadata by key
@@ -110,25 +117,29 @@ access(all) contract interface FixesFungibleTokenInterface {
             }
         }
 
-        // ---- Internal methods - default implementation exsits ----
-
         /// Borrow the mergeable data by key
         ///
         access(contract)
         view fun borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
             return &self.metadata[type] as &{FixesTraits.MergeableData}?
         }
+    }
 
-        /// get the max mutatable amount
-        ///
-        access(contract)
-        view fun getMaxGenerateGeneAttempts(): UInt64 {
-            return 5
-        }
-
+    /// The interface for the Fungible Token MetadataGenerator
+    ///
+    access(all) resource interface MetadataGenerator {
         /// Attempt to generate a new gene
         ///
-        access(contract)
+        access(all)
+        fun attemptGenerateGene(_ attempt: UInt64): FixesAssetGenes.DNA?
+    }
+
+    /// The Implementation some method for the Metadata
+    ///
+    access(all) resource Vault: Metadata, MetadataGenerator {
+        /// Attempt to generate a new gene
+        ///
+        access(all)
         fun attemptGenerateGene(_ attempt: UInt64): FixesAssetGenes.DNA? {
             var max = attempt
             if max == 0 {
@@ -140,7 +151,7 @@ access(all) contract interface FixesFungibleTokenInterface {
                 max = maxLimit
             }
 
-            let dnaRef = &self.metadata[Type<FixesAssetGenes.DNA>()] as &{FixesTraits.MergeableData}?
+            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
                 ?? panic("The DNA metadata is not found")
             let mutatableAmt = dnaRef.getValue("mutatableAmount")
             if mutatableAmt == nil {
