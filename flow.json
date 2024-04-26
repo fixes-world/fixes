@@ -122,7 +122,7 @@
 			}
 		},
 		"FRC20FungibleToken": {
-			"source": "cadence/contracts/FRC20FungibleToken.cdc",
+			"source": "cadence/contracts/deployable/FRC20FungibleToken.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -265,7 +265,7 @@
 			}
 		},
 		"FixesFungibleToken": {
-			"source": "cadence/contracts/FixesFungibleToken.cdc",
+			"source": "cadence/contracts/deployable/FixesFungibleToken.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
