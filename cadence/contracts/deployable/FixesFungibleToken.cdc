@@ -16,6 +16,7 @@ import "FungibleTokenMetadataViews"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FixesFungibleTokenInterface"
 import "FixesTraits"
 import "FixesAssetGenes"
 import "FRC20FTShared"
@@ -24,7 +25,7 @@ import "FRC20AccountsPool"
 /// This is the template source for a Fixes Fungible Token
 /// The contract is deployed in the child account of the FRC20AccountsPool
 /// The Token is issued by Minter
-access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
+access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleToken, ViewResolver {
     // ------ Events -------
 
     /// The event that is emitted when the contract is created
@@ -44,9 +45,6 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
 
     /// The event that is emitted when a new minter resource is created
     access(all) event MinterCreated(allowedAmount: UFix64)
-
-    /// The event that is emitted when a new burner resource is created
-    access(all) event BurnerCreated()
 
     /// The event that is emitted when the metadata is updated
     access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
@@ -71,34 +69,6 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
 
     /// -------- Resources and Interfaces --------
 
-    /// The public interface for the Fungible Token
-    ///
-    access(all) resource interface Metadata {
-        /// Check if the vault is valid
-        access(all)
-        view fun isValidVault(): Bool {
-            return self.getMergeableKeys().contains(Type<FixesAssetGenes.DNA>())
-        }
-        /// Get mergeable metadata keys
-        access(all)
-        view fun getMergeableKeys(): [Type]
-        /// Get the mergeable metadata by key
-        access(all)
-        view fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}?
-        /// Get DNA identifier
-        access(all)
-        view fun getDNAIdentifier(): String
-        /// Get DNA owner
-        access(all)
-        view fun getDNAOwner(): Address
-        /// Get the total mutatable amount of DNA
-        access(all)
-        view fun getDNAMutatableAmount(): UInt64
-        /// DNA charging
-        access(all)
-        fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription)
-    }
-
     /// Each user stores an instance of only the Vault in their storage
     /// The functions in the Vault and governed by the pre and post conditions
     /// in FungibleToken when they are called.
@@ -109,12 +79,12 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    access(all) resource Vault: Metadata, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: FixesFungibleTokenInterface.Metadata, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
         /// Metadata: Type of MergeableData => MergeableData
-        access(self)
+        access(contract)
         let metadata: {Type: {FixesTraits.MergeableData}}
 
         /// Initialize the balance at resource creation time
@@ -173,11 +143,6 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
         access(contract)
         fun initializeMetadata(_ data: {FixesTraits.MergeableData}) {
             let key = data.getType()
-            assert(
-                self._borrowMergeableDataRef(key) == nil,
-                message: "The metadata key already exists"
-            )
-
             self.metadata[key] = data
 
             // emit the event
@@ -189,53 +154,12 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
             )
         }
 
-        /// Borrow the mergeable data by key
-        ///
-        access(self)
-        fun _borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
-            return &self.metadata[type] as &{FixesTraits.MergeableData}?
-        }
-
         /// --------- Implement Metadata --------- ///
 
-        /// Get mergeable metadata keys
-        ///
+        /// Get the symbol of the token
         access(all)
-        view fun getMergeableKeys(): [Type] {
-            return self.metadata.keys
-        }
-
-        /// Get the mergeable metadata by key
-        ///
-        access(all)
-        view fun getMergeableData(_ key: Type): {FixesTraits.MergeableData}? {
-            return self.metadata[key]
-        }
-
-
-        /// Get the DNA identifier
-        ///
-        access(all)
-        view fun getDNAIdentifier(): String {
-            return self.getType().identifier.concat("-").concat(FixesFungibleToken.getSymbol())
-        }
-
-        /// Get DNA owner
-        ///
-        access(all)
-        view fun getDNAOwner(): Address {
-            let dnaRef = self._borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
-                ?? panic("The DNA metadata is not found")
-            return dnaRef.getValue("owner") as! Address
-        }
-
-        /// Get the total mutatable amount of DNA
-        ///
-        access(all)
-        view fun getDNAMutatableAmount(): UInt64 {
-            let dnaRef = self._borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
-                ?? panic("The DNA metadata is not found")
-            return dnaRef.getValue("mutatableAmount") as! UInt64
+        view fun getSymbol(): String {
+            return FixesFungibleToken.getSymbol()
         }
 
         /// DNA charging
@@ -251,16 +175,17 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
             FixesFungibleToken.executeInscription(ins: ins, usage: "charge")
 
             // borrow the DNA metadata
-            let dnaRef = self._borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
+            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetGenes.DNA>())
                 ?? panic("The DNA metadata is not found")
             let oldValue = dnaRef.getValue("mutatableAmount") as! UInt64
             // update the DNA mutatable amount
-            dnaRef.setValue("mutatableAmount", oldValue + 5)
+            let addAmt = self.getMaxGenerateGeneAttempts()
+            dnaRef.setValue("mutatableAmount", oldValue + addAmt)
 
             // emit the event
             emit TokenDNAMutatableCharged(
                 identifier: self.getDNAIdentifier(),
-                mutatableAmount: oldValue + 5,
+                mutatableAmount: oldValue + addAmt,
                 owner: self.owner?.address
             )
         }
@@ -301,7 +226,7 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
             let percentage = amount / oldBalance
             let mergeableKeys = self.getMergeableKeys()
             for key in mergeableKeys {
-                if let dataRef = self._borrowMergeableDataRef(key) {
+                if let dataRef = self.borrowMergeableDataRef(key) {
                     let splitData = dataRef.split(percentage)
                     newVault.metadata[key] = splitData
 
@@ -350,13 +275,13 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
             let keys = vault.getMergeableKeys()
             for key in keys {
                 let data = vault.getMergeableData(key)!
-                if let selfData = self._borrowMergeableDataRef(key) {
+                if let selfData = self.borrowMergeableDataRef(key) {
                     selfData.merge(data)
                 } else {
                     self.metadata[key] = data
                 }
 
-                let dataRef = self._borrowMergeableDataRef(key)!
+                let dataRef = self.borrowMergeableDataRef(key)!
                 // emit the event
                 emit TokensMetadataUpdated(
                     typeIdentifier: key.identifier,
@@ -415,66 +340,21 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
         ///
         access(self)
         fun _attemptGenerateGene(_ attempt: UInt64) {
-            var max = attempt
-            if max > 5 {
-                max = 5
-            }
-            if max == 0 {
-                return
-            }
-
-            let dnaRef = &self.metadata[Type<FixesAssetGenes.DNA>()] as &{FixesTraits.MergeableData}?
-                ?? panic("The DNA metadata is not found")
-            let mutatableAmt = dnaRef.getValue("mutatableAmount")
-            if mutatableAmt == nil {
-                return
-            }
-            // create a new DNA
-            let newDNA = FixesAssetGenes.DNA(
-                self.getDNAIdentifier(),
-                dnaRef.getValue("owner") as! Address,
-                mutatableAmt! as! UInt64,
-            )
-            var anyAdded = false
-            var i: UInt64 = 0
-            while i < max && newDNA.isMutatable() {
-                if let gene = FixesAssetGenes.attemptToGenerateGene() {
-                    newDNA.addGene(gene)
-                    anyAdded = true
-                }
-                i = i + 1
-            }
-
-            if anyAdded {
-                // merge the DNA
-                dnaRef.merge(newDNA)
-
-                // update the DNA mutatable amount
-                let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64
-                dnaRef.setValue("mutatableAmount", newMutatableAmt)
-
+            if let newMergedDNA = self.attemptGenerateGene(attempt) {
                 // emit the event
                 emit TokenDNAGenerated(
                     identifier: self.getDNAIdentifier(),
-                    value: newDNA.toString(),
-                    mutatableAmount: newMutatableAmt,
+                    value: newMergedDNA.toString(),
+                    mutatableAmount: newMergedDNA.mutatableAmount,
                     owner: self.owner?.address
                 )
             }
         }
     }
 
-    /// The admin interface for the FRC20 FT
-    ///
-    access(all) resource interface AdminInterface {
-        /// Mint new tokens
-        access(all)
-        view fun getGrantedMintableAmount(): UFix64
-    }
-
     /// The admin resource for the FRC20 FT
     ///
-    access(all) resource FungibleTokenAdmin: AdminInterface {
+    access(all) resource FungibleTokenAdmin: FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinter {
         /// The amount of tokens that all created minters are allowed to mint
         access(self)
         var grantedMintableAmount: UFix64
@@ -513,7 +393,7 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
 
     /// Resource object that token admin accounts can hold to mint new tokens.
     ///
-    access(all) resource Minter {
+    access(all) resource Minter: FixesFungibleTokenInterface.IMinter {
         /// The amount of tokens that the minter is allowed to mint
         access(all)
         var allowedAmount: UFix64
@@ -547,6 +427,12 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
             meta["usage"] == usage,
             message: "The inscription usage must be ".concat(usage)
         )
+        let tick = meta["tick"] ?? panic("The ticker name is not found")
+        assert(
+            tick[0] == "$" && tick == "$".concat(self.getSymbol()),
+            message: "The ticker name is not matched"
+        )
+        // execute the inscription
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
     }
@@ -578,14 +464,6 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
     access(all)
     fun createEmptyVault(): @Vault {
         return <-create Vault(balance: 0.0)
-    }
-
-    /// Borrow the shared store
-    ///
-    access(all)
-    view fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
-        let addr = self.account.address
-        return FRC20FTShared.borrowStoreRef(addr) ?? panic("Config store not found")
     }
 
     /// Function that resolves a metadata view for this contract.
@@ -721,118 +599,11 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
         return self.totalSupply
     }
 
-    /// Get the ticker name of the token
-    ///
-    access(all)
-    view fun getSymbol(): String {
-        let store = self.borrowSharedStore()
-        let tick = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
-        return tick ?? panic("Ticker name not found")
-    }
-
-    /// Get the display name of the token
-    ///
-    access(all)
-    view fun getDisplayName(): String? {
-        let store = self.borrowSharedStore()
-        return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDisplayName) as! String?
-    }
-
-    /// Get the token description
-    ///
-    access(all)
-    view fun getTokenDescription(): String? {
-        let store = self.borrowSharedStore()
-        return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDescription) as! String?
-    }
-
-    /// Get the external URL of the token
-    ///
-    access(all)
-    view fun getExternalUrl(): String? {
-        let store = self.borrowSharedStore()
-        return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenExternalUrl) as! String?
-    }
-
-    /// Get the icon URL of the token
-    ///
-    access(all)
-    view fun getLogoUrl(): String? {
-        let store = self.borrowSharedStore()
-        let key = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenLogoPrefix)!
-        let iconDefault = store.get(key) as! String?
-        let iconPng = store.get(key.concat("png")) as! String?
-        let iconSvg = store.get(key.concat("svg")) as! String?
-        let iconJpg = store.get(key.concat("jpg")) as! String?
-        return iconPng ?? iconSvg ?? iconJpg ?? iconDefault
-    }
-
-    /// Get the fungible token balance of the address
-    ///
-    access(all)
-    view fun getTokenBalance(_ addr: Address): UFix64 {
-        if let ref = getAccount(addr)
-            .getCapability<&FixesFungibleToken.Vault{FungibleToken.Balance}>(self.getVaultPublicPath())
-            .borrow() {
-            return ref.balance
-        }
-        return 0.0
-    }
-
-    /// Borrow the FlowToken Receiver
-    ///
-    access(all)
-    view fun borrowAccountFlowTokenReceiver(): &{FungibleToken.Receiver}? {
-        let cap = getAccount(self.account.address)
-            .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-        return cap.borrow()
-    }
-
     /// Get the prefix for the storage paths
     ///
     access(all)
     view fun getPathPrefix(): String {
         return "FixsStandardFT_".concat(self.account.address.toString()).concat(self.getSymbol()).concat("_")
-    }
-
-    /// Get the storage path for the Vault
-    ///
-    access(all)
-    view fun getVaultStoragePath(): StoragePath {
-        let prefix = FixesFungibleToken.getPathPrefix()
-        return StoragePath(identifier: prefix.concat("Vault"))!
-    }
-
-    /// Get the public path for the Vault
-    ///
-    access(all)
-    view fun getVaultPublicPath(): PublicPath {
-        let prefix = FixesFungibleToken.getPathPrefix()
-        return PublicPath(identifier: prefix.concat("Metadata"))!
-    }
-
-    /// Get the public path for the Receiver
-    ///
-    access(all)
-    view fun getReceiverPublicPath(): PublicPath {
-        let prefix = FixesFungibleToken.getPathPrefix()
-        return PublicPath(identifier: prefix.concat("Receiver"))!
-    }
-
-    /// Get the admin storage path
-    ///
-    access(all)
-    view fun getAdminStoragePath(): StoragePath {
-        let prefix = FixesFungibleToken.getPathPrefix()
-        return StoragePath(identifier: prefix.concat("Admin"))!
-    }
-
-    /// Get the admin public path
-    ///
-    access(all)
-    view fun getAdminPublicPath(): PublicPath {
-        let prefix = FixesFungibleToken.getPathPrefix()
-        return PublicPath(identifier: prefix.concat("Admin"))!
     }
 
     /// ----- Internal Methods -----
@@ -902,7 +673,6 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
             }
         }
 
-        // ensure frc20 metadata exists
         assert(
             tickerName != nil,
             message: "The ticker name is not found"
@@ -914,7 +684,7 @@ access(all) contract FixesFungibleToken: FungibleToken, ViewResolver {
         self.account.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
         // @deprecated after Cadence 1.0
-        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{FixesFungibleToken.AdminInterface}>(
+        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin}>(
             self.getAdminPublicPath(),
             target: adminStoragePath
         )

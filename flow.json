@@ -272,6 +272,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesFungibleTokenInterface": {
+			"source": "cadence/contracts/FixesFungibleTokenInterface.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FixesHeartbeat": {
 			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
@@ -854,6 +862,7 @@
 				"FGameLotteryFactory",
 				"FRC20Agents",
 				"FixesAssetGenes",
+				"FixesFungibleTokenInterface",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
 				"FungibleTokenManager"
