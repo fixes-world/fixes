@@ -9,6 +9,7 @@ This is the fungible token contract interface for a Fungible tokens with FixesAs
 */
 
 import "FungibleToken"
+import "FungibleTokenMetadataViews"
 // Fixes imports
 import "Fixes"
 import "FixesTraits"
@@ -211,13 +212,9 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTotalSupply(): UFix64
 
-        /// Create an empty vault of the minting token
+        /// Get the vault data of the minting token
         access(all)
-        fun createEmptyVault(): @FungibleToken.Vault {
-            post {
-                result.balance == 0.0: "The balance of the vault must be zero"
-            }
-        }
+        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData
 
         /// Function that mints new tokens, adds them to the total supply,
         /// and returns them to the calling context.

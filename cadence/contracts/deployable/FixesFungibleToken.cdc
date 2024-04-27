@@ -455,10 +455,12 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return FixesFungibleToken.getTotalSupply()
         }
 
-        /// Create an empty vault of the minting token
+        /// Get the vault data of the minting token
+        ///
         access(all)
-        fun createEmptyVault(): @FungibleToken.Vault {
-            return <- FixesFungibleToken.createEmptyVault()
+        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            return FixesFungibleToken.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+                ?? panic("The vault data is not found")
         }
 
         /// Mint new tokens, not limited by the minter
@@ -496,17 +498,19 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
 
         /// Get the total supply of the minting token
+        ///
         access(all)
         view fun getTotalSupply(): UFix64 {
             return FixesFungibleToken.getTotalSupply()
         }
 
-        /// Create an empty vault of the minting token
+        /// Get the vault data of the minting token
+        ///
         access(all)
-        fun createEmptyVault(): @FungibleToken.Vault {
-            return <- FixesFungibleToken.createEmptyVault()
+        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            return FixesFungibleToken.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+                ?? panic("The vault data is not found")
         }
-
         /// Function that mints new tokens, adds them to the total supply,
         /// and returns them to the calling context.
         ///
