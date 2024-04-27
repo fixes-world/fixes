@@ -495,7 +495,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     fun executeInscription(ins: &Fixes.Inscription, usage:String) {
         let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         assert(
-            meta["usage"] == usage,
+            meta["usage"] == usage || meta["usage"] == "*",
             message: "The inscription usage must be ".concat(usage)
         )
         let tick = meta["tick"] ?? panic("The ticker name is not found")
@@ -522,6 +522,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         let newVault <- create Vault(balance: amount)
         if let insRef = ins {
             newVault.initialize(insRef, nil)
+            // execute the inscription
+            FixesFungibleToken.executeInscription(ins: insRef, usage: "mint")
         }
 
         FixesFungibleToken.totalSupply = FixesFungibleToken.totalSupply + amount
