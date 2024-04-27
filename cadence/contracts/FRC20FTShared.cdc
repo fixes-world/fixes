@@ -734,6 +734,7 @@ access(all) contract FRC20FTShared {
         access(all) case FungibleTokenExternalUrl
         access(all) case FungibleTokenLogoPrefix
         access(all) case FungibleTokenSocialPrefix
+        access(all) case FungibleTokenMaxSupply
     }
 
     /* --- Public Methods --- */
@@ -811,6 +812,9 @@ access(all) contract FRC20FTShared {
                 break
             case ConfigType.FungibleTokenSocialPrefix:
                 key = "fungibleToken:Social:"
+                break
+            case ConfigType.FungibleTokenMaxSupply:
+                key = "fungibleToken:MaxSupply"
                 break
             }
             return key

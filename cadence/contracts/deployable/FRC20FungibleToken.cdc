@@ -799,6 +799,15 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         ]
     }
 
+    /// Get the max supply of the token
+    ///
+    access(all)
+    view fun getMaxSupply(): UFix64? {
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let tokenMeta = frc20Indexer.getTokenMeta(tick: self.getSymbol())!
+        return tokenMeta.max
+    }
+
     /// the real total supply is loaded from the FRC20Indexer
     ///
     access(all)

@@ -243,6 +243,14 @@ access(all) contract interface FixesFungibleTokenInterface {
         return tick ?? panic("Ticker name not found")
     }
 
+    /// Get the max supply of the token
+    ///
+    access(all)
+    view fun getMaxSupply(): UFix64? {
+        let store = self.borrowSharedStore()
+        return store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenMaxSupply) as! UFix64?
+    }
+
     /// Get the display name of the token
     ///
     access(all)
