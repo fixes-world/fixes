@@ -431,6 +431,36 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         // ------ Private Methods ------
 
+        /// Create a new Minter resource
+        ///
+        access(all)
+        fun createMinter(allowedAmount: UFix64): @Minter {
+            let minter <- create Minter(allowedAmount: allowedAmount)
+            self.grantedMintableAmount = self.grantedMintableAmount + allowedAmount
+            emit MinterCreated(allowedAmount: allowedAmount)
+            return <- minter
+        }
+
+        // ----- Implement IMinter -----
+
+        /// Get the max supply of the minting token
+        access(all)
+        view fun getMaxSupply(): UFix64 {
+            return FixesFungibleToken.getMaxSupply() ?? UFix64.max
+        }
+
+        /// Get the total supply of the minting token
+        access(all)
+        view fun getTotalSupply(): UFix64 {
+            return FixesFungibleToken.getTotalSupply()
+        }
+
+        /// Create an empty vault of the minting token
+        access(all)
+        fun createEmptyVault(): @FungibleToken.Vault {
+            return <- FixesFungibleToken.createEmptyVault()
+        }
+
         /// Mint new tokens, not limited by the minter
         ///
         access(all)
@@ -444,16 +474,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         fun mintTokensWithInscription(amount: UFix64, ins: &Fixes.Inscription?): @FixesFungibleToken.Vault {
             return <- FixesFungibleToken.mintTokens(amount: amount, ins: ins)
         }
-
-        /// Create a new Minter resource
-        ///
-        access(all)
-        fun createMinter(allowedAmount: UFix64): @Minter {
-            let minter <- create Minter(allowedAmount: allowedAmount)
-            self.grantedMintableAmount = self.grantedMintableAmount + allowedAmount
-            emit MinterCreated(allowedAmount: allowedAmount)
-            return <- minter
-        }
     }
 
     /// Resource object that token admin accounts can hold to mint new tokens.
@@ -465,6 +485,26 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         init(allowedAmount: UFix64) {
             self.allowedAmount = allowedAmount
+        }
+
+        // ----- Implement IMinter -----
+
+        /// Get the max supply of the minting token
+        access(all)
+        view fun getMaxSupply(): UFix64 {
+            return FixesFungibleToken.getMaxSupply() ?? UFix64.max
+        }
+
+        /// Get the total supply of the minting token
+        access(all)
+        view fun getTotalSupply(): UFix64 {
+            return FixesFungibleToken.getTotalSupply()
+        }
+
+        /// Create an empty vault of the minting token
+        access(all)
+        fun createEmptyVault(): @FungibleToken.Vault {
+            return <- FixesFungibleToken.createEmptyVault()
         }
 
         /// Function that mints new tokens, adds them to the total supply,

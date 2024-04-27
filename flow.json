@@ -264,6 +264,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesBondingCurve": {
+			"source": "cadence/contracts/FixesBondingCurve.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FixesFungibleToken": {
 			"source": "cadence/contracts/deployable/FixesFungibleToken.cdc",
 			"aliases": {
@@ -905,7 +913,8 @@
 				"FixesFungibleTokenInterface",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FungibleTokenManager"
+				"FungibleTokenManager",
+				"FixesBondingCurve"
 			]
 		},
 		"mainnet": {

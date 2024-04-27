@@ -203,16 +203,39 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// The minter resource interface
     ///
     access(all) resource interface IMinter {
+        /// Get the max supply of the minting token
+        access(all)
+        view fun getMaxSupply(): UFix64
+
+        /// Get the total supply of the minting token
+        access(all)
+        view fun getTotalSupply(): UFix64
+
+        /// Create an empty vault of the minting token
+        access(all)
+        fun createEmptyVault(): @FungibleToken.Vault {
+            post {
+                result.balance == 0.0: "The balance of the vault must be zero"
+            }
+        }
+
         /// Function that mints new tokens, adds them to the total supply,
         /// and returns them to the calling context.
         ///
         access(all)
-        fun mintTokens(amount: UFix64): @FungibleToken.Vault
+        fun mintTokens(amount: UFix64): @FungibleToken.Vault {
+            pre {
+                amount > 0.0: "The amount must be greater than zero"
+            }
+        }
 
         /// Mint tokens with user's inscription
         ///
         access(all)
-        fun mintTokensWithInscription(amount: UFix64, ins: &Fixes.Inscription?): @FungibleToken.Vault {
+        fun mintTokensWithInscription(
+            amount: UFix64,
+            ins: &Fixes.Inscription?
+        ): @FungibleToken.Vault {
             return <- self.mintTokens(amount: amount)
         }
     }
