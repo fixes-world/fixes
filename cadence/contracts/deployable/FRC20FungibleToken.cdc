@@ -308,7 +308,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(all)
         fun withdraw(amount: UFix64): @FungibleToken.Vault {
             pre {
-                self.isValidVault(): "The vault must be valid, need to be initialized with FRC20Change"
+                self.isValidVault(): "The vault must be valid before withdraw"
             }
             let changeRef = self.borrowChangeRef()!
             let oldBalance = changeRef.getBalance()
@@ -362,13 +362,22 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(all)
         fun deposit(from: @FungibleToken.Vault) {
-            pre {
-                self.isValidVault(): "The vault must be valid, need to be initialized with FRC20Change"
+            post {
+                self.isValidVault(): "The vault must be valid after deposit"
             }
             // the interface ensured that the vault is of the same type
             // so we can safely cast it
             let vault <- from as! @FRC20FungibleToken.Vault
             let change <- vault.extract()
+
+            // initialize current vault if it is not initialized
+            if !self.isValidVault() {
+                let newChange <- FRC20FTShared.createEmptyChange(
+                    tick: change.tick,
+                    from: change.from
+                )
+                self.initialize(<- newChange, false)
+            }
 
             // merge the metadata
             let keys = vault.getMergeableKeys()
