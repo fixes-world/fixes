@@ -396,15 +396,12 @@ access(all) contract FixesAssetMeta {
     /// The DNA data structure
     ///
     access(all) struct DepositTax: FixesTraits.MergeableData {
-        access(all) var enabled: Bool
         access(all) var flags: {String: Bool}
 
         init(
-            _ enabled: Bool?,
             _ flags: {String: Bool}?,
         ) {
-            self.enabled = enabled ?? false
-            self.flags = flags ?? {}
+            self.flags = flags ?? { "enabled": true }
         }
 
         /// Get the id of the data
@@ -422,9 +419,7 @@ access(all) contract FixesAssetMeta {
             for key in self.flags.keys {
                 flags.append(key.concat("=").concat(self.flags[key] == true ? "1" : "0"))
             }
-            return StringUtils.join([
-                "enabled=".concat(self.enabled ? "1" : "0")
-            ].concat(flags), ",")
+            return StringUtils.join(flags, ",")
         }
 
         /// Get the data keys
@@ -440,7 +435,7 @@ access(all) contract FixesAssetMeta {
         access(all)
         view fun getValue(_ key: String): AnyStruct? {
             if key == "enabled" {
-                return self.enabled
+                return self.flags["enabled"]
             }
             return nil
         }
@@ -457,7 +452,7 @@ access(all) contract FixesAssetMeta {
         access(all)
         fun setValue(_ key: String, _ value: AnyStruct) {
             if key == "enabled" {
-                self.enabled = value as! Bool
+                self.flags["enabled"] = value as! Bool
             }
         }
 
@@ -468,7 +463,7 @@ access(all) contract FixesAssetMeta {
             post {
                 self.getId() == result.getId(): "The result id is not the same so cannot split"
             }
-            return DepositTax(self.enabled, self.flags)
+            return DepositTax(self.flags)
         }
 
         /// Merge the data from another instance

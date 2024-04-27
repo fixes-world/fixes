@@ -156,11 +156,13 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             post {
                 self.isValidVault(): "The vault must be valid"
             }
+
             let balance = change.getBalance()
             let from = change.from
             self.change <-! change
             // update balance
             self.syncBalance()
+
             /// init DNA to the metadata
             self.initializeMetadata(FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
@@ -244,16 +246,29 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             pre {
                 ins.isExtractable(): "The inscription must be extractable"
             }
+            post {
+                self.isValidVault(): "The vault must be valid before charge"
+            }
 
             let insOwner = ins.owner?.address ?? panic("The owner of the inscription is not found")
             assert(
                 insOwner == self.owner?.address,
                 message: "The owner of the inscription is not matched"
             )
+
+            // ensure the vault is valid
+            if !self.isValidVault() {
+                let newChange <- FRC20FTShared.createEmptyChange(
+                    tick: self.getSymbol(),
+                    from: insOwner
+                )
+                self.initialize(<- newChange, false)
+            }
+
             let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
             let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
-                meta["tick"]?.toLower() == FRC20FungibleToken.getSymbol(),
+                meta["tick"]?.toLower() == self.getSymbol(),
                 message: "The token tick is not matched"
             )
             assert(
@@ -338,9 +353,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 }
             }
 
-            // every 10% of balance change will get a new attempt to mutate the DNA
-            var attempt = UInt64(UFix64(amount) / UFix64(oldBalance) / 0.1)
-            self._attemptGenerateGene(attempt)
+            // Is the vault has DNA, then attempt to generate a new gene
+            self._attemptGenerateGene(amount, oldBalance)
 
             // emit the event
             emit TokensWithdrawn(
@@ -419,9 +433,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             // update balance
             self.syncBalance()
 
-            // every 10% of balance change will get a new attempt to mutate the DNA
-            let attempt = UInt64(UFix64(depositedBalance) / UFix64(self.balance) / 0.1)
-            self._attemptGenerateGene(attempt)
+            // Is the vault has DNA, then attempt to generate a new gene
+            self._attemptGenerateGene(depositedBalance, self.balance)
 
             emit TokensDeposited(
                 amount: depositedBalance,
@@ -464,7 +477,12 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Attempt to generate a new gene, max 5 attempts for each action
         ///
         access(self)
-        fun _attemptGenerateGene(_ attempt: UInt64) {
+        fun _attemptGenerateGene(_ transactedAmt: UFix64, _ totalAmt: UFix64) {
+            if !self.isValidVault() || self.getDNAMutatableAmount() == 0 || totalAmt == 0.0 {
+                return
+            }
+            // every 10% of balance change will get a new attempt to mutate the DNA
+            let attempt = UInt64(transactedAmt / totalAmt / 0.1)
             if let newMergedDNA = self.attemptGenerateGene(attempt) {
                 // emit the event
                 emit TokenDNAGenerated(

@@ -13,6 +13,7 @@ import "FungibleToken"
 import "ViewResolver"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
+import "BlackHole"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -126,15 +127,21 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             pre {
                 ins != nil || owner != nil: "The inscription or owner must be provided"
             }
-            let from = (ins != nil ? ins!.owner?.address : owner)
+            let fromAddr = (ins != nil ? ins!.owner?.address : owner)
                 ?? panic("Failed to get the owner address")
+
             /// init DNA to the metadata
             self.initializeMetadata(FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
-                from,
+                fromAddr,
                 // if inscription exists, init the DNA with 5 mutatable attempts
                 ins != nil ? 5 : 0
             ))
+
+            // Add deposit tax metadata
+            if fromAddr != FixesFungibleToken.getAccountAddress() {
+                self.initializeMetadata(FixesAssetMeta.DepositTax(nil))
+            }
         }
 
         /// Set the metadata by key
@@ -172,24 +179,30 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 insOwner == self.owner?.address,
                 message: "The owner of the inscription is not matched"
             )
+
+            if !self.isValidVault() {
+                // initialize the vault with the DNA metadata
+                self.initialize(ins, nil)
+            } else {
+                // borrow the DNA metadata
+                let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
+                    ?? panic("The DNA metadata is not found")
+                let oldValue = dnaRef.getValue("mutatableAmount") as! UInt64
+                // update the DNA mutatable amount
+                let addAmt = self.getMaxGenerateGeneAttempts()
+                dnaRef.setValue("mutatableAmount", oldValue + addAmt)
+
+                // emit the event
+                emit TokenDNAMutatableCharged(
+                    identifier: self.getDNAIdentifier(),
+                    mutatableAmount: oldValue + addAmt,
+                    owner: self.owner?.address
+                )
+            }
+
+            // execute the inscription
             FixesFungibleToken.executeInscription(ins: ins, usage: "charge")
-
-            // borrow the DNA metadata
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
-                ?? panic("The DNA metadata is not found")
-            let oldValue = dnaRef.getValue("mutatableAmount") as! UInt64
-            // update the DNA mutatable amount
-            let addAmt = self.getMaxGenerateGeneAttempts()
-            dnaRef.setValue("mutatableAmount", oldValue + addAmt)
-
-            // emit the event
-            emit TokenDNAMutatableCharged(
-                identifier: self.getDNAIdentifier(),
-                mutatableAmount: oldValue + addAmt,
-                owner: self.owner?.address
-            )
         }
-
 
         /// --------- Implement FungibleToken.Provider --------- ///
 
@@ -212,15 +225,19 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(all)
         fun withdraw(amount: UFix64): @FungibleToken.Vault {
             pre {
-                self.isValidVault(): "The vault must be valid, need to be initialized with FRC20Change"
                 self.isAvailableToWithdraw(amount: amount): "The amount withdrawn must be less than or equal to the balance"
             }
             let oldBalance = self.balance
             // update the balance
             self.balance = self.balance - amount
+
             // initialize the new vault with the amount
             let newVault <- create Vault(balance: amount)
-            newVault.initialize(nil, self.getDNAOwner())
+
+            // if current vault is valid vault(with DNA)
+            if self.isValidVault() {
+                newVault.initialize(nil, self.getDNAOwner())
+            }
 
             // setup mergeable data, split from withdraw percentage
             let percentage = amount / oldBalance
@@ -240,9 +257,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 }
             }
 
-            // every 10% of balance change will get a new attempt to mutate the DNA
-            var attempt = UInt64(UFix64(amount) / UFix64(oldBalance) / 0.1)
-            self._attemptGenerateGene(attempt)
+            // Is the vault has DNA, then attempt to generate a new gene
+            self._attemptGenerateGene(amount, oldBalance)
 
             // emit the event
             emit TokensWithdrawn(
@@ -264,12 +280,42 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(all)
         fun deposit(from: @FungibleToken.Vault) {
-            pre {
-                self.isValidVault(): "The vault must be valid, need to be initialized with FRC20Change"
-            }
             // the interface ensured that the vault is of the same type
             // so we can safely cast it
             let vault <- from as! @FixesFungibleToken.Vault
+
+            // try to get the current owner of the DNA
+            let currentOwner = self.owner?.address ?? vault.getDNAOwner()
+
+            // initialize current vault if it is not initialized
+            if !self.isValidVault() && currentOwner != nil {
+                self.initialize(nil, currentOwner!)
+            }
+
+            // check the deposit tax, if exists then charge the tax
+            if let depositTax = self.borrowMergeableDataRef(Type<FixesAssetMeta.DepositTax>())  {
+                let isEnabled = (depositTax.getValue("enabled") as? Bool) == true
+                let tax = FixesFungibleToken.getDepositTaxRatio()
+                let taxReceiver = FixesFungibleToken.getDepositTaxRecepient()
+                if isEnabled && tax > 0.0 && self.owner?.address != taxReceiver {
+                    let taxAmount = vault.balance * tax
+                    let taxVault <- vault.withdraw(amount: taxAmount)
+                    if taxReceiver != nil && FixesFungibleToken.borrowVaultReceiver(taxReceiver!) != nil {
+                        let receiverRef = FixesFungibleToken.borrowVaultReceiver(taxReceiver!)!
+                        receiverRef.deposit(from: <- taxVault)
+                    } else {
+                        // Send to the black hole instead of destroying.
+                        // This can keep the totalSupply unchanged (In theory).
+                        if BlackHole.isAnyBlackHoleAvailable() {
+                            BlackHole.vanish(<- taxVault)
+                        } else {
+                            // Otherwise, destroy the taxVault
+                            // TODO: Using Burner to burn the taxVault in Cadence 1.0
+                            destroy taxVault
+                        }
+                    }
+                }
+            } // end of deposit tax
 
             // merge the metadata
             let keys = vault.getMergeableKeys()
@@ -301,9 +347,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             // vault is useless now
             destroy vault
 
-            // every 10% of balance change will get a new attempt to mutate the DNA
-            let attempt = UInt64(UFix64(depositedBalance) / UFix64(self.balance) / 0.1)
-            self._attemptGenerateGene(attempt)
+            // Is the vault has DNA, then attempt to generate a new gene
+            self._attemptGenerateGene(depositedBalance, self.balance)
 
             emit TokensDeposited(
                 amount: depositedBalance,
@@ -346,7 +391,13 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Attempt to generate a new gene, Max attempts is 10
         ///
         access(self)
-        fun _attemptGenerateGene(_ attempt: UInt64) {
+        fun _attemptGenerateGene(_ transactedAmt: UFix64, _ totalAmt: UFix64) {
+            if !self.isValidVault() || self.getDNAMutatableAmount() == 0 || totalAmt == 0.0 {
+                return
+            }
+            // every 10% of balance change will get a new attempt to mutate the DNA
+            let attempt = UInt64(transactedAmt / totalAmt / 0.1)
+            // attempt to generate a new gene
             if let newMergedDNA = self.attemptGenerateGene(attempt) {
                 // emit the event
                 emit TokenDNAGenerated(
@@ -597,6 +648,13 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             Type<FungibleTokenMetadataViews.FTDisplay>(),
             Type<FungibleTokenMetadataViews.FTVaultData>()
         ]
+    }
+
+    /// Get the account address
+    ///
+    access(all)
+    view fun getAccountAddress(): Address {
+        return self.account.address
     }
 
     /// the real total supply is loaded from the FRC20Indexer

@@ -83,19 +83,25 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Get DNA owner
         ///
         access(all)
-        view fun getDNAOwner(): Address {
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
-                ?? panic("The DNA metadata is not found")
-            return dnaRef.getValue("owner") as! Address
+        view fun getDNAOwner(): Address? {
+            if let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>()) {
+                if let owner = dnaRef.getValue("owner") {
+                    return owner as! Address
+                }
+            }
+            return nil
         }
 
         /// Get the total mutatable amount of DNA
         ///
         access(all)
         view fun getDNAMutatableAmount(): UInt64 {
-            let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
-                ?? panic("The DNA metadata is not found")
-            return dnaRef.getValue("mutatableAmount") as! UInt64
+            if let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>()) {
+                if let mutatableAmount = dnaRef.getValue("mutatableAmount") {
+                    return mutatableAmount as! UInt64
+                }
+            }
+            return 0
         }
 
         /// get the max mutatable amount
@@ -145,24 +151,23 @@ access(all) contract interface FixesFungibleTokenInterface {
             if max == 0 {
                 return nil
             }
-
-            let maxLimit = self.getMaxGenerateGeneAttempts()
-            if max > maxLimit {
-                max = maxLimit
+            let mutatableAmt = self.getDNAMutatableAmount()
+            if mutatableAmt < 1 {
+                return nil
             }
 
             let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
                 ?? panic("The DNA metadata is not found")
-            let mutatableAmt = dnaRef.getValue("mutatableAmount")
-            if mutatableAmt == nil {
-                return nil
-            }
             // create a new DNA
             let newDNA = FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
-                dnaRef.getValue("owner") as! Address,
-                mutatableAmt! as! UInt64,
+                self.getDNAOwner() ?? panic("The DNA owner is not found"),
+                mutatableAmt,
             )
+            let maxLimit = self.getMaxGenerateGeneAttempts()
+            if max > maxLimit {
+                max = maxLimit
+            }
             var anyAdded = false
             var i: UInt64 = 0
             while i < max && newDNA.isMutatable() {
@@ -294,9 +299,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         return self.account.address
     }
 
-    // access(all)
-    // view fun getDepositTaxMode():
-
     /// Get the fungible token balance of the address
     ///
     access(all)
@@ -307,6 +309,15 @@ access(all) contract interface FixesFungibleTokenInterface {
             return ref.balance
         }
         return 0.0
+    }
+
+    /// Borrow the vault receiver of the address
+    ///
+    access(all)
+    view fun borrowVaultReceiver(_ addr: Address): &AnyResource{FungibleToken.Receiver}? {
+        return getAccount(addr)
+            .getCapability<&AnyResource{FungibleToken.Receiver}>(self.getReceiverPublicPath())
+            .borrow()
     }
 
     /// Get the storage path for the Vault
