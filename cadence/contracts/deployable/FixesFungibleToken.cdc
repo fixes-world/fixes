@@ -435,7 +435,14 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(all)
         fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
-            return <- FixesFungibleToken.mintTokens(amount: amount)
+            return <- self.mintTokensWithInscription(amount: amount, ins: nil)
+        }
+
+        /// Mint tokens with user's inscription
+        ///
+        access(all)
+        fun mintTokensWithInscription(amount: UFix64, ins: &Fixes.Inscription?): @FixesFungibleToken.Vault {
+            return <- FixesFungibleToken.mintTokens(amount: amount, ins: ins)
         }
 
         /// Create a new Minter resource
@@ -465,12 +472,18 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(all)
         fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
+            return <- self.mintTokensWithInscription(amount: amount, ins: nil)
+        }
+
+        /// Mint tokens with user's inscription
+        ///
+        access(all)
+        fun mintTokensWithInscription(amount: UFix64, ins: &Fixes.Inscription?): @FixesFungibleToken.Vault {
             pre {
                 amount <= self.allowedAmount: "Amount minted must be less than the allowed amount"
             }
             self.allowedAmount = self.allowedAmount - amount
-
-            return <- FixesFungibleToken.mintTokens(amount: amount)
+            return <- FixesFungibleToken.mintTokens(amount: amount, ins: ins)
         }
     }
 
@@ -501,13 +514,20 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// @param amount: The quantity of tokens to mint
     /// @return The Vault resource containing the minted tokens
     access(contract)
-    fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
+    fun mintTokens(amount: UFix64, ins: &Fixes.Inscription?): @FixesFungibleToken.Vault {
         pre {
             amount > 0.0: "Amount minted must be greater than zero"
         }
+
+        let newVault <- create Vault(balance: amount)
+        if let insRef = ins {
+            newVault.initialize(insRef, nil)
+        }
+
         FixesFungibleToken.totalSupply = FixesFungibleToken.totalSupply + amount
         emit TokensMinted(amount: amount)
-        return <- create Vault(balance: amount)
+
+        return <- newVault
     }
 
     /// ------------ General Functions ------------

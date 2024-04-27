@@ -208,6 +208,13 @@ access(all) contract interface FixesFungibleTokenInterface {
         ///
         access(all)
         fun mintTokens(amount: UFix64): @FungibleToken.Vault
+
+        /// Mint tokens with user's inscription
+        ///
+        access(all)
+        fun mintTokensWithInscription(amount: UFix64, ins: &Fixes.Inscription?): @FungibleToken.Vault {
+            return <- self.mintTokens(amount: amount)
+        }
     }
 
     /// ------------ Public Functions - no default implementation ------------
