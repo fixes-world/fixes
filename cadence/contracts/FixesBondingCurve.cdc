@@ -35,6 +35,9 @@ access(all) contract FixesBondingCurve {
     // Event that is emitted when the subject fee percentage is changed.
     access(all) event LiquidityPoolSubjectFeePercentageChanged(subject: Address, subjectFeePercentage: UFix64)
 
+    // Event that is emitted when the liquidity pool is initialized.
+    access(all) event LiquidityPoolInitialized(subject: Address, mintedAmount: UFix64)
+
     // Event that is emitted when a user buys or sells tokens.
     access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, shareAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
 
@@ -126,19 +129,76 @@ access(all) contract FixesBondingCurve {
     /// The liquidity pool interface.
     ///
     access(all) resource interface LiquidityPoolInterface {
+        access(contract)
+        let curve: {CurveInterface}
+
+        // ----- Subject -----
+
         /// Get the subject address
         access(all)
         view fun getSubjectAddress(): Address {
             return self.owner?.address ?? panic("The owner is missing")
         }
+
+        // ----- Token in the liquidity pool -----
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type
+
+        /// Get the max supply of the token
+        access(all)
+        view fun maxSupply(): UFix64
+
+        /// Get the circulating supply of the token
+        access(all)
+        view fun getCirculatingSupply(): UFix64
+
+        /// Get the balance of the token in liquidity pool
+        access(all)
+        view fun getBalance(): UFix64
+
+        // ---- Bonding Curve ----
+
         /// Get the curve type
         access(all)
-        view fun getCurveType(): Type
+        view fun getCurveType(): Type {
+            return self.curve.getType()
+        }
+
+        /// Get the price of the token based on the supply and amount
+        access(all)
+        view fun getPrice(supply: UFix64, amount: UFix64): UFix64 {
+            return self.curve.calculatePrice(supply: supply, amount: amount)
+        }
+
+        /// Calculate the price of buying the token based on the amount
+        access(all)
+        view fun getBuyPrice(amount: UFix64): UFix64 {
+            return self.curve.calculatePrice(supply: self.getCirculatingSupply(), amount: amount)
+        }
+
+        /// Calculate the price of selling the token based on the amount
+        access(all)
+        view fun getSellPrice(amount: UFix64): UFix64 {
+            return self.curve.calculatePrice(supply: self.getCirculatingSupply() - amount, amount: amount)
+        }
+
+        /// Calculate the amount of tokens that can be bought with the given cost
+        access(all)
+        view fun calculateAmount(cost: UFix64): UFix64 {
+            return self.curve.calculateAmount(supply: self.getCirculatingSupply(), cost: cost)
+        }
     }
 
     /// The liquidity pool admin interface.
     ///
     access(all) resource interface LiquidityPoolAdmin {
+        /// Initialize the liquidity pool
+        ///
+        access(all)
+        fun initialize(mintAmount: UFix64?)
+
         // The admin can set the subject fee percentage
         //
         access(all)
@@ -151,6 +211,8 @@ access(all) contract FixesBondingCurve {
         access(self)
         let minter: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>
         access(self)
+        let vault: @FungibleToken.Vault
+        access(contract)
         let curve: {CurveInterface}
         access(contract)
         var subjectFeePercentage: UFix64
@@ -166,18 +228,31 @@ access(all) contract FixesBondingCurve {
             self.minter = minterCap
             self.curve = curve
             self.subjectFeePercentage = subjectFeePerc ?? 0.0
+
+            let minterRef = minterCap.borrow() ?? panic("The minter capability is missing")
+            let vaultData = minterRef.getVaultData()
+            self.vault <- vaultData.createEmptyVault()
         }
 
-        // ------ Implement LiquidityPoolInterface -----
-
-        /// Get the curve type
-        ///
-        access(all)
-        view fun getCurveType(): Type {
-            return self.curve.getType()
+        // @deprecated in Cadence v1.0
+        destroy() {
+            destroy self.vault
         }
 
         // ----- Implement LiquidityPoolAdmin -----
+
+        /// Initialize the liquidity pool
+        ///
+        access(all)
+        fun initialize(mintAmount: UFix64?) {
+            let toMint = mintAmount ?? 0.0
+            // TODO
+
+            emit LiquidityPoolInitialized(
+                subject: self.getSubjectAddress(),
+                mintedAmount: toMint
+            )
+        }
 
         // The admin can set the subject fee percentage
         //
@@ -190,6 +265,20 @@ access(all) contract FixesBondingCurve {
                 subject: self.getSubjectAddress(),
                 subjectFeePercentage: subjectFeePerc
             )
+        }
+
+        // ------ Implement LiquidityPoolInterface -----
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type {
+            return self.vault.getType()
+        }
+
+        /// Get the balance of the token in liquidity pool
+        access(all)
+        view fun getBalance(): UFix64 {
+            return self.vault.balance
         }
 
         // ----- Internal Methods -----
