@@ -1128,7 +1128,7 @@ access(all) contract FRC20Indexer {
             )
 
             // deposit the token change return to change's from address
-            let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
+            let flowReceiver = Fixes.borrowFlowTokenReceiver(fromAddr)
                 ?? panic("The flow receiver no found")
             let supportedTypes = flowReceiver.getSupportedVaultTypes()
             assert(
@@ -1241,7 +1241,7 @@ access(all) contract FRC20Indexer {
                     message: "The change should be a flow token vault"
                 )
                 // deposit the token change return to change's from address
-                let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
+                let flowReceiver = Fixes.borrowFlowTokenReceiver(fromAddr)
                     ?? panic("The flow receiver no found")
                 let supportedTypes = flowReceiver.getSupportedVaultTypes()
                 assert(
@@ -1586,17 +1586,6 @@ access(all) contract FRC20Indexer {
             .getCapability<&InscriptionIndexer{IndexerPublic}>(self.IndexerPublicPath)
             .borrow()
         return cap ?? panic("Could not borrow InscriptionIndexer")
-    }
-
-    /// Helper method to get FlowToken receiver
-    ///
-    access(all)
-    fun borrowFlowTokenReceiver(
-        _ addr: Address
-    ): &{FungibleToken.Receiver}? {
-        let cap = getAccount(addr)
-            .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-        return cap.borrow()
     }
 
     init() {

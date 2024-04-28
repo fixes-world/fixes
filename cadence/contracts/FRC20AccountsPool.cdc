@@ -188,7 +188,7 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20MarketAddress(tick: tick) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -203,7 +203,7 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}? {
             if let addr = self.getMarketSharedAddress() {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -221,7 +221,7 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20StakingAddress(tick: tick) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -239,7 +239,7 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowEVMAgencyFlowTokenReceiver(_ evmAddress: String): &{FungibleToken.Receiver}? {
             if let addr = self.getEVMAgencyAddress(evmAddress) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -258,7 +258,7 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}? {
             if let addr = self.getEVMEntrustedAccountAddress(evmAddr) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -276,7 +276,7 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}? {
             if let addr = self.getGameWorldAddress(key) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -294,7 +294,7 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFTContractAddress(tick) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
@@ -326,7 +326,7 @@ access(all) contract FRC20AccountsPool {
             // deposit the tokens to pool and treasury
             if let tickDict = self.borrowDict(type: type) {
                 if let addr = tickDict[tick] {
-                    if let tickRelatedFlowReciever = FRC20Indexer.borrowFlowTokenReceiver(addr) {
+                    if let tickRelatedFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
                         // 5% of the extracted tokens will be sent to the system account
                         let amtToTarget = extractedToken.balance * 0.95
                         // withdraw the tokens to the treasury
@@ -336,7 +336,7 @@ access(all) contract FRC20AccountsPool {
                     }
                 }
             }
-            let systemFlowReciever = FRC20Indexer.borrowFlowTokenReceiver(self.owner?.address!)
+            let systemFlowReciever = Fixes.borrowFlowTokenReceiver(self.owner?.address!)
                 ?? panic("Failed to borrow system flow token receiver")
             // remaining 5% of the extracted tokens will be sent to the system account
             systemFlowReciever.deposit(from: <- extractedToken)

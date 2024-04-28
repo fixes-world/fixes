@@ -68,7 +68,7 @@ access(all) contract FRC20VoteCommands {
         ///
         access(account)
         fun refundFailedVoteCommands(receiver: Address): Bool {
-            let recieverRef = FRC20Indexer.borrowFlowTokenReceiver(receiver)
+            let recieverRef = Fixes.borrowFlowTokenReceiver(receiver)
             if recieverRef == nil {
                 return false
             }

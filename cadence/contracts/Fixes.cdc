@@ -6,8 +6,8 @@
 This is the basic contract of the FIXeS protocol. It contains the logic to create and manage inscriptions.
 
 */
-
 import "MetadataViews"
+import "FungibleToken"
 import "FlowToken"
 
 /// FIXES contract to store inscriptions
@@ -705,6 +705,17 @@ access(all) contract Fixes {
     access(all)
     view fun estimateStringValue(_ str: String): UFix64 {
         return UFix64(str.utf8.length) * 0.0002
+    }
+
+    /// Helper method to get FlowToken receiver
+    ///
+    access(all)
+    fun borrowFlowTokenReceiver(
+        _ addr: Address
+    ): &{FungibleToken.Receiver}? {
+        let cap = getAccount(addr)
+            .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+        return cap.borrow()
     }
 
     /// Get the storage path of a inscription

@@ -664,7 +664,7 @@ access(all) contract EVMAgent {
             let addr = acct.address
 
             // extract the flow from the inscriptions and deposit to the agency
-            let flowReceiverRef = FRC20Indexer.borrowFlowTokenReceiver(addr)
+            let flowReceiverRef = Fixes.borrowFlowTokenReceiver(addr)
                 ?? panic("Could not borrow receiver reference to the recipient's Vault")
             flowReceiverRef.deposit(from: <- ins.extract())
 

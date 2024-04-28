@@ -559,7 +559,7 @@ access(all) contract FRC20Storefront {
                 // If there is residual change, pay to the buyer
                 let residualVault <- extractedFlowChange.extractAsVault()
                 destroy extractedFlowChange
-                let buyerVault = FRC20Indexer.borrowFlowTokenReceiver(buyer)
+                let buyerVault = Fixes.borrowFlowTokenReceiver(buyer)
                     ?? panic("Unable to fetch the buyer vault")
                 buyerVault.deposit(from: <- residualVault)
             } else {
@@ -649,7 +649,7 @@ access(all) contract FRC20Storefront {
 
             let transactedPrice = payment?.balance ?? panic("Unable to fetch the payment balance")
             // The payment vault for the sale is from the taker's address
-            let paymentRecipient = FRC20Indexer.borrowFlowTokenReceiver(seller)
+            let paymentRecipient = Fixes.borrowFlowTokenReceiver(seller)
                 ?? panic("Unable to fetch the payment recipient")
 
             // Pay the sale cuts to the recipients.
@@ -892,7 +892,7 @@ access(all) contract FRC20Storefront {
             }
 
             let payToDeployer = fun (_ payment: @FungibleToken.Vault) {
-                if let flowVault = FRC20Indexer.borrowFlowTokenReceiver(listingTokenMeta.deployer) {
+                if let flowVault = Fixes.borrowFlowTokenReceiver(listingTokenMeta.deployer) {
                     flowVault.deposit(from: <- payment)
                 } else {
                     // if the deployer pool doesn't exist, pay to token treasury
