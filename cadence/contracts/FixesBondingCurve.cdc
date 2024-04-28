@@ -25,6 +25,7 @@ import "FixesHeartbeat"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
+import "FRC20AccountsPool"
 
 /// The bonding curve contract.
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
@@ -599,7 +600,37 @@ access(all) contract FixesBondingCurve {
         ins: &Fixes.Inscription,
         _ minterCap: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>,
     ): @TradableLiquidityPool {
-        return <- create TradableLiquidityPool(minterCap)
+        pre {
+            ins.isExtractable(): "The inscription is not extractable"
+        }
+        post {
+            ins.isExtracted(): "The inscription is not extracted"
+        }
+        // singletons
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        // get the minter reference
+        let minter = minterCap.borrow() ?? panic("The minter capability is missing")
+
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let tick = meta["tick"] ?? panic("The ticker name is not found")
+        let addr = acctsPool.getFTContractAddress(tick)
+            ?? panic("The FungibleToken contract address is not found")
+        assert(
+            addr == minterCap.address,
+            message: "The minter capability address is not the same as the FungibleToken contract"
+        )
+        // get the fee percentage from the inscription metadata
+        let subjectFeePerc = UFix64.fromString(meta["feePerc"] ?? "0.0") ?? 0.0
+        // get free amount from the inscription metadata
+        let freeAmount = UFix64.fromString(meta["freeAmount"] ?? "0.0") ?? 0.0
+        let maxSupply = minter.getMaxSupply()
+        // create the bonding curve
+        let curve = BondingCurveQuadratic(freeAmount: freeAmount, maxSupply: maxSupply)
+
+        // execute the inscription
+        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
+
+        return <- create TradableLiquidityPool(minterCap, curve, subjectFeePerc)
     }
 
     /// Get the platform sales fee
