@@ -304,6 +304,14 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesTradablePool": {
+			"source": "cadence/contracts/FixesTradablePool.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FixesTraits": {
 			"source": "cadence/contracts/FixesTraits.cdc",
 			"aliases": {
@@ -914,7 +922,8 @@
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
 				"FungibleTokenManager",
-				"FixesBondingCurve"
+				"FixesBondingCurve",
+				"FixesTradablePool"
 			]
 		},
 		"mainnet": {
