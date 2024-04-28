@@ -223,17 +223,24 @@ access(all) contract interface FixesFungibleTokenInterface {
         fun mintTokens(amount: UFix64): @FungibleToken.Vault {
             pre {
                 amount > 0.0: "The amount must be greater than zero"
+                amount <= self.getMaxSupply() - self.getTotalSupply(): "The amount must be less than or equal to the remaining supply"
             }
         }
 
         /// Mint tokens with user's inscription
         ///
         access(all)
-        fun mintTokensWithInscription(
-            amount: UFix64,
-            ins: &Fixes.Inscription?
+        fun initializeVaultByInscription(
+            vault: @FungibleToken.Vault,
+            ins: &Fixes.Inscription
         ): @FungibleToken.Vault {
-            return <- self.mintTokens(amount: amount)
+            pre {
+                ins.isExtractable(): "The inscription must be extractable"
+            }
+            post {
+                vault.getType() == result.getType(): "The vault type must be the same"
+                vault.balance == result.balance: "The vault balance must be the same"
+            }
         }
     }
 

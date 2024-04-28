@@ -413,12 +413,19 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// The admin resource for the FRC20 FT
     ///
     access(all) resource FungibleTokenAdmin: FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinter {
+        access(self)
+        let minter: @Minter
         /// The amount of tokens that all created minters are allowed to mint
         access(self)
         var grantedMintableAmount: UFix64
 
         init() {
             self.grantedMintableAmount = 0.0
+            self.minter <- create Minter(allowedAmount: nil)
+        }
+
+        destroy() {
+            destroy self.minter
         }
 
         // ----- Implement AdminInterface -----
@@ -446,35 +453,37 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64 {
-            return FixesFungibleToken.getMaxSupply() ?? UFix64.max
+            return self.minter.getMaxSupply()
         }
 
         /// Get the total supply of the minting token
         access(all)
         view fun getTotalSupply(): UFix64 {
-            return FixesFungibleToken.getTotalSupply()
+            return self.minter.getTotalSupply()
         }
 
         /// Get the vault data of the minting token
         ///
         access(all)
         view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
-            return FixesFungibleToken.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
-                ?? panic("The vault data is not found")
+            return self.minter.getVaultData()
         }
 
         /// Mint new tokens, not limited by the minter
         ///
         access(all)
         fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
-            return <- self.mintTokensWithInscription(amount: amount, ins: nil)
+            return <- self.minter.mintTokens(amount: amount)
         }
 
         /// Mint tokens with user's inscription
         ///
         access(all)
-        fun mintTokensWithInscription(amount: UFix64, ins: &Fixes.Inscription?): @FixesFungibleToken.Vault {
-            return <- FixesFungibleToken.mintTokens(amount: amount, ins: ins)
+        fun initializeVaultByInscription(
+            vault: @FungibleToken.Vault,
+            ins: &Fixes.Inscription
+        ): @FungibleToken.Vault {
+            return <- self.minter.initializeVaultByInscription(vault: <- vault, ins: ins)
         }
     }
 
@@ -483,9 +492,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     access(all) resource Minter: FixesFungibleTokenInterface.IMinter {
         /// The amount of tokens that the minter is allowed to mint
         access(all)
-        var allowedAmount: UFix64
+        var allowedAmount: UFix64?
 
-        init(allowedAmount: UFix64) {
+        init(allowedAmount: UFix64?) {
             self.allowedAmount = allowedAmount
         }
 
@@ -511,23 +520,47 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return FixesFungibleToken.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
                 ?? panic("The vault data is not found")
         }
+
         /// Function that mints new tokens, adds them to the total supply,
         /// and returns them to the calling context.
         ///
+        /// @param amount: The quantity of tokens to mint
+        /// @return The Vault resource containing the minted tokens
+        ///
         access(all)
         fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
-            return <- self.mintTokensWithInscription(amount: amount, ins: nil)
+            pre {
+                self.allowedAmount == nil || amount <= self.allowedAmount!: "Amount minted must be less than the allowed amount"
+                amount > 0.0: "Amount minted must be greater than zero"
+            }
+            if self.allowedAmount != nil {
+                self.allowedAmount = self.allowedAmount! - amount
+            }
+
+            let newVault <- create Vault(balance: amount)
+            FixesFungibleToken.totalSupply = FixesFungibleToken.totalSupply + amount
+            emit TokensMinted(amount: amount)
+            return <- newVault
         }
 
         /// Mint tokens with user's inscription
         ///
         access(all)
-        fun mintTokensWithInscription(amount: UFix64, ins: &Fixes.Inscription?): @FixesFungibleToken.Vault {
+        fun initializeVaultByInscription(
+            vault: @FungibleToken.Vault,
+            ins: &Fixes.Inscription
+        ): @FungibleToken.Vault {
             pre {
-                amount <= self.allowedAmount: "Amount minted must be less than the allowed amount"
+                vault.isInstance(Type<@FixesFungibleToken.Vault>()): "The vault must be an instance of FixesFungibleToken.Vault"
+                ins.isExtractable(): "The inscription must be extractable"
             }
-            self.allowedAmount = self.allowedAmount - amount
-            return <- FixesFungibleToken.mintTokens(amount: amount, ins: ins)
+            let typedVault <- vault as! @FixesFungibleToken.Vault
+            if !typedVault.isValidVault() {
+                typedVault.initialize(ins, nil)
+                // execute the inscription
+                FixesFungibleToken.executeInscription(ins: ins, usage: "init")
+            }
+            return <- typedVault
         }
     }
 
@@ -550,30 +583,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         // execute the inscription
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
-    }
-
-    /// Function that mints new tokens, adds them to the total supply,
-    /// and returns them to the calling context.
-    ///
-    /// @param amount: The quantity of tokens to mint
-    /// @return The Vault resource containing the minted tokens
-    access(contract)
-    fun mintTokens(amount: UFix64, ins: &Fixes.Inscription?): @FixesFungibleToken.Vault {
-        pre {
-            amount > 0.0: "Amount minted must be greater than zero"
-        }
-
-        let newVault <- create Vault(balance: amount)
-        if let insRef = ins {
-            newVault.initialize(insRef, nil)
-            // execute the inscription
-            FixesFungibleToken.executeInscription(ins: insRef, usage: "mint")
-        }
-
-        FixesFungibleToken.totalSupply = FixesFungibleToken.totalSupply + amount
-        emit TokensMinted(amount: amount)
-
-        return <- newVault
     }
 
     /// ------------ General Functions ------------
