@@ -509,7 +509,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             let balance = FixesFungibleToken.getTokenBalance(address)
             var highBalanceIdx = 0
             var lowBalanceIdx = self.top100Accounts.length - 1
-            // 使用两分法快速定位，然后再插入 Balance
+            // use binary search to find the position
             while lowBalanceIdx >= highBalanceIdx {
                 let mid = (lowBalanceIdx + highBalanceIdx) / 2
                 let midBalance = FixesFungibleToken.getTokenBalance(self.top100Accounts[mid])
