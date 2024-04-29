@@ -462,6 +462,13 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return self.minter.getTotalSupply()
         }
 
+        /// Get the symbol of the minting token
+        ///
+        access(all)
+        view fun getSymbol(): String {
+            return self.minter.getSymbol()
+        }
+
         /// Get the vault data of the minting token
         ///
         access(all)
@@ -511,6 +518,13 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(all)
         view fun getTotalSupply(): UFix64 {
             return FixesFungibleToken.getTotalSupply()
+        }
+
+        /// Get the symbol of the minting token
+        ///
+        access(all)
+        view fun getSymbol(): String {
+            return FixesFungibleToken.getSymbol()
         }
 
         /// Get the vault data of the minting token

@@ -459,8 +459,22 @@ access(all) contract FixesTradablePool {
             recipient.deposit(from: <- returnVault)
 
             // emit the trade event
+            let tickerName = "$".concat(minter.getSymbol())
+            let poolAddr = self.getSubjectAddress()
+            let traderAddr = recipient.owner?.address ?? insOwner
+
+            // invoke the transaction hook
+            self._onTransactionDeal(
+                seller: poolAddr,
+                buyer: traderAddr,
+                tick: tickerName,
+                dealAmount: buyAmount,
+                dealPrice: totalCost
+            )
+
+            // emit the trade event
             emit Trade(
-                trader: insOwner,
+                trader: traderAddr,
                 isBuy: true,
                 subject: self.getSubjectAddress(),
                 tokenAmount: buyAmount,
@@ -514,9 +528,21 @@ access(all) contract FixesTradablePool {
             self.vault.deposit(from: <- tokenVault)
 
             // emit the trade event
-            let recipientAddress = recipient.owner?.address ?? panic("The recipient owner is missing")
+            let tickerName = "$".concat(minter.getSymbol())
+            let poolAddr = self.getSubjectAddress()
+            let traderAddr = recipient.owner?.address ?? panic("The recipient owner is missing")
+
+            // invoke the transaction hook
+            self._onTransactionDeal(
+                seller: traderAddr,
+                buyer: poolAddr,
+                tick: tickerName,
+                dealAmount: tokenAmount,
+                dealPrice: totalPrice
+            )
+
             emit Trade(
-                trader: recipientAddress,
+                trader: traderAddr,
                 isBuy: false,
                 subject: self.getSubjectAddress(),
                 tokenAmount: tokenAmount,
@@ -532,14 +558,55 @@ access(all) contract FixesTradablePool {
         /// The hook that is invoked when a deal is executed
         ///
         access(self)
-        fun _onDeal(
+        fun _onTransactionDeal(
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
         ) {
-            log("Default Empty Transaction Hook")
+            let minter = self._borrowMinter()
+            // for fixes fungible token, the ticker is $ + {symbol}
+            let tickName = "$".concat(minter.getSymbol())
+
+            // ------- start -- Invoke Hooks --------------
+            // Invoke transaction hooks to do things like:
+            // -- Record the transction record
+            // -- Record trading Volume
+
+            // for TradablePool hook
+            let poolAddr = self.getSubjectAddress()
+            // Buyer or Seller should be the pool address
+            assert(
+                buyer == poolAddr || seller == poolAddr,
+                message: "The buyer or seller must be the pool address"
+            )
+
+            // invoke the pool transaction hook
+            if let poolTransactionHook = FRC20FTShared.borrowTransactionHook(poolAddr) {
+                poolTransactionHook.onDeal(
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickName,
+                    dealAmount: dealAmount,
+                    dealPrice: dealPrice,
+                    storefront: poolAddr,
+                    listingId: nil,
+                )
+            }
+            // invoke the user transaction hook
+            let userAddr = buyer == poolAddr ? seller : buyer
+            if let userTransactionHook = FRC20FTShared.borrowTransactionHook(userAddr) {
+                userTransactionHook.onDeal(
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickName,
+                    dealAmount: dealAmount,
+                    dealPrice: dealPrice,
+                    storefront: poolAddr,
+                    listingId: nil,
+                )
+            }
         }
 
         access(self)

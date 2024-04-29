@@ -212,6 +212,10 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTotalSupply(): UFix64
 
+        /// Get the symbol of the minting token
+        access(all)
+        view fun getSymbol(): String
+
         /// Get the vault data of the minting token
         access(all)
         view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData

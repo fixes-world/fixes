@@ -12,10 +12,12 @@ import "FlowToken"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FixesHeartbeat"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
 import "FRC20Agents"
+import "FRC20TradingRecord"
 
 /// The Manager contract for Fungible Token
 ///
@@ -267,7 +269,7 @@ access(all) contract FungibleTokenManager {
     /// Ensure all resources are available
     ///
     access(contract)
-    fun _ensureFungibleTokenAccountResourcesAvailable(_ tick: String, _ withFRC20Agents: Bool) {
+    fun _ensureFungibleTokenAccountResourcesAvailable(_ tick: String, _ isFRC20Token: Bool) {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
@@ -281,6 +283,11 @@ access(all) contract FungibleTokenManager {
         // - FRC20FTShared.SharedStore: configuration
         //    - Store the Symbol, Name for the token
         // - FRC20Agents.IndexerController: Optional, the controller for the FRC20 Agents
+        // - FRC20FTShared.Hooks
+        // - TradingRecord
+        // TODO:
+        // - Add Trading Pool Resource
+        // - Relink Flow Token Resource
 
         // create the shared store and save it in the account
         if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
@@ -309,7 +316,7 @@ access(all) contract FungibleTokenManager {
         }
 
         // Check if the FRC20Agents.IndexerController is required
-        if withFRC20Agents {
+        if isFRC20Token {
             // Create the FRC20Agents.IndexerController and save it in the account
             let ctrlStoragePath = FRC20Agents.getIndexerControllerStoragePath()
             if childAcctRef.borrow<&AnyResource>(from: ctrlStoragePath) == nil {
@@ -318,6 +325,57 @@ access(all) contract FungibleTokenManager {
 
                 isUpdated = true || isUpdated
             }
+        }
+
+        // create the hooks and save it in the account
+        if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
+            let hooks <- FRC20FTShared.createHooks()
+            childAcctRef.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+
+            isUpdated = true || isUpdated
+        }
+        // link the hooks to the public path
+        if childAcctRef
+            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .borrow() == nil {
+            // link the hooks to the public path
+            childAcctRef.unlink(FRC20FTShared.TransactionHookPublicPath)
+            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
+                FRC20FTShared.TransactionHookPublicPath,
+                target: FRC20FTShared.TransactionHookStoragePath
+            )
+
+            isUpdated = true || isUpdated
+        }
+
+        // ensure trading records are available
+        if childAcctRef.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
+            let tradingRecords <- FRC20TradingRecord.createTradingRecords(tick)
+            childAcctRef.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
+
+            // link the trading records to the public path
+            childAcctRef.unlink(FRC20TradingRecord.TradingRecordsPublicPath)
+            childAcctRef.link<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(FRC20TradingRecord.TradingRecordsPublicPath, target: FRC20TradingRecord.TradingRecordsStoragePath)
+
+            isUpdated = true || isUpdated
+        }
+
+        // borrow the hooks reference
+        let hooksRef = childAcctRef.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+            ?? panic("The hooks were not created")
+
+        // add the trading records to the hooks, if it is not added yet
+        // get the public capability of the trading record hook
+        let tradingRecordsCap = childAcctRef
+            .getCapability<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(
+                FRC20TradingRecord.TradingRecordsPublicPath
+            )
+        assert(tradingRecordsCap.check(), message: "The trading record hook is not valid")
+        // get the reference of the trading record hook
+        let recordsRef = tradingRecordsCap.borrow()
+            ?? panic("The trading record hook is not valid")
+        if !hooksRef.hasHook(recordsRef.getType()) {
+            hooksRef.addHook(tradingRecordsCap)
         }
 
         if isUpdated {
