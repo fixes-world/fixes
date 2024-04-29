@@ -16,6 +16,11 @@ import "FlowToken"
 import "FungibleTokenMetadataViews"
 // Third-party dependencies
 import "BlackHole"
+import "AddressUtils"
+import "PublicPriceOracle"
+import "SwapFactory"
+import "SwapInterfaces"
+import "SwapConfig"
 // Fixes dependencies
 import "Fixes"
 import "FixesHeartbeat"
@@ -38,6 +43,9 @@ access(all) contract FixesTradablePool {
     // Event that is emitted when the liquidity pool is initialized.
     access(all) event LiquidityPoolInitialized(subject: Address, mintedAmount: UFix64)
 
+    // Event that is emitted when the liquidity pool is transferred.
+    access(all) event LiquidityPoolTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
+
     // Event that is emitted when a user buys or sells tokens.
     access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, tokenAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
 
@@ -59,7 +67,7 @@ access(all) contract FixesTradablePool {
 
         /// Check if the liquidity pool is active
         access(all)
-        view fun isActive(): Bool
+        view fun isLocalActive(): Bool
 
         /// Get the subject fee percentage
         access(all)
@@ -87,6 +95,18 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getFlowBalance(): UFix64
 
+        /// Get the liquidity market cap
+        access(all)
+        view fun getLiquidityMarketCap(): UFix64 {
+            let flowAmount = self.getFlowBalance()
+            let flowPrice = FixesTradablePool.getFlowPrice()
+            return flowAmount * flowPrice
+        }
+
+        /// Get the swap pair address
+        access(all)
+        view fun getSwapPairAddress(): Address?
+
         // ----- Trade (Writable) -----
 
         /// Buy the token with the given inscription
@@ -99,7 +119,7 @@ access(all) contract FixesTradablePool {
             recipient: &{FungibleToken.Receiver},
         ) {
             pre {
-                self.isActive(): "The liquidity pool is not active"
+                self.isLocalActive(): "The liquidity pool is not active"
                 ins.isExtractable(): "The inscription is not extractable"
                 ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
                 // TODO: change method in Standard V2
@@ -118,7 +138,7 @@ access(all) contract FixesTradablePool {
             recipient: &{FungibleToken.Receiver},
         ) {
             pre {
-                self.isActive(): "The liquidity pool is not active"
+                self.isLocalActive(): "The liquidity pool is not active"
                 tokenVault.isInstance(self.getTokenType()): "The token vault is not the same type as the liquidity pool"
                 tokenVault.balance > 0.0: "The token vault balance must be greater than 0"
                 // TODO: change method in Standard V2
@@ -275,12 +295,13 @@ access(all) contract FixesTradablePool {
         }
 
         // The admin can set the subject fee percentage
+        // The subject fee percentage must be greater than or equal to 0 and less than or equal to 0.05
         //
         access(all)
         fun setSubjectFeePercentage(_ subjectFeePerc: UFix64) {
             pre {
                 subjectFeePerc >= 0.0: "The subject fee percentage must be greater than or equal to 0"
-                subjectFeePerc <= 0.1: "The subject fee percentage must be less than or equal to 0.1"
+                subjectFeePerc <= 0.05: "The subject fee percentage must be less than or equal to 0.1"
             }
             self.subjectFeePercentage = subjectFeePerc
 
@@ -291,22 +312,11 @@ access(all) contract FixesTradablePool {
             )
         }
 
-        // ----- Implement IHeartbeatHook -----
-
-        /// The methods that is invoked when the heartbeat is executed
-        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
-        ///
-        access(account)
-        fun onHeartbeat(_ deltaTime: UFix64) {
-            // TODO: check the marketcap and move the liquidity pool to the next stage
-            // If the LP removed, the set the active to false and remove the heartbeat hooks
-        }
-
         // ------ Implement LiquidityPoolInterface -----
 
         /// Check if the liquidity pool is active
         access(all)
-        view fun isActive(): Bool {
+        view fun isLocalActive(): Bool {
             return self.acitve
         }
 
@@ -349,6 +359,15 @@ access(all) contract FixesTradablePool {
             return self.flowVault.balance
         }
 
+        /// Get the swap pair address
+        ///
+        access(all)
+        view fun getSwapPairAddress(): Address? {
+            let token0Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+            let token1Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.flowVault.getType().identifier)
+            return SwapFactory.getPairAddress(token0Key: token0Key, token1Key: token1Key)
+        }
+
         // ----- Implement FungibleToken.Receiver -----
 
         /// Returns whether or not the given type is accepted by the Receiver
@@ -376,6 +395,11 @@ access(all) contract FixesTradablePool {
         //
         access(all) fun deposit(from: @FungibleToken.Vault) {
             self.flowVault.deposit(from: <- from)
+
+            // if not active, then try to add liquidity
+            if !self.isLocalActive() && self.flowVault.balance > 1.0 {
+                self._ensureSwapPairAndAddLiquidity()
+            }
         }
 
         // ----- Trade (Writable) -----
@@ -613,6 +637,173 @@ access(all) contract FixesTradablePool {
         fun _borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {
             return self.minter.borrow() ?? panic("The minter capability is missing")
         }
+
+        // ----- Implement IHeartbeatHook -----
+
+        /// The methods that is invoked when the heartbeat is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            // if active, then move the liquidity pool to the next stage
+            self._ensureSwapPairAndAddLiquidity()
+        }
+
+        /// Create a new pair and add liquidity
+        ///
+        access(self)
+        fun _ensureSwapPairAndAddLiquidity() {
+            if self.isLocalActive() {
+                // Check the market cap
+                let localMarketCap = self.getLiquidityMarketCap()
+                let targetMarketCap = FixesTradablePool.getTargetMarketCap()
+                // if the market cap is less than the target market cap, then do nothing
+                if localMarketCap < targetMarketCap {
+                    // DO NOT PANIC
+                    return
+                }
+            } else {
+                // check if flow vault has enough liquidity, if not then do nothing
+                if self.flowVault.balance < 1.0 {
+                    // DO NOT PANIC
+                    return
+                }
+            }
+
+            // Now we can add liquidity to the swap pair
+            let minterRef = self.minter.borrow()!
+            let vaultData = minterRef.getVaultData()
+
+            // check if the token paire is created, if not then create the pair
+            // Token0 => self.vault, Token1 => self.flowVault
+
+            let token0Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+            let token1Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.flowVault.getType().identifier)
+            var pairAddr = SwapFactory.getPairAddress(token0Key: token0Key, token1Key: token1Key)
+            // if the pair is not created, then create the pair
+            if pairAddr == nil {
+                // create the account creation fee vault
+                let acctCreateFeeVault <- self.flowVault.withdraw(amount: 0.01)
+                // create the pair
+                SwapFactory.createPair(
+                    token0Vault: <- vaultData.createEmptyVault(),
+                    token1Vault: <- FlowToken.createEmptyVault(),
+                    accountCreationFee: <- acctCreateFeeVault,
+                    stableMode: false
+                )
+                // set the pair address again
+                pairAddr = SwapFactory.getPairAddress(token0Key: token0Key, token1Key: token1Key)
+            }
+            // check again
+            if pairAddr == nil {
+                // DO NOT PANIC
+                return
+            }
+            // add all liquidity to the pair
+            let pairPublicRef = getAccount(pairAddr!)
+                .getCapability<&{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
+                .borrow()
+            if pairPublicRef == nil {
+                // DO NOT PANIC
+                return
+            }
+            // get the pair info
+            let pairInfo = pairPublicRef!.getPairInfo()
+            var token0Reserve = 0.0
+            var token1Reserve = 0.0
+            if token0Key == (pairInfo[0] as! String) {
+                token0Reserve = (pairInfo[2] as! UFix64)
+                token1Reserve = (pairInfo[3] as! UFix64)
+            } else {
+                token0Reserve = (pairInfo[3] as! UFix64)
+                token1Reserve = (pairInfo[2] as! UFix64)
+            }
+
+            // the vaults for adding liquidity
+            let token0Vault <- vaultData.createEmptyVault()
+            let token1Vault <- FlowToken.createEmptyVault()
+
+            // add all the token to the pair
+            if self.isLocalActive() {
+                let token0In = self.getTokenBalance()
+                var token1In = 0.0
+                // add all the token to the pair
+                if token0Reserve == 0.0 && token1Reserve == 0.0 {
+                    token1In = self.getFlowBalance()
+                } else {
+                    token1In = SwapConfig.quote(amountA: token0In, reserveA: token0Reserve, reserveB: token1Reserve)
+                    if token1In > self.getFlowBalance() {
+                        destroy token0Vault
+                        destroy token1Vault
+                        // DO NOT PANIC
+                        return
+                    }
+                }
+                if token0In > 0.0 {
+                    token0Vault.deposit(from: <- self.vault.withdraw(amount: token0In))
+                }
+                token1Vault.deposit(from: <- self.flowVault.withdraw(amount: token1In))
+                // set the local liquidity pool to inactive
+                self.acitve = false
+            } else {
+                // All Token0 is added to the pair, so we need to calculate the optimized zapped amount through dex
+                let allFlowAmount = self.flowVault.balance
+                let zappedAmt = self._calcZappedAmmount(
+                    tokenInput: allFlowAmount,
+                    tokenReserve: token1Reserve,
+                    swapFeeRateBps: pairInfo[6] as! UInt64
+                )
+
+                let swapVaultIn <- self.flowVault.withdraw(amount: zappedAmt)
+                // withdraw all the token0 and add liquidity to the pair
+                token1Vault.deposit(from: <- self.flowVault.withdraw(amount: allFlowAmount - zappedAmt))
+                // swap the token1 to token0 first, and then add liquidity vault
+                token0Vault.deposit(from: <- pairPublicRef!.swap(
+                    vaultIn: <- swapVaultIn,
+                    exactAmountOut: nil
+                ))
+            }
+
+            // cache value
+            let token0Amount = token0Vault.balance
+            let token1Amount = token1Vault.balance
+
+            // add liquidity to the pair
+            let lpTokenVault <- pairPublicRef!.addLiquidity(
+                tokenAVault: <- token0Vault,
+                tokenBVault: <- token1Vault
+            )
+            // Put the LP token to the BlackHole
+            BlackHole.vanish(<- lpTokenVault)
+
+            // emit the liquidity pool transferred event
+            emit LiquidityPoolTransferred(
+                subject: self.getSubjectAddress(),
+                pairAddr: pairAddr!,
+                tokenType: self.getTokenType(),
+                tokenAmount: token0Amount,
+                flowAmount: token1Amount
+            )
+        }
+
+        /// Calculate the optimized zapped amount through dex
+        ///
+        access(self)
+        fun _calcZappedAmmount(tokenInput: UFix64, tokenReserve: UFix64, swapFeeRateBps: UInt64): UFix64 {
+            // Cal optimized zapped amount through dex
+            let r0Scaled = SwapConfig.UFix64ToScaledUInt256(tokenReserve)
+            let fee = 1.0 - UFix64(swapFeeRateBps)/10000.0
+            let kplus1SquareScaled = SwapConfig.UFix64ToScaledUInt256((1.0+fee)*(1.0+fee))
+            let kScaled = SwapConfig.UFix64ToScaledUInt256(fee)
+            let kplus1Scaled = SwapConfig.UFix64ToScaledUInt256(fee+1.0)
+            let tokenInScaled = SwapConfig.UFix64ToScaledUInt256(tokenInput)
+            let qScaled = SwapConfig.sqrt(
+                r0Scaled * r0Scaled / SwapConfig.scaleFactor * kplus1SquareScaled / SwapConfig.scaleFactor
+                + 4 * kScaled * r0Scaled / SwapConfig.scaleFactor * tokenInScaled / SwapConfig.scaleFactor)
+            return SwapConfig.ScaledUInt256ToUFix64(
+                (qScaled - r0Scaled*kplus1Scaled/SwapConfig.scaleFactor)*SwapConfig.scaleFactor/(kScaled*2)
+            )
+        }
     }
 
     /// ------ Public Methods ------
@@ -655,6 +846,37 @@ access(all) contract FixesTradablePool {
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
 
         return <- create TradableLiquidityPool(minterCap, curve, subjectFeePerc)
+    }
+
+    /// Get the flow price from IncrementFi Oracle
+    ///
+    access(all)
+    view fun getFlowPrice(): UFix64 {
+        let network = AddressUtils.currentNetwork()
+        // reference: https://docs.increment.fi/protocols/decentralized-price-feed-oracle/deployment-addresses
+        var oracleAddress: Address? = nil
+        if network == "MAINNET" {
+            // TO FIX stupid fcl bug
+            oracleAddress = Address.fromString("0x".concat("e385412159992e11"))
+        }
+        if oracleAddress == nil {
+            // Hack for testnet and emulator
+            return 1.0
+        } else {
+            return PublicPriceOracle.getLatestPrice(oracleAddr: oracleAddress!)
+        }
+    }
+
+    /// Get the target market cap for creating LP
+    ///
+    access(all)
+    view fun getTargetMarketCap(): UFix64 {
+        // use the shared store to get the sale fee
+        let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
+        let valueInStore = sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolCreateLPTargetMarketCap) as! UFix64?
+        // Default is 6480 USD
+        let defaultTargetMarketCap = 6480.0
+        return valueInStore ?? defaultTargetMarketCap
     }
 
     /// Get the platform sales fee
