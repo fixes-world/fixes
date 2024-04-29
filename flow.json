@@ -423,7 +423,7 @@
 			}
 		},
 		"PublicPriceOracle": {
-			"source": "./imports/cec15c814971c1dc/PublicPriceOracle.cdc",
+			"source": "./imports/ec67451f8a58216a/PublicPriceOracle.cdc",
 			"aliases": {
 				"mainnet": "ec67451f8a58216a",
 				"testnet": "866a9f1e81898147"
@@ -453,14 +453,6 @@
 				"testnet": "ddb929038d45d4b3"
 			}
 		},
-		"SwapInterfaces": {
-			"source": "./imports/b78ef7afa52ff906/SwapInterfaces.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "b78ef7afa52ff906",
-				"testnet": "ddb929038d45d4b3"
-			}
-		},
 		"SwapError": {
 			"source": "./imports/b78ef7afa52ff906/SwapError.cdc",
 			"aliases": {
@@ -475,6 +467,14 @@
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "b063c16cac85dbd1",
 				"testnet": "cbed4c301441ded2"
+			}
+		},
+		"SwapInterfaces": {
+			"source": "./imports/b78ef7afa52ff906/SwapInterfaces.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
 			}
 		},
 		"ViewResolver": {
