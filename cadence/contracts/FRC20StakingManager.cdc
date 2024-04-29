@@ -451,7 +451,7 @@ access(all) contract FRC20StakingManager {
             // Link the new forwarding receiver capability
             childAcctRef.link<&{FungibleToken.Receiver}>(flowReceiverPath, target: FRC20StakingForwarder.StakingForwarderStoragePath)
             // link the FlowToken to the forwarder fallback path
-            let fallbackPath = FRC20StakingForwarder.getFallbackFlowTokenPublicPath()
+            let fallbackPath = Fixes.getFallbackFlowTokenPublicPath()
             childAcctRef.unlink(fallbackPath)
             childAcctRef.link<&FlowToken.Vault{FungibleToken.Receiver, FungibleToken.Balance}>(fallbackPath, target: /storage/flowTokenVault)
 

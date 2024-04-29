@@ -205,7 +205,7 @@ access(all) contract FixesTradablePool {
 
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FixesHeartbeat.IHeartbeatHook {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesHeartbeat.IHeartbeatHook {
         // The minter of the token
         access(self)
         let minter: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>
@@ -496,6 +496,35 @@ access(all) contract FixesTradablePool {
                 subjectFee: subjectFee,
                 supply: self.getCirculatingSupply()
             )
+        }
+
+        // ----- FungibleToken.Receiver -----
+
+        /// Returns whether or not the given type is accepted by the Receiver
+        /// A vault that can accept any type should just return true by default
+        access(all)
+        view fun isSupportedVaultType(type: Type): Bool {
+            return type == Type<@FlowToken.Vault>()
+        }
+
+        /// A getter function that returns the token types supported by this resource,
+        /// which can be deposited using the 'deposit' function.
+        ///
+        /// @return Array of FT types that can be deposited.
+        access(all)
+        view fun getSupportedVaultTypes(): {Type: Bool} {
+            let supportedVaults: {Type: Bool} = {}
+            supportedVaults[Type<@FlowToken.Vault>()] = true
+            return supportedVaults
+        }
+
+        // deposit
+        //
+        // Function that takes a Vault object as an argument and forwards
+        // it to the recipient's Vault using the stored reference
+        //
+        access(all) fun deposit(from: @FungibleToken.Vault) {
+            self.flowVault.deposit(from: <- from)
         }
 
         // ----- Internal Methods -----

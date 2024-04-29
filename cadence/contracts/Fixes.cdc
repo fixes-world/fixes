@@ -718,6 +718,13 @@ access(all) contract Fixes {
         return cap.borrow()
     }
 
+    /// Returns the fallback receiver assigned to the account
+    ///
+    access(all)
+    fun getFallbackFlowTokenPublicPath(): PublicPath {
+        return PublicPath(identifier: "flowTokenReceiverDefault")!
+    }
+
     /// Get the storage path of a inscription
     ///
     access(all)

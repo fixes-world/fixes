@@ -3,11 +3,12 @@
 
 # FRC20StakingForwarder
 
-TODO: Add description
+The FRC20StakingForwarder contract is a forwarder contract that forwards the Fungible Token to the FRC20Staking Pool.
 
 */
 import "FungibleToken"
 import "FlowToken"
+import "Fixes"
 import "FRC20FTShared"
 import "FRC20Staking"
 
@@ -57,7 +58,7 @@ access(all) contract FRC20StakingForwarder {
          access(all) fun fallbackBorrow(): &{FungibleToken.Receiver}? {
             let ownerAddress = self.owner?.address ?? panic("No owner set")
             let cap = getAccount(ownerAddress)
-                .getCapability<&{FungibleToken.Receiver}>(FRC20StakingForwarder.getFallbackFlowTokenPublicPath())
+                .getCapability<&{FungibleToken.Receiver}>(Fixes.getFallbackFlowTokenPublicPath())
             return cap.check() ? cap.borrow() : nil
         }
 
@@ -129,13 +130,6 @@ access(all) contract FRC20StakingForwarder {
     //
     access(all) fun createNewForwarder(_ poolAddr: Address): @Forwarder {
         return <-create Forwarder(poolAddr)
-    }
-
-    /// Returns the fallback receiver assigned to the account
-    ///
-    access(all)
-    fun getFallbackFlowTokenPublicPath(): PublicPath {
-        return PublicPath(identifier: "flowTokenReceiverDefault")!
     }
 
     init() {
