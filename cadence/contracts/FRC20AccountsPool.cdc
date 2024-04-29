@@ -323,12 +323,13 @@ access(all) contract FRC20AccountsPool {
             // extract the tokens
             let extractedToken <- ins.extract()
 
-            // deposit the tokens to pool and treasury
+            // deposit the tokens to protocol and child account
             if let tickDict = self.borrowDict(type: type) {
                 if let addr = tickDict[tick] {
                     if let tickRelatedFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
-                        // 5% of the extracted tokens will be sent to the system account
-                        let amtToTarget = extractedToken.balance * 0.95
+                        // 30% of the extracted tokens will be sent to the system account
+                        // 70% of the extracted tokens will be sent to the child account
+                        let amtToTarget = extractedToken.balance * 0.7
                         // withdraw the tokens to the treasury
                         let tokenToTarget <- extractedToken.withdraw(amount: amtToTarget)
                         // the target account
@@ -338,7 +339,7 @@ access(all) contract FRC20AccountsPool {
             }
             let systemFlowReciever = Fixes.borrowFlowTokenReceiver(self.owner?.address!)
                 ?? panic("Failed to borrow system flow token receiver")
-            // remaining 5% of the extracted tokens will be sent to the system account
+            // remaining the extracted tokens will be sent to the system account
             systemFlowReciever.deposit(from: <- extractedToken)
         }
 
