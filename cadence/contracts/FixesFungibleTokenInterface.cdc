@@ -194,10 +194,44 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// The admin interface for the FT
     ///
     access(all) resource interface IAdmin {
+        // ---- Readonly ----
+
         /// How many tokens will be mintable
         access(all)
         view fun getGrantedMintableAmount(): UFix64 {
             return 0.0
+        }
+
+        /// Get the top 100 sorted array of holders, descending by balance
+        access(all)
+        view fun getEstimatedTop100Holders(): [Address]? {
+            return nil
+        }
+
+        /// Get the top 1 holder
+        access(all)
+        view fun getTop1Holder(): Address? {
+            return nil
+        }
+
+        /// Get the last top holder
+        access(all)
+        view fun getLastTopHolder(): Address? {
+            return nil
+        }
+
+        /// Check if the address is in the top 100
+        access(all)
+        view fun isInTop100(_ address: Address): Bool {
+            return false
+        }
+
+        // ---- Optional ----
+
+        /// update the balance ranking
+        access(account)
+        fun onBalanceChanged(_ address: Address): Bool {
+            return false
         }
     }
 

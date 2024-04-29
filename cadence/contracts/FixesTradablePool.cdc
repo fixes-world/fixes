@@ -347,7 +347,7 @@ access(all) contract FixesTradablePool {
         fun setSubjectFeePercentage(_ subjectFeePerc: UFix64) {
             pre {
                 subjectFeePerc >= 0.0: "The subject fee percentage must be greater than or equal to 0"
-                subjectFeePerc <= 0.05: "The subject fee percentage must be less than or equal to 0.1"
+                subjectFeePerc <= 0.05: "The subject fee percentage must be less than or equal to 0.05"
             }
             self.subjectFeePercentage = subjectFeePerc
 

@@ -648,12 +648,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     ///
     access(contract)
     fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
-        if let adminRef = getAccount(self.account.address)
-            .getCapability<&FungibleTokenAdmin{AdminInterface}>(self.getAdminPublicPath())
-            .borrow() {
-            return adminRef.borrowFRC20Controller()
-        }
-        panic("The FRC20 Indexer Controller is not found")
+        let adminRef = self.borrowAdminPublic()
+        return adminRef.borrowFRC20Controller()
     }
 
     /// ------------ General Functions ------------
@@ -847,7 +843,14 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         return "FRC20FT_".concat(self.account.address.toString()).concat(self.getSymbol()).concat("_")
     }
 
-    /// ----- Internal Methods -----
+    /// Borrow the admin public reference
+    ///
+    access(all)
+    view fun borrowAdminPublic(): &FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IAdmin} {
+        return self.account
+            .getCapability<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IAdmin}>(self.getAdminPublicPath())
+            .borrow() ?? panic("The FungibleToken Admin is not found")
+    }
 
     /// Initialize the contract with ticker name
     ///
@@ -938,7 +941,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         self.account.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
         // @deprecated after Cadence 1.0
-        self.account.link<&FRC20FungibleToken.FungibleTokenAdmin{FRC20FungibleToken.AdminInterface}>(
+        self.account.link<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IAdmin}>(
             self.getAdminPublicPath(),
             target: adminStoragePath
         )

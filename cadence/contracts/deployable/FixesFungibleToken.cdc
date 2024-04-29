@@ -260,10 +260,24 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             // Is the vault has DNA, then attempt to generate a new gene
             self._attemptGenerateGene(amount, oldBalance)
 
+            // update the balance ranking
+            let ownerAddr = self.owner?.address
+            if ownerAddr != nil {
+                let adminRef = FixesFungibleToken.borrowAdminPublic()
+                if let lastTopHolder = adminRef.getLastTopHolder() {
+                    if lastTopHolder != ownerAddr {
+                        let lastTopBalance = FixesFungibleToken.getTokenBalance(lastTopHolder)
+                        if lastTopBalance > self.balance && adminRef.isInTop100(ownerAddr!) {
+                            adminRef.onBalanceChanged(ownerAddr!)
+                        }
+                    }
+                }
+            }
+
             // emit the event
             emit TokensWithdrawn(
                 amount: amount,
-                from: self.owner?.address
+                from: ownerAddr
             )
             return <- newVault
         }
@@ -350,9 +364,23 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             // Is the vault has DNA, then attempt to generate a new gene
             self._attemptGenerateGene(depositedBalance, self.balance)
 
+            // update the balance ranking
+            let ownerAddr = self.owner?.address
+            if ownerAddr != nil {
+                let adminRef = FixesFungibleToken.borrowAdminPublic()
+                if let lastTopHolder = adminRef.getLastTopHolder() {
+                    if lastTopHolder != ownerAddr {
+                        let lastTopBalance = FixesFungibleToken.getTokenBalance(lastTopHolder)
+                        if lastTopBalance < self.balance {
+                            adminRef.onBalanceChanged(ownerAddr!)
+                        }
+                    }
+                }
+            }
+
             emit TokensDeposited(
                 amount: depositedBalance,
-                to: self.owner?.address
+                to: ownerAddr
             )
         }
 
@@ -418,10 +446,14 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// The amount of tokens that all created minters are allowed to mint
         access(self)
         var grantedMintableAmount: UFix64
+        /// The top 100 accounts sorted by balance
+        access(self)
+        let top100Accounts: [Address]
 
         init() {
-            self.grantedMintableAmount = 0.0
             self.minter <- create Minter(allowedAmount: nil)
+            self.grantedMintableAmount = 0.0
+            self.top100Accounts = []
         }
 
         destroy() {
@@ -434,6 +466,65 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(all)
         view fun getGrantedMintableAmount(): UFix64 {
             return self.grantedMintableAmount
+        }
+
+        /// Get the top 100 sorted array of holders, descending by balance
+        access(all)
+        view fun getEstimatedTop100Holders(): [Address]? {
+            return self.top100Accounts
+        }
+
+        /// Get the top 1 holder
+        access(all)
+        view fun getTop1Holder(): Address? {
+            if self.top100Accounts.length > 0 {
+                return self.top100Accounts[0]
+            }
+            return nil
+        }
+
+        /// Get the last top holder
+        access(all)
+        view fun getLastTopHolder(): Address? {
+            if self.top100Accounts.length > 0 {
+                return self.top100Accounts[self.top100Accounts.length - 1]
+            }
+            return nil
+        }
+
+        /// Check if the address is in the top 100
+        access(all)
+        view fun isInTop100(_ address: Address): Bool {
+            return self.top100Accounts.contains(address)
+        }
+
+        /// update the balance ranking
+        access(account)
+        fun onBalanceChanged(_ address: Address): Bool {
+            // remove the address from the top 100
+            if let idx = self.top100Accounts.firstIndex(of: address) {
+                self.top100Accounts.remove(at: idx)
+            }
+            // now address is not in the top 100, we need to check balance and insert it
+            let balance = FixesFungibleToken.getTokenBalance(address)
+            var highBalanceIdx = 0
+            var lowBalanceIdx = self.top100Accounts.length - 1
+            // 使用两分法快速定位，然后再插入 Balance
+            while lowBalanceIdx >= highBalanceIdx {
+                let mid = (lowBalanceIdx + highBalanceIdx) / 2
+                let midBalance = FixesFungibleToken.getTokenBalance(self.top100Accounts[mid])
+                // find the position
+                if balance > midBalance {
+                    lowBalanceIdx = mid - 1
+                } else if balance < midBalance {
+                    highBalanceIdx = mid + 1
+                } else {
+                    break
+                }
+            }
+            // insert the address
+            self.top100Accounts.insert(at: highBalanceIdx, address)
+            return true
         }
 
         // ------ Private Methods ------
@@ -760,7 +851,14 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         return "FixsStandardFT_".concat(self.account.address.toString()).concat(self.getSymbol()).concat("_")
     }
 
-    /// ----- Internal Methods -----
+    /// Borrow the admin public reference
+    ///
+    access(all)
+    view fun borrowAdminPublic(): &FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin} {
+        return self.account
+            .getCapability<&FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin}>(self.getAdminPublicPath())
+            .borrow() ?? panic("The FungibleToken Admin is not found")
+    }
 
     /// Initialize the contract with ticker name
     ///
