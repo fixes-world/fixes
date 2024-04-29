@@ -86,14 +86,13 @@ access(all) contract FixesAvatar {
         ///
         access(account)
         fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            totalAmountInListing: UFix64,
+            storefront: Address?,
+            listingId: UInt64?,
         ) {
             // For season 0, we only support the following tick
             // "flows", the default tick

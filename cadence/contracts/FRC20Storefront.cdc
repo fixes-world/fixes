@@ -696,40 +696,37 @@ access(all) contract FRC20Storefront {
             let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
             if let marketTransactionHook = FRC20FTShared.borrowTransactionHook(marketAddress) {
                 marketTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
                     seller: seller,
                     buyer: buyer,
                     tick: tickName,
                     dealAmount: transactedAmt,
                     dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
                 )
             }
             // for seller hook
             if let sellerTransactionHook = FRC20FTShared.borrowTransactionHook(seller) {
                 sellerTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
                     seller: seller,
                     buyer: buyer,
                     tick: tickName,
                     dealAmount: transactedAmt,
                     dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
                 )
             }
             // for buyer hook
             if let buyerTransactionHook = FRC20FTShared.borrowTransactionHook(buyer) {
                 buyerTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
                     seller: seller,
                     buyer: buyer,
                     tick: tickName,
                     dealAmount: transactedAmt,
                     dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
                 )
             }
             // ------- end ---------------------------------

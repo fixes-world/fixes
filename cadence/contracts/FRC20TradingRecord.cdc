@@ -518,14 +518,13 @@ access(all) contract FRC20TradingRecord {
         ///
         access(account)
         fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            totalAmountInListing: UFix64,
+            storefront: Address?,
+            listingId: UInt64?,
         ) {
             if self.owner == nil {
                 return // DO NOT PANIC
@@ -536,8 +535,11 @@ access(all) contract FRC20TradingRecord {
             if meta == nil {
                 return // DO NOT PANIC
             }
+            if storefront == nil {
+                return // DO NOT PANIC
+            }
             let newRecord = TransactionRecord(
-                storefront: storefront,
+                storefront: storefront!,
                 buyer: buyer,
                 seller: seller,
                 tick: tick,

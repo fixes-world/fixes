@@ -205,7 +205,7 @@ access(all) contract FixesTradablePool {
 
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesHeartbeat.IHeartbeatHook {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesHeartbeat.IHeartbeatHook, FRC20FTShared.TransactionHook {
         // The minter of the token
         access(self)
         let minter: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>
@@ -289,6 +289,24 @@ access(all) contract FixesTradablePool {
                 subject: self.getSubjectAddress(),
                 subjectFeePercentage: subjectFeePerc
             )
+        }
+
+        // ----- Implement TransactionHook -----
+
+        /// The method that is invoked when the transaction is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onDeal(
+            seller: Address,
+            buyer: Address,
+            tick: String,
+            dealAmount: UFix64,
+            dealPrice: UFix64,
+            storefront: Address?,
+            listingId: UInt64?,
+        ) {
+            log("Default Empty Transaction Hook")
         }
 
         // ----- Implement IHeartbeatHook -----

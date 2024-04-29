@@ -35,8 +35,8 @@ access(all) contract FRC20FTShared {
     access(all) event TransactionHooksOnDeal(
         hooksOwner: Address,
         executedHookType: Type,
-        storefront: Address,
-        listingId: UInt64,
+        storefront: Address?,
+        listingId: UInt64?,
     )
     /// The event that is emitted when a heartbeat is occurred
     access(all) event TransactionHooksOnHeartbeat(
@@ -919,14 +919,13 @@ access(all) contract FRC20FTShared {
         ///
         access(account)
         fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            totalAmountInListing: UFix64,
+            storefront: Address?,
+            listingId: UInt64?,
         ) {
             log("Default Empty Transaction Hook")
         }
@@ -1002,14 +1001,13 @@ access(all) contract FRC20FTShared {
         ///
         access(account)
         fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            totalAmountInListing: UFix64,
+            storefront: Address?,
+            listingId: UInt64?,
         ) {
             let hooksOwnerAddr = self.owner?.address
             if hooksOwnerAddr == nil {
@@ -1018,7 +1016,15 @@ access(all) contract FRC20FTShared {
             // iterate all hooks
             self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
                 // call hook
-                ref.onDeal(storefront: storefront, listingId: listingId, seller: seller, buyer: buyer, tick: tick, dealAmount: dealAmount, dealPrice: dealPrice, totalAmountInListing: totalAmountInListing)
+                ref.onDeal(
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tick,
+                    dealAmount: dealAmount,
+                    dealPrice: dealPrice,
+                    storefront: storefront,
+                    listingId: listingId
+                )
 
                 // emit event
                 emit TransactionHooksOnDeal(
