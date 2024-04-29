@@ -89,23 +89,65 @@ access(all) contract FixesTradablePool {
 
         /// Get the balance of the token in liquidity pool
         access(all)
-        view fun getTokenBalance(): UFix64
+        view fun getTokenBalanceInPool(): UFix64
 
         /// Get the balance of the flow token in liquidity pool
         access(all)
-        view fun getFlowBalance(): UFix64
+        view fun getFlowBalanceInPool(): UFix64
 
-        /// Get the liquidity market cap
+        /// Get the token price
         access(all)
-        view fun getLiquidityMarketCap(): UFix64 {
-            let flowAmount = self.getFlowBalance()
-            let flowPrice = FixesTradablePool.getFlowPrice()
-            return flowAmount * flowPrice
-        }
+        view fun getTokenPriceInFlow(): UFix64
+
+        /// Get the LP token price
+        access(all)
+        view fun getLPPriceInFlow(): UFix64
+
+        /// Get the burned liquidity pair amount
+        access(all)
+        view fun getBurnedLP(): UFix64
 
         /// Get the swap pair address
         access(all)
         view fun getSwapPairAddress(): Address?
+
+        /// Get the liquidity market cap
+        access(all)
+        view fun getLiquidityMarketCap(): UFix64 {
+            if self.isLocalActive() {
+                let flowAmount = self.getFlowBalanceInPool()
+                let flowPrice = FixesTradablePool.getFlowPrice()
+                // The market cap is the flow amount * flow price * 2.0
+                // According to the Token value is equal to the Flow token value.
+                return flowAmount * flowPrice * 2.0
+            } else {
+                // current no liquidity in the pool, all LP token is burned
+                return 0.0
+            }
+        }
+
+        /// Get the locked liquidity market cap
+        access(all)
+        view fun getBurnedLiquidityMarketCap(): UFix64 {
+            if self.isLocalActive() {
+                return 0.0
+            } else {
+                let burnedLP = self.getBurnedLP()
+                let lpPrice = self.getLPPriceInFlow()
+                let flowPrice = FixesTradablePool.getFlowPrice()
+                return burnedLP * lpPrice * flowPrice
+            }
+        }
+
+        /// Get the token market cap
+        ///
+        access(all)
+        view fun getTokenMarketCap(): UFix64 {
+            let tokenSupply = self.getCirculatingSupply()
+            let tokenPrice = self.getTokenPriceInFlow()
+            let flowPrice = FixesTradablePool.getFlowPrice()
+            return tokenSupply * tokenPrice * flowPrice
+        }
 
         // ----- Trade (Writable) -----
 
@@ -226,6 +268,9 @@ access(all) contract FixesTradablePool {
     /// The liquidity pool resource.
     ///
     access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesHeartbeat.IHeartbeatHook {
+        /// The bonding curve of the liquidity pool
+        access(contract)
+        let curve: {FixesBondingCurve.CurveInterface}
         // The minter of the token
         access(self)
         let minter: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>
@@ -235,15 +280,15 @@ access(all) contract FixesTradablePool {
         // The vault for the flow token in the liquidity pool
         access(self)
         let flowVault: @FlowToken.Vault
-        /// The bonding curve of the liquidity pool
-        access(contract)
-        let curve: {FixesBondingCurve.CurveInterface}
         /// The subject fee percentage
-        access(contract)
+        access(self)
         var subjectFeePercentage: UFix64
         /// If the liquidity pool is active
-        access(contract)
+        access(self)
         var acitve: Bool
+        /// The record of LP token burned
+        access(self)
+        var lpBurned: UFix64
 
         init(
             _ minterCap: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>,
@@ -262,6 +307,7 @@ access(all) contract FixesTradablePool {
             self.vault <- vaultData.createEmptyVault()
             self.flowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
             self.acitve = false
+            self.lpBurned = 0.0
         }
 
         // @deprecated in Cadence v1.0
@@ -344,19 +390,78 @@ access(all) contract FixesTradablePool {
         view fun getCirculatingSupply(): UFix64 {
             let minter = self._borrowMinter()
             // The circulating supply is the total supply minus the balance in the vault
-            return minter.getTotalSupply() - self.getTokenBalance()
+            return minter.getTotalSupply() - self.getTokenBalanceInPool()
         }
 
         /// Get the balance of the token in liquidity pool
         access(all)
-        view fun getTokenBalance(): UFix64 {
+        view fun getTokenBalanceInPool(): UFix64 {
             return self.vault.balance
         }
 
         /// Get the balance of the flow token in liquidity pool
         access(all)
-        view fun getFlowBalance(): UFix64 {
+        view fun getFlowBalanceInPool(): UFix64 {
             return self.flowVault.balance
+        }
+
+        /// Get the burned liquidity pair amount
+        access(all)
+        view fun getBurnedLP(): UFix64 {
+            return self.lpBurned
+        }
+
+        /// Get the token price
+        ///
+        access(all)
+        view fun getTokenPriceInFlow(): UFix64 {
+            if self.isLocalActive() {
+                return self.getBuyPrice(1.0)
+            } else {
+                let pairRef = self.borrowSwapPairRef()
+                    ?? panic("The swap pair reference is missing")
+                let pairInfo = pairRef.getPairInfo()
+                let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+
+                var reserve0 = 0.0
+                var reserve1 = 0.0
+                if tokenKey == (pairInfo[0] as! String) {
+                    reserve0 = (pairInfo[2] as! UFix64)
+                    reserve1 = (pairInfo[3] as! UFix64)
+                } else {
+                    reserve0 = (pairInfo[3] as! UFix64)
+                    reserve1 = (pairInfo[2] as! UFix64)
+                }
+                return SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
+            }
+        }
+
+        /// Get the LP token price
+        ///
+        access(all)
+        view fun getLPPriceInFlow(): UFix64 {
+            if self.isLocalActive() {
+                return 0.0
+            } else {
+                let pairRef = self.borrowSwapPairRef()
+                    ?? panic("The swap pair reference is missing")
+                let pairInfo = pairRef.getPairInfo()
+                let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+
+                var reserve0 = 0.0
+                var reserve1 = 0.0
+                if tokenKey == (pairInfo[0] as! String) {
+                    reserve0 = (pairInfo[2] as! UFix64)
+                    reserve1 = (pairInfo[3] as! UFix64)
+                } else {
+                    reserve0 = (pairInfo[3] as! UFix64)
+                    reserve1 = (pairInfo[2] as! UFix64)
+                }
+                let lpTokenSupply = pairInfo[5] as! UFix64
+                let price0 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
+                let totalValueInFlow = price0 * reserve0 + reserve1 * 1.0
+                return totalValueInFlow / lpTokenSupply
+            }
         }
 
         /// Get the swap pair address
@@ -366,6 +471,18 @@ access(all) contract FixesTradablePool {
             let token0Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
             let token1Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.flowVault.getType().identifier)
             return SwapFactory.getPairAddress(token0Key: token0Key, token1Key: token1Key)
+        }
+
+        /// Borrow the swap pair reference
+        ///
+        access(all)
+        view fun borrowSwapPairRef(): &AnyResource{SwapInterfaces.PairPublic}? {
+            if let pairAddr = self.getSwapPairAddress() {
+                return getAccount(pairAddr)
+                    .getCapability<&AnyResource{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
+                    .borrow()
+            }
+            return nil
         }
 
         // ----- Implement FungibleToken.Receiver -----
@@ -677,9 +794,7 @@ access(all) contract FixesTradablePool {
             // check if the token paire is created, if not then create the pair
             // Token0 => self.vault, Token1 => self.flowVault
 
-            let token0Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
-            let token1Key = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.flowVault.getType().identifier)
-            var pairAddr = SwapFactory.getPairAddress(token0Key: token0Key, token1Key: token1Key)
+            var pairAddr = self.getSwapPairAddress()
             // if the pair is not created, then create the pair
             if pairAddr == nil {
                 // create the account creation fee vault
@@ -692,7 +807,7 @@ access(all) contract FixesTradablePool {
                     stableMode: false
                 )
                 // set the pair address again
-                pairAddr = SwapFactory.getPairAddress(token0Key: token0Key, token1Key: token1Key)
+                pairAddr = self.getSwapPairAddress()
             }
             // check again
             if pairAddr == nil {
@@ -700,18 +815,17 @@ access(all) contract FixesTradablePool {
                 return
             }
             // add all liquidity to the pair
-            let pairPublicRef = getAccount(pairAddr!)
-                .getCapability<&{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
-                .borrow()
+            let pairPublicRef = self.borrowSwapPairRef()
             if pairPublicRef == nil {
                 // DO NOT PANIC
                 return
             }
+            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
             // get the pair info
             let pairInfo = pairPublicRef!.getPairInfo()
             var token0Reserve = 0.0
             var token1Reserve = 0.0
-            if token0Key == (pairInfo[0] as! String) {
+            if tokenKey == (pairInfo[0] as! String) {
                 token0Reserve = (pairInfo[2] as! UFix64)
                 token1Reserve = (pairInfo[3] as! UFix64)
             } else {
@@ -725,14 +839,12 @@ access(all) contract FixesTradablePool {
 
             // add all the token to the pair
             if self.isLocalActive() {
-                let token0In = self.getTokenBalance()
-                var token1In = 0.0
+                let token0In = self.getTokenBalanceInPool()
+                var token1In = self.getFlowBalanceInPool()
                 // add all the token to the pair
-                if token0Reserve == 0.0 && token1Reserve == 0.0 {
-                    token1In = self.getFlowBalance()
-                } else {
+                if token0Reserve != 0.0 || token1Reserve != 0.0 {
                     token1In = SwapConfig.quote(amountA: token0In, reserveA: token0Reserve, reserveB: token1Reserve)
-                    if token1In > self.getFlowBalance() {
+                    if token1In > token1In {
                         destroy token0Vault
                         destroy token1Vault
                         // DO NOT PANIC
@@ -773,7 +885,10 @@ access(all) contract FixesTradablePool {
                 tokenAVault: <- token0Vault,
                 tokenBVault: <- token1Vault
             )
-            // Put the LP token to the BlackHole
+            // record the burned LP token
+            self.lpBurned = self.lpBurned + lpTokenVault.balance
+
+            // Send the LP token vault to the BlackHole
             BlackHole.vanish(<- lpTokenVault)
 
             // emit the liquidity pool transferred event
