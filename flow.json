@@ -429,6 +429,14 @@
 				"testnet": "866a9f1e81898147"
 			}
 		},
+		"StableSwapFactory": {
+			"source": "./imports/b063c16cac85dbd1/StableSwapFactory.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b063c16cac85dbd1",
+				"testnet": "cbed4c301441ded2"
+			}
+		},
 		"StringUtils": {
 			"source": "./imports/a340dc0a4ec828ab/StringUtils.cdc",
 			"aliases": {
@@ -451,6 +459,22 @@
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "b78ef7afa52ff906",
 				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapError": {
+			"source": "./imports/b78ef7afa52ff906/SwapError.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapFactory": {
+			"source": "./imports/b063c16cac85dbd1/SwapFactory.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b063c16cac85dbd1",
+				"testnet": "cbed4c301441ded2"
 			}
 		},
 		"ViewResolver": {
@@ -749,6 +773,14 @@
 				"testnet": "35717efbbce11c74"
 			}
 		},
+		"StableSwapFactory": {
+			"source": "mainnet://b063c16cac85dbd1.StableSwapFactory",
+			"hash": "6ab97a590125008e8a3531457dc71912115c42cf79ff54a1142d5103ba2a0b96",
+			"aliases": {
+				"mainnet": "b063c16cac85dbd1",
+				"testnet": "cbed4c301441ded2"
+			}
+		},
 		"StringUtils": {
 			"source": "mainnet://a340dc0a4ec828ab.StringUtils",
 			"hash": "5cb6f0c52bac8014c4b40cae267e505b52c37cddf10b761b84cbe02aed9b80f3",
@@ -765,6 +797,24 @@
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "b78ef7afa52ff906",
 				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapError": {
+			"source": "mainnet://b78ef7afa52ff906.SwapError",
+			"hash": "a2468e24c530f1a504f8566459112574906b85f0ef179bf75513ee55b3e4123d",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapFactory": {
+			"source": "mainnet://b063c16cac85dbd1.SwapFactory",
+			"hash": "545e2e23dc349a97783467121adcbe7c91870f3ab97fc69613430eca8369af0c",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "b063c16cac85dbd1",
+				"testnet": "cbed4c301441ded2"
 			}
 		},
 		"SwapInterfaces": {
@@ -886,6 +936,9 @@
 				"CapabilityFactory",
 				"SwapConfig",
 				"SwapInterfaces",
+				"SwapFactory",
+				"SwapError",
+				"StableSwapFactory",
 				"BlackHole",
 				"ViewResolvers",
 				"FTViewUtils",
