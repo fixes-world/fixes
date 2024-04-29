@@ -3,9 +3,11 @@
 
 # FRC20TradingRecord
 
-TODO: Add description
+The contract is used to record the trading records of the fungible tokens.
 
 */
+import "SwapConfig"
+// Fixes Imports
 import "Fixes"
 import "FRC20Indexer"
 import "FRC20FTShared"
@@ -379,9 +381,6 @@ access(all) contract FRC20TradingRecord {
         view fun getTickerName(): String?
 
         access(all)
-        view fun getMarketCap(): UFix64?
-
-        access(all)
         fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
         // ---- 2x Traders Points ----
         access(all)
@@ -454,12 +453,6 @@ access(all) contract FRC20TradingRecord {
             return self.tick
         }
 
-        /// @deprecated
-        access(all)
-        view fun getMarketCap(): UFix64? {
-            return nil
-        }
-
         /// Get the public daily records
         ///
         access(all)
@@ -523,29 +516,29 @@ access(all) contract FRC20TradingRecord {
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            storefront: Address?,
+            storefront: Address,
             listingId: UInt64?,
         ) {
             if self.owner == nil {
                 return // DO NOT PANIC
             }
 
+            var dealPricePerMint = 0.0
+            // for frc20
             let frc20Indexer = FRC20Indexer.getIndexer()
-            let meta = frc20Indexer.getTokenMeta(tick: tick)
-            if meta == nil {
-                return // DO NOT PANIC
-            }
-            if storefront == nil {
-                return // DO NOT PANIC
+            if let meta = frc20Indexer.getTokenMeta(tick: tick) {
+                dealPricePerMint = SwapConfig.ScaledUInt256ToUFix64(
+                    SwapConfig.UFix64ToScaledUInt256(meta.limit) / SwapConfig.UFix64ToScaledUInt256(dealAmount) * SwapConfig.UFix64ToScaledUInt256(dealPrice)
+                )
             }
             let newRecord = TransactionRecord(
-                storefront: storefront!,
+                storefront: storefront,
                 buyer: buyer,
                 seller: seller,
                 tick: tick,
                 dealAmount: dealAmount,
                 dealPrice: dealPrice,
-                dealPricePerMint: meta!.limit / dealAmount * dealPrice
+                dealPricePerMint: dealPricePerMint
             )
 
             self.addRecord(record: newRecord)
@@ -580,7 +573,7 @@ access(all) contract FRC20TradingRecord {
             // add to the daily records
             dailyRecordsRef!.addRecord(record: record)
 
-            /// calculate the traders points
+            /// calculate the traders points for frc20
             let frcIndexer = FRC20Indexer.getIndexer()
             let tokenMeta = frcIndexer.getTokenMeta(tick: record.tick)
             if tokenMeta == nil {

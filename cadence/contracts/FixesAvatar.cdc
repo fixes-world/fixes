@@ -91,7 +91,7 @@ access(all) contract FixesAvatar {
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            storefront: Address?,
+            storefront: Address,
             listingId: UInt64?,
         ) {
             // For season 0, we only support the following tick

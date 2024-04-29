@@ -205,7 +205,7 @@ access(all) contract FixesTradablePool {
 
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesHeartbeat.IHeartbeatHook, FRC20FTShared.TransactionHook {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesHeartbeat.IHeartbeatHook {
         // The minter of the token
         access(self)
         let minter: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>
@@ -291,24 +291,6 @@ access(all) contract FixesTradablePool {
             )
         }
 
-        // ----- Implement TransactionHook -----
-
-        /// The method that is invoked when the transaction is executed
-        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
-        ///
-        access(account)
-        fun onDeal(
-            seller: Address,
-            buyer: Address,
-            tick: String,
-            dealAmount: UFix64,
-            dealPrice: UFix64,
-            storefront: Address?,
-            listingId: UInt64?,
-        ) {
-            log("Default Empty Transaction Hook")
-        }
-
         // ----- Implement IHeartbeatHook -----
 
         /// The methods that is invoked when the heartbeat is executed
@@ -365,6 +347,35 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getFlowBalance(): UFix64 {
             return self.flowVault.balance
+        }
+
+        // ----- Implement FungibleToken.Receiver -----
+
+        /// Returns whether or not the given type is accepted by the Receiver
+        /// A vault that can accept any type should just return true by default
+        access(all)
+        view fun isSupportedVaultType(type: Type): Bool {
+            return type == Type<@FlowToken.Vault>()
+        }
+
+        /// A getter function that returns the token types supported by this resource,
+        /// which can be deposited using the 'deposit' function.
+        ///
+        /// @return Array of FT types that can be deposited.
+        access(all)
+        view fun getSupportedVaultTypes(): {Type: Bool} {
+            let supportedVaults: {Type: Bool} = {}
+            supportedVaults[Type<@FlowToken.Vault>()] = true
+            return supportedVaults
+        }
+
+        // deposit
+        //
+        // Function that takes a Vault object as an argument and forwards
+        // it to the recipient's Vault using the stored reference
+        //
+        access(all) fun deposit(from: @FungibleToken.Vault) {
+            self.flowVault.deposit(from: <- from)
         }
 
         // ----- Trade (Writable) -----
@@ -516,36 +527,20 @@ access(all) contract FixesTradablePool {
             )
         }
 
-        // ----- FungibleToken.Receiver -----
-
-        /// Returns whether or not the given type is accepted by the Receiver
-        /// A vault that can accept any type should just return true by default
-        access(all)
-        view fun isSupportedVaultType(type: Type): Bool {
-            return type == Type<@FlowToken.Vault>()
-        }
-
-        /// A getter function that returns the token types supported by this resource,
-        /// which can be deposited using the 'deposit' function.
-        ///
-        /// @return Array of FT types that can be deposited.
-        access(all)
-        view fun getSupportedVaultTypes(): {Type: Bool} {
-            let supportedVaults: {Type: Bool} = {}
-            supportedVaults[Type<@FlowToken.Vault>()] = true
-            return supportedVaults
-        }
-
-        // deposit
-        //
-        // Function that takes a Vault object as an argument and forwards
-        // it to the recipient's Vault using the stored reference
-        //
-        access(all) fun deposit(from: @FungibleToken.Vault) {
-            self.flowVault.deposit(from: <- from)
-        }
-
         // ----- Internal Methods -----
+
+        /// The hook that is invoked when a deal is executed
+        ///
+        access(self)
+        fun _onDeal(
+            seller: Address,
+            buyer: Address,
+            tick: String,
+            dealAmount: UFix64,
+            dealPrice: UFix64,
+        ) {
+            log("Default Empty Transaction Hook")
+        }
 
         access(self)
         fun _borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {

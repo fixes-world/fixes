@@ -35,7 +35,7 @@ access(all) contract FRC20FTShared {
     access(all) event TransactionHooksOnDeal(
         hooksOwner: Address,
         executedHookType: Type,
-        storefront: Address?,
+        storefront: Address,
         listingId: UInt64?,
     )
     /// The event that is emitted when a heartbeat is occurred
@@ -924,7 +924,7 @@ access(all) contract FRC20FTShared {
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            storefront: Address?,
+            storefront: Address,
             listingId: UInt64?,
         ) {
             log("Default Empty Transaction Hook")
@@ -1006,7 +1006,7 @@ access(all) contract FRC20FTShared {
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            storefront: Address?,
+            storefront: Address,
             listingId: UInt64?,
         ) {
             let hooksOwnerAddr = self.owner?.address

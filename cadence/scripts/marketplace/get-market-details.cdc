@@ -108,7 +108,6 @@ fun main(
         sales24h: todayStatus?.sales ?? 0,
         volumeTotal: totalStatus.volume,
         salesTotal: totalStatus.sales,
-        marketCap: marketRecords.getMarketCap() ?? 0.0,
         listedAmount: market.getListedAmount(),
         address: marketAddr,
         // detailed info
@@ -138,7 +137,6 @@ struct TokenMarketDetailed {
     access(all) let sales24h: UInt64
     access(all) let volumeTotal: UFix64
     access(all) let salesTotal: UInt64
-    access(all) let marketCap: UFix64
     access(all) let listedAmount: UInt64
     access(all) let address: Address
     // detailed info
@@ -162,7 +160,6 @@ struct TokenMarketDetailed {
         sales24h: UInt64,
         volumeTotal: UFix64,
         salesTotal: UInt64,
-        marketCap: UFix64,
         listedAmount: UInt64,
         address: Address,
         floorPriceBuyListing: UFix64,
@@ -183,7 +180,6 @@ struct TokenMarketDetailed {
         self.sales24h = sales24h
         self.volumeTotal = volumeTotal
         self.salesTotal = salesTotal
-        self.marketCap = marketCap
         self.listedAmount = listedAmount
         self.address = address
         self.floorPriceBuyListing = floorPriceBuyListing
