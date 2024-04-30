@@ -217,6 +217,13 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FixesLockDrops": {
+			"source": "cadence/contracts/FixesLockDrops.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FixesTradablePool": {
 			"source": "cadence/contracts/FixesTradablePool.cdc",
 			"aliases": {
@@ -716,7 +723,8 @@
 				"FungibleTokenManager",
 				"FixesBondingCurve",
 				"FixesTradablePool",
-				"FixesComments"
+				"FixesComments",
+				"FixesLockDrops"
 			]
 		},
 		"mainnet": {
