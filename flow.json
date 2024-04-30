@@ -1,59 +1,8 @@
 {
 	"contracts": {
-		"AddressUtils": {
-			"source": "./imports/a340dc0a4ec828ab/AddressUtils.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
-		},
-		"ArrayUtils": {
-			"source": "./imports/a340dc0a4ec828ab/ArrayUtils.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
-		},
-		"CapabilityDelegator": {
-			"source": "./imports/d8a7e05a7ac670c0/CapabilityDelegator.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
-		},
-		"CapabilityFactory": {
-			"source": "./imports/d8a7e05a7ac670c0/CapabilityFactory.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
-		},
-		"CapabilityFilter": {
-			"source": "./imports/d8a7e05a7ac670c0/CapabilityFilter.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
-		},
-		"Domains": {
-			"source": "./imports/233eb012d34b0070/Domains.cdc",
-			"aliases": {
-				"mainnet": "233eb012d34b0070",
-				"testnet": "b05b2abb42335e88"
-			}
-		},
 		"ETHUtils": {
 			"source": "cadence/contracts/ETHUtils.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -61,7 +10,6 @@
 		"EVMAgent": {
 			"source": "cadence/contracts/EVMAgent.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -69,7 +17,6 @@
 		"FGameLottery": {
 			"source": "cadence/contracts/FGameLottery.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -77,7 +24,6 @@
 		"FGameLotteryFactory": {
 			"source": "cadence/contracts/FGameLotteryFactory.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -85,22 +31,13 @@
 		"FGameLotteryRegistry": {
 			"source": "cadence/contracts/FGameLotteryRegistry.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FIND": {
-			"source": "./imports/097bafa4e0b48eef/FIND.cdc",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
 			}
 		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -108,7 +45,6 @@
 		"FRC20Agents": {
 			"source": "cadence/contracts/FRC20Agents.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -116,7 +52,6 @@
 		"FRC20FTShared": {
 			"source": "cadence/contracts/FRC20FTShared.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -124,7 +59,6 @@
 		"FRC20FungibleToken": {
 			"source": "cadence/contracts/deployable/FRC20FungibleToken.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -132,7 +66,6 @@
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -140,7 +73,6 @@
 		"FRC20MarketManager": {
 			"source": "cadence/contracts/FRC20MarketManager.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -148,7 +80,6 @@
 		"FRC20Marketplace": {
 			"source": "cadence/contracts/FRC20Marketplace.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -156,7 +87,6 @@
 		"FRC20NFTWrapper": {
 			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -164,7 +94,6 @@
 		"FRC20SemiNFT": {
 			"source": "cadence/contracts/FRC20SemiNFT.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -172,7 +101,6 @@
 		"FRC20Staking": {
 			"source": "cadence/contracts/FRC20Staking.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -180,7 +108,6 @@
 		"FRC20StakingForwarder": {
 			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -188,7 +115,6 @@
 		"FRC20StakingManager": {
 			"source": "cadence/contracts/FRC20StakingManager.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -196,7 +122,6 @@
 		"FRC20StakingVesting": {
 			"source": "cadence/contracts/FRC20StakingVesting.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -204,7 +129,6 @@
 		"FRC20Storefront": {
 			"source": "cadence/contracts/FRC20Storefront.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -212,7 +136,6 @@
 		"FRC20TradingRecord": {
 			"source": "cadence/contracts/FRC20TradingRecord.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -220,7 +143,6 @@
 		"FRC20VoteCommands": {
 			"source": "cadence/contracts/FRC20VoteCommands.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -228,22 +150,13 @@
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FindViews": {
-			"source": "./imports/097bafa4e0b48eef/FindViews.cdc",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
 			}
 		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -251,7 +164,6 @@
 		"FixesAssetMeta": {
 			"source": "cadence/contracts/FixesAssetMeta.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -259,7 +171,6 @@
 		"FixesAvatar": {
 			"source": "cadence/contracts/FixesAvatar.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -267,7 +178,6 @@
 		"FixesBondingCurve": {
 			"source": "cadence/contracts/FixesBondingCurve.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -275,7 +185,6 @@
 		"FixesComments": {
 			"source": "cadence/contracts/FixesComments.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -283,7 +192,6 @@
 		"FixesFungibleToken": {
 			"source": "cadence/contracts/deployable/FixesFungibleToken.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -291,7 +199,6 @@
 		"FixesFungibleTokenInterface": {
 			"source": "cadence/contracts/FixesFungibleTokenInterface.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -299,7 +206,6 @@
 		"FixesHeartbeat": {
 			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -307,7 +213,6 @@
 		"FixesInscriptionFactory": {
 			"source": "cadence/contracts/FixesInscriptionFactory.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -315,7 +220,6 @@
 		"FixesTradablePool": {
 			"source": "cadence/contracts/FixesTradablePool.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -323,7 +227,6 @@
 		"FixesTraits": {
 			"source": "cadence/contracts/FixesTraits.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
@@ -331,166 +234,15 @@
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FlowToken": {
-			"source": "./imports/1654653399040a61/FlowToken.cdc",
-			"aliases": {
-				"emulator": "0ae53cb6e3f42a79",
-				"mainnet": "1654653399040a61",
-				"testnet": "7e60df042a9c0868"
-			}
-		},
-		"FungibleToken": {
-			"source": "./imports/f233dcee88fe0abe/FungibleToken.cdc",
-			"aliases": {
-				"emulator": "ee82856bf20e2aa6",
-				"mainnet": "f233dcee88fe0abe",
-				"testnet": "9a0766d93b6608b7"
 			}
 		},
 		"FungibleTokenManager": {
 			"source": "cadence/contracts/FungibleTokenManager.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FungibleTokenMetadataViews": {
-			"source": "./imports/f233dcee88fe0abe/FungibleTokenMetadataViews.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "f233dcee88fe0abe",
-				"testnet": "9a0766d93b6608b7"
-			}
-		},
-		"HybridCustody": {
-			"source": "./imports/d8a7e05a7ac670c0/HybridCustody.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
-		},
-		"InscriptionMetadata": {
-			"source": "./imports/88dd257fcf26d3cc/InscriptionMetadata.cdc",
-			"aliases": {
-				"mainnet": "88dd257fcf26d3cc",
-				"testnet": "564b229bd8380848"
-			}
-		},
-		"MetadataViews": {
-			"source": "./imports/1d7e57aa55817448/MetadataViews.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
-		},
-		"NFTCatalog": {
-			"source": "./imports/49a7cda3a1eecc29/NFTCatalog.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "49a7cda3a1eecc29",
-				"testnet": "324c34e1c517e4db"
-			}
-		},
-		"NFTRetrieval": {
-			"source": "./imports/49a7cda3a1eecc29/NFTRetrieval.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "49a7cda3a1eecc29",
-				"testnet": "324c34e1c517e4db"
-			}
-		},
-		"NonFungibleToken": {
-			"source": "./imports/1d7e57aa55817448/NonFungibleToken.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
-		},
-		"OracleConfig": {
-			"source": "./imports/cec15c814971c1dc/OracleConfig.cdc",
-			"aliases": {
-				"mainnet": "cec15c814971c1dc",
-				"testnet": "2a9b59c3e2b72ee0"
-			}
-		},
-		"OracleInterface": {
-			"source": "./imports/cec15c814971c1dc/OracleInterface.cdc",
-			"aliases": {
-				"mainnet": "cec15c814971c1dc",
-				"testnet": "2a9b59c3e2b72ee0"
-			}
-		},
-		"PublicPriceOracle": {
-			"source": "./imports/ec67451f8a58216a/PublicPriceOracle.cdc",
-			"aliases": {
-				"mainnet": "ec67451f8a58216a",
-				"testnet": "866a9f1e81898147"
-			}
-		},
-		"StableSwapFactory": {
-			"source": "./imports/b063c16cac85dbd1/StableSwapFactory.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "b063c16cac85dbd1",
-				"testnet": "cbed4c301441ded2"
-			}
-		},
-		"StringUtils": {
-			"source": "./imports/a340dc0a4ec828ab/StringUtils.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
-		},
-		"SwapConfig": {
-			"source": "./imports/b78ef7afa52ff906/SwapConfig.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "b78ef7afa52ff906",
-				"testnet": "ddb929038d45d4b3"
-			}
-		},
-		"SwapError": {
-			"source": "./imports/b78ef7afa52ff906/SwapError.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "b78ef7afa52ff906",
-				"testnet": "ddb929038d45d4b3"
-			}
-		},
-		"SwapFactory": {
-			"source": "./imports/b063c16cac85dbd1/SwapFactory.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "b063c16cac85dbd1",
-				"testnet": "cbed4c301441ded2"
-			}
-		},
-		"SwapInterfaces": {
-			"source": "./imports/b78ef7afa52ff906/SwapInterfaces.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "b78ef7afa52ff906",
-				"testnet": "ddb929038d45d4b3"
-			}
-		},
-		"ViewResolver": {
-			"source": "./imports/1d7e57aa55817448/ViewResolver.cdc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
 			}
 		}
 	},
@@ -499,7 +251,6 @@
 			"source": "mainnet://a340dc0a4ec828ab.AddressUtils",
 			"hash": "fbef5765f68a64359f2ca799df0fbd594a6e1c92a6f6a0fbba980751e593803f",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
 				"testnet": "31ad40c07a2a9788"
 			}
@@ -508,7 +259,6 @@
 			"source": "mainnet://a340dc0a4ec828ab.ArrayUtils",
 			"hash": "6b17ff77591d04ac7dbb07adbd8df3ee5a67ea5bf361099a7b78676b9a58eacc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
 				"testnet": "31ad40c07a2a9788"
 			}
@@ -517,7 +267,6 @@
 			"source": "mainnet://4396883a58c3a2d1.BlackHole",
 			"hash": "d45cf1a3a5468bd502ee4e3b94bc81c968e9bb91a56dcefcb1bcbb3ad32fd904",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "4396883a58c3a2d1",
 				"testnet": "ad26718c4b6b921b"
 			}
@@ -526,7 +275,6 @@
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityDelegator",
 			"hash": "026019cb04d32e65fca7f40f700f2d46d16a41521f38db27bbf5963816b5d971",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
 				"testnet": "294e44e1ec6993c6"
@@ -536,7 +284,6 @@
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityFactory",
 			"hash": "742bd314afa81bdff5eae4293e7df25923120c70d1f200dff253740deb741cb8",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
 				"testnet": "294e44e1ec6993c6"
@@ -546,7 +293,6 @@
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityFilter",
 			"hash": "ebf6b62fbc3b31ec825839e62a39baf481c0244106c0e55a7bdb9c15e374cd6a",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
 				"testnet": "294e44e1ec6993c6"
@@ -603,7 +349,6 @@
 			"source": "mainnet://15a918087ab12d86.FTViewUtils",
 			"hash": "9ed7d0e8cf849d6603228a52cb91cc9de5d997abb4f2bb65b3f4ff49ec48e50a",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "15a918087ab12d86",
 				"testnet": "0b86f928a1fa7798"
 			}
@@ -660,7 +405,6 @@
 			"source": "mainnet://f233dcee88fe0abe.FungibleTokenMetadataViews",
 			"hash": "46174b8f88bfe289c17e00348643536ab70a27f9b69e7bb1cddc70949fc8cb4b",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "f233dcee88fe0abe",
 				"testnet": "9a0766d93b6608b7"
 			}
@@ -669,7 +413,6 @@
 			"source": "mainnet://d8a7e05a7ac670c0.HybridCustody",
 			"hash": "455e527f1ad0f6b842979350bad9f158a09cd94632884a46075939dfef2dce3c",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
 				"testnet": "294e44e1ec6993c6"
@@ -687,7 +430,6 @@
 			"source": "mainnet://1d7e57aa55817448.MetadataViews",
 			"hash": "8d605dbd8135085aa9e8bb0604ff67ddb24f70c9368c0be7673efaaa17fcfc8f",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
 				"testnet": "631e88ae7f1d7c20"
 			}
@@ -696,7 +438,6 @@
 			"source": "mainnet://49a7cda3a1eecc29.NFTCatalog",
 			"hash": "1764304baead3b4c248073011c931e0f803c8961e0b8a19be48e8562461e6e3c",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "49a7cda3a1eecc29",
 				"testnet": "324c34e1c517e4db"
 			}
@@ -705,7 +446,6 @@
 			"source": "mainnet://49a7cda3a1eecc29.NFTRetrieval",
 			"hash": "3daa75ef44751d4c45f99bb8f8a86008cfa81ca9d6cd449a91ca6209a4414074",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "49a7cda3a1eecc29",
 				"testnet": "324c34e1c517e4db"
 			}
@@ -721,7 +461,6 @@
 			"source": "mainnet://1d7e57aa55817448.NonFungibleToken",
 			"hash": "cdd73be33e303af8e2658bca8a6c1a24494e492e4dc577dbeef14113f04b1ce1",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
 				"testnet": "631e88ae7f1d7c20"
 			}
@@ -793,7 +532,6 @@
 			"source": "mainnet://a340dc0a4ec828ab.StringUtils",
 			"hash": "5cb6f0c52bac8014c4b40cae267e505b52c37cddf10b761b84cbe02aed9b80f3",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "a340dc0a4ec828ab",
 				"testnet": "31ad40c07a2a9788"
 			}
@@ -802,7 +540,6 @@
 			"source": "mainnet://b78ef7afa52ff906.SwapConfig",
 			"hash": "5680309531a1373e12086df8a3770afabbbeda0dc52f43a1fb231b626236fbc3",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "b78ef7afa52ff906",
 				"testnet": "ddb929038d45d4b3"
 			}
@@ -811,7 +548,6 @@
 			"source": "mainnet://b78ef7afa52ff906.SwapError",
 			"hash": "a2468e24c530f1a504f8566459112574906b85f0ef179bf75513ee55b3e4123d",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "b78ef7afa52ff906",
 				"testnet": "ddb929038d45d4b3"
 			}
@@ -820,7 +556,6 @@
 			"source": "mainnet://b063c16cac85dbd1.SwapFactory",
 			"hash": "545e2e23dc349a97783467121adcbe7c91870f3ab97fc69613430eca8369af0c",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "b063c16cac85dbd1",
 				"testnet": "cbed4c301441ded2"
 			}
@@ -829,7 +564,6 @@
 			"source": "mainnet://b78ef7afa52ff906.SwapInterfaces",
 			"hash": "600b3a9eeee86cd44ef08b1263fb1b6f29ec5fb422d93d008d34d6cd1caea139",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "b78ef7afa52ff906",
 				"testnet": "ddb929038d45d4b3"
 			}
@@ -838,7 +572,6 @@
 			"source": "mainnet://15a918087ab12d86.TokenList",
 			"hash": "b0569e11763c23e97fd073baeffaa6539c7d7035b6c5c6180243285bc5c92f1c",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "15a918087ab12d86",
 				"testnet": "b86f928a1fa7798e"
 			}
@@ -847,7 +580,6 @@
 			"source": "mainnet://1d7e57aa55817448.ViewResolver",
 			"hash": "9fa41186f38899625a6b4774f1a9addf8d16b76022d52a99174b4493499dc3de",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
 				"testnet": "631e88ae7f1d7c20"
 			}
@@ -856,7 +588,6 @@
 			"source": "mainnet://15a918087ab12d86.ViewResolvers",
 			"hash": "e5ec455d8d71a03e7bd50d72031594cf3a452b138c4f8b4348ea45bc066d6fca",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "15a918087ab12d86",
 				"testnet": "0b86f928a1fa7798"
 			}
