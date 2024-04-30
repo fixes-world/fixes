@@ -257,7 +257,7 @@ access(all) contract FixesTradablePool {
         /// Initialize the liquidity pool
         ///
         access(all)
-        fun initialize(mintAmount: UFix64?)
+        fun initialize()
 
         // The admin can set the subject fee percentage
         //
@@ -267,7 +267,7 @@ access(all) contract FixesTradablePool {
 
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesHeartbeat.IHeartbeatHook {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook {
         /// The bonding curve of the liquidity pool
         access(contract)
         let curve: {FixesBondingCurve.CurveInterface}
@@ -321,14 +321,18 @@ access(all) contract FixesTradablePool {
         /// Initialize the liquidity pool
         ///
         access(all)
-        fun initialize(mintAmount: UFix64?) {
-            let minter = self._borrowMinter()
-            let allUnsupplied = minter.getMaxSupply() - minter.getTotalSupply()
+        fun initialize() {
+            pre {
+                self.acitve == false: "Tradable Pool is active"
+                self.vault.balance == 0.0: "Token vault should be zero"
+            }
+
+            let minter = self.borrowMinter()
+            let totalMintAmount = minter.getCurrentMintableAmount()
             assert(
-                mintAmount == nil || mintAmount! <= allUnsupplied,
+                totalMintAmount > 0.0,
                 message: "The mint amount must be less than or equal to the unsupplied amount"
             )
-            let totalMintAmount = mintAmount ?? allUnsupplied
             let newVault <- minter.mintTokens(amount: totalMintAmount)
             self.vault.deposit(from: <- newVault)
             self.acitve = true
@@ -381,14 +385,14 @@ access(all) contract FixesTradablePool {
         /// Get the max supply of the token
         access(all)
         view fun getMaxSupply(): UFix64 {
-            let minter = self._borrowMinter()
+            let minter = self.borrowMinter()
             return minter.getMaxSupply()
         }
 
         /// Get the circulating supply of the token
         access(all)
         view fun getCirculatingSupply(): UFix64 {
-            let minter = self._borrowMinter()
+            let minter = self.borrowMinter()
             // The circulating supply is the total supply minus the balance in the vault
             return minter.getTotalSupply() - self.getTokenBalanceInPool()
         }
@@ -529,7 +533,7 @@ access(all) contract FixesTradablePool {
             _ amount: UFix64?,
             recipient: &{FungibleToken.Receiver},
         ) {
-            let minter = self._borrowMinter()
+            let minter = self.borrowMinter()
             // extract all Flow tokens from the inscription
             let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
             let flowAvailableVault <- ins.partialExtract(flowAvailableAmount)
@@ -633,7 +637,7 @@ access(all) contract FixesTradablePool {
             _ tokenVault: @FungibleToken.Vault,
             recipient: &{FungibleToken.Receiver},
         ) {
-            let minter = self._borrowMinter()
+            let minter = self.borrowMinter()
             // calculate the price
             let totalPrice = self.getSellPrice(tokenVault.balance)
             assert(
@@ -706,7 +710,7 @@ access(all) contract FixesTradablePool {
             dealAmount: UFix64,
             dealPrice: UFix64,
         ) {
-            let minter = self._borrowMinter()
+            let minter = self.borrowMinter()
             // for fixes fungible token, the ticker is $ + {symbol}
             let tickName = "$".concat(minter.getSymbol())
 
@@ -750,8 +754,10 @@ access(all) contract FixesTradablePool {
             }
         }
 
-        access(self)
-        fun _borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {
+        // ----- Implement IMinterHolder -----
+
+        access(contract)
+        view fun borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {
             return self.minter.borrow() ?? panic("The minter capability is missing")
         }
 
@@ -1009,11 +1015,14 @@ access(all) contract FixesTradablePool {
         return salesFee
     }
 
-    /// Get the platform destination
+    /// Get the public capability of Tradable Pool
     ///
     access(all)
-    view fun getPlatformFeeDestination(): Address {
-        return self.account.address
+    view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool{LiquidityPoolInterface, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook}? {
+        // @deprecated in Cadence 1.0
+        return getAccount(addr)
+            .getCapability<&TradableLiquidityPool{LiquidityPoolInterface, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook}>(self.getLiquidityPoolPublicPath())
+            .borrow()
     }
 
     /// Get the prefix for the storage paths
@@ -1037,5 +1046,12 @@ access(all) contract FixesTradablePool {
     view fun getLiquidityPoolPublicPath(): PublicPath {
         let prefix = self.getPathPrefix()
         return PublicPath(identifier: prefix.concat("LiquidityPool"))!
+    }
+
+    /// Get the platform destination
+    ///
+    access(all)
+    view fun getPlatformFeeDestination(): Address {
+        return self.account.address
     }
 }

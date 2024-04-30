@@ -238,6 +238,10 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// The minter resource interface
     ///
     access(all) resource interface IMinter {
+        /// Get the symbol of the minting token
+        access(all)
+        view fun getSymbol(): String
+
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64
@@ -246,9 +250,19 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTotalSupply(): UFix64
 
-        /// Get the symbol of the minting token
+        /// Get the unsupplied amount
         access(all)
-        view fun getSymbol(): String
+        view fun getUnsuppliedAmount(): UFix64 {
+            return self.getMaxSupply() - self.getTotalSupply()
+        }
+
+        /// Get the current mintable amount
+        access(all)
+        view fun getCurrentMintableAmount(): UFix64
+
+        /// Get the total allowed mintable amount
+        access(all)
+        view fun getTotalAllowedMintableAmount(): UFix64
 
         /// Get the vault data of the minting token
         access(all)
@@ -280,6 +294,27 @@ access(all) contract interface FixesFungibleTokenInterface {
                 vault.balance == result.balance: "The vault balance must be the same"
             }
         }
+    }
+
+    /// The minter holder resource interface
+    ///
+    access(all) resource interface IMinterHolder {
+        /// Get the total minted amount
+        access(all)
+        view fun getTotalMintedAmount(): UFix64 {
+            let minterRef = self.borrowMinter()
+            return minterRef.getTotalAllowedMintableAmount() - minterRef.getCurrentMintableAmount()
+        }
+
+        /// Get the total allowed mintable amount
+        access(all)
+        view fun getTotalAllowedMintableAmount(): UFix64 {
+            return self.borrowMinter().getTotalAllowedMintableAmount()
+        }
+
+        /// Borrow the minter reference
+        access(contract)
+        view fun borrowMinter(): &{IMinter}
     }
 
     /// ------------ Public Functions - no default implementation ------------

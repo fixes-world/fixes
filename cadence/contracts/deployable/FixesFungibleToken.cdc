@@ -440,7 +440,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
     /// The admin resource for the FRC20 FT
     ///
-    access(all) resource FungibleTokenAdmin: FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinter {
+    access(all) resource FungibleTokenAdmin: FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder {
         access(self)
         let minter: @Minter
         /// The amount of tokens that all created minters are allowed to mint
@@ -456,6 +456,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.top100Accounts = []
         }
 
+        // @deprecated in Cadence 1.0
         destroy() {
             destroy self.minter
         }
@@ -463,18 +464,21 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         // ----- Implement AdminInterface -----
 
         /// Mint new tokens
+        ///
         access(all)
         view fun getGrantedMintableAmount(): UFix64 {
             return self.grantedMintableAmount
         }
 
         /// Get the top 100 sorted array of holders, descending by balance
+        ///
         access(all)
         view fun getEstimatedTop100Holders(): [Address]? {
             return self.top100Accounts
         }
 
         /// Get the top 1 holder
+        ///
         access(all)
         view fun getTop1Holder(): Address? {
             if self.top100Accounts.length > 0 {
@@ -484,6 +488,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
 
         /// Get the last top holder
+        ///
         access(all)
         view fun getLastTopHolder(): Address? {
             if self.top100Accounts.length > 0 {
@@ -493,12 +498,14 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
 
         /// Check if the address is in the top 100
+        ///
         access(all)
         view fun isInTop100(_ address: Address): Bool {
             return self.top100Accounts.contains(address)
         }
 
         /// update the balance ranking
+        ///
         access(account)
         fun onBalanceChanged(_ address: Address): Bool {
             // remove the address from the top 100
@@ -530,6 +537,15 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return true
         }
 
+        // ----- Implement IMinterHolder -----
+
+        /// Borrow the minter reference
+        ///
+        access(contract)
+        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
+            return self.borrowSuperMinter()
+        }
+
         // ------ Private Methods ------
 
         /// Create a new Minter resource
@@ -542,64 +558,37 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return <- minter
         }
 
-        // ----- Implement IMinter -----
-
-        /// Get the max supply of the minting token
-        access(all)
-        view fun getMaxSupply(): UFix64 {
-            return self.minter.getMaxSupply()
-        }
-
-        /// Get the total supply of the minting token
-        access(all)
-        view fun getTotalSupply(): UFix64 {
-            return self.minter.getTotalSupply()
-        }
-
-        /// Get the symbol of the minting token
+        /// Borrow the super minter resource
         ///
         access(all)
-        view fun getSymbol(): String {
-            return self.minter.getSymbol()
-        }
-
-        /// Get the vault data of the minting token
-        ///
-        access(all)
-        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
-            return self.minter.getVaultData()
-        }
-
-        /// Mint new tokens, not limited by the minter
-        ///
-        access(all)
-        fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
-            return <- self.minter.mintTokens(amount: amount)
-        }
-
-        /// Mint tokens with user's inscription
-        ///
-        access(all)
-        fun initializeVaultByInscription(
-            vault: @FungibleToken.Vault,
-            ins: &Fixes.Inscription
-        ): @FungibleToken.Vault {
-            return <- self.minter.initializeVaultByInscription(vault: <- vault, ins: ins)
+        fun borrowSuperMinter(): &Minter {
+            return &self.minter as &Minter
         }
     }
 
     /// Resource object that token admin accounts can hold to mint new tokens.
     ///
     access(all) resource Minter: FixesFungibleTokenInterface.IMinter {
+        /// The total allowed amount of the minting token, if nil means unlimited
+        access(all)
+        let totalAllowedAmount: UFix64?
         /// The amount of tokens that the minter is allowed to mint
         access(all)
         var allowedAmount: UFix64?
 
         init(allowedAmount: UFix64?) {
+            self.totalAllowedAmount = allowedAmount
             self.allowedAmount = allowedAmount
         }
 
         // ----- Implement IMinter -----
+
+        /// Get the symbol of the minting token
+        ///
+        access(all)
+        view fun getSymbol(): String {
+            return FixesFungibleToken.getSymbol()
+        }
 
         /// Get the max supply of the minting token
         access(all)
@@ -614,11 +603,18 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return FixesFungibleToken.getTotalSupply()
         }
 
-        /// Get the symbol of the minting token
+        /// Get the current mintable amount
         ///
         access(all)
-        view fun getSymbol(): String {
-            return FixesFungibleToken.getSymbol()
+        view fun getCurrentMintableAmount(): UFix64 {
+            return self.allowedAmount ?? self.getUnsuppliedAmount()
+        }
+
+        /// Get the total allowed mintable amount
+        ///
+        access(all)
+        view fun getTotalAllowedMintableAmount(): UFix64 {
+            return self.totalAllowedAmount ?? self.getMaxSupply()
         }
 
         /// Get the vault data of the minting token
@@ -857,9 +853,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the admin public reference
     ///
     access(all)
-    view fun borrowAdminPublic(): &FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin} {
+    view fun borrowAdminPublic(): &FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder} {
         return self.account
-            .getCapability<&FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin}>(self.getAdminPublicPath())
+            .getCapability<&FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -939,7 +935,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         self.account.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
         // @deprecated after Cadence 1.0
-        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin}>(
+        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder}>(
             self.getAdminPublicPath(),
             target: adminStoragePath
         )
