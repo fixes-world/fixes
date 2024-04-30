@@ -217,8 +217,15 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FixesLockDrops": {
-			"source": "cadence/contracts/FixesLockDrops.cdc",
+		"FixesTokenAirDrops": {
+			"source": "cadence/contracts/FixesTokenAirDrops.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FixesTokenLockDrops": {
+			"source": "cadence/contracts/FixesTokenLockDrops.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
@@ -724,7 +731,8 @@
 				"FixesBondingCurve",
 				"FixesTradablePool",
 				"FixesComments",
-				"FixesLockDrops"
+				"FixesTokenLockDrops",
+				"FixesTokenAirDrops"
 			]
 		},
 		"mainnet": {
