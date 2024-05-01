@@ -182,13 +182,6 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FixesComments": {
-			"source": "cadence/contracts/FixesComments.cdc",
-			"aliases": {
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
 		"FixesFungibleToken": {
 			"source": "cadence/contracts/deployable/FixesFungibleToken.cdc",
 			"aliases": {
@@ -730,7 +723,6 @@
 				"FungibleTokenManager",
 				"FixesBondingCurve",
 				"FixesTradablePool",
-				"FixesComments",
 				"FixesTokenLockDrops",
 				"FixesTokenAirDrops"
 			]
