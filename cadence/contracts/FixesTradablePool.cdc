@@ -221,7 +221,7 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getBuyPriceAfterFee(_ amount: UFix64): UFix64 {
             let price = self.getBuyPrice(amount)
-            let protocolFee = price * FixesTradablePool.getPlatformSalesFee()
+            let protocolFee = price * FixesTradablePool.getProtocolTradingFee()
             let subjectFee = price * self.getSubjectFeePercentage()
             return price + protocolFee + subjectFee
         }
@@ -230,7 +230,7 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getSellPriceAfterFee(_ amount: UFix64): UFix64 {
             let price = self.getSellPrice(amount)
-            let protocolFee = price * FixesTradablePool.getPlatformSalesFee()
+            let protocolFee = price * FixesTradablePool.getProtocolTradingFee()
             let subjectFee = price * self.getSubjectFeePercentage()
             return price - protocolFee - subjectFee
         }
@@ -245,7 +245,7 @@ access(all) contract FixesTradablePool {
         ///
         access(all)
         view fun getBuyAmountAfterFee(_ cost: UFix64): UFix64 {
-            let protocolFee = cost * FixesTradablePool.getPlatformSalesFee()
+            let protocolFee = cost * FixesTradablePool.getProtocolTradingFee()
             let subjectFee = cost * self.getSubjectFeePercentage()
             return self.getBuyAmount(cost - protocolFee - subjectFee)
         }
@@ -297,6 +297,7 @@ access(all) contract FixesTradablePool {
         ) {
             pre {
                 minterCap.check(): "The minter capability is missing"
+                subjectFeePerc == nil || subjectFeePerc! < 0.01: "Invalid Subject Fee"
             }
             self.minter = minterCap
             self.curve = curve
@@ -345,13 +346,13 @@ access(all) contract FixesTradablePool {
         }
 
         // The admin can set the subject fee percentage
-        // The subject fee percentage must be greater than or equal to 0 and less than or equal to 0.05
+        // The subject fee percentage must be greater than or equal to 0 and less than or equal to 0.01
         //
         access(all)
         fun setSubjectFeePercentage(_ subjectFeePerc: UFix64) {
             pre {
                 subjectFeePerc >= 0.0: "The subject fee percentage must be greater than or equal to 0"
-                subjectFeePerc <= 0.05: "The subject fee percentage must be less than or equal to 0.05"
+                subjectFeePerc <= 0.01: "The subject fee percentage must be less than or equal to 0.01"
             }
             self.subjectFeePercentage = subjectFeePerc
 
@@ -545,10 +546,10 @@ access(all) contract FixesTradablePool {
             if amount != nil {
                 buyAmount = amount!
                 price = self.getBuyPrice(buyAmount)
-                protocolFee = price * FixesTradablePool.getPlatformSalesFee()
+                protocolFee = price * FixesTradablePool.getProtocolTradingFee()
                 subjectFee = price * self.getSubjectFeePercentage()
             } else {
-                protocolFee = flowAvailableVault.balance * FixesTradablePool.getPlatformSalesFee()
+                protocolFee = flowAvailableVault.balance * FixesTradablePool.getProtocolTradingFee()
                 subjectFee = flowAvailableVault.balance * self.getSubjectFeePercentage()
                 price = flowAvailableVault.balance - protocolFee - subjectFee
                 buyAmount = self.getBuyAmount(price)
@@ -648,7 +649,7 @@ access(all) contract FixesTradablePool {
                 self.flowVault.balance >= totalPrice,
                 message: "Insufficient payment: The flow vault does not have enough tokens"
             )
-            let protocolFee = totalPrice * FixesTradablePool.getPlatformSalesFee()
+            let protocolFee = totalPrice * FixesTradablePool.getProtocolTradingFee()
             let subjectFee = totalPrice * self.getSubjectFeePercentage()
             let userFund = totalPrice - protocolFee - subjectFee
             // withdraw the protocol fee from the flow vault
@@ -1000,18 +1001,19 @@ access(all) contract FixesTradablePool {
         return valueInStore ?? defaultTargetMarketCap
     }
 
-    /// Get the platform sales fee
+    /// Get the trading pool protocol fee
     ///
     access(all)
-    view fun getPlatformSalesFee(): UFix64 {
+    view fun getProtocolTradingFee(): UFix64 {
         post {
             result >= 0.0: "The platform sales fee must be greater than or equal to 0"
-            result <= 0.1: "The platform sales fee must be less than or equal to 0.1"
+            result <= 0.02: "The platform sales fee must be less than or equal to 0.02"
         }
         // use the shared store to get the sale fee
         let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
-        // Default sales fee, 2% of the total price
-        let salesFee = (sharedStore.getByEnum(FRC20FTShared.ConfigType.PlatformSalesFee) as! UFix64?) ?? 0.02
+        // Default sales fee, 0.5% of the total price
+        let defaultSalesFee = 0.005
+        let salesFee = (sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolTradingFee) as! UFix64?) ?? defaultSalesFee
         return salesFee
     }
 
