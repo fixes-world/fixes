@@ -505,7 +505,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
     /// The admin resource for the FRC20 FT
     ///
-    access(all) resource FungibleTokenAdmin: AdminInterface, FixesFungibleTokenInterface.IAdmin {
+    access(all) resource FungibleTokenAdmin: AdminInterface, FixesFungibleTokenInterface.IGlobalPublic {
         access(contract)
         var frc20IndexerController: Capability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>
 
@@ -516,6 +516,15 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 cap.check(): "The capability must be valid"
             }
             self.frc20IndexerController = cap
+        }
+
+        /// Check if the address is the admin
+        access(all)
+        view fun isAuthorizedUser(_ addr: Address): Bool {
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let tick = FRC20FungibleToken.getSymbol()
+            let meta = frc20Indexer.getTokenMeta(tick: tick)
+            return meta?.deployer == addr
         }
 
         /// Borrow the FRC20 Indexer Controller
@@ -846,9 +855,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the admin public reference
     ///
     access(all)
-    view fun borrowAdminPublic(): &FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IAdmin} {
+    view fun borrowAdminPublic(): &FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic} {
         return self.account
-            .getCapability<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IAdmin}>(self.getAdminPublicPath())
+            .getCapability<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic}>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -941,7 +950,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         self.account.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
         // @deprecated after Cadence 1.0
-        self.account.link<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IAdmin}>(
+        self.account.link<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic}>(
             self.getAdminPublicPath(),
             target: adminStoragePath
         )

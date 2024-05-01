@@ -13,11 +13,13 @@ import "FlowToken"
 import "Fixes"
 import "FixesInscriptionFactory"
 import "FixesHeartbeat"
+import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
 import "FRC20Agents"
 import "FRC20TradingRecord"
+import "FixesTradablePool"
 
 /// The Manager contract for Fungible Token
 ///
@@ -101,7 +103,7 @@ access(all) contract FungibleTokenManager {
         }
     }
 
-    /** ------- Public Methods - Deploper ---- */
+    /** ------- Public Methods - Authorized Users ---- */
 
     /// Check if the Fungible Token Symbol is already enabled
     ///
@@ -122,22 +124,8 @@ access(all) contract FungibleTokenManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        assert(
-            meta["op"] == "exec",
-            message: "The inscription operation must be 'exec'"
-        )
-        let usage = meta["usage"] ?? panic("The token operation is not found")
-        assert(
-            usage == "init-ft",
-            message: "The inscription is not for initialize a Fungible Token account"
-        )
-
+        let meta = self.verifyExecutingInscription(ins: ins, usage: "init-ft")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
-        assert(
-            tick[0] == "$",
-            message: "The token symbol must start with '$'"
-        )
 
         /// Check if the account is already enabled
         assert(
@@ -152,7 +140,17 @@ access(all) contract FungibleTokenManager {
         let callerAddr = ins.owner!.address
         let newAddr = newAccount.address
 
-        self._enableAndCreateFixesFungibleTokenAccount(tick, newAccount: newAccount)
+        // create the account for the fungible token at the accounts pool
+        acctsPool.setupNewChildForFungibleToken(tick: tick, newAccount)
+
+        // update the resources in the account
+        self._ensureFungibleTokenAccountResourcesAvailable(tick, false)
+        // deploy the contract of Fixes Fungible Token to the account
+        self._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
+
+        // set the authorized account
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        tokenAdminRef.updateAuthorizedUsers(callerAddr, true)
 
         // emit the event
         emit FungibleTokenAccountCreated(
@@ -160,6 +158,76 @@ access(all) contract FungibleTokenManager {
             account: newAddr,
             by: callerAddr
         )
+    }
+
+    /// Setup Tradable Pool Resources
+    ///
+    access(all)
+    fun setupTradablePoolResources(
+        ins: &Fixes.Inscription
+    ) {
+        // singletoken resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = self.verifyExecutingInscription(ins: ins, usage: "setup-tradable-pool")
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        // Get the caller address
+        let callerAddr = ins.owner!.address
+
+        // get the token admin reference
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        // check if the caller is authorized
+        assert(
+            tokenAdminRef.isAuthorizedUser(callerAddr),
+            message: "You are not authorized to setup the tradable pool resources"
+        )
+
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The staking account was not created")
+        let childAddr = childAcctRef.address
+
+        var isUpdated = false
+        // - Add Tradable Pool Resource
+        //   - Add Heartbeat Hook
+        //   - Relink Flow Token Resource
+
+        // add tradable pool resource
+        let poolStoragePath = FixesTradablePool.getLiquidityPoolStoragePath()
+        // if childAcctRef.borrow<&AnyResource>(from: poolStoragePath) == nil {
+        //     let tradablePool <- FixesTradablePool.createTradableLiquidityPool(
+        //         ins: ins,
+        //         minterCap
+        //     )
+        // }
+    }
+
+    /// Verify the inscription for executing the Fungible Token
+    ///
+    access(self)
+    fun verifyExecutingInscription(
+        ins: &Fixes.Inscription,
+        usage: String
+    ): {String: String} {
+        // inscription data
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        assert(
+            meta["op"] == "exec",
+            message: "The inscription operation must be 'exec'"
+        )
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+        assert(
+            tick[0] == "$",
+            message: "The token symbol must start with '$'"
+        )
+        let usageInMeta = meta["usage"] ?? panic("The token operation is not found")
+        assert(
+            usageInMeta == usage || usage == "*",
+            message: "The inscription is not for initialize a Fungible Token account"
+        )
+        return meta
     }
 
     /// Enable the FRC20 Fungible Token
@@ -181,19 +249,20 @@ access(all) contract FungibleTokenManager {
             message: "The inscription is not for initialize a Fungible Token account"
         )
 
-        let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+        let tickerName = meta["tick"]?.toLower() ?? panic("The token tick is not found")
 
         /// Check if the account is already enabled
         assert(
-            acctsPool.getFTContractAddress(tick) == nil,
+            acctsPool.getFTContractAddress(tickerName) == nil,
             message: "The Fungible Token account is already created"
         )
 
         // Get the caller address
         let callerAddr = ins.owner!.address
+        let newAddr = newAccount.address
 
         // Check if the the caller is valid
-        let tokenMeta = frc20Indexer.getTokenMeta(tick: tick) ?? panic("The token is not registered")
+        let tokenMeta = frc20Indexer.getTokenMeta(tick: tickerName) ?? panic("The token is not registered")
         assert(
             tokenMeta.deployer == callerAddr,
             message: "You are not allowed to create the Fungible Token account"
@@ -206,54 +275,6 @@ access(all) contract FungibleTokenManager {
             message: "The inscription execution failed"
         )
 
-        let newAddr = newAccount.address
-
-        self._enableAndCreateFRC20FungibleTokenAccount(tick, newAccount: newAccount)
-
-        // emit the event
-        emit FungibleTokenAccountCreated(
-            ticker: tick,
-            account: newAddr,
-            by: callerAddr
-        )
-    }
-
-    /** ---- Internal Methods ---- */
-
-    /// Create a new account to deploy the Fixes Fungible Token
-    ///
-    access(contract)
-    fun _enableAndCreateFixesFungibleTokenAccount(
-        _ tick: String,
-        newAccount: Capability<&AuthAccount>,
-    ) {
-        // singleton resources
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-
-        // create the account for the fungible token at the accounts pool
-        acctsPool.setupNewChildForFungibleToken(tick: tick, newAccount)
-
-        // update the resources in the account
-        self._ensureFungibleTokenAccountResourcesAvailable(tick, false)
-        // deploy the contract of Fixes Fungible Token to the account
-        self._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
-    }
-
-    /// Create a new account to deploy the FRC20 Fungible Token
-    ///
-    access(contract)
-    fun _enableAndCreateFRC20FungibleTokenAccount(
-        _ tick: String,
-        newAccount: Capability<&AuthAccount>,
-    ) {
-        // singleton resources
-        let frc20Indexer = FRC20Indexer.getIndexer()
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-
-        // Check if the token is already registered
-        let tickerName = tick.toLower()
-        let tokenMeta = frc20Indexer.getTokenMeta(tick: tickerName) ?? panic("The token is not registered")
-
         // create the account for the fungible token at the accounts pool
         acctsPool.setupNewChildForFungibleToken(
             tick: tokenMeta.tick,
@@ -264,11 +285,50 @@ access(all) contract FungibleTokenManager {
         self._ensureFungibleTokenAccountResourcesAvailable(tickerName, true)
         // deploy the contract of FRC20 Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tickerName, contractName: "FRC20FungibleToken")
+
+        // emit the event
+        emit FungibleTokenAccountCreated(
+            ticker: tickerName,
+            account: newAddr,
+            by: callerAddr
+        )
+    }
+
+    /** ---- Internal Methods ---- */
+
+    /// Borrow the Fixes Fungible Token contract interface
+    ///
+    access(self)
+    view fun borrowFixesFTContract(tick: String): &FixesFungibleTokenInterface {
+        // try to borrow the account to check if it was created
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The staking account was not created")
+        let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: "FixesFungibleToken")
+            ?? panic("The Fixes Fungible Token contract was not deployed")
+        return contractRef
+    }
+
+    /// Borrow the Fixes Fungible Token Admin Resource
+    ///
+    access(self)
+    view fun borrowWritableTokenAdmin(tick: String): &AnyResource{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable} {
+        // try to borrow the account to check if it was created
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The staking account was not created")
+        let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: "FixesFungibleToken")
+            ?? panic("The Fixes Fungible Token contract was not deployed")
+
+        // Check if the admin resource is available
+        let adminStoragePath = contractRef.getAdminStoragePath()
+        return childAcctRef.borrow<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(from: adminStoragePath)
+            ?? panic("The admin resource is not available")
     }
 
     /// Ensure all resources are available
     ///
-    access(contract)
+    access(self)
     fun _ensureFungibleTokenAccountResourcesAvailable(_ tick: String, _ isFRC20Token: Bool) {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -279,15 +339,12 @@ access(all) contract FungibleTokenManager {
         let childAddr = childAcctRef.address
 
         var isUpdated = false
-        // The staking pool should have the following resources in the account:
+        // The fungible token should have the following resources in the account:
         // - FRC20FTShared.SharedStore: configuration
-        //    - Store the Symbol, Name for the token
+        //   - Store the Symbol, Name for the token
         // - FRC20Agents.IndexerController: Optional, the controller for the FRC20 Agents
         // - FRC20FTShared.Hooks
-        // - TradingRecord
-        // TODO:
-        // - Add Trading Pool Resource
-        // - Relink Flow Token Resource
+        //   - TradingRecord
 
         // create the shared store and save it in the account
         if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
@@ -385,7 +442,7 @@ access(all) contract FungibleTokenManager {
 
     /// Update the FRC20 Fungible Token contract in the account
     ///
-    access(contract)
+    access(self)
     fun _updateFungibleTokenContractInAccount(_ tick: String, contractName: String) {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -411,6 +468,7 @@ access(all) contract FungibleTokenManager {
             panic("The contract of FRC20 Fungible Token is not deployed")
         }
 
+        // emit the event
         emit FungibleTokenContractUpdated(ticker: tick, account: childAddr, contractName: contractName)
     }
 

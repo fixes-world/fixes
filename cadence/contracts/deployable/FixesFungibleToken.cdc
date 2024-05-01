@@ -47,6 +47,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// The event that is emitted when a new minter resource is created
     access(all) event MinterCreated(allowedAmount: UFix64)
 
+    /// The event that is emitted when the admin is updated
+    access(all) event AdminUserUpdated(addr: Address, flag: Bool)
+
     /// The event that is emitted when the metadata is updated
     access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
 
@@ -440,7 +443,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
     /// The admin resource for the FRC20 FT
     ///
-    access(all) resource FungibleTokenAdmin: FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder {
+    access(all) resource FungibleTokenAdmin: FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder, FixesFungibleTokenInterface.IAdminWritable {
         access(self)
         let minter: @Minter
         /// The amount of tokens that all created minters are allowed to mint
@@ -449,11 +452,15 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// The top 100 accounts sorted by balance
         access(self)
         let top100Accounts: [Address]
+        /// All authorized users
+        access(self)
+        let authorizedUsers: {Address: Bool}
 
         init() {
             self.minter <- create Minter(allowedAmount: nil)
             self.grantedMintableAmount = 0.0
             self.top100Accounts = []
+            self.authorizedUsers = {}
         }
 
         // @deprecated in Cadence 1.0
@@ -462,6 +469,11 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
 
         // ----- Implement AdminInterface -----
+
+        access(all)
+        view fun isAuthorizedUser(_ addr: Address): Bool {
+            return self.authorizedUsers[addr] == true
+        }
 
         /// Mint new tokens
         ///
@@ -556,6 +568,15 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.grantedMintableAmount = self.grantedMintableAmount + allowedAmount
             emit MinterCreated(allowedAmount: allowedAmount)
             return <- minter
+        }
+
+        /// Update the authorized users
+        ///
+        access(all)
+        fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool) {
+            self.authorizedUsers[addr] = isAdd
+
+            emit AdminUserUpdated(addr: addr, flag: isAdd)
         }
 
         /// Borrow the super minter resource
@@ -853,9 +874,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the admin public reference
     ///
     access(all)
-    view fun borrowAdminPublic(): &FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder} {
+    view fun borrowAdminPublic(): &FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder} {
         return self.account
-            .getCapability<&FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
+            .getCapability<&FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -935,7 +956,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         self.account.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
         // @deprecated after Cadence 1.0
-        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{FixesFungibleTokenInterface.IAdmin, FixesFungibleTokenInterface.IMinterHolder}>(
+        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(
             self.getAdminPublicPath(),
             target: adminStoragePath
         )

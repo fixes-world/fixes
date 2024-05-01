@@ -193,8 +193,12 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// The admin interface for the FT
     ///
-    access(all) resource interface IAdmin {
+    access(all) resource interface IGlobalPublic {
         // ---- Readonly ----
+
+        /// Check if the address is the admin
+        access(all)
+        view fun isAuthorizedUser(_ addr: Address): Bool
 
         /// How many tokens will be mintable
         access(all)
@@ -233,6 +237,25 @@ access(all) contract interface FixesFungibleTokenInterface {
         fun onBalanceChanged(_ address: Address): Bool {
             return false
         }
+    }
+
+    /// The admin interface for the FT
+    ///
+    access(all) resource interface IAdminWritable {
+        /// Create a new Minter resource
+        ///
+        access(all)
+        fun createMinter(allowedAmount: UFix64): @{IMinter}
+
+        /// Update the authorized users
+        ///
+        access(all)
+        fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool)
+
+        /// Borrow the super minter resource
+        ///
+        access(all)
+        fun borrowSuperMinter(): &AnyResource{IMinter}
     }
 
     /// The minter resource interface
@@ -433,6 +456,15 @@ access(all) contract interface FixesFungibleTokenInterface {
         return getAccount(addr)
             .getCapability<&AnyResource{FungibleToken.Receiver}>(self.getReceiverPublicPath())
             .borrow()
+    }
+
+    /// Borrow the global public reference
+    ///
+    access(all)
+    view fun borrowGlobalPublic(): &{IGlobalPublic} {
+        return self.account
+            .getCapability<&{IGlobalPublic}>(self.getAdminPublicPath())
+            .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
     /// Get the storage path for the Vault
