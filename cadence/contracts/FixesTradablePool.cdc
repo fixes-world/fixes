@@ -47,7 +47,7 @@ access(all) contract FixesTradablePool {
     access(all) event LiquidityPoolTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
 
     // Event that is emitted when a user buys or sells tokens.
-    access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, tokenAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
+    access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, ticker: String, tokenAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
 
     /// -------- Resources and Interfaces --------
 
@@ -623,6 +623,7 @@ access(all) contract FixesTradablePool {
                 trader: traderAddr,
                 isBuy: true,
                 subject: self.getSubjectAddress(),
+                ticker: minter.getSymbol(),
                 tokenAmount: buyAmount,
                 flowAmount: totalCost,
                 protocolFee: protocolFee,
@@ -691,6 +692,7 @@ access(all) contract FixesTradablePool {
                 trader: traderAddr,
                 isBuy: false,
                 subject: self.getSubjectAddress(),
+                ticker: minter.getSymbol(),
                 tokenAmount: tokenAmount,
                 flowAmount: totalPrice,
                 protocolFee: protocolFee,
