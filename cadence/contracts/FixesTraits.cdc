@@ -91,8 +91,8 @@ access(all) contract FixesTraits {
         access(all) case RuggedHill // 乱石山岗
     }
 
-    access(all) view
-    fun getSeason0SecretPlacesDefs(): [Definition] {
+    access(all)
+    view fun getSeason0SecretPlacesDefs(): [Definition] {
         return [
             Definition(5, 100), // 1% chance, rarity 2
             Definition(12, 1900), // 19% chance, rarity 1
@@ -156,8 +156,8 @@ access(all) contract FixesTraits {
         access(all) case PhysicalTraining // 锻炼体魄
     }
 
-    access(all) view
-    fun getSeason0AbilityDefs(): [Definition] {
+    access(all)
+    view fun getSeason0AbilityDefs(): [Definition] {
         return [
             Definition(5, 20), // 0.2% chance, rarity 3
             Definition(12, 100), // 1% chance, rarity 2
@@ -201,8 +201,8 @@ access(all) contract FixesTraits {
         access(all) case TrollsHammer // 巨魔之锤
     }
 
-    access(all) view
-    fun getSeason0WeaponsDefs(): [Definition] {
+    access(all)
+    view fun getSeason0WeaponsDefs(): [Definition] {
         return [
             Definition(5, 20), // 0.2% chance, rarity 3
             Definition(12, 100), // 1% chance, rarity 2

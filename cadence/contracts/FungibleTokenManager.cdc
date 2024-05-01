@@ -56,11 +56,11 @@ access(all) contract FungibleTokenManager {
 
     access(all) resource interface AdminPublic {
         /// get the list of initialized fungible tokens
-        access(all) view
-        fun getFungibleTokens(): [String]
+        access(all)
+        view fun getFungibleTokens(): [String]
         /// get the address of the fungible token account
-        access(all) view
-        fun getFungibleTokenAccount(tick: String): Address?
+        access(all)
+        view fun getFungibleTokenAccount(tick: String): Address?
     }
 
     /// Admin Resource, represents an admin resource and store in admin's account
@@ -71,16 +71,16 @@ access(all) contract FungibleTokenManager {
 
         /// get the list of initialized fungible tokens
         ///
-        access(all) view
-        fun getFungibleTokens(): [String] {
+        access(all)
+        view fun getFungibleTokens(): [String] {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let dict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
             return dict.keys
         }
 
         /// get the address of the fungible token account
-        access(all) view
-        fun getFungibleTokenAccount(tick: String): Address? {
+        access(all)
+        view fun getFungibleTokenAccount(tick: String): Address? {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             return acctsPool.getFTContractAddress(tick)
         }
