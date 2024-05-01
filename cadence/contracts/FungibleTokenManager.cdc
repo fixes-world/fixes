@@ -14,12 +14,13 @@ import "Fixes"
 import "FixesInscriptionFactory"
 import "FixesHeartbeat"
 import "FixesFungibleTokenInterface"
+import "FixesTradablePool"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
 import "FRC20Agents"
 import "FRC20TradingRecord"
-import "FixesTradablePool"
+import "FRC20StakingManager"
 
 /// The Manager contract for Fungible Token
 ///
@@ -166,6 +167,12 @@ access(all) contract FungibleTokenManager {
     fun setupTradablePoolResources(
         ins: &Fixes.Inscription
     ) {
+        pre {
+            ins.isExtractable(): "The inscription is not extracted"
+        }
+        post {
+            ins.isExtracted(): "The inscription is not extracted"
+        }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
@@ -173,7 +180,12 @@ access(all) contract FungibleTokenManager {
         let meta = self.verifyExecutingInscription(ins: ins, usage: "setup-tradable-pool")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The staking account was not created")
+
         // Get the caller address
+        let childAddr = childAcctRef.address
         let callerAddr = ins.owner!.address
 
         // get the token admin reference
@@ -184,24 +196,87 @@ access(all) contract FungibleTokenManager {
             message: "You are not authorized to setup the tradable pool resources"
         )
 
-        // try to borrow the account to check if it was created
-        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
-            ?? panic("The staking account was not created")
-        let childAddr = childAcctRef.address
+        // borrow the super minter
+        let superMinter = tokenAdminRef.borrowSuperMinter()
+        let maxSupply = superMinter.getMaxSupply()
+        let currentSupply = superMinter.getTotalSupply()
+        let grantedSupply = tokenAdminRef.getGrantedMintableAmount()
 
-        var isUpdated = false
+        // new minter supply
+        let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
+        var newGrantedAmount = maxSupplyForNewMinter
+        if let supplyStr = meta["supply"] {
+            let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+            assert(
+                FRC20StakingManager.isEligibleForRegistering(stakeTick: stakeTick, addr: callerAddr),
+                message: "You are not eligible to setup custimzed supply amount for the tradable pool"
+            )
+            newGrantedAmount = UFix64.fromString(supplyStr)
+                ?? panic("The supply amount is not valid")
+        }
+        assert(
+            newGrantedAmount <= maxSupplyForNewMinter && newGrantedAmount > 0.0,
+            message: "The supply amount of the tradable pool minter is more than the all unused supply or less than 0.0"
+        )
+
         // - Add Tradable Pool Resource
         //   - Add Heartbeat Hook
         //   - Relink Flow Token Resource
 
         // add tradable pool resource
         let poolStoragePath = FixesTradablePool.getLiquidityPoolStoragePath()
-        // if childAcctRef.borrow<&AnyResource>(from: poolStoragePath) == nil {
-        //     let tradablePool <- FixesTradablePool.createTradableLiquidityPool(
-        //         ins: ins,
-        //         minterCap
-        //     )
-        // }
+        assert(
+            childAcctRef.borrow<&AnyResource>(from: poolStoragePath) == nil,
+            message: "The tradable pool is already created"
+        )
+
+        // create a new minter from the account
+        let minter <- tokenAdminRef.createMinter(allowedAmount: newGrantedAmount)
+        // create the tradable pool
+        let tradablePool <- FixesTradablePool.createTradableLiquidityPool(
+            ins: ins,
+            <- minter
+        )
+        childAcctRef.save(<- tradablePool, to: poolStoragePath)
+
+        // link the tradable pool to the public path
+        let poolPublicPath = FixesTradablePool.getLiquidityPoolPublicPath()
+        // @deprecated in Cadence 1.0
+        childAcctRef.link<&FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook}>(
+            poolPublicPath,
+            target: poolStoragePath
+        )
+
+        // Add the heartbeat hook to the tradable pool
+
+        // Register to FixesHeartbeat
+        let heartbeatScope = "TradablePool"
+        if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: childAcctRef.address) {
+            FixesHeartbeat.addHook(
+                scope: heartbeatScope,
+                hookAddr: childAcctRef.address,
+                hookPath: poolPublicPath
+            )
+        }
+
+        // Reset Flow Receiver
+        // This is the standard receiver path of FlowToken
+        let flowReceiverPath = /public/flowTokenReceiver
+
+         // Unlink the existing receiver capability for flowReceiverPath
+        if childAcctRef.getCapability(flowReceiverPath).check<&{FungibleToken.Receiver}>() {
+            // link the forwarder to the public path
+            childAcctRef.unlink(flowReceiverPath)
+            // Link the new forwarding receiver capability
+            childAcctRef.link<&{FungibleToken.Receiver}>(flowReceiverPath, target: poolStoragePath)
+
+            // link the FlowToken to the forwarder fallback path
+            let fallbackPath = Fixes.getFallbackFlowTokenPublicPath()
+            childAcctRef.unlink(fallbackPath)
+            childAcctRef.link<&FlowToken.Vault{FungibleToken.Receiver, FungibleToken.Balance}>(fallbackPath, target: /storage/flowTokenVault)
+        }
+
+        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: childAddr)
     }
 
     /// Verify the inscription for executing the Fungible Token

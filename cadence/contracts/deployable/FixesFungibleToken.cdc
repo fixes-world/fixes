@@ -611,6 +611,12 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return FixesFungibleToken.getSymbol()
         }
 
+        /// Get the type of the minting token
+        access(all)
+        view fun getTokenType(): Type {
+            return Type<@FixesFungibleToken.Vault>()
+        }
+
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64 {

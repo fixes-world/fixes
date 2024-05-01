@@ -273,7 +273,7 @@ access(all) contract FixesTradablePool {
         let curve: {FixesBondingCurve.CurveInterface}
         // The minter of the token
         access(self)
-        let minter: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>
+        let minter: @{FixesFungibleTokenInterface.IMinter}
         // The vault for the token
         access(self)
         let vault: @FungibleToken.Vault
@@ -291,20 +291,18 @@ access(all) contract FixesTradablePool {
         var lpBurned: UFix64
 
         init(
-            _ minterCap: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>,
+            _ minter: @{FixesFungibleTokenInterface.IMinter},
             _ curve: {FixesBondingCurve.CurveInterface},
             _ subjectFeePerc: UFix64?
         ) {
             pre {
-                minterCap.check(): "The minter capability is missing"
                 subjectFeePerc == nil || subjectFeePerc! < 0.01: "Invalid Subject Fee"
             }
-            self.minter = minterCap
+            self.minter <- minter
             self.curve = curve
             self.subjectFeePercentage = subjectFeePerc ?? 0.0
 
-            let minterRef = minterCap.borrow() ?? panic("The minter capability is missing")
-            let vaultData = minterRef.getVaultData()
+            let vaultData = self.minter.getVaultData()
             self.vault <- vaultData.createEmptyVault()
             self.flowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
             self.acitve = false
@@ -313,6 +311,7 @@ access(all) contract FixesTradablePool {
 
         // @deprecated in Cadence v1.0
         destroy() {
+            destroy self.minter
             destroy self.vault
             destroy self.flowVault
         }
@@ -761,7 +760,7 @@ access(all) contract FixesTradablePool {
 
         access(contract)
         view fun borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {
-            return self.minter.borrow() ?? panic("The minter capability is missing")
+            return &self.minter as &AnyResource{FixesFungibleTokenInterface.IMinter}
         }
 
         // ----- Implement IHeartbeatHook -----
@@ -797,7 +796,7 @@ access(all) contract FixesTradablePool {
             }
 
             // Now we can add liquidity to the swap pair
-            let minterRef = self.minter.borrow()!
+            let minterRef = self.borrowMinter()
             let vaultData = minterRef.getVaultData()
 
             // check if the token paire is created, if not then create the pair
@@ -937,7 +936,7 @@ access(all) contract FixesTradablePool {
     access(all)
     fun createTradableLiquidityPool(
         ins: &Fixes.Inscription,
-        _ minterCap: Capability<&AnyResource{FixesFungibleTokenInterface.IMinter}>,
+        _ minter: @AnyResource{FixesFungibleTokenInterface.IMinter},
     ): @TradableLiquidityPool {
         pre {
             ins.isExtractable(): "The inscription is not extractable"
@@ -947,17 +946,18 @@ access(all) contract FixesTradablePool {
         }
         // singletons
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-        // get the minter reference
-        let minter = minterCap.borrow() ?? panic("The minter capability is missing")
 
         let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let tick = meta["tick"] ?? panic("The ticker name is not found")
-        let addr = acctsPool.getFTContractAddress(tick)
-            ?? panic("The FungibleToken contract address is not found")
         assert(
-            addr == minterCap.address,
+            acctsPool.getFTContractAddress(tick) != nil,
+            message: "The FungibleToken contract is not found"
+        )
+        assert(
+            tick == "$".concat(minter.getSymbol()),
             message: "The minter capability address is not the same as the FungibleToken contract"
         )
+
         // get the fee percentage from the inscription metadata
         let subjectFeePerc = UFix64.fromString(meta["feePerc"] ?? "0.0") ?? 0.0
         // get free amount from the inscription metadata
@@ -969,7 +969,7 @@ access(all) contract FixesTradablePool {
         // execute the inscription
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
 
-        return <- create TradableLiquidityPool(minterCap, curve, subjectFeePerc)
+        return <- create TradableLiquidityPool(<- minter, curve, subjectFeePerc)
     }
 
     /// Get the flow price from IncrementFi Oracle

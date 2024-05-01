@@ -265,6 +265,10 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getSymbol(): String
 
+        /// Get the type of the minting token
+        access(all)
+        view fun getTokenType(): Type
+
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64
