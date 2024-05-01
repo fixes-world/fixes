@@ -247,7 +247,18 @@ access(all) contract FungibleTokenManager {
             target: poolStoragePath
         )
 
-        // Add the heartbeat hook to the tradable pool
+        let tradablePoolRef = childAcctRef.borrow<&FixesTradablePool.TradableLiquidityPool>(from: poolStoragePath)
+            ?? panic("The tradable pool was not created")
+        // Initialize the tradable pool
+        tradablePoolRef.initialize()
+
+        // Check if the tradable pool is active
+        assert(
+            tradablePoolRef.isLocalActive(),
+            message: "The tradable pool is not active"
+        )
+
+        // -- Add the heartbeat hook to the tradable pool
 
         // Register to FixesHeartbeat
         let heartbeatScope = "TradablePool"

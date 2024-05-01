@@ -40,8 +40,11 @@ access(all) contract FixesTradablePool {
     // Event that is emitted when the subject fee percentage is changed.
     access(all) event LiquidityPoolSubjectFeePercentageChanged(subject: Address, subjectFeePercentage: UFix64)
 
+    // Event that is emitted when the liquidity pool is created.
+    access(all) event LiquidityPoolCreated(tokenType: Type, curveType: Type, tokenSymbol: String, subjectFeePerc: UFix64, freeAmount: UFix64, createdBy: Address)
+
     // Event that is emitted when the liquidity pool is initialized.
-    access(all) event LiquidityPoolInitialized(subject: Address, mintedAmount: UFix64)
+    access(all) event LiquidityPoolInitialized(subject: Address, tokenType: Type, mintedAmount: UFix64)
 
     // Event that is emitted when the liquidity pool is transferred.
     access(all) event LiquidityPoolTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
@@ -340,6 +343,7 @@ access(all) contract FixesTradablePool {
             // Emit the event
             emit LiquidityPoolInitialized(
                 subject: self.getSubjectAddress(),
+                tokenType: self.getTokenType(),
                 mintedAmount: totalMintAmount
             )
         }
@@ -969,7 +973,22 @@ access(all) contract FixesTradablePool {
         // execute the inscription
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
 
-        return <- create TradableLiquidityPool(<- minter, curve, subjectFeePerc)
+        let tokenType = minter.getTokenType()
+        let tokenSymbol = minter.getSymbol()
+
+        let pool <- create TradableLiquidityPool(<- minter, curve, subjectFeePerc)
+
+        // emit the liquidity pool created event
+        emit LiquidityPoolCreated(
+            tokenType: tokenType,
+            curveType: curve.getType(),
+            tokenSymbol: tokenSymbol,
+            subjectFeePerc: subjectFeePerc,
+            freeAmount: freeAmount,
+            createdBy: ins.owner?.address ?? panic("The inscription owner is missing")
+        )
+
+        return <- pool
     }
 
     /// Get the flow price from IncrementFi Oracle
