@@ -522,7 +522,8 @@ access(all) contract FixesTradablePool {
             self.flowVault.deposit(from: <- from)
 
             // if not active, then try to add liquidity
-            if !self.isLocalActive() && self.flowVault.balance > 1.0 {
+            let swapThreshold = 10.0
+            if !self.isLocalActive() && self.flowVault.balance >= swapThreshold {
                 self._ensureSwapPairAndAddLiquidity()
             }
         }

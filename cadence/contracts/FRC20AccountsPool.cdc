@@ -15,6 +15,7 @@ import "HybridCustody"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FRC20FTShared"
 import "FRC20Indexer"
 
 access(all) contract FRC20AccountsPool {
@@ -47,9 +48,13 @@ access(all) contract FRC20AccountsPool {
     ///
     access(all) resource interface PoolPublic {
         /// ---- Getters ----
+
         /// Returns the addresses of the FRC20 with the given type
         access(all)
         view fun getFRC20Addresses(type: ChildAccountType): {String: Address}
+        /// Get Address
+        access(all)
+        view fun getAddress(type: ChildAccountType, _ key: String): Address?
 
         /// Returns the address of the FRC20 staking for the given tick
         access(all)
@@ -175,13 +180,20 @@ access(all) contract FRC20AccountsPool {
             return {}
         }
 
+        /// Get Address
+        ///
+        access(all)
+        view fun getAddress(type: ChildAccountType, _ key: String): Address? {
+            if let dict = self.borrowDict(type: type) {
+                return dict[key]
+            }
+            return nil
+        }
+
         /// Returns the address of the FRC20 market for the given tick
         access(all)
         view fun getFRC20MarketAddress(tick: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.Market) {
-                return tickDict[tick]
-            }
-            return nil
+            return self.getAddress(type: ChildAccountType.Market, tick)
         }
 
         /// Returns the flow token receiver for the given tick
@@ -211,10 +223,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the address of the FRC20 staking for the given tick
         access(all)
         view fun getFRC20StakingAddress(tick: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.Staking) {
-                return tickDict[tick]
-            }
-            return nil
+            return self.getAddress(type: ChildAccountType.Staking, tick)
         }
 
         /// Returns the flow token receiver for the given tick
@@ -229,10 +238,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the address of the EVM agent for the given eth address
         access(all)
         view fun getEVMAgencyAddress(_ owner: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.EVMAgency) {
-                return tickDict[owner]
-            }
-            return nil
+            return self.getAddress(type: ChildAccountType.EVMAgency, owner)
         }
 
         /// Returns the flow token receiver for the given tick
@@ -248,10 +254,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the address of the EVM entrusted account for the given evm address
         access(all)
         view fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.EVMEntrustedAccount) {
-                return tickDict[evmAddr]
-            }
-            return nil
+            return self.getAddress(type: ChildAccountType.EVMEntrustedAccount, evmAddr)
         }
 
         /// Returns the flow token receiver for the given evm address
@@ -266,10 +269,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the address of the GameWorld for the given key
         access(all)
         view fun getGameWorldAddress(_ key: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.GameWorld) {
-                return tickDict[key]
-            }
-            return nil
+            return self.getAddress(type: ChildAccountType.GameWorld, key)
         }
 
         /// Returns the flow token receiver for the given key
@@ -284,10 +284,7 @@ access(all) contract FRC20AccountsPool {
         /// Returns the address of the FRC20 Fungible token with the given type
         access(all)
         view fun getFTContractAddress(_ tick: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.FungibleToken) {
-                return tickDict[tick]
-            }
-            return nil
+            return self.getAddress(type: ChildAccountType.FungibleToken, tick)
         }
 
         /// Returns the flow token receiver for the given tick
@@ -322,21 +319,27 @@ access(all) contract FRC20AccountsPool {
 
             // extract the tokens
             let extractedToken <- ins.extract()
+            let totalAmount = extractedToken.balance
 
-            // deposit the tokens to protocol and child account
-            if let tickDict = self.borrowDict(type: type) {
-                if let addr = tickDict[tick] {
-                    if let tickRelatedFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
-                        // 30% of the extracted tokens will be sent to the system account
-                        // 70% of the extracted tokens will be sent to the child account
-                        let amtToTarget = extractedToken.balance * 0.7
-                        // withdraw the tokens to the treasury
-                        let tokenToTarget <- extractedToken.withdraw(amount: amtToTarget)
-                        // the target account
-                        tickRelatedFlowReciever.deposit(from: <- tokenToTarget)
-                    }
+            // 1/4 -> Platform Staking Account
+            let globalStore = FRC20FTShared.borrowGlobalStoreRef()
+            let stakingFRC20Tick = (globalStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?) ?? "flows"
+            if let addr = self.getAddress(type: ChildAccountType.Staking, stakingFRC20Tick) {
+                if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
+                    // withdraw the tokens to the treasury
+                    stakingFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.4))
                 }
             }
+
+            // 1/3 -> Token Child Account
+            if let addr = self.getAddress(type: type, tick) {
+                if let tickRelatedFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
+                    // the target account
+                    tickRelatedFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.3))
+                }
+            }
+
+            // 1/3 -> Protocol(System Account)
             let systemFlowReciever = Fixes.borrowFlowTokenReceiver(self.owner?.address!)
                 ?? panic("Failed to borrow system flow token receiver")
             // remaining the extracted tokens will be sent to the system account
