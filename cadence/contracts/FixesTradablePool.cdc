@@ -901,8 +901,8 @@ access(all) contract FixesTradablePool {
             // record the burned LP token
             self.lpBurned = self.lpBurned + lpTokenVault.balance
 
-            // Send the LP token vault to the BlackHole
-            BlackHole.vanish(<- lpTokenVault)
+            // Send the LP token vault to the BlackHole for soft burning
+            FixesTradablePool.softBurnVault(<- lpTokenVault)
 
             // emit the liquidity pool transferred event
             emit LiquidityPoolTransferred(
@@ -991,6 +991,26 @@ access(all) contract FixesTradablePool {
         )
 
         return <- pool
+    }
+
+    /// Soft burn the vault
+    ///
+    access(all)
+    fun softBurnVault(_ vault: @FungibleToken.Vault) {
+        let network = AddressUtils.currentNetwork()
+
+        // Send the vault to the BlackHole
+        if network == "MAINNET" {
+            // Use IncrementFi's BlackHole: https://app.increment.fi/profile/0x9c1142b81f1ae962
+            let blackHoleAddr = Address.fromString("0x".concat("9c1142b81f1ae962"))!
+            if let blackHoleRef = BlackHole.borrowBlackHoleReceiver(blackHoleAddr) {
+                blackHoleRef.deposit(from: <- vault)
+            } else {
+                BlackHole.vanish(<- vault)
+            }
+        } else {
+            BlackHole.vanish(<- vault)
+        }
     }
 
     /// Get the flow price from IncrementFi Oracle
