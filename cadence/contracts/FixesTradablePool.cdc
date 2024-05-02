@@ -966,7 +966,8 @@ access(all) contract FixesTradablePool {
         let subjectFeePerc = UFix64.fromString(meta["feePerc"] ?? "0.0") ?? 0.0
         // get free amount from the inscription metadata
         let freeAmount = UFix64.fromString(meta["freeAmount"] ?? "0.0") ?? 0.0
-        let maxSupply = minter.getMaxSupply()
+        // using total allowed mintable amount as the max supply
+        let maxSupply = minter.getTotalAllowedMintableAmount()
         // create the bonding curve
         let curve = FixesBondingCurve.Quadratic(freeAmount: freeAmount, maxSupply: maxSupply)
 
