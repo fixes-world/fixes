@@ -616,8 +616,8 @@ access(all) contract FRC20TradingRecord {
                 }
             } else {
                 // Here is the points for non-frc20 traders
-                // 1 $FLOW = 1 Point
-                let points = record.dealPrice
+                // 1 $FLOW = 10 Point
+                let points = record.dealPrice * 10.0
                 if record.buyer != record.storefront {
                     self.traderPoints[record.buyer] = (self.traderPoints[record.buyer] ?? 0.0) + points
                 }
