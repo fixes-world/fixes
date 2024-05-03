@@ -568,7 +568,7 @@ access(all) contract FixesTradablePool {
             let payment <- flowAvailableVault.withdraw(amount: totalCost)
             if protocolFee > 0.0 {
                 let protocolFeeVault <- payment.withdraw(amount: protocolFee)
-                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(FixesTradablePool.getPlatformFeeDestination())
+                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformFeeDestination())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
@@ -660,7 +660,7 @@ access(all) contract FixesTradablePool {
             // withdraw the protocol fee from the flow vault
             if protocolFee > 0.0 {
                 let protocolFeeVault <- self.flowVault.withdraw(amount: protocolFee)
-                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(FixesTradablePool.getPlatformFeeDestination())
+                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformFeeDestination())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
@@ -1091,12 +1091,5 @@ access(all) contract FixesTradablePool {
     view fun getLiquidityPoolPublicPath(): PublicPath {
         let prefix = self.getPathPrefix()
         return PublicPath(identifier: prefix.concat("LiquidityPool"))!
-    }
-
-    /// Get the platform destination
-    ///
-    access(all)
-    view fun getPlatformFeeDestination(): Address {
-        return self.account.address
     }
 }

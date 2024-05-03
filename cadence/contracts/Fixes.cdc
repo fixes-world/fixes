@@ -710,12 +710,27 @@ access(all) contract Fixes {
     /// Helper method to get FlowToken receiver
     ///
     access(all)
-    fun borrowFlowTokenReceiver(
+    view fun borrowFlowTokenReceiver(
         _ addr: Address
     ): &{FungibleToken.Receiver}? {
         let cap = getAccount(addr)
             .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
         return cap.borrow()
+    }
+
+    /// Get the platform destination
+    ///
+    access(all)
+    view fun getPlatformFeeDestination(): Address {
+        return self.account.address
+    }
+
+    /// Get the platform fee receiver
+    ///
+    access(all)
+    view fun borrowPlatformFeeReceiver(): &{FungibleToken.Receiver} {
+        return self.borrowFlowTokenReceiver(self.getPlatformFeeDestination())
+            ?? panic("Platform fee receiver not found")
     }
 
     /// Returns the fallback receiver assigned to the account
