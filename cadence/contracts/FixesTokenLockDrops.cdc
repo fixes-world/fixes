@@ -26,6 +26,26 @@ access(all) contract FixesTokenLockDrops {
 
     // ------ Events -------
 
+    // emitted when a new token is locked
+    access(all) event TokenLocked(
+        poolAddr: Address,
+        userAddr: Address,
+        lockedTokenTicker: String,
+        lockedTokenType: Type?,
+        lockedAmount: UFix64,
+        lockingPeriod: UFix64,
+        unlockTime: UFix64
+    )
+
+    // emitted when the locked token is unlocked
+    access(all) event TokenUnlocked(
+        poolAddr: Address,
+        userAddr: Address,
+        lockedTokenTicker: String,
+        lockedTokenType: Type?,
+        lockedAmount: UFix64
+    )
+
     // emitted when a new Drops Pool is created
     access(all) event DropsPoolCreated(
         lockingToken: String,
@@ -36,30 +56,408 @@ access(all) contract FixesTokenLockDrops {
 
     /// -------- Resources and Interfaces --------
 
+    /// Locking Entry Resource
+    ///
+    access(all) resource LockingEntry {
+        access(self)
+        let locked: @FRC20FTShared.Change
+        access(all)
+        let unlockTime: UFix64
+
+        init(
+            _ change: @FRC20FTShared.Change,
+            _ unlockTime: UFix64
+        ) {
+            self.locked <- change
+            self.unlockTime = unlockTime
+        }
+
+        destroy() {
+            destroy self.locked
+        }
+
+        /// Get the locked balance
+        ///
+        access(contract)
+        view fun getLockedBalance(): UFix64 {
+            return self.locked.getBalance()
+        }
+
+        /// Check if the entry is unlocked
+        ///
+        access(contract)
+        view fun isUnlocked(): Bool {
+            return self.unlockTime <= getCurrentBlock().timestamp
+        }
+
+        /// Withdraw all the locked balance
+        ///
+        access(contract)
+        fun extractLockedChange(): @FRC20FTShared.Change {
+            pre {
+                self.isUnlocked(): "The entry is not unlocked"
+            }
+            post {
+                self.locked.getBalance() == 0.0: "The locked balance is not zero"
+                result.getBalance() == before(self.locked.getBalance()): "The balance is not matched"
+            }
+            return <- self.locked.withdrawAsChange(amount: self.locked.getBalance())
+        }
+    }
+
+    /// User Locking Info Resource
+    ///
+    access(all) resource UserLockingInfo {
+        access(self)
+        let belongsTo: Address
+        access(self)
+        let entries: @[LockingEntry]
+
+        init(
+            _ belongsTo: Address
+        ) {
+            self.belongsTo = belongsTo
+            self.entries <- []
+        }
+
+        destroy() {
+            destroy self.entries
+        }
+
+        access(contract)
+        view fun getTotalLockedBalance(): UFix64 {
+            var total: UFix64 = 0.0
+            var i = self.entries.length
+            while i > 0 {
+                i = i - 1
+                total = total + self.entries[i].getLockedBalance()
+            }
+            return total
+        }
+
+        /// Check if the user has unlocked entries
+        ///
+        access(contract)
+        view fun hasUnlockedEntries(): Bool {
+            if self.entries.length == 0 {
+                return false
+            }
+            return self.entries[0].isUnlocked()
+        }
+
+        /// Get the unlocked balance
+        ///
+        access(contract)
+        view fun getUnlockedBalance(): UFix64 {
+            if !self.hasUnlockedEntries() {
+                return 0.0
+            }
+            var total = 0.0
+            var i = 0
+            while i < self.entries.length {
+                if self.entries[i].isUnlocked() {
+                    total = total + self.entries[i].getLockedBalance()
+                } else {
+                    break
+                }
+                i = i + 1
+            }
+            return total
+        }
+
+        /// Add a new entry
+        ///
+        access(contract)
+        fun addEntry(_ entry: @FRC20FTShared.Change, _ lockingPeriod: UFix64) {
+            pre {
+                entry.from == self.belongsTo: "The entry is not owned by the user: ".concat(self.belongsTo.toString())
+            }
+            let unlockTime = getCurrentBlock().timestamp + lockingPeriod
+            // find the proper index to insert the new entry based on the unlock time
+            var idx = 0
+            while idx < self.entries.length {
+                if self.entries[idx].unlockTime > unlockTime {
+                    break
+                }
+                idx = idx + 1
+            }
+            // insert the new entry
+            self.entries.insert(at: idx, <- create LockingEntry(<- entry, unlockTime))
+        }
+
+        /// Release the unlocked entries
+        ///
+        access(contract)
+        fun releaseUnlockedEntries(force: Bool): @FRC20FTShared.Change? {
+            var unlocked: @FRC20FTShared.Change? <- nil
+            while self.entries.length > 0 && (self.entries[0].isUnlocked() || force == true) {
+                let entry <- self.entries.remove(at: 0)
+                if unlocked == nil {
+                    unlocked <-! entry.extractLockedChange()
+                } else {
+                    unlocked?.merge(from: <- entry.extractLockedChange())
+                }
+                // destroy entry
+                destroy entry
+            }
+            return <- unlocked!
+        }
+
+        /// --- Internal Methods ---
+
+        access(self)
+        view fun borrowLockingEntry(_ idx: Int): &LockingEntry? {
+            if idx >= 0 && idx < self.entries.length {
+                return &self.entries[idx] as &LockingEntry
+            }
+            return nil
+        }
+    }
+
     /// Public resource interface for the Locking Center
     ///
     access(all) resource interface CeneterPublic {
+        /// Get the locked token ticker
+        access(all)
+        view fun getLockedTokenTicker(_ poolAddr: Address): String?
+        /// Get the locked token balance
+        access(all)
+        view fun getLockedTokenBalance(_ poolAddr: Address, _ userAddr: Address): UFix64
+        /// Get the total locked token balance
+        access(all)
+        view fun getTotalLockedTokenBalance(_ poolAddr: Address): UFix64
+        /// Check if the user has joined the pool
+        access(all)
+        view fun isUserJoinedPool(_ poolAddr: Address, _ userAddr: Address): Bool
+        /// Get the user joined pools
+        access(all)
+        view fun getUserJoinedPools(_ userAddr: Address): [Address]
+        /// Check if the user has unlocked entries
+        access(all)
+        view fun hasUnlockedEntries(_ poolAddr: Address, _ userAddr: Address): Bool
+        /// Get the unlocked balance
+        access(all)
+        view fun getUnlockedBalance(_ poolAddr: Address, _ userAddr: Address): UFix64
 
+        // --- Writable ---
+
+        /// Lock the change to the locking center
+        access(contract)
+        fun lock(
+            _ poolAddr: Address,
+            entry: @FRC20FTShared.Change,
+            lockingPeriod: UFix64
+        )
+
+        /// Release the unlocked entries
+        access(contract)
+        fun releaseUnlockedEntries(_ poolAddr: Address, _ userAddr: Address, force: Bool): @FRC20FTShared.Change?
     }
 
     /// Locking Center Resource
     ///
     access(all) resource LockingCenter: CeneterPublic {
+        /// The locking mapping: PoolAddress -> UserAddress -> UserLockingInfo
         access(self)
-        let lockingMapping: @{UInt64: {Address: FRC20FTShared.Change}}
+        let lockingMapping: @{Address: {Address: UserLockingInfo}}
+        /// The joined pools: UserAddress -> [PoolAddress]
+        access(self)
+        let joinedPools: {Address: [Address]}
 
         init() {
             self.lockingMapping <- {}
+            self.joinedPools = {}
         }
 
         destroy() {
             destroy self.lockingMapping
         }
 
-        // ----- Contract Level Methods -----
+        // ------ Implment CeneterPublic ------
+
+        /// Get the locked token ticker
+        ///
+        access(all)
+        view fun getLockedTokenTicker(_ poolAddr: Address): String? {
+            if let pool = FixesTokenLockDrops.borrowDropsPool(poolAddr) {
+                return pool.getLockedTokenTicker()
+            }
+            return nil
+        }
+
+        /// Get the locked token balance
+        ///
+        access(all)
+        view fun getLockedTokenBalance(_ poolAddr: Address, _ userAddr: Address): UFix64 {
+            if let info = self.borrowLockingInfo(poolAddr, userAddr) {
+                return info.getTotalLockedBalance()
+            }
+            return 0.0
+        }
+
+        /// Get the total locked token balance
+        ///
+        access(all)
+        view fun getTotalLockedTokenBalance(_ poolAddr: Address): UFix64 {
+            var total: UFix64 = 0.0
+            if let dictRef = self.borrowLockedDict(poolAddr) {
+                for userAddr in dictRef.keys {
+                    if let infoRef = &dictRef[userAddr] as &UserLockingInfo? {
+                        total = total + infoRef.getTotalLockedBalance()
+                    }
+                }
+            }
+            return total
+        }
+
+        /// Check if the user has joined the pool
+        ///
+        access(all)
+        view fun isUserJoinedPool(_ poolAddr: Address, _ userAddr: Address): Bool {
+            if let dictRef = self.borrowLockedDict(poolAddr) {
+                return dictRef[userAddr] != nil
+            }
+            return false
+        }
+
+        /// Get the user joined pools
+        ///
+        access(all)
+        view fun getUserJoinedPools(_ userAddr: Address): [Address] {
+            return self.joinedPools[userAddr] ?? []
+        }
+
+        /// Check if the user has unlocked entries
+        access(all)
+        view fun hasUnlockedEntries(_ poolAddr: Address, _ userAddr: Address): Bool {
+            if let info = self.borrowLockingInfo(poolAddr, userAddr) {
+                return info.hasUnlockedEntries()
+            }
+            return false
+        }
+
+        /// Get the unlocked balance
+        access(all)
+        view fun getUnlockedBalance(_ poolAddr: Address, _ userAddr: Address): UFix64 {
+            if let info = self.borrowLockingInfo(poolAddr, userAddr) {
+                return info.getUnlockedBalance()
+            }
+            return 0.0
+        }
+
+        /// Lock the change to the locking center
+        access(contract)
+        fun lock(
+            _ poolAddr: Address,
+            entry: @FRC20FTShared.Change,
+            lockingPeriod: UFix64
+        ) {
+            pre {
+                self.getLockedTokenTicker(poolAddr) == entry.tick:
+                    "The locked token ticker is not matched"
+            }
+
+            let userAddr = entry.from
+            let userLockingTicker = entry.tick
+            let userLockingType = entry.isBackedByVault() ? entry.getVaultType() : nil
+            let userLockingAmount = entry.getBalance()
+
+            // check if the pool dict exists
+            if self.lockingMapping[poolAddr] == nil {
+                self.lockingMapping[poolAddr] <-! {}
+            }
+            let poolDict = self.borrowLockedDict(poolAddr) ?? panic("The pool dict is missing")
+
+            // check if the user has joined the pool
+            if poolDict[userAddr] == nil {
+                // create a new user locking info
+                let info <- create UserLockingInfo(userAddr)
+                poolDict[userAddr] <-! info
+            }
+            let userLockingRef = &poolDict[userAddr] as &UserLockingInfo?
+                ?? panic("The user locking info is missing")
+
+            // lock the change
+            userLockingRef.addEntry(<- entry, lockingPeriod)
+
+            // add the pool to the user's joined pools
+            if self.joinedPools[userAddr] == nil {
+                self.joinedPools[userAddr] == []
+            }
+            let userJoinedPools = self.borrowUserJoinedPools(userAddr) ?? panic("The user joined pools is missing")
+            if !userJoinedPools.contains(poolAddr) {
+                userJoinedPools.append(poolAddr)
+            }
+
+            // emit the token locked event
+            emit TokenLocked(
+                poolAddr: poolAddr,
+                userAddr: userAddr,
+                lockedTokenTicker: userLockingTicker,
+                lockedTokenType: userLockingType,
+                lockedAmount: userLockingAmount,
+                lockingPeriod: lockingPeriod,
+                unlockTime: getCurrentBlock().timestamp + lockingPeriod
+            )
+        }
+
+        /// Release the unlocked entries
+        /// - force: this is used to force the release of the unlocked entries, only can be called when the pool is deactivated
+        access(contract)
+        fun releaseUnlockedEntries(_ poolAddr: Address, _ userAddr: Address, force: Bool): @FRC20FTShared.Change? {
+            post {
+                result == nil || result?.tick == self.getLockedTokenTicker(poolAddr): "The locked token ticker is not matched"
+            }
+            let userLockingRef = self.borrowLockingInfo(poolAddr, userAddr)
+                ?? panic("The user locking info is missing")
+
+            if force == true {
+                let pool = FixesTokenLockDrops.borrowDropsPool(poolAddr)
+                    ?? panic("The pool is missing")
+                assert(
+                    pool.isDeactivated(),
+                    message: "The pool is not deactivated"
+                )
+            }
+
+            let unlock <- userLockingRef.releaseUnlockedEntries(force: force)
+
+            // emit the token unlocked event
+            if unlock != nil {
+                emit TokenUnlocked(
+                    poolAddr: poolAddr,
+                    userAddr: userAddr,
+                    lockedTokenTicker: unlock?.tick!,
+                    lockedTokenType: unlock?.isBackedByVault() == true ? unlock?.getVaultType()! : nil,
+                    lockedAmount: unlock?.getBalance() ?? 0.0
+                )
+            }
+            return <- unlock
+        }
 
         // ----- Internal Methods -----
 
+        /// Borrow the locking dict
+        ///
+        access(self)
+        view fun borrowLockedDict(_ poolAddr: Address): &{Address: UserLockingInfo}? {
+            return &self.lockingMapping[poolAddr] as &{Address: UserLockingInfo}?
+        }
+
+        /// Borrow the locked token change
+        ///
+        access(self)
+        view fun borrowLockingInfo(_ poolAddr: Address, _ userAddr: Address): &UserLockingInfo? {
+            if let poolDict = self.borrowLockedDict(poolAddr) {
+                return &poolDict[userAddr] as &UserLockingInfo?
+            }
+            return nil
+        }
+
+        access(self)
+        view fun borrowUserJoinedPools(_ userAddr: Address): &[Address]? {
+            return &self.joinedPools[userAddr] as &[Address]?
+        }
     }
 
     /// Public resource interface for the Drops Pool
@@ -83,6 +481,10 @@ access(all) contract FixesTokenLockDrops {
         /// Check if the pool is active
         access(all)
         view fun isActivated(): Bool
+
+        /// Check if the pool is deactivated
+        access(all)
+        view fun isDeactivated(): Bool
 
         // ----- Token in the drops pool -----
 
@@ -108,7 +510,11 @@ access(all) contract FixesTokenLockDrops {
 
         /// Get the balance of the locked token
         access(all)
-        view fun getLockedTokenBalance(): UFix64
+        view fun getLockedTokenBalance(_ userAddr: Address): UFix64
+
+        /// Get the total locked token balance
+        access(all)
+        view fun getTotalLockedTokenBalance(): UFix64
 
         // --- Writable ---
     }
@@ -131,12 +537,16 @@ access(all) contract FixesTokenLockDrops {
         /// When the pool is activated
         access(self)
         var activateTime: UFix64?
+        /// When the pool is deactivated if the activation fails
+        access(self)
+        var failureDeactivateTime: UFix64?
 
         init(
             _ minter: @{FixesFungibleTokenInterface.IMinter},
             _ lockingTokenTicker: String,
             _ lockingExchangeRates: {UFix64: UFix64},
-            _ activateTime: UFix64?
+            activateTime: UFix64?,
+            failureDeactivateTime: UFix64?
         ) {
             self.minter <- minter
             let vaultData = self.minter.getVaultData()
@@ -144,6 +554,7 @@ access(all) contract FixesTokenLockDrops {
             self.lockingTokenTicker = lockingTokenTicker
             self.lockingExchangeRates = lockingExchangeRates
             self.activateTime = activateTime
+            self.failureDeactivateTime = failureDeactivateTime
         }
 
         // @deprecated in Cadence 1.0
@@ -164,12 +575,30 @@ access(all) contract FixesTokenLockDrops {
             if !isActivated {
                 return false
             }
-            // check if tradaable pool exists
+            // check if tradable pool exists
             // the drops pool is activated only when the tradable pool is initialized but not active
             if let tradablePool = self.borrowRelavantTradablePool() {
                 isActivated = isActivated && tradablePool.isInitialized() && !tradablePool.isLocalActive()
             }
             return isActivated
+        }
+
+        /// Check if the pool is deactivated
+        access(all)
+        view fun isDeactivated(): Bool {
+            var isDeactivated = false
+            if self.failureDeactivateTime != nil {
+                isDeactivated = self.failureDeactivateTime! <= getCurrentBlock().timestamp
+            }
+            if !isDeactivated {
+                return false
+            }
+            // check if tradable pool exists
+            // the drops pool is deactivated only after the tradable pool is active
+            if let tradablePool = self.borrowRelavantTradablePool() {
+                isDeactivated = isDeactivated && tradablePool.isLocalActive()
+            }
+            return isDeactivated
         }
 
         // ----- Token in the drops pool -----
@@ -214,9 +643,17 @@ access(all) contract FixesTokenLockDrops {
 
         /// Get the balance of the locked token
         access(all)
-        view fun getLockedTokenBalance(): UFix64 {
-            // TODO: load from locking center
-            return 0.0
+        view fun getLockedTokenBalance(_ userAddr: Address): UFix64 {
+            let center = FixesTokenLockDrops.borrowLockingCenter()
+            return center.getLockedTokenBalance(self.getPoolAddress(), userAddr)
+        }
+
+        /// Get the total locked token balance
+        //
+        access(all)
+        view fun getTotalLockedTokenBalance(): UFix64 {
+            let center = FixesTokenLockDrops.borrowLockingCenter()
+            return center.getTotalLockedTokenBalance(self.getPoolAddress())
         }
 
         // ------ Implment FixesFungibleTokenInterface.IMinterHolder ------
@@ -276,12 +713,13 @@ access(all) contract FixesTokenLockDrops {
 
     /// Create a new Drops Pool
     ///
-    access(all)
+    access(account)
     fun createDropsPool(
         ins: &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
         _ lockingExchangeRates: {UFix64: UFix64},
-        _ activateTime: UFix64?
+        _ activateTime: UFix64?,
+        _ failureDeactivateTime: UFix64?
     ): @DropsPool {
         pre {
             ins.isExtractable(): "The inscription is not extractable"
@@ -317,7 +755,13 @@ access(all) contract FixesTokenLockDrops {
 
         let tokenType = minter.getTokenType()
         let tokenSymbol = minter.getSymbol()
-        let pool <- create DropsPool(<- minter, lockingTick, lockingExchangeRates, activateTime)
+        let pool <- create DropsPool(
+            <- minter,
+            lockingTick,
+            lockingExchangeRates,
+            activateTime: activateTime,
+            failureDeactivateTime: failureDeactivateTime
+        )
 
         // emit the created event
         emit DropsPoolCreated(
@@ -333,11 +777,12 @@ access(all) contract FixesTokenLockDrops {
     /// Borrow the Locking Center
     ///
     access(all)
-    view fun borrowLockingCenter(_ addr: Address): &LockingCenter{CeneterPublic}? {
+    view fun borrowLockingCenter(): &LockingCenter{CeneterPublic} {
         // @deprecated in Cadence 1.0
-        return getAccount(addr)
+        return getAccount(self.account.address)
             .getCapability<&LockingCenter{CeneterPublic}>(self.getLockingCenterPublicPath())
             .borrow()
+            ?? panic("The Locking Center is missing")
     }
 
     /// Borrow the Drops Pool

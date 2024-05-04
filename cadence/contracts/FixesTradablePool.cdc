@@ -954,7 +954,7 @@ access(all) contract FixesTradablePool {
 
     /// Create a new tradable liquidity pool(bonding curve) resource
     ///
-    access(all)
+    access(account)
     fun createTradableLiquidityPool(
         ins: &Fixes.Inscription,
         _ minter: @AnyResource{FixesFungibleTokenInterface.IMinter},
