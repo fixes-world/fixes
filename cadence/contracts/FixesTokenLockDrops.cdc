@@ -219,7 +219,7 @@ access(all) contract FixesTokenLockDrops {
     access(all) resource interface CeneterPublic {
         /// Get the locked token ticker
         access(all)
-        view fun getLockedTokenTicker(_ poolAddr: Address): String?
+        view fun getLockingTokenTicker(_ poolAddr: Address): String?
         /// Get the locked token balance
         access(all)
         view fun getLockedTokenBalance(_ poolAddr: Address, _ userAddr: Address): UFix64
@@ -278,9 +278,9 @@ access(all) contract FixesTokenLockDrops {
         /// Get the locked token ticker
         ///
         access(all)
-        view fun getLockedTokenTicker(_ poolAddr: Address): String? {
+        view fun getLockingTokenTicker(_ poolAddr: Address): String? {
             if let pool = FixesTokenLockDrops.borrowDropsPool(poolAddr) {
-                return pool.getLockedTokenTicker()
+                return pool.getLockingTokenTicker()
             }
             return nil
         }
@@ -353,7 +353,7 @@ access(all) contract FixesTokenLockDrops {
             lockingPeriod: UFix64
         ) {
             pre {
-                self.getLockedTokenTicker(poolAddr) == entry.tick:
+                self.getLockingTokenTicker(poolAddr) == entry.tick:
                     "The locked token ticker is not matched"
             }
 
@@ -406,7 +406,7 @@ access(all) contract FixesTokenLockDrops {
         access(contract)
         fun releaseUnlockedEntries(_ poolAddr: Address, _ userAddr: Address, force: Bool): @FRC20FTShared.Change? {
             post {
-                result == nil || result?.tick == self.getLockedTokenTicker(poolAddr): "The locked token ticker is not matched"
+                result == nil || result?.tick == self.getLockingTokenTicker(poolAddr): "The locked token ticker is not matched"
             }
             let userLockingRef = self.borrowLockingInfo(poolAddr, userAddr)
                 ?? panic("The user locking info is missing")
@@ -415,7 +415,7 @@ access(all) contract FixesTokenLockDrops {
                 let pool = FixesTokenLockDrops.borrowDropsPool(poolAddr)
                     ?? panic("The pool is missing")
                 assert(
-                    pool.isDeactivated(),
+                    pool.isDeprecated(),
                     message: "The pool is not deactivated"
                 )
             }
@@ -463,7 +463,6 @@ access(all) contract FixesTokenLockDrops {
     /// Public resource interface for the Drops Pool
     ///
     access(all) resource interface DropsPoolPublic {
-
         // ----- Basics -----
 
         /// Get the subject address
@@ -482,9 +481,13 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         view fun isActivated(): Bool
 
+        /// Check if the pool is claimable
+        access(all)
+        view fun isClaimable(): Bool
+
         /// Check if the pool is deactivated
         access(all)
-        view fun isDeactivated(): Bool
+        view fun isDeprecated(): Bool
 
         // ----- Token in the drops pool -----
 
@@ -504,19 +507,88 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         view fun getTokenBalanceInPool(): UFix64
 
-        /// Get the locked token ticker
+        /// Get the total locked token balance
         access(all)
-        view fun getLockedTokenTicker(): String
+        view fun getTotalLockedTokenBalance(): UFix64
 
         /// Get the balance of the locked token
         access(all)
         view fun getLockedTokenBalance(_ userAddr: Address): UFix64
 
-        /// Get the total locked token balance
+        /// Check if the user has unlocked entries
         access(all)
-        view fun getTotalLockedTokenBalance(): UFix64
+        view fun hasUnlockedToken(_ userAddr: Address): Bool
+
+        /// Get the unlocked balance
+        access(all)
+        view fun getUnlockedBalance(_ userAddr: Address): UFix64
+
+        /// Get the claimable amount
+        access(all)
+        view fun getClaimableTokenAmount(_ userAddr: Address): UFix64
+
+        // ----- Locking Parameters -----
+
+        /// Get the locked token ticker
+        access(all)
+        view fun getLockingTokenTicker(): String
+
+        access(all)
+        view fun getLockingPeriods(): [UFix64]
+
+        access(all)
+        view fun getExchangeRate(_ lockingPeriod: UFix64): UFix64
 
         // --- Writable ---
+
+        /// Locking for token drops
+        access(all)
+        fun lockAndMint(
+            _ ins: &Fixes.Inscription,
+            _ lockingVault: @FungibleToken.Vault?,
+        ) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isActivated(): "You can not lock the token when the pool is not activated"
+                !self.isClaimable(): "You can not lock the token when the pool is claimable"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+        }
+
+        /// Claim drops token
+        access(all)
+        fun claimDrops(
+            _ ins: &Fixes.Inscription,
+            recipient: &{FungibleToken.Receiver},
+        ) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isActivated(): "You can not lock the token when the pool is not activated"
+                self.isClaimable(): "You can not claim the token when the pool is not claimable"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+        }
+
+        /// Claim unlocked tokens
+        ///
+        access(all)
+        fun claimUnlockedTokens(
+            _ ins: &Fixes.Inscription,
+            recipient: &{FungibleToken.Receiver}?,
+        ) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                self.isActivated(): "You can not lock the token when the pool is not activated"
+                self.isDeprecated() || self.hasUnlockedToken(ins.owner?.address ?? panic("The owner is missing")): "You can not claim the token when the pool is not deprecated or the user has no unlocked entries"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+        }
     }
 
     /// Drops Pool Resource
@@ -528,6 +600,9 @@ access(all) contract FixesTokenLockDrops {
         // The vault for the token
         access(self)
         let vault: @FungibleToken.Vault
+        // Address => Record
+        access(self)
+        let claimableRecords: {Address: UFix64}
         // The locking pool for the locking token
         access(self)
         let lockingTokenTicker: String
@@ -539,22 +614,23 @@ access(all) contract FixesTokenLockDrops {
         var activateTime: UFix64?
         /// When the pool is deactivated if the activation fails
         access(self)
-        var failureDeactivateTime: UFix64?
+        var failureDeprecatedTime: UFix64?
 
         init(
             _ minter: @{FixesFungibleTokenInterface.IMinter},
             _ lockingTokenTicker: String,
             _ lockingExchangeRates: {UFix64: UFix64},
             activateTime: UFix64?,
-            failureDeactivateTime: UFix64?
+            failureDeprecatedTime: UFix64?
         ) {
             self.minter <- minter
             let vaultData = self.minter.getVaultData()
             self.vault <- vaultData.createEmptyVault()
+            self.claimableRecords = {}
             self.lockingTokenTicker = lockingTokenTicker
             self.lockingExchangeRates = lockingExchangeRates
             self.activateTime = activateTime
-            self.failureDeactivateTime = failureDeactivateTime
+            self.failureDeprecatedTime = failureDeprecatedTime
         }
 
         // @deprecated in Cadence 1.0
@@ -572,33 +648,39 @@ access(all) contract FixesTokenLockDrops {
             if self.activateTime != nil {
                 isActivated = self.activateTime! <= getCurrentBlock().timestamp
             }
-            if !isActivated {
+            return isActivated
+        }
+
+        /// Check if the pool is claimable
+        access(all)
+        view fun isClaimable(): Bool {
+            if !self.isActivated() {
                 return false
             }
             // check if tradable pool exists
             // the drops pool is activated only when the tradable pool is initialized but not active
             if let tradablePool = self.borrowRelavantTradablePool() {
-                isActivated = isActivated && tradablePool.isInitialized() && !tradablePool.isLocalActive()
+                return tradablePool.isInitialized() && !tradablePool.isLocalActive()
             }
-            return isActivated
+            return true
         }
 
         /// Check if the pool is deactivated
         access(all)
-        view fun isDeactivated(): Bool {
-            var isDeactivated = false
-            if self.failureDeactivateTime != nil {
-                isDeactivated = self.failureDeactivateTime! <= getCurrentBlock().timestamp
+        view fun isDeprecated(): Bool {
+            var isDeprecated = false
+            if self.failureDeprecatedTime != nil {
+                isDeprecated = self.failureDeprecatedTime! <= getCurrentBlock().timestamp
             }
-            if !isDeactivated {
+            if !isDeprecated {
                 return false
             }
             // check if tradable pool exists
             // the drops pool is deactivated only after the tradable pool is active
             if let tradablePool = self.borrowRelavantTradablePool() {
-                isDeactivated = isDeactivated && tradablePool.isLocalActive()
+                isDeprecated = isDeprecated && tradablePool.isInitialized() && tradablePool.isLocalActive()
             }
-            return isDeactivated
+            return isDeprecated
         }
 
         // ----- Token in the drops pool -----
@@ -618,9 +700,9 @@ access(all) contract FixesTokenLockDrops {
         /// Get the circulating supply of the token
         access(all)
         view fun getCirculatingSupply(): UFix64 {
-            if !self.isActivated() {
+            if !self.isClaimable() {
                 if let tradablePool = self.borrowRelavantTradablePool() {
-                    return tradablePool.getCirculatingSupply()
+                    return tradablePool.getTradablePoolCirculatingSupply()
                 } else {
                     return self.minter.getTotalSupply()
                 }
@@ -635,10 +717,12 @@ access(all) contract FixesTokenLockDrops {
             return self.vault.balance
         }
 
-        /// Get the locked token ticker
+        /// Get the total locked token balance
+        //
         access(all)
-        view fun getLockedTokenTicker(): String {
-            return self.lockingTokenTicker
+        view fun getTotalLockedTokenBalance(): UFix64 {
+            let center = FixesTokenLockDrops.borrowLockingCenter()
+            return center.getTotalLockedTokenBalance(self.getPoolAddress())
         }
 
         /// Get the balance of the locked token
@@ -648,12 +732,76 @@ access(all) contract FixesTokenLockDrops {
             return center.getLockedTokenBalance(self.getPoolAddress(), userAddr)
         }
 
-        /// Get the total locked token balance
-        //
+        /// Check if the user has unlocked entries
+        ///
         access(all)
-        view fun getTotalLockedTokenBalance(): UFix64 {
+        view fun hasUnlockedToken(_ userAddr: Address): Bool {
             let center = FixesTokenLockDrops.borrowLockingCenter()
-            return center.getTotalLockedTokenBalance(self.getPoolAddress())
+            return center.hasUnlockedEntries(self.getPoolAddress(), userAddr)
+        }
+
+        /// Get the unlocked balance
+        access(all)
+        view fun getUnlockedBalance(_ userAddr: Address): UFix64 {
+            let center = FixesTokenLockDrops.borrowLockingCenter()
+            return center.getUnlockedBalance(self.getPoolAddress(), userAddr)
+        }
+
+        /// Get the claimable amount
+        access(all)
+        view fun getClaimableTokenAmount(_ userAddr: Address): UFix64 {
+            return self.claimableRecords[userAddr] ?? 0.0
+        }
+
+        /// Get the locked token ticker
+        access(all)
+        view fun getLockingTokenTicker(): String {
+            return self.lockingTokenTicker
+        }
+
+        /// Get the locking periods
+        access(all)
+        view fun getLockingPeriods(): [UFix64] {
+            return self.lockingExchangeRates.keys
+        }
+
+        /// Get the exchange rate for the locking period
+        access(all)
+        view fun getExchangeRate(_ lockingPeriod: UFix64): UFix64 {
+            return self.lockingExchangeRates[lockingPeriod] ?? 0.0
+        }
+
+        // ------ Writeable ------
+
+        /// Locking for token drops
+        ///
+        access(all)
+        fun lockAndMint(
+            _ ins: &Fixes.Inscription,
+            _ vault: @FungibleToken.Vault?,
+        ) {
+            let minter = self.borrowMinter()
+            // all FLOW in the inscription is fee
+        }
+
+        /// Claim drops token
+        ///
+        access(all)
+        fun claimDrops(
+            _ ins: &Fixes.Inscription,
+            recipient: &{FungibleToken.Receiver},
+        ) {
+
+        }
+
+        /// Claim unlocked tokens
+        ///
+        access(all)
+        fun claimUnlockedTokens(
+            _ ins: &Fixes.Inscription,
+            recipient: &{FungibleToken.Receiver}?,
+        ) {
+
         }
 
         // ------ Implment FixesFungibleTokenInterface.IMinterHolder ------
@@ -719,7 +867,7 @@ access(all) contract FixesTokenLockDrops {
         _ minter: @{FixesFungibleTokenInterface.IMinter},
         _ lockingExchangeRates: {UFix64: UFix64},
         _ activateTime: UFix64?,
-        _ failureDeactivateTime: UFix64?
+        _ failureDeprecatedTime: UFix64?
     ): @DropsPool {
         pre {
             ins.isExtractable(): "The inscription is not extractable"
@@ -760,7 +908,7 @@ access(all) contract FixesTokenLockDrops {
             lockingTick,
             lockingExchangeRates,
             activateTime: activateTime,
-            failureDeactivateTime: failureDeactivateTime
+            failureDeprecatedTime: failureDeprecatedTime
         )
 
         // emit the created event

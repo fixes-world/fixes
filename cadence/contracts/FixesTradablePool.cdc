@@ -92,7 +92,11 @@ access(all) contract FixesTradablePool {
 
         /// Get the circulating supply of the token
         access(all)
-        view fun getCirculatingSupply(): UFix64
+        view fun getTotalSupply(): UFix64
+
+        /// Get the circulating supply in the tradable pool
+        access(all)
+        view fun getTradablePoolCirculatingSupply(): UFix64
 
         /// Get the balance of the token in liquidity pool
         access(all)
@@ -150,7 +154,7 @@ access(all) contract FixesTradablePool {
         ///
         access(all)
         view fun getTokenMarketCap(): UFix64 {
-            let tokenSupply = self.getCirculatingSupply()
+            let tokenSupply = self.getTotalSupply()
             let tokenPrice = self.getTokenPriceInFlow()
             let flowPrice = FixesTradablePool.getFlowPrice()
             return tokenSupply * tokenPrice * flowPrice
@@ -196,7 +200,7 @@ access(all) contract FixesTradablePool {
                 recipient.getSupportedVaultTypes()[Type<@FlowToken.Vault>()] == true: "The recipient does not support FlowToken.Vault"
             }
             post {
-                before(self.getCirculatingSupply()) == self.getCirculatingSupply() + before(tokenVault.balance): "The circulating supply is not updated"
+                before(self.getTradablePoolCirculatingSupply()) == self.getTradablePoolCirculatingSupply() + before(tokenVault.balance): "The circulating supply is not updated"
             }
         }
 
@@ -217,13 +221,13 @@ access(all) contract FixesTradablePool {
         /// Calculate the price of buying the token based on the amount
         access(all)
         view fun getBuyPrice(_ amount: UFix64): UFix64 {
-            return self.curve.calculatePrice(supply: self.getCirculatingSupply(), amount: amount)
+            return self.curve.calculatePrice(supply: self.getTradablePoolCirculatingSupply(), amount: amount)
         }
 
         /// Calculate the price of selling the token based on the amount
         access(all)
         view fun getSellPrice(_ amount: UFix64): UFix64 {
-            return self.curve.calculatePrice(supply: self.getCirculatingSupply() - amount, amount: amount)
+            return self.curve.calculatePrice(supply: self.getTradablePoolCirculatingSupply() - amount, amount: amount)
         }
 
         /// Calculate the price of buying the token after the subject fee
@@ -247,7 +251,7 @@ access(all) contract FixesTradablePool {
         /// Calculate the amount of tokens that can be bought with the given cost
         access(all)
         view fun getBuyAmount(_ cost: UFix64): UFix64 {
-            return self.curve.calculateAmount(supply: self.getCirculatingSupply(), cost: cost)
+            return self.curve.calculateAmount(supply: self.getTradablePoolCirculatingSupply(), cost: cost)
         }
 
         /// Calculate the amount of tokens that can be bought with the given cost after the subject fee
@@ -405,12 +409,20 @@ access(all) contract FixesTradablePool {
             return minter.getMaxSupply()
         }
 
-        /// Get the circulating supply of the token
+        /// Get the total supply of the token
         access(all)
-        view fun getCirculatingSupply(): UFix64 {
+        view fun getTotalSupply(): UFix64 {
             let minter = self.borrowMinter()
             // The circulating supply is the total supply minus the balance in the vault
-            return minter.getTotalSupply() - self.getTokenBalanceInPool()
+            return minter.getTotalSupply()
+        }
+
+        /// Get the circulating supply in the tradable pool
+        access(all)
+        view fun getTradablePoolCirculatingSupply(): UFix64 {
+            let minter = self.borrowMinter()
+            // The circulating supply is the total supply minus the balance in the vault
+            return minter.getTotalAllowedMintableAmount() - self.getTokenBalanceInPool()
         }
 
         /// Get the balance of the token in liquidity pool
@@ -648,7 +660,7 @@ access(all) contract FixesTradablePool {
                 flowAmount: totalCost,
                 protocolFee: protocolFee,
                 subjectFee: subjectFee,
-                supply: self.getCirculatingSupply()
+                supply: self.getTradablePoolCirculatingSupply()
             )
         }
 
@@ -717,7 +729,7 @@ access(all) contract FixesTradablePool {
                 flowAmount: totalPrice,
                 protocolFee: protocolFee,
                 subjectFee: subjectFee,
-                supply: self.getCirculatingSupply()
+                supply: self.getTradablePoolCirculatingSupply()
             )
         }
 

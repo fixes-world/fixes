@@ -212,12 +212,14 @@ access(all) contract FungibleTokenManager {
         let currentSupply = superMinter.getTotalSupply()
         let grantedSupply = tokenAdminRef.getGrantedMintableAmount()
 
+        let isAdvancedCaller = self.isAdvancedTokenPlayer(callerAddr)
+
         // new minter supply
         let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
         var newGrantedAmount = maxSupplyForNewMinter
         if let supplyStr = meta["supply"] {
             assert(
-                self.isAdvancedTokenPlayer(callerAddr),
+                isAdvancedCaller,
                 message: "You are not eligible to setup custimzed supply amount for the tradable pool"
             )
             newGrantedAmount = UFix64.fromString(supplyStr)
@@ -227,6 +229,13 @@ access(all) contract FungibleTokenManager {
             newGrantedAmount <= maxSupplyForNewMinter && newGrantedAmount > 0.0,
             message: "The supply amount of the tradable pool minter is more than the all unused supply or less than 0.0"
         )
+        // check if the fee percentage is set
+        if let feePerc = meta["feePerc"] {
+            assert(
+                isAdvancedCaller,
+                message: "You are not eligible to setup custimzed fee percentage for the tradable pool"
+            )
+        }
 
         // - Add Tradable Pool Resource
         //   - Add Heartbeat Hook
