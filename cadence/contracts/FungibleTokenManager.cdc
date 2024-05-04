@@ -15,12 +15,13 @@ import "FixesInscriptionFactory"
 import "FixesHeartbeat"
 import "FixesFungibleTokenInterface"
 import "FixesTradablePool"
+import "FixesTokenLockDrops"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
+import "FRC20StakingManager"
 import "FRC20Agents"
 import "FRC20TradingRecord"
-import "FRC20StakingManager"
 
 /// The Manager contract for Fungible Token
 ///
@@ -128,14 +129,20 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun initializeFixesFungibleTokenAccount(
-        ins: &Fixes.Inscription,
+        _ ins: &Fixes.Inscription,
         newAccount: Capability<&AuthAccount>,
     ) {
+        pre {
+            ins.isExtractable(): "The inscription is not extracted"
+        }
+        post {
+            ins.isExtracted(): "The inscription is not extracted"
+        }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = self.verifyExecutingInscription(ins: ins, usage: "init-ft")
+        let meta = self.verifyExecutingInscription(ins, usage: "init-ft")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
         /// Check if the account is already enabled
@@ -175,7 +182,7 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun setupTradablePoolResources(
-        ins: &Fixes.Inscription
+        _ ins: &Fixes.Inscription
     ) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
@@ -187,7 +194,7 @@ access(all) contract FungibleTokenManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = self.verifyExecutingInscription(ins: ins, usage: "setup-tradable-pool")
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
         // try to borrow the account to check if it was created
@@ -195,47 +202,14 @@ access(all) contract FungibleTokenManager {
             ?? panic("The staking account was not created")
 
         // Get the caller address
-        let childAddr = childAcctRef.address
-        let callerAddr = ins.owner!.address
+        let ftContractAddr = childAcctRef.address
 
-        // get the token admin reference
-        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
-        // check if the caller is authorized
-        assert(
-            tokenAdminRef.isAuthorizedUser(callerAddr),
-            message: "You are not authorized to setup the tradable pool resources"
+        // create a new minter from the account
+        let minter <- self._initializeMinter(
+            ins,
+            usage: "setup-tradable-pool",
+            extrafields: ["feePerc"]
         )
-
-        // borrow the super minter
-        let superMinter = tokenAdminRef.borrowSuperMinter()
-        let maxSupply = superMinter.getMaxSupply()
-        let currentSupply = superMinter.getTotalSupply()
-        let grantedSupply = tokenAdminRef.getGrantedMintableAmount()
-
-        let isAdvancedCaller = self.isAdvancedTokenPlayer(callerAddr)
-
-        // new minter supply
-        let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
-        var newGrantedAmount = maxSupplyForNewMinter
-        if let supplyStr = meta["supply"] {
-            assert(
-                isAdvancedCaller,
-                message: "You are not eligible to setup custimzed supply amount for the tradable pool"
-            )
-            newGrantedAmount = UFix64.fromString(supplyStr)
-                ?? panic("The supply amount is not valid")
-        }
-        assert(
-            newGrantedAmount <= maxSupplyForNewMinter && newGrantedAmount > 0.0,
-            message: "The supply amount of the tradable pool minter is more than the all unused supply or less than 0.0"
-        )
-        // check if the fee percentage is set
-        if let feePerc = meta["feePerc"] {
-            assert(
-                isAdvancedCaller,
-                message: "You are not eligible to setup custimzed fee percentage for the tradable pool"
-            )
-        }
 
         // - Add Tradable Pool Resource
         //   - Add Heartbeat Hook
@@ -248,8 +222,6 @@ access(all) contract FungibleTokenManager {
             message: "The tradable pool is already created"
         )
 
-        // create a new minter from the account
-        let minter <- tokenAdminRef.createMinter(allowedAmount: newGrantedAmount)
         // create the tradable pool
         let tradablePool <- FixesTradablePool.createTradableLiquidityPool(
             ins: ins,
@@ -280,10 +252,10 @@ access(all) contract FungibleTokenManager {
 
         // Register to FixesHeartbeat
         let heartbeatScope = "TradablePool"
-        if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: childAcctRef.address) {
+        if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: ftContractAddr) {
             FixesHeartbeat.addHook(
                 scope: heartbeatScope,
-                hookAddr: childAcctRef.address,
+                hookAddr: ftContractAddr,
                 hookPath: poolPublicPath
             )
         }
@@ -305,14 +277,163 @@ access(all) contract FungibleTokenManager {
             childAcctRef.link<&FlowToken.Vault{FungibleToken.Receiver, FungibleToken.Balance}>(fallbackPath, target: /storage/flowTokenVault)
         }
 
-        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: childAddr)
+        // emit the event
+        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: ftContractAddr)
+    }
+
+    access(all)
+    fun initializeLockDrops(
+        _ ins: &Fixes.Inscription,
+        lockingExchangeRates: {UFix64: UFix64},
+    ) {
+        pre {
+            ins.isExtractable(): "The inscription is not extracted"
+        }
+        post {
+            ins.isExtracted(): "The inscription is not extracted"
+        }
+        // singletoken resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = self.verifyExecutingInscription(ins, usage: "setup-lockdrop")
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The staking account was not created")
+
+        // Get the caller address
+        let ftContractAddr = childAcctRef.address
+
+        // create a new minter from the account
+        let minter <- self._initializeMinter(
+            ins,
+            usage: "setup-lockdrops",
+            extrafields: []
+        )
+
+        // - Add Lock Drop Resource
+
+        let lockdropsStoragePath = FixesTokenLockDrops.getDropsPoolStoragePath()
+        assert(
+            childAcctRef.borrow<&AnyResource>(from: lockdropsStoragePath) == nil,
+            message: "The lockdrops pool is already created"
+        )
+
+        var activateTime: UFix64? = nil
+        if let activateAt = meta["activateAt"] {
+            activateTime = UFix64.fromString(activateAt)
+        }
+        var failureDeprecatedTime: UFix64? = nil
+        if let deprecatedAt = meta["deprecatedAt"] {
+            failureDeprecatedTime = UFix64.fromString(deprecatedAt)
+        }
+
+        // create the lockdrops pool
+        let lockdrops <- FixesTokenLockDrops.createDropsPool(
+            ins,
+            <- minter,
+            lockingExchangeRates,
+            activateTime,
+            failureDeprecatedTime
+        )
+        childAcctRef.save(<- lockdrops, to: lockdropsStoragePath)
+
+        // link the lockdrops pool to the public path
+        let lockdropsPublicPath = FixesTokenLockDrops.getDropsPoolPublicPath()
+        // @deprecated in Cadence 1.0
+        childAcctRef.link<&FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(
+            lockdropsPublicPath,
+            target: lockdropsStoragePath
+        )
+
+        // emit the event
+        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: ftContractAddr)
+    }
+
+    access(self)
+    fun _initializeMinter(
+        _ ins: &Fixes.Inscription,
+        usage: String,
+        extrafields: [String]
+    ): @{FixesFungibleTokenInterface.IMinter} {
+        // singletoken resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = self.verifyExecutingInscription(ins, usage: usage)
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The staking account was not created")
+
+        // Get the caller address
+        let ftContractAddr = childAcctRef.address
+        let callerAddr = ins.owner!.address
+
+        // get the token admin reference
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        // check if the caller is authorized
+        assert(
+            tokenAdminRef.isAuthorizedUser(callerAddr),
+            message: "You are not authorized to setup the tradable pool resources"
+        )
+
+        // borrow the super minter
+        let superMinter = tokenAdminRef.borrowSuperMinter()
+        assert(
+            tick == "$".concat(superMinter.getSymbol()),
+            message: "The token symbol is not valid"
+        )
+
+        // calculate the new minter supply
+        let maxSupply = superMinter.getMaxSupply()
+        let currentSupply = superMinter.getTotalSupply()
+        let grantedSupply = tokenAdminRef.getGrantedMintableAmount()
+
+        // check if the caller is advanced
+        let isAdvancedCaller = self.isAdvancedTokenPlayer(callerAddr)
+
+        // new minter supply
+        let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
+        var newGrantedAmount = maxSupplyForNewMinter
+        if let supplyStr = meta["supply"] {
+            assert(
+                isAdvancedCaller,
+                message: "You are not eligible to setup custimzed supply amount for the tradable pool"
+            )
+            newGrantedAmount = UFix64.fromString(supplyStr)
+                ?? panic("The supply amount is not valid")
+        }
+        assert(
+            newGrantedAmount <= maxSupplyForNewMinter && newGrantedAmount > 0.0,
+            message: "The supply amount of the minter is more than the all unused supply or less than 0.0"
+        )
+        var isExtraFieldsExist = false
+        for fields in extrafields {
+            if let value = meta[fields] {
+                isExtraFieldsExist = true
+                break
+            }
+        }
+        /// Check if the caller is eligible to configure the minter with extra fields
+        if isExtraFieldsExist {
+            assert(
+                isAdvancedCaller,
+                message: "You are not eligible to configure the minter with extra fields"
+            )
+        }
+        // create a new minter from the account
+        return <- tokenAdminRef.createMinter(allowedAmount: newGrantedAmount)
     }
 
     /// Enable the FRC20 Fungible Token
     ///
     access(all)
     fun initializeFRC20FungibleTokenAccount(
-        ins: &Fixes.Inscription,
+        _ ins: &Fixes.Inscription,
         newAccount: Capability<&AuthAccount>,
     ) {
         // singletoken resources
@@ -378,7 +499,7 @@ access(all) contract FungibleTokenManager {
     ///
     access(self)
     fun verifyExecutingInscription(
-        ins: &Fixes.Inscription,
+        _ ins: &Fixes.Inscription,
         usage: String
     ): {String: String} {
         // inscription data

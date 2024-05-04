@@ -1087,7 +1087,7 @@ access(all) contract FixesTokenLockDrops {
     ///
     access(account)
     fun createDropsPool(
-        ins: &Fixes.Inscription,
+        _ ins: &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
         _ lockingExchangeRates: {UFix64: UFix64},
         _ activateTime: UFix64?,
