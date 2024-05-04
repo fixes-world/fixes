@@ -45,6 +45,20 @@ access(all) contract FixesTokenLockDrops {
     /// Locking Center Resource
     ///
     access(all) resource LockingCenter: CeneterPublic {
+        access(self)
+        let lockingMapping: @{UInt64: {Address: FRC20FTShared.Change}}
+
+        init() {
+            self.lockingMapping <- {}
+        }
+
+        destroy() {
+            destroy self.lockingMapping
+        }
+
+        // ----- Contract Level Methods -----
+
+        // ----- Internal Methods -----
 
     }
 
@@ -109,8 +123,8 @@ access(all) contract FixesTokenLockDrops {
         access(self)
         let vault: @FungibleToken.Vault
         // The locking pool for the locking token
-        access(contract)
-        let lockedPool: @FRC20FTShared.Change
+        access(self)
+        let lockingTokenTicker: String
         // The locking exchange rates: LockingPeriod -> ExchangeRate
         access(self)
         let lockingExchangeRates: {UFix64: UFix64}
@@ -120,14 +134,14 @@ access(all) contract FixesTokenLockDrops {
 
         init(
             _ minter: @{FixesFungibleTokenInterface.IMinter},
-            _ lockingPool: @FRC20FTShared.Change,
+            _ lockingTokenTicker: String,
             _ lockingExchangeRates: {UFix64: UFix64},
             _ activateTime: UFix64?
         ) {
             self.minter <- minter
             let vaultData = self.minter.getVaultData()
             self.vault <- vaultData.createEmptyVault()
-            self.lockedPool <- lockingPool
+            self.lockingTokenTicker = lockingTokenTicker
             self.lockingExchangeRates = lockingExchangeRates
             self.activateTime = activateTime
         }
@@ -136,7 +150,6 @@ access(all) contract FixesTokenLockDrops {
         destroy() {
             destroy self.minter
             destroy self.vault
-            destroy self.lockedPool
         }
 
         // ------ Implment DropsPoolPublic ------
@@ -196,13 +209,14 @@ access(all) contract FixesTokenLockDrops {
         /// Get the locked token ticker
         access(all)
         view fun getLockedTokenTicker(): String {
-            return self.lockedPool.getOriginalTick()
+            return self.lockingTokenTicker
         }
 
         /// Get the balance of the locked token
         access(all)
         view fun getLockedTokenBalance(): UFix64 {
-            return self.lockedPool.getBalance()
+            // TODO: load from locking center
+            return 0.0
         }
 
         // ------ Implment FixesFungibleTokenInterface.IMinterHolder ------
@@ -216,8 +230,49 @@ access(all) contract FixesTokenLockDrops {
 
     }
 
-
     /// ------ Public Methods ------
+
+    /// Check if the locking tick is supported
+    /// Currently, only three types of lockingTick are supported
+    /// 1. empty string: the token is a flow token
+    /// 2. "@A.xxx.stFlowToken.Vault": the staked flow token, powered by IncrementFi
+    /// 3. "fixes": the frc20 token - fixes
+    ///
+    access(all)
+    view fun isSupportedLockingTick(_ lockingTick: String): Bool {
+        return lockingTick == "" || lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) || lockingTick == "fixes"
+    }
+
+    /// Create an empty change for acceptable locking tick
+    ///
+    access(all)
+    fun createEmptyChangeForLockingTick(_ lockingTick: String, _ from: Address): @FRC20FTShared.Change {
+        // setup empty locking change
+        var emptyChange: @FRC20FTShared.Change? <- nil
+        if lockingTick == "" {
+            // create an empty flow change
+            emptyChange <-! FRC20FTShared.createEmptyFlowChange(from: from)
+        } else if lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
+            // create an empty stFlowToken change
+            let vault <- stFlowToken.createEmptyVault()
+            emptyChange <-! FRC20FTShared.wrapFungibleVaultChange(ftVault: <- vault, from: from)
+        } else if lockingTick == "fixes" {
+            // create an empty fixes change
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            assert(
+                frc20Indexer.getTokenMeta(tick: lockingTick) != nil,
+                message: "The FRC20 token: fixes is not found"
+            )
+            emptyChange <-! FRC20FTShared.createEmptyChange(tick: lockingTick, from: from)
+        } else {
+            panic("The locking ticker name is not supported")
+        }
+
+        if emptyChange == nil {
+            panic("The empty change is not created")
+        }
+        return <- emptyChange!
+    }
 
     /// Create a new Drops Pool
     ///
@@ -252,42 +307,17 @@ access(all) contract FixesTokenLockDrops {
         )
 
         let lockingTick = meta["lockingTick"] ?? panic("The locking ticker name is not found")
-        // Currently, only three types of lockingTick are supported
-        // 1. empty string: the token is a flow token
-        // 2. "@A.xxx.stFlowToken.Vault": the staked flow token, powered by IncrementFi
-        // 3. "fixes": the frc20 token - fixes
+        assert(
+            self.isSupportedLockingTick(lockingTick),
+            message: "The locking ticker name is not supported"
+        )
 
         // execute the inscription
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
 
-        // setup empty locking change
-        var emptyChange: @FRC20FTShared.Change? <- nil
-        if lockingTick == "" {
-            // create an empty flow change
-            emptyChange <-! FRC20FTShared.createEmptyFlowChange(from: minterContractAddr)
-        } else if lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
-            // create an empty stFlowToken change
-            let vault <- stFlowToken.createEmptyVault()
-            emptyChange <-! FRC20FTShared.wrapFungibleVaultChange(ftVault: <- vault, from: minterContractAddr)
-        } else if lockingTick == "fixes" {
-            // create an empty fixes change
-            let frc20Indexer = FRC20Indexer.getIndexer()
-            assert(
-                frc20Indexer.getTokenMeta(tick: lockingTick) != nil,
-                message: "The FRC20 token: fixes is not found"
-            )
-            emptyChange <-! FRC20FTShared.createEmptyChange(tick: lockingTick, from: minterContractAddr)
-        } else {
-            panic("The locking ticker name is not supported")
-        }
-
-        if emptyChange == nil {
-            panic("The empty change is not created")
-        }
-
         let tokenType = minter.getTokenType()
         let tokenSymbol = minter.getSymbol()
-        let pool <- create DropsPool(<- minter, <- emptyChange!, lockingExchangeRates, activateTime)
+        let pool <- create DropsPool(<- minter, lockingTick, lockingExchangeRates, activateTime)
 
         // emit the created event
         emit DropsPoolCreated(
