@@ -977,19 +977,9 @@ access(all) contract FixesTradablePool {
         post {
             ins.isExtracted(): "The inscription is not extracted"
         }
-        // singletons
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        let tick = meta["tick"] ?? panic("The ticker name is not found")
-        assert(
-            acctsPool.getFTContractAddress(tick) != nil,
-            message: "The FungibleToken contract is not found"
-        )
-        assert(
-            tick == "$".concat(minter.getSymbol()),
-            message: "The minter capability address is not the same as the FungibleToken contract"
-        )
+        // execute the inscription
+        let meta = self.verifyAndExecuteInscription(ins, symbol: minter.getSymbol(), usage: "*")
 
         // get the fee percentage from the inscription metadata
         let subjectFeePerc = UFix64.fromString(meta["feePerc"] ?? "0.0") ?? 0.0
@@ -999,9 +989,6 @@ access(all) contract FixesTradablePool {
         let maxSupply = minter.getTotalAllowedMintableAmount()
         // create the bonding curve
         let curve = FixesBondingCurve.Quadratic(freeAmount: freeAmount, maxSupply: maxSupply)
-
-        // execute the inscription
-        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
 
         let tokenType = minter.getTokenType()
         let tokenSymbol = minter.getSymbol()
@@ -1039,6 +1026,46 @@ access(all) contract FixesTradablePool {
         } else {
             BlackHole.vanish(<- vault)
         }
+    }
+
+    /// Verify the inscription for executing the Fungible Token
+    ///
+    access(all)
+    fun verifyAndExecuteInscription(
+        _ ins: &Fixes.Inscription,
+        symbol: String,
+        usage: String
+    ): {String: String} {
+        // borrow the accounts pool
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        // check the operation
+        assert(
+            meta["op"] == "exec",
+            message: "The inscription operation must be 'exec'"
+        )
+        // check the symbol
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+        assert(
+            acctsPool.getFTContractAddress(tick) != nil,
+            message: "The FungibleToken contract is not found"
+        )
+        assert(
+            tick == "$".concat(symbol),
+            message: "The minter's symbol is not matched. Required: $".concat(symbol)
+        )
+        // check the usage
+        let usageInMeta = meta["usage"] ?? panic("The token operation is not found")
+        assert(
+            usageInMeta == usage || usage == "*",
+            message: "The inscription is not for initialize a Fungible Token account"
+        )
+        // execute the inscription
+        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
+        // return the metadata
+        return meta
     }
 
     /// Get the flow price from IncrementFi Oracle

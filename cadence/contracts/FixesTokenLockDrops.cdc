@@ -66,10 +66,11 @@ access(all) contract FixesTokenLockDrops {
     )
 
     // emitted when a new Drops Pool is created
-    access(all) event DropsPoolCreated(
+    access(all) event LockDropsPoolCreated(
         lockingToken: String,
         dropsTokenType: Type,
         dropsTokenSymbol: String,
+        minterGrantedAmount: UFix64,
         createdBy: Address
     )
 
@@ -841,7 +842,7 @@ access(all) contract FixesTokenLockDrops {
                 )
                 locking.merge(from: <- FRC20FTShared.wrapFungibleVaultChange(ftVault: <- lockingVault!, from: callerAddr))
                 // execute the inscription
-                FixesTokenLockDrops.verifyAndExecuteInscription(
+                FixesTradablePool.verifyAndExecuteInscription(
                     ins,
                     symbol: minter.getSymbol(),
                     usage: "lock-drop"
@@ -987,7 +988,7 @@ access(all) contract FixesTokenLockDrops {
                     frc20Indexer.returnChange(change: <- releasedEntry)
                 }
                 // execute the inscription
-                FixesTokenLockDrops.verifyAndExecuteInscription(
+                FixesTradablePool.verifyAndExecuteInscription(
                     ins,
                     symbol: self.minter.getSymbol(),
                     usage: "claim-unlocked"
@@ -1051,38 +1052,6 @@ access(all) contract FixesTokenLockDrops {
         return <- emptyChange!
     }
 
-    /// Verify the inscription for executing the Fungible Token
-    ///
-    access(contract)
-    fun verifyAndExecuteInscription(
-        _ ins: &Fixes.Inscription,
-        symbol: String,
-        usage: String
-    ) {
-        // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        // check the operation
-        assert(
-            meta["op"] == "exec",
-            message: "The inscription operation must be 'exec'"
-        )
-        // check the symbol
-        let tick = meta["tick"] ?? panic("The token symbol is not found")
-        assert(
-            tick == "$".concat(symbol),
-            message: "The minter's symbol is not matched. Required: $".concat(symbol)
-        )
-        // check the usage
-        let usageInMeta = meta["usage"] ?? panic("The token operation is not found")
-        assert(
-            usageInMeta == usage || usage == "*",
-            message: "The inscription is not for initialize a Fungible Token account"
-        )
-        // execute the inscription
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
-    }
-
     /// Create a new Drops Pool
     ///
     access(account)
@@ -1099,21 +1068,12 @@ access(all) contract FixesTokenLockDrops {
         post {
             ins.isExtracted(): "The inscription is not extracted"
         }
-        // singletons
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        let tick = meta["tick"] ?? panic("The ticker name is not found")
-        let ftContractAddr = acctsPool.getFTContractAddress(tick)
-            ?? panic("The FungibleToken contract is not found")
-        let minterContractAddr = minter.getContractAddress()
-        assert(
-            ftContractAddr == minterContractAddr,
-            message: "The FungibleToken contract is not found"
-        )
-        assert(
-            tick == "$".concat(minter.getSymbol()),
-            message: "The minter capability address is not the same as the FungibleToken contract"
+        // verify the inscription and get the meta data
+        let meta =  FixesTradablePool.verifyAndExecuteInscription(
+            ins,
+            symbol: minter.getSymbol(),
+            usage: "*"
         )
 
         let lockingTick = meta["lockingTick"] ?? panic("The locking ticker name is not found")
@@ -1122,11 +1082,9 @@ access(all) contract FixesTokenLockDrops {
             message: "The locking ticker name is not supported"
         )
 
-        // execute the inscription
-        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
-
         let tokenType = minter.getTokenType()
         let tokenSymbol = minter.getSymbol()
+        let grantedAmount = minter.getCurrentMintableAmount()
         let pool <- create DropsPool(
             <- minter,
             lockingTick,
@@ -1136,10 +1094,11 @@ access(all) contract FixesTokenLockDrops {
         )
 
         // emit the created event
-        emit DropsPoolCreated(
+        emit LockDropsPoolCreated(
             lockingToken: lockingTick,
             dropsTokenType: tokenType,
             dropsTokenSymbol: tokenSymbol,
+            minterGrantedAmount: grantedAmount,
             createdBy: ins.owner?.address ?? panic("The inscription owner is missing")
         )
 
