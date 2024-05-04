@@ -437,6 +437,7 @@
 			"source": "mainnet://1d7e57aa55817448.MetadataViews",
 			"hash": "8d605dbd8135085aa9e8bb0604ff67ddb24f70c9368c0be7673efaaa17fcfc8f",
 			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
 				"testnet": "631e88ae7f1d7c20"
 			}
@@ -468,6 +469,7 @@
 			"source": "mainnet://1d7e57aa55817448.NonFungibleToken",
 			"hash": "cdd73be33e303af8e2658bca8a6c1a24494e492e4dc577dbeef14113f04b1ce1",
 			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
 				"testnet": "631e88ae7f1d7c20"
 			}
@@ -587,6 +589,7 @@
 			"source": "mainnet://1d7e57aa55817448.ViewResolver",
 			"hash": "9fa41186f38899625a6b4774f1a9addf8d16b76022d52a99174b4493499dc3de",
 			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
 				"testnet": "631e88ae7f1d7c20"
 			}
@@ -597,6 +600,14 @@
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
 				"testnet": "0b86f928a1fa7798"
+			}
+		},
+		"stFlowToken": {
+			"source": "mainnet://d6f80565193ad727.stFlowToken",
+			"hash": "2d38c56cf7e78ebc19e92b1c603c9b21a49f0f30cbff92af4f80e209759b5f4e",
+			"aliases": {
+				"mainnet": "d6f80565193ad727",
+				"testnet": "e45c64ecfe31e465"
 			}
 		}
 	},
@@ -680,6 +691,7 @@
 				"CapabilityDelegator",
 				"CapabilityFilter",
 				"CapabilityFactory",
+				"stFlowToken",
 				"SwapConfig",
 				"SwapInterfaces",
 				"SwapFactory",

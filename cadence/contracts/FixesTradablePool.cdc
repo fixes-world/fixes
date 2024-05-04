@@ -64,9 +64,13 @@ access(all) contract FixesTradablePool {
 
         /// Get the subject address
         access(all)
-        view fun getSubjectAddress(): Address {
+        view fun getPoolAddress(): Address {
             return self.owner?.address ?? panic("The owner is missing")
         }
+
+        /// Check if the liquidity pool is initialized
+        access(all)
+        view fun isInitialized(): Bool
 
         /// Check if the liquidity pool is active
         access(all)
@@ -164,6 +168,7 @@ access(all) contract FixesTradablePool {
             recipient: &{FungibleToken.Receiver},
         ) {
             pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
                 self.isLocalActive(): "The liquidity pool is not active"
                 ins.isExtractable(): "The inscription is not extractable"
                 ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
@@ -183,6 +188,7 @@ access(all) contract FixesTradablePool {
             recipient: &{FungibleToken.Receiver},
         ) {
             pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
                 self.isLocalActive(): "The liquidity pool is not active"
                 tokenVault.isInstance(self.getTokenType()): "The token vault is not the same type as the liquidity pool"
                 tokenVault.balance > 0.0: "The token vault balance must be greater than 0"
@@ -328,21 +334,21 @@ access(all) contract FixesTradablePool {
             pre {
                 self.acitve == false: "Tradable Pool is active"
                 self.vault.balance == 0.0: "Token vault should be zero"
+                self.minter.getCurrentMintableAmount() > 0.0: "The mint amount must be greater than 0"
+            }
+            post {
+                self.minter.getCurrentMintableAmount() == 0.0: "The mint amount must be zero"
             }
 
             let minter = self.borrowMinter()
             let totalMintAmount = minter.getCurrentMintableAmount()
-            assert(
-                totalMintAmount > 0.0,
-                message: "The mint amount must be less than or equal to the unsupplied amount"
-            )
             let newVault <- minter.mintTokens(amount: totalMintAmount)
             self.vault.deposit(from: <- newVault)
             self.acitve = true
 
             // Emit the event
             emit LiquidityPoolInitialized(
-                subject: self.getSubjectAddress(),
+                subject: self.getPoolAddress(),
                 tokenType: self.getTokenType(),
                 mintedAmount: totalMintAmount
             )
@@ -361,12 +367,18 @@ access(all) contract FixesTradablePool {
 
             // Emit the event
             emit LiquidityPoolSubjectFeePercentageChanged(
-                subject: self.getSubjectAddress(),
+                subject: self.getPoolAddress(),
                 subjectFeePercentage: subjectFeePerc
             )
         }
 
         // ------ Implement LiquidityPoolInterface -----
+
+        /// Check if the liquidity pool is initialized
+        access(all)
+        view fun isInitialized(): Bool {
+            return self.minter.getCurrentMintableAmount() == 0.0
+        }
 
         /// Check if the liquidity pool is active
         access(all)
@@ -427,8 +439,10 @@ access(all) contract FixesTradablePool {
                 return self.getBuyPrice(1.0)
             } else {
                 let pairRef = self.borrowSwapPairRef()
-                    ?? panic("The swap pair reference is missing")
-                let pairInfo = pairRef.getPairInfo()
+                if pairRef == nil {
+                    return 0.0
+                }
+                let pairInfo = pairRef!.getPairInfo()
                 let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
 
                 var reserve0 = 0.0
@@ -452,8 +466,10 @@ access(all) contract FixesTradablePool {
                 return 0.0
             } else {
                 let pairRef = self.borrowSwapPairRef()
-                    ?? panic("The swap pair reference is missing")
-                let pairInfo = pairRef.getPairInfo()
+                if pairRef == nil {
+                    return 0.0
+                }
+                let pairInfo = pairRef!.getPairInfo()
                 let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
 
                 var reserve0 = 0.0
@@ -574,7 +590,7 @@ access(all) contract FixesTradablePool {
             }
             if subjectFee > 0.0 {
                 let subjectFeeVault <- payment.withdraw(amount: subjectFee)
-                let subjectFeeReceiverRef = Fixes.borrowFlowTokenReceiver(self.getSubjectAddress())
+                let subjectFeeReceiverRef = Fixes.borrowFlowTokenReceiver(self.getPoolAddress())
                     ?? panic("The subject does not have a FlowTokenReceiver capability")
                 subjectFeeReceiverRef.deposit(from: <- subjectFeeVault)
             }
@@ -610,7 +626,7 @@ access(all) contract FixesTradablePool {
 
             // emit the trade event
             let tickerName = "$".concat(minter.getSymbol())
-            let poolAddr = self.getSubjectAddress()
+            let poolAddr = self.getPoolAddress()
             let traderAddr = recipient.owner?.address ?? insOwner
 
             // invoke the transaction hook
@@ -626,7 +642,7 @@ access(all) contract FixesTradablePool {
             emit Trade(
                 trader: traderAddr,
                 isBuy: true,
-                subject: self.getSubjectAddress(),
+                subject: self.getPoolAddress(),
                 ticker: minter.getSymbol(),
                 tokenAmount: buyAmount,
                 flowAmount: totalCost,
@@ -667,7 +683,7 @@ access(all) contract FixesTradablePool {
             // withdraw the subject fee from the flow vault
             if subjectFee > 0.0 {
                 let subjectFeeVault <- self.flowVault.withdraw(amount: subjectFee)
-                let subjectFeeReceiverRef = Fixes.borrowFlowTokenReceiver(self.getSubjectAddress())
+                let subjectFeeReceiverRef = Fixes.borrowFlowTokenReceiver(self.getPoolAddress())
                     ?? panic("The subject does not have a FlowTokenReceiver capability")
                 subjectFeeReceiverRef.deposit(from: <- subjectFeeVault)
             }
@@ -680,7 +696,7 @@ access(all) contract FixesTradablePool {
 
             // emit the trade event
             let tickerName = "$".concat(minter.getSymbol())
-            let poolAddr = self.getSubjectAddress()
+            let poolAddr = self.getPoolAddress()
             let traderAddr = recipient.owner?.address ?? panic("The recipient owner is missing")
 
             // invoke the transaction hook
@@ -695,7 +711,7 @@ access(all) contract FixesTradablePool {
             emit Trade(
                 trader: traderAddr,
                 isBuy: false,
-                subject: self.getSubjectAddress(),
+                subject: self.getPoolAddress(),
                 ticker: minter.getSymbol(),
                 tokenAmount: tokenAmount,
                 flowAmount: totalPrice,
@@ -727,7 +743,7 @@ access(all) contract FixesTradablePool {
             // -- Record trading Volume
 
             // for TradablePool hook
-            let poolAddr = self.getSubjectAddress()
+            let poolAddr = self.getPoolAddress()
             // Buyer or Seller should be the pool address
             assert(
                 buyer == poolAddr || seller == poolAddr,
@@ -906,7 +922,7 @@ access(all) contract FixesTradablePool {
 
             // emit the liquidity pool transferred event
             emit LiquidityPoolTransferred(
-                subject: self.getSubjectAddress(),
+                subject: self.getPoolAddress(),
                 pairAddr: pairAddr!,
                 tokenType: self.getTokenType(),
                 tokenAmount: token0Amount,

@@ -9,9 +9,15 @@ It allows users to lock their frc20/fungible tokens for a certain period of time
 
 */
 import "FungibleToken"
+import "FlowToken"
+import "stFlowToken"
+// FIXeS imports
 import "Fixes"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
+import "FixesTradablePool"
+import "FRC20Indexer"
+import "FRC20FTShared"
 import "FRC20AccountsPool"
 
 /// The contract definition
@@ -20,6 +26,13 @@ access(all) contract FixesTokenLockDrops {
 
     // ------ Events -------
 
+    // emitted when a new Drops Pool is created
+    access(all) event DropsPoolCreated(
+        lockingToken: String,
+        dropsTokenType: Type,
+        dropsTokenSymbol: String,
+        createdBy: Address
+    )
 
     /// -------- Resources and Interfaces --------
 
@@ -39,11 +52,166 @@ access(all) contract FixesTokenLockDrops {
     ///
     access(all) resource interface DropsPoolPublic {
 
+        // ----- Basics -----
+
+        /// Get the subject address
+        access(all)
+        view fun getPoolAddress(): Address {
+            return self.owner?.address ?? panic("The owner is missing")
+        }
+
+        // Borrow the tradable pool
+        access(all)
+        view fun borrowRelavantTradablePool(): &FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface}? {
+            return FixesTradablePool.borrowTradablePool(self.getPoolAddress())
+        }
+
+        /// Check if the pool is active
+        access(all)
+        view fun isActivated(): Bool
+
+        // ----- Token in the drops pool -----
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type
+
+        /// Get the max supply of the token
+        access(all)
+        view fun getMaxSupply(): UFix64
+
+        /// Get the circulating supply of the token
+        access(all)
+        view fun getCirculatingSupply(): UFix64
+
+        /// Get the balance of the token in pool
+        access(all)
+        view fun getTokenBalanceInPool(): UFix64
+
+        /// Get the locked token ticker
+        access(all)
+        view fun getLockedTokenTicker(): String
+
+        /// Get the balance of the locked token
+        access(all)
+        view fun getLockedTokenBalance(): UFix64
+
     }
 
     /// Drops Pool Resource
     ///
-    access(all) resource DropsPool: DropsPoolPublic {
+    access(all) resource DropsPool: DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder {
+        // The minter of the token
+        access(self)
+        let minter: @{FixesFungibleTokenInterface.IMinter}
+        // The vault for the token
+        access(self)
+        let vault: @FungibleToken.Vault
+        // The locking pool for the locking token
+        access(self)
+        let lockedPool: @FRC20FTShared.Change
+        // The locking exchange rates: LockingPeriod -> ExchangeRate
+        access(self)
+        let lockingExchangeRates: {UFix64: UFix64}
+        /// When the pool is activated
+        access(self)
+        var activateTime: UFix64?
+
+        init(
+            _ minter: @{FixesFungibleTokenInterface.IMinter},
+            _ lockingPool: @FRC20FTShared.Change,
+            _ lockingExchangeRates: {UFix64: UFix64},
+            _ activateTime: UFix64?
+        ) {
+            self.minter <- minter
+            let vaultData = self.minter.getVaultData()
+            self.vault <- vaultData.createEmptyVault()
+            self.lockedPool <- lockingPool
+            self.lockingExchangeRates = lockingExchangeRates
+            self.activateTime = activateTime
+        }
+
+        // @deprecated in Cadence 1.0
+        destroy() {
+            destroy self.minter
+            destroy self.vault
+            destroy self.lockedPool
+        }
+
+        // ------ Implment DropsPoolPublic ------
+
+        /// Check if the pool is active
+        access(all)
+        view fun isActivated(): Bool {
+            var isActivated = true
+            if self.activateTime != nil {
+                isActivated = self.activateTime! <= getCurrentBlock().timestamp
+            }
+            if !isActivated {
+                return false
+            }
+            // check if tradaable pool exists
+            // the drops pool is activated only when the tradable pool is initialized but not active
+            if let tradablePool = self.borrowRelavantTradablePool() {
+                isActivated = isActivated && tradablePool.isInitialized() && !tradablePool.isLocalActive()
+            }
+            return isActivated
+        }
+
+        // ----- Token in the drops pool -----
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type {
+            return self.minter.getTokenType()
+        }
+
+        /// Get the max supply of the token
+        access(all)
+        view fun getMaxSupply(): UFix64 {
+            return self.minter.getMaxSupply()
+        }
+
+        /// Get the circulating supply of the token
+        access(all)
+        view fun getCirculatingSupply(): UFix64 {
+            if !self.isActivated() {
+                if let tradablePool = self.borrowRelavantTradablePool() {
+                    return tradablePool.getCirculatingSupply()
+                } else {
+                    return self.minter.getTotalSupply()
+                }
+            } else {
+                return self.minter.getTotalSupply() - self.getTokenBalanceInPool()
+            }
+        }
+
+        /// Get the balance of the token in pool
+        access(all)
+        view fun getTokenBalanceInPool(): UFix64 {
+            return self.vault.balance
+        }
+
+        /// Get the locked token ticker
+        access(all)
+        view fun getLockedTokenTicker(): String {
+            return self.lockedPool.getOriginalTick()
+        }
+
+        /// Get the balance of the locked token
+        access(all)
+        view fun getLockedTokenBalance(): UFix64 {
+            return self.lockedPool.getBalance()
+        }
+
+        // ------ Implment FixesFungibleTokenInterface.IMinterHolder ------
+
+        access(contract)
+        view fun borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {
+            return &self.minter as &AnyResource{FixesFungibleTokenInterface.IMinter}
+        }
+
+        // ----- Internal Methods -----
 
     }
 
@@ -56,6 +224,8 @@ access(all) contract FixesTokenLockDrops {
     fun createDropsPool(
         ins: &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
+        _ lockingExchangeRates: {UFix64: UFix64},
+        _ activateTime: UFix64?
     ): @DropsPool {
         pre {
             ins.isExtractable(): "The inscription is not extractable"
@@ -68,8 +238,9 @@ access(all) contract FixesTokenLockDrops {
 
         let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let tick = meta["tick"] ?? panic("The ticker name is not found")
+        let ftContractAddr = acctsPool.getFTContractAddress(tick)
         assert(
-            acctsPool.getFTContractAddress(tick) != nil,
+            ftContractAddr != nil,
             message: "The FungibleToken contract is not found"
         )
         assert(
@@ -77,21 +248,73 @@ access(all) contract FixesTokenLockDrops {
             message: "The minter capability address is not the same as the FungibleToken contract"
         )
 
+        let lockingTick = meta["lockingTick"] ?? panic("The locking ticker name is not found")
+        // Currently, only three types of lockingTick are supported
+        // 1. empty string: the token is a flow token
+        // 2. "@A.xxx.stFlowToken.Vault": the staked flow token, powered by IncrementFi
+        // 3. "fixes": the frc20 token - fixes
+
         // execute the inscription
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
 
-        let pool <- create DropsPool()
+        // setup empty locking change
+        var emptyChange: @FRC20FTShared.Change? <- nil
+        if lockingTick == "" {
+            // create an empty flow change
+            emptyChange <-! FRC20FTShared.createEmptyFlowChange(from: ftContractAddr!)
+        } else if lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
+            // create an empty stFlowToken change
+            let vault <- stFlowToken.createEmptyVault()
+            emptyChange <-! FRC20FTShared.wrapFungibleVaultChange(ftVault: <- vault, from: ftContractAddr!)
+        } else if lockingTick == "fixes" {
+            // create an empty fixes change
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            assert(
+                frc20Indexer.getTokenMeta(tick: lockingTick) != nil,
+                message: "The FRC20 token: fixes is not found"
+            )
+            emptyChange <-! FRC20FTShared.createEmptyChange(tick: lockingTick, from: ftContractAddr!)
+        } else {
+            panic("The locking ticker name is not supported")
+        }
+
+        if emptyChange == nil {
+            panic("The empty change is not created")
+        }
 
         let tokenType = minter.getTokenType()
         let tokenSymbol = minter.getSymbol()
+        let pool <- create DropsPool(<- minter, <- emptyChange!, lockingExchangeRates, activateTime)
 
         // emit the created event
-        // emit DropsPoolCreated(
-        //     tokenType: tokenType,
-        //     createdBy: ins.owner?.address ?? panic("The inscription owner is missing")
-        // )
+        emit DropsPoolCreated(
+            lockingToken: lockingTick,
+            dropsTokenType: tokenType,
+            dropsTokenSymbol: tokenSymbol,
+            createdBy: ins.owner?.address ?? panic("The inscription owner is missing")
+        )
 
         return <- pool
+    }
+
+    /// Borrow the Locking Center
+    ///
+    access(all)
+    view fun borrowLockingCenter(_ addr: Address): &LockingCenter{CeneterPublic}? {
+        // @deprecated in Cadence 1.0
+        return getAccount(addr)
+            .getCapability<&LockingCenter{CeneterPublic}>(self.getLockingCenterPublicPath())
+            .borrow()
+    }
+
+    /// Borrow the Drops Pool
+    ///
+    access(all)
+    view fun borrowDropsPool(_ addr: Address): &DropsPool{DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}? {
+        // @deprecated in Cadence 1.0
+        return getAccount(addr)
+            .getCapability<&DropsPool{DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getDropsPoolPublicPath())
+            .borrow()
     }
 
     /// Get the prefix for the storage paths
@@ -134,6 +357,10 @@ access(all) contract FixesTokenLockDrops {
     }
 
     init() {
-        // Create the Locking Center
+        self.account.save(<- create LockingCenter(), to: self.getLockingCenterStoragePath())
+        self.account.link<&LockingCenter{CeneterPublic}>(
+            self.getLockingCenterPublicPath(),
+            target: self.getLockingCenterStoragePath()
+        )
     }
 }
