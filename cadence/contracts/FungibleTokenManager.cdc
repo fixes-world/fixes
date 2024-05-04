@@ -109,9 +109,19 @@ access(all) contract FungibleTokenManager {
     /// Check if the Fungible Token Symbol is already enabled
     ///
     access(all)
-    view fun isTokenSymbolEnabled(tick: String): Bool {
+    view fun isTokenSymbolEnabled(_ tick: String): Bool {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         return acctsPool.getFTContractAddress(tick) != nil
+    }
+
+    /// Check if the caller is an advanced token player(by staked $flows)
+    ///
+    access(all)
+    view fun isAdvancedTokenPlayer(_ addr: Address): Bool {
+        let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+        // the threshold is 100K staked $flows
+        let threshold = 100_000.0
+        return FRC20StakingManager.isEligibleByStakePower(stakeTick: stakeTick, addr: addr, threshold: threshold)
     }
 
     /// Enable the Fixes Fungible Token
@@ -206,9 +216,8 @@ access(all) contract FungibleTokenManager {
         let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
         var newGrantedAmount = maxSupplyForNewMinter
         if let supplyStr = meta["supply"] {
-            let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
             assert(
-                FRC20StakingManager.isEligibleForRegistering(stakeTick: stakeTick, addr: callerAddr),
+                self.isAdvancedTokenPlayer(callerAddr),
                 message: "You are not eligible to setup custimzed supply amount for the tradable pool"
             )
             newGrantedAmount = UFix64.fromString(supplyStr)

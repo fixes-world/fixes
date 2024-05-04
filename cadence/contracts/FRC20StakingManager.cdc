@@ -488,15 +488,23 @@ access(all) contract FRC20StakingManager {
         // borrow the staking pool
         let pool = FRC20Staking.borrowPool(poolAddress)
             ?? panic("The staking pool is not found")
+        let totalStakedBalance = pool.getDetails().totalStaked
+                // if the controller staked more than 10% of the total staked tokens, then it is valid
+        return self.isEligibleByStakePower(stakeTick: stakeTick, addr: addr, threshold: totalStakedBalance * 0.1)
+    }
+
+    /// Check if the given address is eligible by stake power
+    ///
+    access(all)
+    view fun isEligibleByStakePower(stakeTick: String, addr: Address, threshold: UFix64): Bool {
         // Check if the controller is whitelisted or staked enough tokens
         var isValid = self.isWhitelisted(addr)
         // Check if the controller is staked enough tokens
         if !isValid {
             if let delegator = FRC20Staking.borrowDelegator(addr) {
-                let totalStakedBalance = pool.getDetails().totalStaked
                 let controllerStakedBalance = delegator.getStakedBalance(tick: stakeTick)
                 // if the controller staked more than 10% of the total staked tokens, then it is valid
-                isValid = controllerStakedBalance >= totalStakedBalance * 0.1
+                isValid = controllerStakedBalance >= threshold
             }
         }
         return isValid

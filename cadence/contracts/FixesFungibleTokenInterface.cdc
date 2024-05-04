@@ -269,6 +269,10 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTokenType(): Type
 
+        /// Get the contract address of the minting token
+        access(all)
+        view fun getContractAddress(): Address
+
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64
@@ -317,6 +321,7 @@ access(all) contract interface FixesFungibleTokenInterface {
                 ins.isExtractable(): "The inscription must be extractable"
             }
             post {
+                ins.isExtracted(): "The inscription must be extracted"
                 vault.getType() == result.getType(): "The vault type must be the same"
                 vault.balance == result.balance: "The vault balance must be the same"
             }

@@ -96,6 +96,7 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         view fun getLockedTokenBalance(): UFix64
 
+        // --- Writable ---
     }
 
     /// Drops Pool Resource
@@ -108,7 +109,7 @@ access(all) contract FixesTokenLockDrops {
         access(self)
         let vault: @FungibleToken.Vault
         // The locking pool for the locking token
-        access(self)
+        access(contract)
         let lockedPool: @FRC20FTShared.Change
         // The locking exchange rates: LockingPeriod -> ExchangeRate
         access(self)
@@ -239,8 +240,10 @@ access(all) contract FixesTokenLockDrops {
         let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let tick = meta["tick"] ?? panic("The ticker name is not found")
         let ftContractAddr = acctsPool.getFTContractAddress(tick)
+            ?? panic("The FungibleToken contract is not found")
+        let minterContractAddr = minter.getContractAddress()
         assert(
-            ftContractAddr != nil,
+            ftContractAddr == minterContractAddr,
             message: "The FungibleToken contract is not found"
         )
         assert(
@@ -261,11 +264,11 @@ access(all) contract FixesTokenLockDrops {
         var emptyChange: @FRC20FTShared.Change? <- nil
         if lockingTick == "" {
             // create an empty flow change
-            emptyChange <-! FRC20FTShared.createEmptyFlowChange(from: ftContractAddr!)
+            emptyChange <-! FRC20FTShared.createEmptyFlowChange(from: minterContractAddr)
         } else if lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
             // create an empty stFlowToken change
             let vault <- stFlowToken.createEmptyVault()
-            emptyChange <-! FRC20FTShared.wrapFungibleVaultChange(ftVault: <- vault, from: ftContractAddr!)
+            emptyChange <-! FRC20FTShared.wrapFungibleVaultChange(ftVault: <- vault, from: minterContractAddr)
         } else if lockingTick == "fixes" {
             // create an empty fixes change
             let frc20Indexer = FRC20Indexer.getIndexer()
@@ -273,7 +276,7 @@ access(all) contract FixesTokenLockDrops {
                 frc20Indexer.getTokenMeta(tick: lockingTick) != nil,
                 message: "The FRC20 token: fixes is not found"
             )
-            emptyChange <-! FRC20FTShared.createEmptyChange(tick: lockingTick, from: ftContractAddr!)
+            emptyChange <-! FRC20FTShared.createEmptyChange(tick: lockingTick, from: minterContractAddr)
         } else {
             panic("The locking ticker name is not supported")
         }

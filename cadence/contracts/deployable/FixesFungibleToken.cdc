@@ -617,6 +617,12 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return Type<@FixesFungibleToken.Vault>()
         }
 
+        /// Get the contract address of the minting token
+        access(all)
+        view fun getContractAddress(): Address {
+            return FixesFungibleToken.getAccountAddress()
+        }
+
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64 {
