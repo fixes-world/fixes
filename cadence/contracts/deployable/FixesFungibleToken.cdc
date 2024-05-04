@@ -310,29 +310,31 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
 
             // check the deposit tax, if exists then charge the tax
-            if let depositTax = self.borrowMergeableDataRef(Type<FixesAssetMeta.DepositTax>())  {
-                let isEnabled = (depositTax.getValue("enabled") as? Bool) == true
-                let tax = FixesFungibleToken.getDepositTaxRatio()
-                let taxReceiver = FixesFungibleToken.getDepositTaxRecepient()
-                if isEnabled && tax > 0.0 && self.owner?.address != taxReceiver {
-                    let taxAmount = vault.balance * tax
-                    let taxVault <- vault.withdraw(amount: taxAmount)
-                    if taxReceiver != nil && FixesFungibleToken.borrowVaultReceiver(taxReceiver!) != nil {
-                        let receiverRef = FixesFungibleToken.borrowVaultReceiver(taxReceiver!)!
-                        receiverRef.deposit(from: <- taxVault)
-                    } else {
-                        // Send to the black hole instead of destroying.
-                        // This can keep the totalSupply unchanged (In theory).
-                        if BlackHole.isAnyBlackHoleAvailable() {
-                            BlackHole.vanish(<- taxVault)
+            let tax = FixesFungibleToken.getDepositTaxRatio()
+            if tax > 0.0 {
+                if let depositTax = self.borrowMergeableDataRef(Type<FixesAssetMeta.DepositTax>())  {
+                    let isEnabled = (depositTax.getValue("enabled") as? Bool) == true
+                    let taxReceiver = FixesFungibleToken.getDepositTaxRecepient()
+                    if isEnabled && self.owner?.address != taxReceiver {
+                        let taxAmount = vault.balance * tax
+                        let taxVault <- vault.withdraw(amount: taxAmount)
+                        if taxReceiver != nil && FixesFungibleToken.borrowVaultReceiver(taxReceiver!) != nil {
+                            let receiverRef = FixesFungibleToken.borrowVaultReceiver(taxReceiver!)!
+                            receiverRef.deposit(from: <- taxVault)
                         } else {
-                            // Otherwise, destroy the taxVault
-                            // TODO: Using Burner to burn the taxVault in Cadence 1.0
-                            destroy taxVault
+                            // Send to the black hole instead of destroying.
+                            // This can keep the totalSupply unchanged (In theory).
+                            if BlackHole.isAnyBlackHoleAvailable() {
+                                BlackHole.vanish(<- taxVault)
+                            } else {
+                                // Otherwise, destroy the taxVault
+                                // TODO: Using Burner to burn the taxVault in Cadence 1.0
+                                destroy taxVault
+                            }
                         }
                     }
-                }
-            } // end of deposit tax
+                } // end of deposit tax
+            } // end of tax > 0.0
 
             // merge the metadata
             let keys = vault.getMergeableKeys()
@@ -689,13 +691,17 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ): @FungibleToken.Vault {
             pre {
                 vault.isInstance(Type<@FixesFungibleToken.Vault>()): "The vault must be an instance of FixesFungibleToken.Vault"
-                ins.isExtractable(): "The inscription must be extractable"
             }
             let typedVault <- vault as! @FixesFungibleToken.Vault
+            // ensure vault is initialized
             if !typedVault.isValidVault() {
-                typedVault.initialize(ins, nil)
-                // execute the inscription
-                FixesFungibleToken.executeInscription(ins: ins, usage: "init")
+                if ins.isExtractable() {
+                    typedVault.initialize(ins, nil)
+                    // execute the inscription
+                    FixesFungibleToken.executeInscription(ins: ins, usage: "init")
+                } else {
+                    typedVault.initialize(nil, ins.owner?.address)
+                }
             }
             return <- typedVault
         }

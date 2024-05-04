@@ -308,32 +308,6 @@ access(all) contract FungibleTokenManager {
         emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: childAddr)
     }
 
-    /// Verify the inscription for executing the Fungible Token
-    ///
-    access(self)
-    fun verifyExecutingInscription(
-        ins: &Fixes.Inscription,
-        usage: String
-    ): {String: String} {
-        // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        assert(
-            meta["op"] == "exec",
-            message: "The inscription operation must be 'exec'"
-        )
-        let tick = meta["tick"] ?? panic("The token symbol is not found")
-        assert(
-            tick[0] == "$",
-            message: "The token symbol must start with '$'"
-        )
-        let usageInMeta = meta["usage"] ?? panic("The token operation is not found")
-        assert(
-            usageInMeta == usage || usage == "*",
-            message: "The inscription is not for initialize a Fungible Token account"
-        )
-        return meta
-    }
-
     /// Enable the FRC20 Fungible Token
     ///
     access(all)
@@ -399,6 +373,32 @@ access(all) contract FungibleTokenManager {
     }
 
     /** ---- Internal Methods ---- */
+
+    /// Verify the inscription for executing the Fungible Token
+    ///
+    access(self)
+    fun verifyExecutingInscription(
+        ins: &Fixes.Inscription,
+        usage: String
+    ): {String: String} {
+        // inscription data
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        assert(
+            meta["op"] == "exec",
+            message: "The inscription operation must be 'exec'"
+        )
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+        assert(
+            tick[0] == "$",
+            message: "The token symbol must start with '$'"
+        )
+        let usageInMeta = meta["usage"] ?? panic("The token operation is not found")
+        assert(
+            usageInMeta == usage || usage == "*",
+            message: "The inscription is not for initialize a Fungible Token account"
+        )
+        return meta
+    }
 
     /// Borrow the Fixes Fungible Token contract interface
     ///

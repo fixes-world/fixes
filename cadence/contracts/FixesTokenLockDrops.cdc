@@ -46,6 +46,25 @@ access(all) contract FixesTokenLockDrops {
         lockedAmount: UFix64
     )
 
+    // emitted when the drops are prepared
+    access(all) event TokenDropsPrepared(
+        poolAddr: Address,
+        userAddr: Address,
+        lockedTokenTicker: String,
+        lockedTokenType: Type?,
+        lockedAmount: UFix64,
+        dropsTokenType: Type,
+        dropsTokenAmount: UFix64,
+    )
+
+    // emitted when the drops are claimed
+    access(all) event TokenDropsClaimed(
+        poolAddr: Address,
+        userAddr: Address,
+        dropsTokenType: Type,
+        dropsTokenAmount: UFix64
+    )
+
     // emitted when a new Drops Pool is created
     access(all) event DropsPoolCreated(
         lockingToken: String,
@@ -503,9 +522,13 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         view fun getCirculatingSupply(): UFix64
 
+        /// Get the issued drops supply
+        access(all)
+        view fun getIssuedDropsSupply(): UFix64
+
         /// Get the balance of the token in pool
         access(all)
-        view fun getTokenBalanceInPool(): UFix64
+        view fun getUnclaimedBalanceInPool(): UFix64
 
         /// Get the total locked token balance
         access(all)
@@ -545,7 +568,8 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         fun lockAndMint(
             _ ins: &Fixes.Inscription,
-            _ lockingVault: @FungibleToken.Vault?,
+            lockingPeriod: UFix64,
+            lockingVault: @FungibleToken.Vault?,
         ) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
@@ -623,6 +647,12 @@ access(all) contract FixesTokenLockDrops {
             activateTime: UFix64?,
             failureDeprecatedTime: UFix64?
         ) {
+            for one in lockingExchangeRates.keys {
+                assert(
+                    lockingExchangeRates[one]! > 0.0,
+                    message: "The exchange rate should be greater than zero"
+                )
+            }
             self.minter <- minter
             let vaultData = self.minter.getVaultData()
             self.vault <- vaultData.createEmptyVault()
@@ -707,13 +737,19 @@ access(all) contract FixesTokenLockDrops {
                     return self.minter.getTotalSupply()
                 }
             } else {
-                return self.minter.getTotalSupply() - self.getTokenBalanceInPool()
+                return self.minter.getTotalSupply() - self.getUnclaimedBalanceInPool()
             }
+        }
+
+        /// Get the issued drops supply
+        access(all)
+        view fun getIssuedDropsSupply(): UFix64 {
+            return self.minter.getTotalAllowedMintableAmount() - self.minter.getCurrentMintableAmount()
         }
 
         /// Get the balance of the token in pool
         access(all)
-        view fun getTokenBalanceInPool(): UFix64 {
+        view fun getUnclaimedBalanceInPool(): UFix64 {
             return self.vault.balance
         }
 
@@ -778,10 +814,86 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         fun lockAndMint(
             _ ins: &Fixes.Inscription,
-            _ vault: @FungibleToken.Vault?,
+            lockingPeriod: UFix64,
+            lockingVault: @FungibleToken.Vault?,
         ) {
+            pre {
+                self.lockingExchangeRates[lockingPeriod] != nil: "The locking period is not supported"
+            }
             let minter = self.borrowMinter()
-            // all FLOW in the inscription is fee
+            let callerAddr = ins.owner?.address ?? panic("The owner is missing")
+
+            // check the locking token
+            let locking <- FixesTokenLockDrops.createEmptyChangeForLockingTick(
+                self.lockingTokenTicker,
+                callerAddr
+            )
+
+            // check if it is FlowToken or stFlowToken
+            if locking.isBackedByVault() {
+                assert(
+                    lockingVault != nil,
+                    message: "The vault is missing"
+                )
+                assert(
+                    locking.getVaultType() == lockingVault?.getType()!,
+                    message: "The vault type is not matched"
+                )
+                locking.merge(from: <- FRC20FTShared.wrapFungibleVaultChange(ftVault: <- lockingVault!, from: callerAddr))
+                // execute the inscription
+                FixesTokenLockDrops.verifyAndExecuteInscription(
+                    ins,
+                    symbol: minter.getSymbol(),
+                    usage: "lock-drop"
+                )
+            } else {
+                assert(
+                    lockingVault == nil,
+                    message: "The vault is not needed"
+                )
+                destroy lockingVault
+                // here is for FRC20 token
+                let frc20Indexer = FRC20Indexer.getIndexer()
+                // inscription should be op=withdraw for withdraw frc20 token
+                let withdrawChange <- frc20Indexer.withdrawChange(ins: ins)
+                assert(
+                    withdrawChange.tick == self.lockingTokenTicker,
+                    message: "The locking token ticker is not matched"
+                )
+                locking.merge(from: <- withdrawChange)
+            }
+
+            // calculate how many tokens to mint
+            let exchangeRate = self.lockingExchangeRates[lockingPeriod]!
+            var mintAmount = locking.getBalance() * exchangeRate
+            let maxMintAmount = self.minter.getCurrentMintableAmount()
+            if mintAmount > maxMintAmount {
+                mintAmount = maxMintAmount
+            }
+
+            // mint the tokens and deposit to the vault
+            self.vault.deposit(from: <- self.minter.mintTokens(amount: mintAmount))
+            // add the claimable record
+            self.claimableRecords[callerAddr] = mintAmount + (self.claimableRecords[callerAddr] ?? 0.0)
+
+            // emit drops prepared event
+            emit TokenDropsPrepared(
+                poolAddr: self.getPoolAddress(),
+                userAddr: callerAddr,
+                lockedTokenTicker: locking.tick,
+                lockedTokenType: locking.isBackedByVault() ? locking.getVaultType() : nil,
+                lockedAmount: locking.getBalance(),
+                dropsTokenType: self.minter.getTokenType(),
+                dropsTokenAmount: mintAmount
+            )
+
+            // lock the token
+            let center = FixesTokenLockDrops.borrowLockingCenter()
+            center.lock(
+                self.getPoolAddress(),
+                entry: <- locking,
+                lockingPeriod: lockingPeriod
+            )
         }
 
         /// Claim drops token
@@ -791,7 +903,45 @@ access(all) contract FixesTokenLockDrops {
             _ ins: &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver},
         ) {
+            let callerAddr = ins.owner?.address ?? panic("The owner is missing")
 
+            // check the claimable amount
+            let claimableAmount = self.claimableRecords[callerAddr] ?? 0.0
+            assert(
+                claimableAmount > 0.0,
+                message: "The claimable amount is zero"
+            )
+            assert(
+                claimableAmount <= self.vault.balance,
+                message: "The claimable amount is greater than the vault balance"
+            )
+
+            let supportedTokens = recipient.getSupportedVaultTypes()
+            let tokenType = self.vault.getType()
+            assert(
+                supportedTokens[tokenType] == true,
+                message: "The recipient does not support the token type"
+            )
+
+            // withdraw the claimable amount from the vault
+            let newVault <- self.vault.withdraw(amount: claimableAmount)
+            // update the claimable record
+            self.claimableRecords[callerAddr] = 0.0
+
+            // initialize the vault by inscription, op=exec
+            let initializedVault <- self.minter.initializeVaultByInscription(
+                vault: <- newVault,
+                ins: ins
+            )
+            recipient.deposit(from: <- initializedVault)
+
+            // emit the drops claimed event
+            emit TokenDropsClaimed(
+                poolAddr: self.getPoolAddress(),
+                userAddr: callerAddr,
+                dropsTokenType: tokenType,
+                dropsTokenAmount: claimableAmount
+            )
         }
 
         /// Claim unlocked tokens
@@ -801,7 +951,49 @@ access(all) contract FixesTokenLockDrops {
             _ ins: &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver}?,
         ) {
+            let callerAddr = ins.owner?.address ?? panic("The owner is missing")
 
+            let center = FixesTokenLockDrops.borrowLockingCenter()
+
+            // first we need to release the unlocked entries, for deparecated pool, we need to force the release
+            if let releasedEntry <- center.releaseUnlockedEntries(
+                self.getPoolAddress(),
+                callerAddr,
+                force: self.isDeprecated()
+            ) {
+                let stFlowType = Type<@stFlowToken.Vault>()
+                let stFlowTicker = "@".concat(stFlowType.identifier)
+                // for stFlowToken, we need to deposit the released entry to the recipient
+                if self.lockingTokenTicker == stFlowTicker {
+                    assert(
+                        recipient != nil,
+                        message: "The recipient is missing"
+                    )
+                    assert(
+                        releasedEntry.isBackedByVault() && releasedEntry.getType() == stFlowType,
+                        message: "The released entry is not stFlowToken"
+                    )
+                    let accepts = recipient?.getSupportedVaultTypes() ?? {}
+                    assert(
+                        accepts[stFlowType] == true,
+                        message: "The recipient does not support the stFlowToken"
+                    )
+                    // deposit the released entry to the recipient
+                    recipient!.deposit(from: <- releasedEntry.extractAsVault())
+                    destroy releasedEntry
+                } else {
+                    // for FRC20 token and Flow, we can use FRC20Indexer.return
+                    let frc20Indexer = FRC20Indexer.getIndexer()
+                    frc20Indexer.returnChange(change: <- releasedEntry)
+                }
+                // execute the inscription
+                FixesTokenLockDrops.verifyAndExecuteInscription(
+                    ins,
+                    symbol: self.minter.getSymbol(),
+                    usage: "claim-unlocked"
+                )
+            } // enf if
+            // if no released entry, we do nothing
         }
 
         // ------ Implment FixesFungibleTokenInterface.IMinterHolder ------
@@ -857,6 +1049,38 @@ access(all) contract FixesTokenLockDrops {
             panic("The empty change is not created")
         }
         return <- emptyChange!
+    }
+
+    /// Verify the inscription for executing the Fungible Token
+    ///
+    access(contract)
+    fun verifyAndExecuteInscription(
+        _ ins: &Fixes.Inscription,
+        symbol: String,
+        usage: String
+    ) {
+        // inscription data
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        // check the operation
+        assert(
+            meta["op"] == "exec",
+            message: "The inscription operation must be 'exec'"
+        )
+        // check the symbol
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+        assert(
+            tick == "$".concat(symbol),
+            message: "The minter's symbol is not matched. Required: $".concat(symbol)
+        )
+        // check the usage
+        let usageInMeta = meta["usage"] ?? panic("The token operation is not found")
+        assert(
+            usageInMeta == usage || usage == "*",
+            message: "The inscription is not for initialize a Fungible Token account"
+        )
+        // execute the inscription
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
     }
 
     /// Create a new Drops Pool

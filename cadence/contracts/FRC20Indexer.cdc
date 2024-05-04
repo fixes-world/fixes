@@ -1161,8 +1161,8 @@ access(all) contract FRC20Indexer {
             let tokenMeta = self.borrowTokenMeta(tick: tick)
             let usage = meta["usage"]!
             assert(
-                usage == "staking" || usage == "donate" || usage == "lottery" || usage == "convert" || usage == "empty",
-                message: "The usage should be 'staking', 'donate', 'lottery', 'convert' or 'command'"
+                usage == "staking" || usage == "donate" || usage == "lottery" || usage == "convert" || usage == "lock" || usage == "empty",
+                message: "The usage should be 'staking', 'donate', 'lottery', 'convert', 'lock' or 'empty'"
             )
 
             // The from address: the owner of the inscription
