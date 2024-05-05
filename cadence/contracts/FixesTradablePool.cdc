@@ -29,6 +29,7 @@ import "FixesFungibleTokenInterface"
 import "FixesBondingCurve"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
+import "FRC20StakingManager"
 
 /// The bonding curve contract.
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
@@ -1066,6 +1067,16 @@ access(all) contract FixesTradablePool {
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
         // return the metadata
         return meta
+    }
+
+    /// Check if the caller is an advanced token player(by staked $flows)
+    ///
+    access(all)
+    view fun isAdvancedTokenPlayer(_ addr: Address): Bool {
+        let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+        // the threshold is 100K staked $flows
+        let threshold = 100_000.0
+        return FRC20StakingManager.isEligibleByStakePower(stakeTick: stakeTick, addr: addr, threshold: threshold)
     }
 
     /// Get the flow price from IncrementFi Oracle

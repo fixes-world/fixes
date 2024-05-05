@@ -511,22 +511,6 @@ access(all) contract FixesTokenLockDrops {
 
         // ----- Token in the drops pool -----
 
-        /// Get the token type
-        access(all)
-        view fun getTokenType(): Type
-
-        /// Get the max supply of the token
-        access(all)
-        view fun getMaxSupply(): UFix64
-
-        /// Get the circulating supply of the token
-        access(all)
-        view fun getCirculatingSupply(): UFix64
-
-        /// Get the issued drops supply
-        access(all)
-        view fun getIssuedDropsSupply(): UFix64
-
         /// Get the balance of the token in pool
         access(all)
         view fun getUnclaimedBalanceInPool(): UFix64
@@ -715,38 +699,6 @@ access(all) contract FixesTokenLockDrops {
         }
 
         // ----- Token in the drops pool -----
-
-        /// Get the token type
-        access(all)
-        view fun getTokenType(): Type {
-            return self.minter.getTokenType()
-        }
-
-        /// Get the max supply of the token
-        access(all)
-        view fun getMaxSupply(): UFix64 {
-            return self.minter.getMaxSupply()
-        }
-
-        /// Get the circulating supply of the token
-        access(all)
-        view fun getCirculatingSupply(): UFix64 {
-            if !self.isClaimable() {
-                if let tradablePool = self.borrowRelavantTradablePool() {
-                    return tradablePool.getTradablePoolCirculatingSupply()
-                } else {
-                    return self.minter.getTotalSupply()
-                }
-            } else {
-                return self.minter.getTotalSupply() - self.getUnclaimedBalanceInPool()
-            }
-        }
-
-        /// Get the issued drops supply
-        access(all)
-        view fun getIssuedDropsSupply(): UFix64 {
-            return self.minter.getTotalAllowedMintableAmount() - self.minter.getCurrentMintableAmount()
-        }
 
         /// Get the balance of the token in pool
         access(all)
@@ -998,6 +950,20 @@ access(all) contract FixesTokenLockDrops {
         }
 
         // ------ Implment FixesFungibleTokenInterface.IMinterHolder ------
+
+        /// Get the circulating supply of the token
+        access(all)
+        view fun getCirculatingSupply(): UFix64 {
+            if !self.isClaimable() {
+                if let tradablePool = self.borrowRelavantTradablePool() {
+                    return tradablePool.getTradablePoolCirculatingSupply()
+                } else {
+                    return self.minter.getTotalSupply()
+                }
+            } else {
+                return self.minter.getTotalSupply() - self.getUnclaimedBalanceInPool()
+            }
+        }
 
         access(contract)
         view fun borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {

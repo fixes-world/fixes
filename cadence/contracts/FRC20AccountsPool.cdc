@@ -15,6 +15,7 @@ import "HybridCustody"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
 import "FRC20Indexer"
 
@@ -104,6 +105,9 @@ access(all) contract FRC20AccountsPool {
         /// Returns the flow token receiver for the given tick
         access(all)
         view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}?
+        /// Borrow the Fixes Fungible Token contract interface
+        access(all)
+        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface
 
         /// Execute inscription and extract FlowToken in the inscription
         access(all)
@@ -294,6 +298,22 @@ access(all) contract FRC20AccountsPool {
                 return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
+        }
+
+        /// Borrow the Fixes Fungible Token contract interface
+        /// If the tick starts with "$", it will borrow FixesFungibleToken, otherwise FRC20FungibleToken
+        /// If no contract is found, it will panic
+        ///
+        access(all)
+        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface {
+            // try to borrow the account to check if it was created
+            let childAcctRef = self.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+                ?? panic("The staking account was not created")
+            let name = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+            // try to borrow the contract
+            let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: name)
+                ?? panic("The Fungible Token contract was not deployed for tick: ".concat(tick))
+            return contractRef
         }
 
         /// Execute inscription and extract FlowToken in the inscription

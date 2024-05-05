@@ -341,7 +341,36 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Get the total allowed mintable amount
         access(all)
         view fun getTotalAllowedMintableAmount(): UFix64 {
-            return self.borrowMinter().getTotalAllowedMintableAmount()
+            let minterRef = self.borrowMinter()
+            return minterRef.getTotalAllowedMintableAmount()
+        }
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type {
+            let minterRef = self.borrowMinter()
+            return minterRef.getTokenType()
+        }
+
+        /// Get the max supply of the token
+        access(all)
+        view fun getMaxSupply(): UFix64 {
+            let minterRef = self.borrowMinter()
+            return minterRef.getMaxSupply()
+        }
+
+        /// Get the issued drops supply
+        access(all)
+        view fun getIssuedDropsSupply(): UFix64 {
+            let minterRef = self.borrowMinter()
+            return minterRef.getTotalAllowedMintableAmount() - minterRef.getCurrentMintableAmount()
+        }
+
+        /// Get the circulating supply of the token
+        access(all)
+        view fun getCirculatingSupply(): UFix64 {
+            let minterRef = self.borrowMinter()
+            return minterRef.getTotalSupply()
         }
 
         /// Borrow the minter reference

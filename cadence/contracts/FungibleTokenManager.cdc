@@ -115,16 +115,6 @@ access(all) contract FungibleTokenManager {
         return acctsPool.getFTContractAddress(tick) != nil
     }
 
-    /// Check if the caller is an advanced token player(by staked $flows)
-    ///
-    access(all)
-    view fun isAdvancedTokenPlayer(_ addr: Address): Bool {
-        let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
-        // the threshold is 100K staked $flows
-        let threshold = 100_000.0
-        return FRC20StakingManager.isEligibleByStakePower(stakeTick: stakeTick, addr: addr, threshold: threshold)
-    }
-
     /// Enable the Fixes Fungible Token
     ///
     access(all)
@@ -394,7 +384,7 @@ access(all) contract FungibleTokenManager {
         let grantedSupply = tokenAdminRef.getGrantedMintableAmount()
 
         // check if the caller is advanced
-        let isAdvancedCaller = self.isAdvancedTokenPlayer(callerAddr)
+        let isAdvancedCaller = FixesTradablePool.isAdvancedTokenPlayer(callerAddr)
 
         // new minter supply
         let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
@@ -521,19 +511,6 @@ access(all) contract FungibleTokenManager {
         return meta
     }
 
-    /// Borrow the Fixes Fungible Token contract interface
-    ///
-    access(self)
-    view fun borrowFixesFTContract(tick: String): &FixesFungibleTokenInterface {
-        // try to borrow the account to check if it was created
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
-            ?? panic("The staking account was not created")
-        let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: "FixesFungibleToken")
-            ?? panic("The Fixes Fungible Token contract was not deployed")
-        return contractRef
-    }
-
     /// Borrow the Fixes Fungible Token Admin Resource
     ///
     access(self)
@@ -542,9 +519,7 @@ access(all) contract FungibleTokenManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
             ?? panic("The staking account was not created")
-        let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: "FixesFungibleToken")
-            ?? panic("The Fixes Fungible Token contract was not deployed")
-
+        let contractRef = acctsPool.borrowFTContract(tick)
         // Check if the admin resource is available
         let adminStoragePath = contractRef.getAdminStoragePath()
         return childAcctRef.borrow<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(from: adminStoragePath)
