@@ -269,6 +269,10 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTokenType(): Type
 
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String?
+
         /// Get the contract address of the minting token
         access(all)
         view fun getContractAddress(): Address

@@ -32,6 +32,23 @@ access(all) contract FixesTokenAirDropss {
         createdBy: Address
     )
 
+    // emitted when the claimable amount is set
+    access(all) event AirdropPoolSetClaimable(
+        tokenType: Type,
+        tokenSymbol: String,
+        claimables: {Address: UFix64},
+        currentGrantedAmount: UFix64,
+        by: Address
+    )
+
+    // emitted when the claimable amount is claimed
+    access(all) event AirdropPoolClaimed(
+        tokenType: Type,
+        tokenSymbol: String,
+        claimer: Address,
+        claimedAmount: UFix64,
+    )
+
     /// -------- Resources and Interfaces --------
 
     /// The Airdrop Pool public resource interface
@@ -157,7 +174,54 @@ access(all) contract FixesTokenAirDropss {
             _ ins: &Fixes.Inscription,
             claimables: {Address: UFix64}
         ) {
-            // TODO: implement the claimDrops method
+            let callerAddr = ins.owner?.address ?? panic("The owner is missing")
+
+            // extract the inscription
+            FixesTradablePool.verifyAndExecuteInscription(
+                ins,
+                symbol: self.minter.getSymbol(),
+                usage: "set-claimables"
+            )
+
+            // singleton resources
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+            // The caller should be authorized user for the token
+            // borrow the contract
+            let key = self.minter.getAccountsPoolKey() ?? panic("The accounts pool key is missing")
+            let contractRef = acctsPool.borrowFTContract(key)
+            let globalPublicRef = contractRef.borrowGlobalPublic()
+            assert(
+                globalPublicRef.isAuthorizedUser(callerAddr),
+                message: "The caller is not authorized to set the claimable amount"
+            )
+
+            // Total claimable amount
+            let totalClaimableAmount = self.minter.getCurrentMintableAmount()
+            let oldGrantedClaimableAmount = self.grantedClaimableAmount
+            var newGrantedClaimableAmount = oldGrantedClaimableAmount
+
+            // set the claimable amount
+            for addr in claimables.keys {
+                if let amount = claimables[addr] {
+                    self.claimableRecords[addr] = amount + (self.claimableRecords[addr] ?? 0.0)
+                    newGrantedClaimableAmount = newGrantedClaimableAmount + amount
+                }
+            }
+            assert(
+                newGrantedClaimableAmount <= totalClaimableAmount,
+                message: "The total claimable amount exceeds the mintable amount"
+            )
+            self.grantedClaimableAmount = newGrantedClaimableAmount
+
+            // emit the event
+            emit AirdropPoolSetClaimable(
+                tokenType: self.minter.getTokenType(),
+                tokenSymbol: self.minter.getSymbol(),
+                claimables: claimables,
+                currentGrantedAmount: newGrantedClaimableAmount,
+                by: callerAddr
+            )
         }
 
         /// Claim drops token
@@ -166,7 +230,45 @@ access(all) contract FixesTokenAirDropss {
             _ ins: &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver},
         ) {
-            // TODO: implement the claimDrops method
+            let callerAddr = ins.owner?.address ?? panic("The owner is missing")
+            assert(
+                callerAddr == recipient.owner?.address,
+                message: "The caller is not the recipient"
+            )
+
+            let claimableAmount = self.getClaimableTokenAmount(callerAddr)
+
+            assert(
+                claimableAmount > 0.0,
+                message: "The caller has no claimable amount"
+            )
+
+            let supportTypes = recipient.getSupportedVaultTypes()
+            assert(
+                supportTypes[self.minter.getTokenType()] == true,
+                message: "The recipient does not support the token"
+            )
+
+            // mint the token
+            let newVault <- self.minter.mintTokens(amount: claimableAmount)
+            // update the claimable amount
+            self.claimableRecords[callerAddr] = 0.0
+
+            // initialize the vault by inscription, op=exec
+            let initializedVault <- self.minter.initializeVaultByInscription(
+                vault: <- newVault,
+                ins: ins
+            )
+            // transfer the token
+            recipient.deposit(from: <- initializedVault)
+
+            // emit the event
+            emit AirdropPoolClaimed(
+                tokenType: self.minter.getTokenType(),
+                tokenSymbol: self.minter.getSymbol(),
+                claimer: callerAddr,
+                claimedAmount: claimableAmount
+            )
         }
 
         // ------ Implment FixesFungibleTokenInterface.IMinterHolder ------
@@ -197,7 +299,43 @@ access(all) contract FixesTokenAirDropss {
 
     /// ------ Public Methods ------
 
-    // access(account)
+    /// Create a new Airdrop Pool
+    ///
+    access(account)
+    fun createDropsPool(
+        _ ins: &Fixes.Inscription,
+        _ minter: @{FixesFungibleTokenInterface.IMinter},
+    ): @AirdropPool {
+        pre {
+            ins.isExtractable(): "The inscription is not extractable"
+        }
+        post {
+            ins.isExtracted(): "The inscription is not extracted"
+        }
+
+        // verify the inscription and get the meta data
+        let meta =  FixesTradablePool.verifyAndExecuteInscription(
+            ins,
+            symbol: minter.getSymbol(),
+            usage: "*"
+        )
+
+        let tokenType = minter.getTokenType()
+        let tokenSymbol = minter.getSymbol()
+        let grantedAmount = minter.getCurrentMintableAmount()
+
+        let pool <- create AirdropPool(<- minter)
+
+        // emit the event
+        emit AirdropPoolCreated(
+            tokenType: tokenType,
+            tokenSymbol: tokenSymbol,
+            minterGrantedAmount: grantedAmount,
+            createdBy: ins.owner?.address ?? panic("The inscription owner is missing")
+        )
+
+        return <- pool
+    }
 
     /// Borrow the Drops Pool
     ///

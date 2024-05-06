@@ -619,6 +619,12 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return Type<@FixesFungibleToken.Vault>()
         }
 
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String? {
+            return "$".concat(self.getSymbol())
+        }
+
         /// Get the contract address of the minting token
         access(all)
         view fun getContractAddress(): Address {
