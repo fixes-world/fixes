@@ -8,7 +8,7 @@ access(all)
 fun main():[TokenMarketInfo] {
     let indexer = FRC20Indexer.getIndexer()
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-    let addrsDict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.Market)
+    let addrsDict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.Market)
 
     let now = getCurrentBlock().timestamp
 

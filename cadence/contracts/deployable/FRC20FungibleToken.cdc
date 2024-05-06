@@ -900,7 +900,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         var tickerName = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
         if tickerName == nil {
             // try load the ticker name from AccountPools
-            let addrDict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
+            let addrDict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
             let contractAddr = self.account.address
             addrDict.forEachKey(fun (key: String): Bool {
                 if let addr = addrDict[key] {

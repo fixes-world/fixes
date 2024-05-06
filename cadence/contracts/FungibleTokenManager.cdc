@@ -76,7 +76,7 @@ access(all) contract FungibleTokenManager {
         access(all)
         view fun getFungibleTokens(): [String] {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            let dict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
+            let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
             return dict.keys
         }
 
@@ -93,7 +93,7 @@ access(all) contract FungibleTokenManager {
         access(all)
         fun updateAllChildrenContracts() {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            let dict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
+            let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
             let ticks = dict.keys
             // update the contracts
             for tick in ticks {

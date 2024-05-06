@@ -946,7 +946,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         if tickerName == nil {
             var fixesFTKey: String? = nil
             // try load the ticker name from AccountPools
-            let addrDict = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
+            let addrDict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
             let contractAddr = self.account.address
             addrDict.forEachKey(fun (key: String): Bool {
                 if let addr = addrDict[key] {

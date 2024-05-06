@@ -125,13 +125,18 @@ access(all) contract FixesTradablePool {
 
         /// Get the liquidity market cap
         access(all)
-        view fun getLiquidityMarketCap(): UFix64 {
+        view fun getLiquidityPoolMarketCap(): UFix64 {
+            return self.getLiquidityPoolValue() * FixesTradablePool.getFlowPrice()
+        }
+
+        /// Get the liquidity pool value
+        access(all)
+        view fun getLiquidityPoolValue(): UFix64 {
             if self.isLocalActive() {
                 let flowAmount = self.getFlowBalanceInPool()
-                let flowPrice = FixesTradablePool.getFlowPrice()
                 // The market cap is the flow amount * flow price * 2.0
                 // According to the Token value is equal to the Flow token value.
-                return flowAmount * flowPrice * 2.0
+                return flowAmount * 2.0
             } else {
                 // current no liquidity in the pool, all LP token is burned
                 return 0.0
@@ -139,26 +144,39 @@ access(all) contract FixesTradablePool {
         }
 
         /// Get the locked liquidity market cap
+        ///
         access(all)
         view fun getBurnedLiquidityMarketCap(): UFix64 {
+            return self.getBurnedLiquidityValue() * FixesTradablePool.getFlowPrice()
+        }
+
+        /// Get the burned liquidity value
+        ///
+        access(all)
+        view fun getBurnedLiquidityValue(): UFix64 {
             if self.isLocalActive() {
                 return 0.0
             } else {
                 let burnedLP = self.getBurnedLP()
                 let lpPrice = self.getLPPriceInFlow()
-                let flowPrice = FixesTradablePool.getFlowPrice()
-                return burnedLP * lpPrice * flowPrice
+                return burnedLP * lpPrice
             }
         }
 
         /// Get the token market cap
         ///
         access(all)
-        view fun getTokenMarketCap(): UFix64 {
+        view fun getTotalTokenMarketCap(): UFix64 {
+            return self.getTotalTokenValue() * FixesTradablePool.getFlowPrice()
+        }
+
+        /// Get token supply value
+        ///
+        access(all)
+        view fun getTotalTokenValue(): UFix64 {
             let tokenSupply = self.getTotalSupply()
             let tokenPrice = self.getTokenPriceInFlow()
-            let flowPrice = FixesTradablePool.getFlowPrice()
-            return tokenSupply * tokenPrice * flowPrice
+            return tokenSupply * tokenPrice
         }
 
         // ----- Trade (Writable) -----
@@ -814,7 +832,7 @@ access(all) contract FixesTradablePool {
         fun _ensureSwapPairAndAddLiquidity() {
             if self.isLocalActive() {
                 // Check the market cap
-                let localMarketCap = self.getLiquidityMarketCap()
+                let localMarketCap = self.getLiquidityPoolMarketCap()
                 let targetMarketCap = FixesTradablePool.getTargetMarketCap()
                 // if the market cap is less than the target market cap, then do nothing
                 if localMarketCap < targetMarketCap {

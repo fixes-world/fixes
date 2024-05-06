@@ -52,7 +52,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the addresses of the FRC20 with the given type
         access(all)
-        view fun getFRC20Addresses(type: ChildAccountType): {String: Address}
+        view fun getAddresses(type: ChildAccountType): {String: Address}
         /// Get Address
         access(all)
         view fun getAddress(type: ChildAccountType, _ key: String): Address?
@@ -177,7 +177,7 @@ access(all) contract FRC20AccountsPool {
 
         /// Returns the addresses of the FRC20 with the given type
         access(all)
-        view fun getFRC20Addresses(type: ChildAccountType): {String: Address} {
+        view fun getAddresses(type: ChildAccountType): {String: Address} {
             if let tickDict = self.addressMapping[type] {
                 return tickDict
             }
