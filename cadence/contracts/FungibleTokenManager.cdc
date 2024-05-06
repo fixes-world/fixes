@@ -9,6 +9,7 @@ This contract is used to manage the account and contract of Fixes' Fungible Toke
 // Third Party Imports
 import "FungibleToken"
 import "FlowToken"
+import "TokenList"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -159,6 +160,9 @@ access(all) contract FungibleTokenManager {
         // set the authorized account
         let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
         tokenAdminRef.updateAuthorizedUsers(callerAddr, true)
+
+        // register token to the tokenlist
+        TokenList.ensureFungibleTokenRegistered(newAddr, "FixesFungibleToken")
 
         // emit the event
         emit FungibleTokenAccountCreated(
@@ -474,6 +478,9 @@ access(all) contract FungibleTokenManager {
         self._ensureFungibleTokenAccountResourcesAvailable(tickerName, true)
         // deploy the contract of FRC20 Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tickerName, contractName: "FRC20FungibleToken")
+
+        // register token to the tokenlist
+        TokenList.ensureFungibleTokenRegistered(newAddr, "FRC20FungibleToken")
 
         // emit the event
         emit FungibleTokenAccountCreated(
