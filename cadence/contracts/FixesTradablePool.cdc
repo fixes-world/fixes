@@ -47,6 +47,9 @@ access(all) contract FixesTradablePool {
     // Event that is emitted when the liquidity pool is initialized.
     access(all) event LiquidityPoolInitialized(subject: Address, tokenType: Type, mintedAmount: UFix64)
 
+    // Event that is emitted when the liquidity pool is crowned as king of the hill.
+    access(all) event LiquidityPoolCrownedAsKing(king: Address, tokenType: Type, marketCap: UFix64, at: UFix64)
+
     // Event that is emitted when the liquidity pool is transferred.
     access(all) event LiquidityPoolTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
 
@@ -664,7 +667,7 @@ access(all) contract FixesTradablePool {
             // deposit the tokens to the recipient
             recipient.deposit(from: <- returnVault)
 
-            // emit the trade event
+            // the variables for the trade event
             let tickerName = "$".concat(minter.getSymbol())
             let poolAddr = self.getPoolAddress()
             let traderAddr = recipient.owner?.address ?? insOwner
@@ -843,6 +846,31 @@ access(all) contract FixesTradablePool {
                 // Check the market cap
                 let localMarketCap = self.getLiquidityPoolMarketCap()
                 let targetMarketCap = FixesTradablePool.getTargetMarketCap()
+                let kothMarketCap = FixesTradablePool.getKingOfTheHillMarketCap()
+
+                // if the pool is greater than the current king of the hill's market cap
+                if localMarketCap >= kothMarketCap {
+                    if let addr = FixesTradablePool.currentKingOfTheHillAddress {
+                        if let currKothPool = FixesTradablePool.borrowTradablePool(addr) {
+                            let currKothPoolMarketCap = currKothPool.getLiquidityPoolMarketCap()
+                            if kothMarketCap > currKothPoolMarketCap {
+                                let poolAddr = self.getPoolAddress()
+                                // transfer the liquidity pool to the current king of the hill
+                                FixesTradablePool.currentKingOfTheHillAddress = poolAddr
+                                // set the crowned time
+                                self.crownedAsKingAt = getCurrentBlock().timestamp
+
+                                // emit the king of the hill event
+                                emit LiquidityPoolCrownedAsKing(
+                                    king: poolAddr,
+                                    tokenType: self.getTokenType(),
+                                    marketCap: localMarketCap,
+                                    at: self.crownedAsKingAt!
+                                )
+                            }
+                        }
+                    }
+                }
                 // if the market cap is less than the target market cap, then do nothing
                 if localMarketCap < targetMarketCap {
                     // DO NOT PANIC
