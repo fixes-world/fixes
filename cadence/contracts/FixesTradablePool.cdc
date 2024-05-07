@@ -53,6 +53,11 @@ access(all) contract FixesTradablePool {
     // Event that is emitted when a user buys or sells tokens.
     access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, ticker: String, tokenAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
 
+    /// -------- Variables --------
+
+    /// The current king of the hill address.
+    access(contract) var currentKingOfTheHillAddress: Address?
+
     /// -------- Resources and Interfaces --------
 
     /// The liquidity pool interface.
@@ -321,6 +326,9 @@ access(all) contract FixesTradablePool {
         /// The record of LP token burned
         access(self)
         var lpBurned: UFix64
+        /// The time when the pool is crowned as king
+        access(self)
+        var crownedAsKingAt: UFix64?
 
         init(
             _ minter: @{FixesFungibleTokenInterface.IMinter},
@@ -339,6 +347,7 @@ access(all) contract FixesTradablePool {
             self.flowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
             self.acitve = false
             self.lpBurned = 0.0
+            self.crownedAsKingAt = nil
         }
 
         // @deprecated in Cadence v1.0
@@ -1128,6 +1137,13 @@ access(all) contract FixesTradablePool {
         return valueInStore ?? defaultTargetMarketCap
     }
 
+    /// Get the target koth market cap
+    ///
+    access(all)
+    view fun getKingOfTheHillMarketCap(): UFix64 {
+        return self.getTargetMarketCap() * 0.95
+    }
+
     /// Get the trading pool protocol fee
     ///
     access(all)
@@ -1175,5 +1191,9 @@ access(all) contract FixesTradablePool {
     view fun getLiquidityPoolPublicPath(): PublicPath {
         let prefix = self.getPathPrefix()
         return PublicPath(identifier: prefix.concat("LiquidityPool"))!
+    }
+
+    init() {
+        self.currentKingOfTheHillAddress = nil
     }
 }
