@@ -727,6 +727,12 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                             mediaType: "image/jpeg"
                         ))
                     }
+                    if let iconUrl = store.get(logoKey.concat("gif")) as! String? {
+                        medias.append(MetadataViews.Media(
+                            file: MetadataViews.HTTPFile(url: iconUrl),
+                            mediaType: "image/gif"
+                        ))
+                    }
                     // socials
                     let socialDict: {String: MetadataViews.ExternalURL} = {}
                     let socialKey = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenSocialPrefix)!
@@ -742,9 +748,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                     }
                     if let socialUrl = store.get(socialKey.concat("github")) {
                         socialDict["github"] = MetadataViews.ExternalURL((socialUrl as! String?)!)
-                    }
-                    if let socialUrl = store.get(socialKey.concat("website")) {
-                        socialDict["website"] = MetadataViews.ExternalURL((socialUrl as! String?)!)
                     }
                     // override all customized fields
                     return FungibleTokenMetadataViews.FTDisplay(

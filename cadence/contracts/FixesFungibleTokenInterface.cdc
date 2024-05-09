@@ -450,7 +450,8 @@ access(all) contract interface FixesFungibleTokenInterface {
         let iconPng = store.get(key.concat("png")) as! String?
         let iconSvg = store.get(key.concat("svg")) as! String?
         let iconJpg = store.get(key.concat("jpg")) as! String?
-        return iconPng ?? iconSvg ?? iconJpg ?? iconDefault
+        let iconGif = store.get(key.concat("gif")) as! String?
+        return iconPng ?? iconSvg ?? iconJpg ?? iconGif ?? iconDefault
     }
 
     /// Get the deposit tax of the Fungible Token

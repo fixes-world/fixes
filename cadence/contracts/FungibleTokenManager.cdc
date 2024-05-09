@@ -113,8 +113,15 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     view fun isTokenSymbolEnabled(_ tick: String): Bool {
+        return self.getFTContractAddress(tick) != nil
+    }
+
+    /// Get the Fungible Token Account Address
+    ///
+    access(all)
+    view fun getFTContractAddress(_ tick: String): Address? {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-        return acctsPool.getFTContractAddress(tick) != nil
+        return acctsPool.getFTContractAddress(tick)
     }
 
     /// Enable the Fixes Fungible Token
@@ -275,10 +282,7 @@ access(all) contract FungibleTokenManager {
     }
 
     access(all)
-    fun initializeLockDrops(
-        _ ins: &Fixes.Inscription,
-        lockingExchangeRates: {UFix64: UFix64},
-    ) {
+    fun setupLockDropsPool(_ ins: &Fixes.Inscription, lockingExchangeRates: {UFix64: UFix64}) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
         }
@@ -348,7 +352,7 @@ access(all) contract FungibleTokenManager {
     /// Enable the Airdrop pool for the Fungible Token
     ///
     access(all)
-    fun initializeAirdrops(_ ins: &Fixes.Inscription) {
+    fun setupAirdropsPool(_ ins: &Fixes.Inscription) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
         }
@@ -490,9 +494,8 @@ access(all) contract FungibleTokenManager {
 
         // inscription data
         let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-        let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
-            op == "init-ft",
+            meta["op"] == "exec" && meta["usage"] == "init-ft",
             message: "The inscription is not for initialize a Fungible Token account"
         )
 

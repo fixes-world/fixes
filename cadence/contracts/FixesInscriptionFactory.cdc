@@ -318,15 +318,6 @@ access(all) contract FixesInscriptionFactory {
 
     // FRC20 Fungible Token Inscription
 
-    /// Build the inscription for initializing a fungible token account
-    ///
-    access(all)
-    view fun buildFungibleTokenInitialize(
-        tick: String,
-    ): String {
-        return "op=init-ft,tick=".concat(tick)
-    }
-
     /// Build the inscription for converting fungible token to indexer
     ///
     access(all)
@@ -353,9 +344,14 @@ access(all) contract FixesInscriptionFactory {
     access(all)
     view fun buildPureExecuting(
         tick: String,
-        usage: String?
+        usage: String?,
+        _ extraFields: {String: String},
     ): String {
-        return "op=exec,tick=".concat(tick)
+        var str = "op=exec,tick=".concat(tick)
             .concat(",usage=".concat(usage ?? "*"))
+        for key in extraFields.keys {
+            str = str.concat(",").concat(key).concat("=").concat(extraFields[key]!)
+        }
+        return str
     }
 }
