@@ -17,6 +17,7 @@ import "FixesHeartbeat"
 import "FixesFungibleTokenInterface"
 import "FixesTradablePool"
 import "FixesTokenLockDrops"
+import "FixesTokenAirDrops"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
@@ -175,9 +176,7 @@ access(all) contract FungibleTokenManager {
     /// Setup Tradable Pool Resources
     ///
     access(all)
-    fun setupTradablePoolResources(
-        _ ins: &Fixes.Inscription
-    ) {
+    fun setupTradablePoolResources(_ ins: &Fixes.Inscription) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
         }
@@ -202,7 +201,7 @@ access(all) contract FungibleTokenManager {
         let minter <- self._initializeMinter(
             ins,
             usage: "setup-tradable-pool",
-            extrafields: ["feePerc"]
+            extrafields: ["supply", "feePerc", "freeAmount"]
         )
 
         // - Add Tradable Pool Resource
@@ -300,19 +299,19 @@ access(all) contract FungibleTokenManager {
         // Get the caller address
         let ftContractAddr = childAcctRef.address
 
-        // create a new minter from the account
-        let minter <- self._initializeMinter(
-            ins,
-            usage: "setup-lockdrops",
-            extrafields: []
-        )
-
         // - Add Lock Drop Resource
 
         let lockdropsStoragePath = FixesTokenLockDrops.getDropsPoolStoragePath()
         assert(
             childAcctRef.borrow<&AnyResource>(from: lockdropsStoragePath) == nil,
             message: "The lockdrops pool is already created"
+        )
+
+        // create a new minter from the account
+        let minter <- self._initializeMinter(
+            ins,
+            usage: "setup-lockdrops",
+            extrafields: ["supply"]
         )
 
         var activateTime: UFix64? = nil
@@ -340,6 +339,61 @@ access(all) contract FungibleTokenManager {
         childAcctRef.link<&FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(
             lockdropsPublicPath,
             target: lockdropsStoragePath
+        )
+
+        // emit the event
+        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: ftContractAddr)
+    }
+
+    /// Enable the Airdrop pool for the Fungible Token
+    ///
+    access(all)
+    fun initializeAirdrops(_ ins: &Fixes.Inscription) {
+        pre {
+            ins.isExtractable(): "The inscription is not extracted"
+        }
+        post {
+            ins.isExtracted(): "The inscription is not extracted"
+        }
+        // singletoken resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = self.verifyExecutingInscription(ins, usage: "setup-airdrop")
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The staking account was not created")
+
+        // Get the caller address
+        let ftContractAddr = childAcctRef.address
+
+        // - Add Airdrop Resource
+
+        let storagePath = FixesTokenAirDrops.getAirdropPoolStoragePath()
+        assert(
+            childAcctRef.borrow<&AnyResource>(from: storagePath) == nil,
+            message: "The airdrop pool is already created"
+        )
+
+        // create a new minter from the account
+        let minter <- self._initializeMinter(
+            ins,
+            usage: "setup-airdrop",
+            extrafields: ["supply"]
+        )
+
+        // create the airdrops pool
+        let airdrops <- FixesTokenAirDrops.createDropsPool(ins, <- minter)
+        childAcctRef.save(<- airdrops, to: storagePath)
+
+        // link the airdrops pool to the public path
+        let publicPath = FixesTokenAirDrops.getAirdropPoolPublicPath()
+        // @deprecated in Cadence 1.0
+        childAcctRef.link<&FixesTokenAirDrops.AirdropPool{FixesTokenAirDrops.AirdropPoolPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(
+            publicPath,
+            target: storagePath
         )
 
         // emit the event

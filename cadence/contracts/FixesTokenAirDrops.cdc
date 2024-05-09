@@ -20,7 +20,7 @@ import "FRC20AccountsPool"
 
 /// The contract definition
 ///
-access(all) contract FixesTokenAirDropss {
+access(all) contract FixesTokenAirDrops {
 
     // ------ Events -------
 
