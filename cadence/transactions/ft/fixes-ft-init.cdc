@@ -7,9 +7,7 @@ import "HybridCustody"
 import "FungibleTokenManager"
 import "Fixes"
 import "FixesInscriptionFactory"
-import "FixesTradablePool"
 import "FRC20FTShared"
-import "FRC20AccountsPool"
 
 transaction(
     symbol: String,
