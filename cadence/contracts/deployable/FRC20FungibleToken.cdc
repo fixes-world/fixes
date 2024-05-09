@@ -109,6 +109,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 self.balance == UFix64(0): "Balance must be zero for destroy"
             }
             destroy self.change
+            // call the burn callback
+            self.burnCallback()
         }
 
         /// Called when a fungible token is burned via the `Burner.burn()` method
@@ -505,7 +507,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
     /// The admin resource for the FRC20 FT
     ///
-    access(all) resource FungibleTokenAdmin: AdminInterface, FixesFungibleTokenInterface.IGlobalPublic {
+    access(all) resource FungibleTokenAdmin: AdminInterface, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder, FixesFungibleTokenInterface.IAdminWritable {
+        access(self)
+        let minter: @Minter
         access(contract)
         var frc20IndexerController: Capability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>
 
@@ -515,8 +519,25 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             pre {
                 cap.check(): "The capability must be valid"
             }
+            self.minter <- create Minter()
             self.frc20IndexerController = cap
         }
+
+        // @deprecated in Cadence 1.0
+        destroy() {
+            destroy self.minter
+        }
+
+        // ----- Implement AdminInterface -----
+
+        /// Borrow the FRC20 Indexer Controller
+        ///
+        access(contract)
+        fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
+            return self.frc20IndexerController.borrow() ?? panic("The FRC20 Indexer Controller is not found")
+        }
+
+        // ----- Implement IGlobalPublic -----
 
         /// Check if the address is the admin
         access(all)
@@ -527,11 +548,144 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             return meta?.deployer == addr
         }
 
-        /// Borrow the FRC20 Indexer Controller
+        // ----- Implement IAdminWritable -----
+
+        /// Create a new Minter resource
+        ///
+        access(all)
+        fun createMinter(allowedAmount: UFix64): @Minter {
+            panic("This method is invalid for FRC20FundibleToken")
+        }
+
+        /// Update the authorized users
+        ///
+        access(all)
+        fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool) {
+            panic("This method is invalid for FRC20FundibleToken")
+        }
+
+        /// Borrow the super minter resource
+        ///
+        access(all)
+        fun borrowSuperMinter(): &Minter {
+            return &self.minter as &Minter
+        }
+
+        // ----- Implement IMinterHolder -----
+
+        /// Borrow the minter reference
         ///
         access(contract)
-        fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
-            return self.frc20IndexerController.borrow() ?? panic("The FRC20 Indexer Controller is not found")
+        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
+            return self.borrowSuperMinter()
+        }
+    }
+
+    /// Resource object that token admin accounts can hold to mint new tokens.
+    ///
+    access(all) resource Minter: FixesFungibleTokenInterface.IMinter {
+        // ----- Implement IMinter -----
+
+        /// Get the symbol of the minting token
+        ///
+        access(all)
+        view fun getSymbol(): String {
+            return FRC20FungibleToken.getSymbol()
+        }
+
+        /// Get the type of the minting token
+        access(all)
+        view fun getTokenType(): Type {
+            return Type<@FRC20FungibleToken.Vault>()
+        }
+
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String? {
+            return self.getSymbol()
+        }
+
+        /// Get the contract address of the minting token
+        access(all)
+        view fun getContractAddress(): Address {
+            return FRC20FungibleToken.getAccountAddress()
+        }
+
+        /// Get the max supply of the minting token
+        access(all)
+        view fun getMaxSupply(): UFix64 {
+            return FRC20FungibleToken.getMaxSupply()!
+        }
+
+        /// Get the total supply of the minting token
+        ///
+        access(all)
+        view fun getTotalSupply(): UFix64 {
+            return FRC20FungibleToken.getTotalSupply()
+        }
+
+        /// Get the current mintable amount
+        ///
+        access(all)
+        view fun getCurrentMintableAmount(): UFix64 {
+            return 0.0
+        }
+
+        /// Get the total allowed mintable amount
+        ///
+        access(all)
+        view fun getTotalAllowedMintableAmount(): UFix64 {
+            return 0.0
+        }
+
+        /// Get the vault data of the minting token
+        ///
+        access(all)
+        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            return FRC20FungibleToken.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+                ?? panic("The vault data is not found")
+        }
+
+        /// Fake mint tokens
+        ///
+        access(all)
+        fun mintTokens(amount: UFix64): @FRC20FungibleToken.Vault {
+            // Whatever the amount is, it is not mintable, always return empty vault
+            return <- FRC20FungibleToken.createEmptyVault()
+        }
+
+        /// Mint tokens with user's inscription
+        ///
+        access(all)
+        fun initializeVaultByInscription(
+            vault: @FungibleToken.Vault,
+            ins: &Fixes.Inscription
+        ): @FungibleToken.Vault {
+            let convertedVault <- FRC20FungibleToken.convertFromIndexer(ins: ins)
+            assert(
+                convertedVault.isValidVault(),
+                message: "The converted vault must be valid"
+            )
+            assert(
+                convertedVault.getType() == vault.getType(),
+                message: "The converted vault must be of the same type as the token"
+            )
+            if vault.balance == 0.0 {
+                destroy vault
+            } else {
+                convertedVault.deposit(from: <- vault)
+            }
+            return <- convertedVault
+        }
+
+        /// Burn tokens with user's inscription
+        ///
+        access(all)
+        fun burnTokenWithInscription(
+            vault: @FungibleToken.Vault,
+            ins: &Fixes.Inscription
+        ) {
+            FRC20FungibleToken.convertBackToIndexer(ins: ins, vault: <- vault)
         }
     }
 
@@ -539,7 +693,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
     /// Issue new Fungible Tokens from a FRC20 FT Change
     ///
-    access(all)
+    access(contract)
     fun convertFromIndexer(ins: &Fixes.Inscription): @FRC20FungibleToken.Vault {
         pre {
             ins.isExtractable(): "The inscription must be extractable"
@@ -593,7 +747,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
     /// Burn Fungible Tokens and convert into a FRC20 FT Change
     ///
-    access(all)
+    access(contract)
     fun convertBackToIndexer(ins: &Fixes.Inscription, vault: @FungibleToken.Vault) {
         pre {
             ins.isExtractable(): "The inscription must be extractable"
@@ -611,8 +765,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         let fromVault <- vault as! @FRC20FungibleToken.Vault
         let retChange <- fromVault.extract()
-        // burn the fungible token
-        fromVault.burnCallback()
         // no need to emit the event, it is emitted in the extract function
         destroy fromVault
 
@@ -656,9 +808,18 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the FRC20 Indexer Controller
     ///
     access(contract)
-    fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
+    view fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
         let adminRef = self.borrowAdminPublic()
         return adminRef.borrowFRC20Controller()
+    }
+
+    /// Borrow the admin public reference
+    ///
+    access(contract)
+    view fun borrowAdminPublic(): &FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder} {
+        return self.account
+            .getCapability<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
+            .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
     /// ------------ General Functions ------------
@@ -855,15 +1016,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         return "FRC20FT_".concat(self.account.address.toString()).concat(self.getSymbol()).concat("_")
     }
 
-    /// Borrow the admin public reference
-    ///
-    access(all)
-    view fun borrowAdminPublic(): &FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic} {
-        return self.account
-            .getCapability<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic}>(self.getAdminPublicPath())
-            .borrow() ?? panic("The FungibleToken Admin is not found")
-    }
-
     /// Initialize the contract with ticker name
     ///
     init() {
@@ -953,7 +1105,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         self.account.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
         // @deprecated after Cadence 1.0
-        self.account.link<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic}>(
+        self.account.link<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(
             self.getAdminPublicPath(),
             target: adminStoragePath
         )

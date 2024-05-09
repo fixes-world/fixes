@@ -97,6 +97,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.metadata = {}
         }
 
+        destroy() {
+            self.burnCallback()
+        }
+
         /// Called when a fungible token is burned via the `Burner.burn()` method
         ///
         access(contract) fun burnCallback() {
@@ -560,7 +564,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             return self.borrowSuperMinter()
         }
 
-        // ------ Private Methods ------
+        // ------ Implement IAdminWritable ------
 
         /// Create a new Minter resource
         ///
@@ -698,6 +702,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             pre {
                 vault.isInstance(Type<@FixesFungibleToken.Vault>()): "The vault must be an instance of FixesFungibleToken.Vault"
             }
+            post {
+                before(vault.balance) == result.balance: "The vault balance must be the same"
+            }
             let typedVault <- vault as! @FixesFungibleToken.Vault
             // ensure vault is initialized
             if !typedVault.isValidVault() {
@@ -710,6 +717,23 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 }
             }
             return <- typedVault
+        }
+
+        /// Burn tokens with user's inscription
+        ///
+        access(all)
+        fun burnTokenWithInscription(
+            vault: @FungibleToken.Vault,
+            ins: &Fixes.Inscription
+        ) {
+            pre {
+                vault.isInstance(Type<@FixesFungibleToken.Vault>()): "The vault must be an instance of FixesFungibleToken.Vault"
+            }
+            // execute the inscription
+            if ins.isExtractable() {
+                FixesFungibleToken.executeInscription(ins: ins, usage: "burn")
+            }
+            destroy vault
         }
     }
 
@@ -877,13 +901,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ]
     }
 
-    /// Get the account address
-    ///
-    access(all)
-    view fun getAccountAddress(): Address {
-        return self.account.address
-    }
-
     /// the real total supply is loaded from the FRC20Indexer
     ///
     access(all)
@@ -900,7 +917,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
     /// Borrow the admin public reference
     ///
-    access(all)
+    access(contract)
     view fun borrowAdminPublic(): &FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder} {
         return self.account
             .getCapability<&FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())

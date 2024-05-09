@@ -323,11 +323,27 @@ access(all) contract interface FixesFungibleTokenInterface {
         ): @FungibleToken.Vault {
             pre {
                 ins.isExtractable(): "The inscription must be extractable"
+                vault.getType() == self.getTokenType(): "The vault type must be the same"
             }
             post {
                 ins.isExtracted(): "The inscription must be extracted"
                 vault.getType() == result.getType(): "The vault type must be the same"
-                vault.balance == result.balance: "The vault balance must be the same"
+            }
+        }
+
+        /// Burn tokens with user's inscription
+        ///
+        access(all)
+        fun burnTokenWithInscription(
+            vault: @FungibleToken.Vault,
+            ins: &Fixes.Inscription
+        ) {
+            pre {
+                ins.isExtractable(): "The inscription must be extractable"
+                vault.getType() == self.getTokenType(): "The vault type must be the same"
+            }
+            post {
+                ins.isExtracted(): "The inscription must be extracted"
             }
         }
     }
@@ -390,6 +406,13 @@ access(all) contract interface FixesFungibleTokenInterface {
     view fun getPathPrefix(): String
 
     /// ------------ Public Functions - with default implementation ------------
+
+    /// Get the account address
+    ///
+    access(all)
+    view fun getAccountAddress(): Address {
+        return self.account.address
+    }
 
     /// Borrow the shared store
     ///
