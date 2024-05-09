@@ -231,6 +231,20 @@ access(all) contract FixesTradablePool {
             }
         }
 
+        /// Swap all tokens in the vault and deposit to the token out recipient
+        access(all)
+        fun quickSwapToken(
+            _ tokenInVault: @FungibleToken.Vault,
+            _ tokenOutRecipient: &{FungibleToken.Receiver},
+        ) {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                !self.isLocalActive(): "The liquidity pool is active"
+                tokenInVault.balance > 0.0: "The token vault balance must be greater than 0"
+                tokenInVault.isInstance(self.getTokenType()) || tokenInVault.isInstance(Type<@FlowToken.Vault>()): "The token vault is not the same type as the liquidity pool"
+            }
+        }
+
         // ---- Bonding Curve ----
 
         /// Get the curve type
@@ -668,7 +682,6 @@ access(all) contract FixesTradablePool {
             recipient.deposit(from: <- returnVault)
 
             // the variables for the trade event
-            let tickerName = "$".concat(minter.getSymbol())
             let poolAddr = self.getPoolAddress()
             let traderAddr = recipient.owner?.address ?? insOwner
 
@@ -676,7 +689,6 @@ access(all) contract FixesTradablePool {
             self._onTransactionDeal(
                 seller: poolAddr,
                 buyer: traderAddr,
-                tick: tickerName,
                 dealAmount: buyAmount,
                 dealPrice: totalCost
             )
@@ -738,7 +750,6 @@ access(all) contract FixesTradablePool {
             self.vault.deposit(from: <- tokenVault)
 
             // emit the trade event
-            let tickerName = "$".concat(minter.getSymbol())
             let poolAddr = self.getPoolAddress()
             let traderAddr = recipient.owner?.address ?? panic("The recipient owner is missing")
 
@@ -746,7 +757,6 @@ access(all) contract FixesTradablePool {
             self._onTransactionDeal(
                 seller: traderAddr,
                 buyer: poolAddr,
-                tick: tickerName,
                 dealAmount: tokenAmount,
                 dealPrice: totalPrice
             )
@@ -764,6 +774,69 @@ access(all) contract FixesTradablePool {
             )
         }
 
+        /// Swap all tokens in the vault and deposit to the token out recipient
+        /// Only invokable when the local pool is not active
+        ///
+        access(all)
+        fun quickSwapToken(
+            _ tokenInVault: @FungibleToken.Vault,
+            _ tokenOutRecipient: &{FungibleToken.Receiver},
+        ) {
+            let supportTypes = tokenOutRecipient.getSupportedVaultTypes()
+            let minterTokenType = self.getTokenType()
+            let tokenInVaultType = tokenInVault.getType()
+            let isTokenInFlowToken = tokenInVaultType == Type<@FlowToken.Vault>()
+            // check if the recipient supports the token type
+            if isTokenInFlowToken {
+                assert(
+                    supportTypes[minterTokenType] == true,
+                    message: "The recipient does not support FungibleToken.Vault"
+                )
+            } else {
+                assert(
+                    supportTypes[Type<@FlowToken.Vault>()] == true,
+                    message: "The recipient does not support FlowToken.Vault"
+                )
+            }
+
+            let pairPublicRef = self.borrowSwapPairRef() ?? panic("The swap pair is missing")
+            let tokenInAmount = tokenInVault.balance
+            let tokenOutVault <- pairPublicRef.swap(
+                vaultIn: <- tokenInVault,
+                exactAmountOut: nil
+            )
+            let tokenOutAmount = tokenOutVault.balance
+
+            // parameters for the event
+            let symbol = self.minter.getSymbol()
+            let pairAddr = pairPublicRef.owner?.address ?? panic("The pair owner is missing")
+            let traderAddr = tokenOutRecipient.owner?.address ?? panic("The recipient owner is missing")
+            let tradeTokenAmount = isTokenInFlowToken ? tokenOutAmount : tokenInAmount
+            let tradeTokenPrice = isTokenInFlowToken ? tokenInAmount : tokenOutAmount
+
+            tokenOutRecipient.deposit(from: <- tokenOutVault)
+
+            // emit the trade event
+            self._onTransactionDeal(
+                seller: isTokenInFlowToken ? pairAddr : traderAddr,
+                buyer: isTokenInFlowToken ? traderAddr : pairAddr,
+                dealAmount: tradeTokenAmount,
+                dealPrice: tradeTokenPrice
+            )
+
+            emit Trade(
+                trader: traderAddr,
+                isBuy: isTokenInFlowToken,
+                subject: self.getPoolAddress(),
+                ticker: symbol,
+                tokenAmount:tradeTokenAmount,
+                flowAmount: tradeTokenPrice,
+                protocolFee: 0.0,
+                subjectFee: 0.0,
+                supply: self.getTradablePoolCirculatingSupply()
+            )
+        }
+
         // ----- Internal Methods -----
 
         /// The hook that is invoked when a deal is executed
@@ -772,13 +845,12 @@ access(all) contract FixesTradablePool {
         fun _onTransactionDeal(
             seller: Address,
             buyer: Address,
-            tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
         ) {
             let minter = self.borrowMinter()
             // for fixes fungible token, the ticker is $ + {symbol}
-            let tickName = "$".concat(minter.getSymbol())
+            let tickerName = "$".concat(minter.getSymbol())
 
             // ------- start -- Invoke Hooks --------------
             // Invoke transaction hooks to do things like:
@@ -798,7 +870,7 @@ access(all) contract FixesTradablePool {
                 poolTransactionHook.onDeal(
                     seller: seller,
                     buyer: buyer,
-                    tick: tickName,
+                    tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
                     storefront: poolAddr,
@@ -811,7 +883,7 @@ access(all) contract FixesTradablePool {
                 userTransactionHook.onDeal(
                     seller: seller,
                     buyer: buyer,
-                    tick: tickName,
+                    tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
                     storefront: poolAddr,
