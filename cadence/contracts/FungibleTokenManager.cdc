@@ -21,9 +21,10 @@ import "FixesTokenAirDrops"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
+import "FRC20TradingRecord"
 import "FRC20StakingManager"
 import "FRC20Agents"
-import "FRC20TradingRecord"
+import "FRC20Converter"
 
 /// The Manager contract for Fungible Token
 ///
@@ -161,7 +162,7 @@ access(all) contract FungibleTokenManager {
         acctsPool.setupNewChildForFungibleToken(tick: tick, newAccount)
 
         // update the resources in the account
-        self._ensureFungibleTokenAccountResourcesAvailable(tick, false)
+        self._ensureFungibleTokenAccountResourcesAvailable(tick)
         // deploy the contract of Fixes Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
 
@@ -556,9 +557,50 @@ access(all) contract FungibleTokenManager {
         )
 
         // update the resources in the account
-        self._ensureFungibleTokenAccountResourcesAvailable(tickerName, true)
+        self._ensureFungibleTokenAccountResourcesAvailable(tickerName)
+
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tickerName)
+            ?? panic("The staking account was not created")
+
+        // Create the FRC20Agents.IndexerController and save it in the account
+        // This is required for FRC20FungibleToken
+        let ctrlStoragePath = FRC20Agents.getIndexerControllerStoragePath()
+        if childAcctRef.borrow<&AnyResource>(from: ctrlStoragePath) == nil {
+            let indexerController <- FRC20Agents.createIndexerController([tickerName])
+            childAcctRef.save(<- indexerController, to: ctrlStoragePath)
+        }
+
         // deploy the contract of FRC20 Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tickerName, contractName: "FRC20FungibleToken")
+
+        // --- Create the FRC20 Converter ---
+
+        // @deprecated in Cadence 1.0
+        let privPath = /private/FRC20ConverterPrivate
+        if childAcctRef.getCapability<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(privPath) == nil {
+            let contractRef = acctsPool.borrowFTContract(tickerName)
+            // Check if the admin resource is available
+            let adminStoragePath = contractRef.getAdminStoragePath()
+            // link the admin resource to the private path
+            childAcctRef.link<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(
+                privPath,
+                target: adminStoragePath
+            )
+        }
+        let adminCap = childAcctRef.getCapability<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(privPath)
+        assert(
+            adminCap.check(),
+            message: "The admin resource is not available"
+        )
+        let converterStoragePath = FRC20Converter.getFTConverterStoragePath()
+        childAcctRef.save(<- FRC20Converter.createConverter(adminCap), to: converterStoragePath)
+        // link the converter to the public path
+        // @deprecated in Cadence 1.0
+        childAcctRef.link<&FRC20Converter.FTConverter{FRC20Converter.IConverter}>(
+            FRC20Converter.getFTConverterPublicPath(),
+            target: converterStoragePath
+        )
 
         // register token to the tokenlist
         TokenList.ensureFungibleTokenRegistered(newAddr, "FRC20FungibleToken")
@@ -617,7 +659,7 @@ access(all) contract FungibleTokenManager {
     /// Ensure all resources are available
     ///
     access(self)
-    fun _ensureFungibleTokenAccountResourcesAvailable(_ tick: String, _ isFRC20Token: Bool) {
+    fun _ensureFungibleTokenAccountResourcesAvailable(_ tick: String) {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
@@ -658,18 +700,6 @@ access(all) contract FungibleTokenManager {
             store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol, value: symbol)
 
             isUpdated = true || isUpdated
-        }
-
-        // Check if the FRC20Agents.IndexerController is required
-        if isFRC20Token {
-            // Create the FRC20Agents.IndexerController and save it in the account
-            let ctrlStoragePath = FRC20Agents.getIndexerControllerStoragePath()
-            if childAcctRef.borrow<&AnyResource>(from: ctrlStoragePath) == nil {
-                let indexerController <- FRC20Agents.createIndexerController([tick])
-                childAcctRef.save(<- indexerController, to: ctrlStoragePath)
-
-                isUpdated = true || isUpdated
-            }
         }
 
         // create the hooks and save it in the account

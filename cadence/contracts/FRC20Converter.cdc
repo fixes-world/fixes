@@ -93,7 +93,7 @@ access(all) contract FRC20Converter {
 
     /// Interface for the FRC20 Converter
     ///
-    access(all) resource interface IFRC20Converter {
+    access(all) resource interface IConverter {
         /// get the ticker name
         access(all)
         view fun getTickerName(): String
@@ -126,7 +126,7 @@ access(all) contract FRC20Converter {
 
     /// FRC20 Converter
     ///
-    access(all) resource FTConverter: IFRC20Converter {
+    access(all) resource FTConverter: IConverter {
         access(self)
         let adminCap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>
 
@@ -136,7 +136,7 @@ access(all) contract FRC20Converter {
             self.adminCap = cap
         }
 
-        // ---- IFRC20Converter ----
+        // ---- IConverter ----
 
         /// get the ticker name
         ///
@@ -245,9 +245,9 @@ access(all) contract FRC20Converter {
     /// Borrow the FRC20 Converter
     ///
     access(all)
-    view fun borrowConverter(_ addr: Address): &FTConverter{IFRC20Converter}? {
+    view fun borrowConverter(_ addr: Address): &FTConverter{IConverter}? {
         return getAccount(addr)
-            .getCapability<&FTConverter{IFRC20Converter}>(self.getFTConverterPublicPath())
+            .getCapability<&FTConverter{IConverter}>(self.getFTConverterPublicPath())
             .borrow()
     }
 
