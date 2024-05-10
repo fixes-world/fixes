@@ -197,6 +197,9 @@ access(all) contract FRC20Indexer {
         /// Return the change of a FRC20 order back to the owner
         access(account)
         fun returnChange(change: @FRC20FTShared.Change)
+        /// Burn a FRC20 token and withdraw $FLOW by SystemBurner
+        access(account)
+        fun burnFromTreasury(ins: &Fixes.Inscription): @FlowToken.Vault
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -204,7 +207,7 @@ access(all) contract FRC20Indexer {
         // Burn unsupplied frc20 tokens
         access(account)
         fun burnUnsupplied(ins: &Fixes.Inscription)
-        /// Burn unsupplied frc20 tokens
+        /// Withdraw some $FLOW from the treasury
         access(account)
         fun withdrawFromTreasury(ins: &Fixes.Inscription): @FRC20FTShared.Change
         /// Allocate the tokens to some address
@@ -580,9 +583,26 @@ access(all) contract FRC20Indexer {
         }
 
         /// Burn a FRC20 token
+        /// it is public so it can be called by the frc20 holders
         ///
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault {
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            // this method is public, so the token should be burnable
+            assert(
+                tokenMeta.burnable,
+                message: "The token is not burnable"
+            )
+            return <- self.burnFromTreasury(ins: ins)
+        }
+
+        /// Burn a FRC20 token and withdraw $FLOW
+        /// This method is account access, so it can be called by the indexer or other contracts in the account
+        ///
+        access(account)
+        fun burnFromTreasury(ins: &Fixes.Inscription): @FlowToken.Vault {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
@@ -595,10 +615,6 @@ access(all) contract FRC20Indexer {
 
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
-            assert(
-                tokenMeta.burnable,
-                message: "The token is not burnable"
-            )
             assert(
                 tokenMeta.supplied > tokenMeta.burned,
                 message: "The token has been burned out"

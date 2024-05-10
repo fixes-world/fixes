@@ -49,6 +49,13 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FRC20Converter": {
+			"source": "cadence/contracts/FRC20Converter.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20FTShared": {
 			"source": "cadence/contracts/FRC20FTShared.cdc",
 			"aliases": {
@@ -822,11 +829,12 @@
 				"FixesFungibleTokenInterface",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FungibleTokenManager",
+				"FRC20Converter",
 				"FixesBondingCurve",
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
-				"FixesTokenAirDrops"
+				"FixesTokenAirDrops",
+				"FungibleTokenManager"
 			]
 		},
 		"mainnet": {
