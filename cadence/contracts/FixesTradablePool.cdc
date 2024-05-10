@@ -47,19 +47,11 @@ access(all) contract FixesTradablePool {
     // Event that is emitted when the liquidity pool is initialized.
     access(all) event LiquidityPoolInitialized(subject: Address, tokenType: Type, mintedAmount: UFix64)
 
-    // Event that is emitted when the liquidity pool is crowned as king of the hill.
-    access(all) event LiquidityPoolCrownedAsKing(king: Address, tokenType: Type, marketCap: UFix64, at: UFix64)
-
     // Event that is emitted when the liquidity pool is transferred.
     access(all) event LiquidityPoolTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
 
     // Event that is emitted when a user buys or sells tokens.
     access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, ticker: String, tokenAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
-
-    /// -------- Variables --------
-
-    /// The current king of the hill address.
-    access(contract) var currentKingOfTheHillAddress: Address?
 
     /// -------- Resources and Interfaces --------
 
@@ -343,9 +335,6 @@ access(all) contract FixesTradablePool {
         /// The record of LP token burned
         access(self)
         var lpBurned: UFix64
-        /// The time when the pool is crowned as king
-        access(self)
-        var crownedAsKingAt: UFix64?
 
         init(
             _ minter: @{FixesFungibleTokenInterface.IMinter},
@@ -364,7 +353,6 @@ access(all) contract FixesTradablePool {
             self.flowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
             self.acitve = false
             self.lpBurned = 0.0
-            self.crownedAsKingAt = nil
         }
 
         // @deprecated in Cadence v1.0
@@ -918,31 +906,7 @@ access(all) contract FixesTradablePool {
                 // Check the market cap
                 let localMarketCap = self.getLiquidityPoolMarketCap()
                 let targetMarketCap = FixesTradablePool.getTargetMarketCap()
-                let kothMarketCap = FixesTradablePool.getKingOfTheHillMarketCap()
 
-                // if the pool is greater than the current king of the hill's market cap
-                if localMarketCap >= kothMarketCap {
-                    if let addr = FixesTradablePool.currentKingOfTheHillAddress {
-                        if let currKothPool = FixesTradablePool.borrowTradablePool(addr) {
-                            let currKothPoolMarketCap = currKothPool.getLiquidityPoolMarketCap()
-                            if kothMarketCap > currKothPoolMarketCap {
-                                let poolAddr = self.getPoolAddress()
-                                // transfer the liquidity pool to the current king of the hill
-                                FixesTradablePool.currentKingOfTheHillAddress = poolAddr
-                                // set the crowned time
-                                self.crownedAsKingAt = getCurrentBlock().timestamp
-
-                                // emit the king of the hill event
-                                emit LiquidityPoolCrownedAsKing(
-                                    king: poolAddr,
-                                    tokenType: self.getTokenType(),
-                                    marketCap: localMarketCap,
-                                    at: self.crownedAsKingAt!
-                                )
-                            }
-                        }
-                    }
-                }
                 // if the market cap is less than the target market cap, then do nothing
                 if localMarketCap < targetMarketCap {
                     // DO NOT PANIC
@@ -1233,15 +1197,8 @@ access(all) contract FixesTradablePool {
         let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
         let valueInStore = sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolCreateLPTargetMarketCap) as! UFix64?
         // Default is 6480 USD
-        let defaultTargetMarketCap = 6480.0
+        let defaultTargetMarketCap = 100_000.0
         return valueInStore ?? defaultTargetMarketCap
-    }
-
-    /// Get the target koth market cap
-    ///
-    access(all)
-    view fun getKingOfTheHillMarketCap(): UFix64 {
-        return self.getTargetMarketCap() * 0.95
     }
 
     /// Get the trading pool protocol fee
@@ -1291,9 +1248,5 @@ access(all) contract FixesTradablePool {
     view fun getLiquidityPoolPublicPath(): PublicPath {
         let prefix = self.getPathPrefix()
         return PublicPath(identifier: prefix.concat("LiquidityPool"))!
-    }
-
-    init() {
-        self.currentKingOfTheHillAddress = nil
     }
 }
