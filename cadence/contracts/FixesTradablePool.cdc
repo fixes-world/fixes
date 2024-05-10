@@ -30,6 +30,7 @@ import "FixesBondingCurve"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20StakingManager"
+import "FGameRugRoyale"
 
 /// The bonding curve contract.
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
@@ -69,6 +70,13 @@ access(all) contract FixesTradablePool {
             return self.owner?.address ?? panic("The owner is missing")
         }
 
+        /// Check if the liquidity is handovered
+        ///
+        access(all)
+        view fun isLiquidityHandovered(): Bool {
+            return self.isInitialized() && !self.isLocalActive() && self.getSwapPairAddress() != nil
+        }
+
         /// Check if the liquidity pool is initialized
         access(all)
         view fun isInitialized(): Bool
@@ -86,6 +94,10 @@ access(all) contract FixesTradablePool {
         /// Get the token type
         access(all)
         view fun getTokenType(): Type
+
+        /// Get the swap pair address
+        access(all)
+        view fun getSwapPairAddress(): Address?
 
         /// Get the max supply of the token
         access(all)
@@ -119,29 +131,13 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getBurnedLP(): UFix64
 
-        /// Get the swap pair address
-        access(all)
-        view fun getSwapPairAddress(): Address?
-
         /// Get the liquidity market cap
         access(all)
-        view fun getLiquidityPoolMarketCap(): UFix64 {
-            return self.getLiquidityPoolValue() * FixesTradablePool.getFlowPrice()
-        }
+        view fun getLiquidityMarketCap(): UFix64
 
         /// Get the liquidity pool value
         access(all)
-        view fun getLiquidityPoolValue(): UFix64 {
-            if self.isLocalActive() {
-                let flowAmount = self.getFlowBalanceInPool()
-                // The market cap is the flow amount * flow price * 2.0
-                // According to the Token value is equal to the Flow token value.
-                return flowAmount * 2.0
-            } else {
-                // current no liquidity in the pool, all LP token is burned
-                return 0.0
-            }
-        }
+        view fun getLiquidityValue(): UFix64
 
         /// Get the locked liquidity market cap
         ///
@@ -313,7 +309,7 @@ access(all) contract FixesTradablePool {
 
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver {
         /// The bonding curve of the liquidity pool
         access(contract)
         let curve: {FixesBondingCurve.CurveInterface}
@@ -335,6 +331,9 @@ access(all) contract FixesTradablePool {
         /// The record of LP token burned
         access(self)
         var lpBurned: UFix64
+        /// The trade amount
+        access(self)
+        var tradedCount: UInt64
 
         init(
             _ minter: @{FixesFungibleTokenInterface.IMinter},
@@ -353,6 +352,7 @@ access(all) contract FixesTradablePool {
             self.flowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
             self.acitve = false
             self.lpBurned = 0.0
+            self.tradedCount = 0
         }
 
         // @deprecated in Cadence v1.0
@@ -552,6 +552,51 @@ access(all) contract FixesTradablePool {
                     .borrow()
             }
             return nil
+        }
+
+        /// Borrow the token global public reference
+        ///
+        access(all)
+        view fun borrowTokenGlobalPublic(): &AnyResource{FixesFungibleTokenInterface.IGlobalPublic} {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let key = self.minter.getAccountsPoolKey() ?? panic("The accounts pool key is missing")
+            let contractRef = acctsPool.borrowFTContract(key)
+            return contractRef.borrowGlobalPublic()
+        }
+
+        // ----- Implement FGameRugRoyale.LiquidityHolder -----
+
+        /// Get the liquidity market cap
+        access(all)
+        view fun getLiquidityMarketCap(): UFix64 {
+            return self.getLiquidityValue() * FixesTradablePool.getFlowPrice()
+        }
+
+        /// Get the liquidity pool value
+        access(all)
+        view fun getLiquidityValue(): UFix64 {
+            if self.isLocalActive() {
+                let flowAmount = self.getFlowBalanceInPool()
+                // The market cap is the flow amount * flow price * 2.0
+                // According to the Token value is equal to the Flow token value.
+                return flowAmount * 2.0
+            } else {
+                // current no liquidity in the pool, all LP token is burned
+                return 0.0
+            }
+        }
+
+        /// Get the token holders
+        access(all)
+        view fun getHolders(): UInt64 {
+            let globalInfo = self.borrowTokenGlobalPublic()
+            return globalInfo.getHoldersAmount()
+        }
+
+        /// Get the trade count
+        access(all)
+        view fun getTrades(): UInt64 {
+            return self.tradedCount
         }
 
         // ----- Implement FungibleToken.Receiver -----
@@ -836,6 +881,9 @@ access(all) contract FixesTradablePool {
             dealAmount: UFix64,
             dealPrice: UFix64,
         ) {
+            // update the traded count
+            self.tradedCount = self.tradedCount + 1
+
             let minter = self.borrowMinter()
             // for fixes fungible token, the ticker is $ + {symbol}
             let tickerName = "$".concat(minter.getSymbol())
@@ -904,7 +952,7 @@ access(all) contract FixesTradablePool {
         fun _ensureSwapPairAndAddLiquidity() {
             if self.isLocalActive() {
                 // Check the market cap
-                let localMarketCap = self.getLiquidityPoolMarketCap()
+                let localMarketCap = self.getLiquidityMarketCap()
                 let targetMarketCap = FixesTradablePool.getTargetMarketCap()
 
                 // if the market cap is less than the target market cap, then do nothing
@@ -1220,10 +1268,10 @@ access(all) contract FixesTradablePool {
     /// Get the public capability of Tradable Pool
     ///
     access(all)
-    view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool{LiquidityPoolInterface, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook}? {
+    view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool{LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}? {
         // @deprecated in Cadence 1.0
         return getAccount(addr)
-            .getCapability<&TradableLiquidityPool{LiquidityPoolInterface, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook}>(self.getLiquidityPoolPublicPath())
+            .getCapability<&TradableLiquidityPool{LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}>(self.getLiquidityPoolPublicPath())
             .borrow()
     }
 

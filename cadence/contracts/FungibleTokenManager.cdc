@@ -25,6 +25,7 @@ import "FRC20TradingRecord"
 import "FRC20StakingManager"
 import "FRC20Agents"
 import "FRC20Converter"
+import "FGameRugRoyale"
 
 /// The Manager contract for Fungible Token
 ///
@@ -241,7 +242,7 @@ access(all) contract FungibleTokenManager {
         // link the tradable pool to the public path
         let poolPublicPath = FixesTradablePool.getLiquidityPoolPublicPath()
         // @deprecated in Cadence 1.0
-        childAcctRef.link<&FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface, FungibleToken.Receiver, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook}>(
+        childAcctRef.link<&FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}>(
             poolPublicPath,
             target: poolStoragePath
         )

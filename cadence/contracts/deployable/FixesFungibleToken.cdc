@@ -279,6 +279,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                         }
                     }
                 }
+                // if balance is greater than 0, then update the token holder
+                if self.balance > 0.0 && !adminRef.isTokenHolder(ownerAddr!) {
+                    adminRef.onTokenDeposited(ownerAddr!)
+                }
             }
 
             // emit the event
@@ -458,6 +462,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// The top 100 accounts sorted by balance
         access(self)
         let top100Accounts: [Address]
+        /// All token holders
+        access(self)
+        let tokenHolders: {Address: Bool}
         /// All authorized users
         access(self)
         let authorizedUsers: {Address: Bool}
@@ -467,6 +474,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.grantedMintableAmount = 0.0
             self.top100Accounts = []
             self.authorizedUsers = {}
+            self.tokenHolders = {}
         }
 
         // @deprecated in Cadence 1.0
@@ -520,6 +528,29 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(all)
         view fun isInTop100(_ address: Address): Bool {
             return self.top100Accounts.contains(address)
+        }
+
+        /// Check if the address is the token holder
+        access(all)
+        view fun isTokenHolder(_ addr: Address): Bool {
+            return self.tokenHolders[addr] == true
+        }
+
+        /// Get the holders amount
+        access(all)
+        view fun getHoldersAmount(): UInt64 {
+            return UInt64(self.tokenHolders.keys.length)
+        }
+
+        /// update the token holder
+        access(contract)
+        fun onTokenDeposited(_ address: Address): Bool {
+            var isUpdated = false
+            if self.tokenHolders[address] == nil {
+                self.tokenHolders[address] = true
+                isUpdated = true
+            }
+            return isUpdated
         }
 
         /// update the balance ranking

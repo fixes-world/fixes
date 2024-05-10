@@ -230,7 +230,25 @@ access(all) contract interface FixesFungibleTokenInterface {
             return false
         }
 
+        /// Check if the address is the token holder
+        access(all)
+        view fun isTokenHolder(_ addr: Address): Bool {
+            return false
+        }
+
+        /// Get the holders amount
+        access(all)
+        view fun getHoldersAmount(): UInt64 {
+            return 0
+        }
+
         // ---- Optional ----
+
+        /// update the token holder
+        access(contract)
+        fun onTokenDeposited(_ address: Address): Bool {
+            return false
+        }
 
         /// update the balance ranking
         access(contract)

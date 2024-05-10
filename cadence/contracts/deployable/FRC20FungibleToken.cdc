@@ -548,6 +548,23 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             return meta?.deployer == addr
         }
 
+        /// Check if the address is the token holder
+        ///
+        access(all)
+        view fun isTokenHolder(_ addr: Address): Bool {
+            let tick = FRC20FungibleToken.getSymbol()
+            return FRC20FungibleToken.getTokenBalance(addr) > 0.0
+        }
+
+        /// Get the holders amount
+        ///
+        access(all)
+        view fun getHoldersAmount(): UInt64 {
+            let frc20Indexer = FRC20Indexer.getIndexer()
+            let tick = FRC20FungibleToken.getSymbol()
+            return frc20Indexer.getHoldersAmount(tick: tick)
+        }
+
         // ----- Implement IAdminWritable -----
 
         /// Create a new Minter resource
