@@ -232,7 +232,7 @@ access(all) contract FRC20Votes {
         ///
         access(all)
         fun getVotingPower(): UFix64 {
-            let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+            let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
             let selfAddr = self.getVoterAddress()
 
             var power = 0.0
@@ -288,7 +288,7 @@ access(all) contract FRC20Votes {
             let details = proposal.getDetails()
 
             // check the staked balance
-            let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+            let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
 
             let stakedNFTColRef = self.semiNFTColCap.borrow() ?? panic("The staked NFT collection is not found")
             let unlockingStakedBalance = stakedNFTColRef.getStakedBalance(tick: stakeTick)
@@ -346,7 +346,7 @@ access(all) contract FRC20Votes {
             // check is no more active proposals
             if self.activeProposals.keys.length == 0 {
                 // return all the staked NFTs to the staked collection
-                let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+                let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
                 let lockedNFTIds = self.lockedSemiNFTCollection.getIDsByTick(tick: stakeTick)
                 if let semiNFTColRef = self.semiNFTColCap.borrow() {
                     for id in lockedNFTIds {
@@ -773,7 +773,7 @@ access(all) contract FRC20Votes {
             pre {
                 self.isVotingAllowed(): "Voting is not allowed for now"
                 choice < self.details.slots.length: "Choice is out of range"
-                semiNFT.getOriginalTick() == FRC20StakingManager.getPlatformStakingTickerName(): "The ticker is not the staking ticker"
+                semiNFT.getOriginalTick() == FRC20FTShared.getPlatformStakingTickerName(): "The ticker is not the staking ticker"
                 semiNFT.isStakedTick(): "The ticker is not staked"
                 semiNFT.getBalance() > 0.0: "The NFT balance is zero"
                 self.votedNFTs[semiNFT.id] == nil: "NFT is already voted"
@@ -1027,7 +1027,7 @@ access(all) contract FRC20Votes {
                 // ensure the staked amount is enough
                 return voter.getVotingPower() >= thresholdPower
             } else if let delegatorRef = FRC20Staking.borrowDelegator(voterAddr) {
-                let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+                let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
                 return delegatorRef.getStakedBalance(tick: stakeTick) >= thresholdPower
             }
             return false

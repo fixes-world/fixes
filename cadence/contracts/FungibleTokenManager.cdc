@@ -1,7 +1,7 @@
 /**
 > Author: FIXeS World <https://fixes.world/>
 
-# FRC20 Fungible Token Manager
+# Fungible Token Manager
 
 This contract is used to manage the account and contract of Fixes' Fungible Tokens
 
@@ -107,7 +107,7 @@ access(all) contract FungibleTokenManager {
         }
     }
 
-    /** ------- Public Methods - Authorized Users ---- */
+    /** ------- Public Methods ---- */
 
     /// Check if the Fungible Token Symbol is already enabled
     ///
@@ -196,6 +196,14 @@ access(all) contract FungibleTokenManager {
         // inscription data
         let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        // check if the caller is authorized
+        let callerAddr = ins.owner?.address ?? panic("The owner of the inscription is not found")
+        assert(
+            tokenAdminRef.isAuthorizedUser(callerAddr),
+            message: "You are not authorized to setup the tradable pool resources"
+        )
 
         // try to borrow the account to check if it was created
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
@@ -296,6 +304,14 @@ access(all) contract FungibleTokenManager {
         let meta = self.verifyExecutingInscription(ins, usage: "setup-lockdrop")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        // check if the caller is authorized
+        let callerAddr = ins.owner?.address ?? panic("The owner of the inscription is not found")
+        assert(
+            tokenAdminRef.isAuthorizedUser(callerAddr),
+            message: "You are not authorized to setup the lockdrops pool resources"
+        )
+
         // try to borrow the account to check if it was created
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
             ?? panic("The staking account was not created")
@@ -365,6 +381,14 @@ access(all) contract FungibleTokenManager {
         // inscription data
         let meta = self.verifyExecutingInscription(ins, usage: "setup-airdrop")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        // check if the caller is authorized
+        let callerAddr = ins.owner?.address ?? panic("The owner of the inscription is not found")
+        assert(
+            tokenAdminRef.isAuthorizedUser(callerAddr),
+            message: "You are not authorized to setup the airdrops pool resources"
+        )
 
         // try to borrow the account to check if it was created
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)

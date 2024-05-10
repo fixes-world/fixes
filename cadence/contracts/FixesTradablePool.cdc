@@ -1164,7 +1164,7 @@ access(all) contract FixesTradablePool {
     ///
     access(all)
     view fun isAdvancedTokenPlayer(_ addr: Address): Bool {
-        let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+        let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
         // the threshold is 100K staked $flows
         let threshold = 100_000.0
         return FRC20StakingManager.isEligibleByStakePower(stakeTick: stakeTick, addr: addr, threshold: threshold)

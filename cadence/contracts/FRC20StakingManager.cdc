@@ -519,15 +519,6 @@ access(all) contract FRC20StakingManager {
 
     /** ---- Public Methods - User ---- */
 
-    /// Get the staking ticker name.
-    ///
-    access(all)
-    view fun getPlatformStakingTickerName(): String {
-        let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
-        let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
-        return stakingToken ?? "flows"
-    }
-
     /// Borrow the platform staking pool.
     ///
     access(all)
@@ -535,7 +526,7 @@ access(all) contract FRC20StakingManager {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         // Get the staking pool address
-        let stakeTick = self.getPlatformStakingTickerName()
+        let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
         let poolAddress = acctsPool.getFRC20StakingAddress(tick: stakeTick)
             ?? panic("The staking pool is not enabled")
         // borrow the staking pool

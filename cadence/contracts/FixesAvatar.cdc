@@ -97,7 +97,11 @@ access(all) contract FixesAvatar {
             // For season 0, we only support the following tick
             // "flows", the default tick
             // "fixes", the tick for the FIXeS platform
-            if tick == "flows" || tick == "fixes" {
+            let availableTicks = [
+                FRC20FTShared.getPlatformStakingTickerName(),
+                FRC20FTShared.getPlatformUtilityTickerName()
+            ]
+            if availableTicks.contains(tick) {
                 if let entry <- FixesTraits.attemptToGenerateRandomEntryForSeason0() {
                     log("Generated a random entry for season 0".concat(entry.uuid.toString()))
                     self.addTraitEntry(<- entry)

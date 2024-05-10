@@ -346,7 +346,7 @@ access(all) contract FRC20VoteCommands {
 
             // singleton resources
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            let platformStakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+            let platformStakeTick = FRC20FTShared.getPlatformStakingTickerName()
             let vestingBatch = UInt32.fromString(meta["batch"]!)
             let vestingInterval = UFix64.fromString(meta["interval"]!)
             if vestingBatch == nil || vestingInterval == nil {

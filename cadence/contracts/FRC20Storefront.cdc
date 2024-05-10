@@ -847,7 +847,7 @@ access(all) contract FRC20Storefront {
             let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
 
             // some constants
-            let stakingFRC20Tick = (globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?) ?? "flows"
+            let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
             let listingTick = self.details.tick
             let listingTokenMeta = frc20Indexer.getTokenMeta(tick: listingTick)
                 ?? panic("Unable to fetch the token meta")

@@ -343,7 +343,7 @@ access(all) contract FRC20AccountsPool {
 
             // 1/4 -> Platform Staking Account
             let globalStore = FRC20FTShared.borrowGlobalStoreRef()
-            let stakingFRC20Tick = (globalStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?) ?? "flows"
+            let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
             if let addr = self.getAddress(type: ChildAccountType.Staking, stakingFRC20Tick) {
                 if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
                     // withdraw the tokens to the treasury

@@ -42,7 +42,7 @@ access(all) contract FGameLotteryFactory {
         self._initializeLotteryPool(
             controller,
             name: self.getFIXESLotteryPoolName(),
-            rewardTick: "fixes",
+            rewardTick: FRC20FTShared.getPlatformUtilityTickerName(),
             ticketPrice: FixesInscriptionFactory.estimateLotteryFIXESTicketsCost(1, nil),
             epochInterval: epochInterval,
             newAccount: newAccount

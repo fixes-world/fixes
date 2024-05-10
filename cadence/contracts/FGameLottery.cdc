@@ -1329,9 +1329,9 @@ access(all) contract FGameLottery {
                 let feeTickName = feeChange.getOriginalTick()
                 let totalFeeAmount = feeChange.getBalance()
                 // Borrow the FRC20 accounts pool
-                let acctsPool: &FRC20AccountsPool.Pool{FRC20AccountsPool.PoolPublic} = FRC20AccountsPool.borrowAccountsPool()
+                let acctsPool = FRC20AccountsPool.borrowAccountsPool()
                 let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
-                let stakingFRC20Tick = (globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?) ?? "flows"
+                let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
 
                 if feeTickName == "" {
                     // this is $FLOW token

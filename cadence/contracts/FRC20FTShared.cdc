@@ -738,6 +738,7 @@ access(all) contract FRC20FTShared {
         // TradablePool config type
         access(all) case TradablePoolCreateLPTargetMarketCap
         access(all) case TradablePoolTradingFee
+        // Rug Royale config type
     }
 
     /* --- Public Methods --- */
@@ -904,6 +905,24 @@ access(all) contract FRC20FTShared {
         return getAccount(address)
             .getCapability<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath)
             .borrow()
+    }
+
+    /// Get the staking ticker name.
+    ///
+    access(all)
+    view fun getPlatformStakingTickerName(): String {
+        let globalSharedStore = self.borrowGlobalStoreRef()
+        let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
+        return stakingToken ?? "flows"
+    }
+
+    /// Get the platform utility ticker name.
+    ///
+    access(all)
+    view fun getPlatformUtilityTickerName(): String {
+        let globalSharedStore = self.borrowGlobalStoreRef()
+        let tick = globalSharedStore.get("platform:UtilityToken") as! String?
+        return tick ?? "fixes"
     }
 
     /* --- Account Methods --- */

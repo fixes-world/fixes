@@ -984,7 +984,8 @@ access(all) contract FixesTokenLockDrops {
     ///
     access(all)
     view fun isSupportedLockingTick(_ lockingTick: String): Bool {
-        return lockingTick == "" || lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) || lockingTick == "fixes"
+        let utilityTick = FRC20FTShared.getPlatformUtilityTickerName()
+        return lockingTick == "" || lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) || lockingTick == utilityTick
     }
 
     /// Create an empty change for acceptable locking tick
@@ -993,6 +994,7 @@ access(all) contract FixesTokenLockDrops {
     fun createEmptyChangeForLockingTick(_ lockingTick: String, _ from: Address): @FRC20FTShared.Change {
         // setup empty locking change
         var emptyChange: @FRC20FTShared.Change? <- nil
+        let utilityTick = FRC20FTShared.getPlatformUtilityTickerName()
         if lockingTick == "" {
             // create an empty flow change
             emptyChange <-! FRC20FTShared.createEmptyFlowChange(from: from)
@@ -1000,7 +1002,7 @@ access(all) contract FixesTokenLockDrops {
             // create an empty stFlowToken change
             let vault <- stFlowToken.createEmptyVault()
             emptyChange <-! FRC20FTShared.wrapFungibleVaultChange(ftVault: <- vault, from: from)
-        } else if lockingTick == "fixes" {
+        } else if lockingTick == utilityTick {
             // create an empty fixes change
             let frc20Indexer = FRC20Indexer.getIndexer()
             assert(
