@@ -524,7 +524,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// update the balance ranking
         ///
-        access(account)
+        access(contract)
         fun onBalanceChanged(_ address: Address): Bool {
             // remove the address from the top 100
             if let idx = self.top100Accounts.firstIndex(of: address) {
@@ -679,8 +679,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(all)
         fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
             pre {
-                self.allowedAmount == nil || amount <= self.allowedAmount!: "Amount minted must be less than the allowed amount"
                 amount > 0.0: "Amount minted must be greater than zero"
+                self.allowedAmount == nil || amount <= self.allowedAmount!: "Amount minted must be less than the allowed amount"
             }
             if self.allowedAmount != nil {
                 self.allowedAmount = self.allowedAmount! - amount

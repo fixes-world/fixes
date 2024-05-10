@@ -14,7 +14,6 @@ import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
 import "FRC20Indexer"
-import "FRC20AccountsPool"
 
 access(all) contract FRC20Converter {
     /* --- Events --- */
@@ -95,16 +94,134 @@ access(all) contract FRC20Converter {
     /// Interface for the FRC20 Converter
     ///
     access(all) resource interface IFRC20Converter {
-
+        /// get the ticker name
+        access(all)
+        view fun getTickerName(): String
+        /// get the token type
+        access(all)
+        view fun getTokenType(): Type
+        /// convert the frc20 to the frc20 FT
+        access(all)
+        fun convertFromIndexer(ins: &Fixes.Inscription, recipient: &{FungibleToken.Receiver}) {
+            pre {
+                ins.isExtractable(): "Inscription is not extractable"
+                recipient.getSupportedVaultTypes()[self.getTokenType()] == true: "Recipient does not support the token type"
+            }
+            post {
+                ins.isExtracted(): "Inscription is not extracted"
+            }
+        }
+        /// convert the frc20 FT to the frc20
+        access(all)
+        fun convertBackToIndexer(ins: &Fixes.Inscription, vault: @FungibleToken.Vault) {
+            pre {
+                ins.isExtractable(): "Inscription is not extractable"
+                vault.getType() == self.getTokenType(): "Vault does not support the token type"
+            }
+            post {
+                ins.isExtracted(): "Inscription is not extracted"
+            }
+        }
     }
 
     /// FRC20 Converter
     ///
     access(all) resource FTConverter: IFRC20Converter {
+        access(self)
+        let adminCap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>
 
+        init(
+            _ cap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>
+        ) {
+            self.adminCap = cap
+        }
+
+        // ---- IFRC20Converter ----
+
+        /// get the ticker name
+        ///
+        access(all)
+        view fun getTickerName(): String {
+            let minter = self.borrowMinterRef()
+            return minter.getSymbol()
+        }
+
+        /// get the token type
+        access(all)
+        view fun getTokenType(): Type {
+            let minter = self.borrowMinterRef()
+            return minter.getTokenType()
+        }
+
+        /// convert the frc20 to the frc20 FT
+        ///
+        access(all)
+        fun convertFromIndexer(ins: &Fixes.Inscription, recipient: &{FungibleToken.Receiver}) {
+            // borrow the minter reference
+            let minter = self.borrowMinterRef()
+
+            // parse the metadata
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+            let minterTicker = minter.getSymbol()
+            assert(
+                minterTicker == tick,
+                message: "The token tick does not match the converter ticker"
+            )
+
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            let minterType = minter.getTokenType()
+            // convert the tokens
+            let emptyVault <- minter.mintTokens(amount: 0.0)
+            let convertedVault <- minter.initializeVaultByInscription(vault: <- emptyVault, ins: ins)
+            assert(
+                convertedVault.getType() == minterType,
+                message: "The converted vault type does not match the minter type"
+            )
+            assert(
+                amt == convertedVault.balance,
+                message: "The converted vault balance does not match the inscription amount"
+            )
+
+            recipient.deposit(from: <- convertedVault)
+        }
+
+        /// convert the frc20 FT to the frc20
+        ///
+        access(all)
+        fun convertBackToIndexer(ins: &Fixes.Inscription, vault: @FungibleToken.Vault) {
+            // borrow the minter reference
+            let minter = self.borrowMinterRef()
+
+            // parse the metadata
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
+            let minterTicker = minter.getSymbol()
+            assert(
+                minterTicker == tick,
+                message: "The token tick does not match the converter ticker"
+            )
+            // burn the tokens
+            minter.burnTokenWithInscription(vault: <- vault, ins: ins)
+        }
+
+        // ----- Internal Methods ----
+
+        /// Borrow the admin reference
+        ///
+        access(self)
+        view fun borrowAdminRef(): &{FixesFungibleTokenInterface.IAdminWritable} {
+            return self.adminCap.borrow()
+                ?? panic("Could not borrow the admin reference")
+        }
+
+        /// Borrow the super minter reference
+        ///
+        access(self)
+        view fun borrowMinterRef(): &{FixesFungibleTokenInterface.IMinter} {
+            return self.borrowAdminRef().borrowSuperMinter()
+        }
     }
-
-    /** ------- Internal Methods ---- */
 
     /** ------- Public Methods ---- */
 
@@ -121,8 +238,17 @@ access(all) contract FRC20Converter {
     /// Create the FRC20 Converter
     ///
     access(all)
-    fun createConverter(): @FTConverter {
-        return <- create FTConverter()
+    fun createConverter(_ privCap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>): @FTConverter {
+        return <- create FTConverter(privCap)
+    }
+
+    /// Borrow the FRC20 Converter
+    ///
+    access(all)
+    view fun borrowConverter(_ addr: Address): &FTConverter{IFRC20Converter}? {
+        return getAccount(addr)
+            .getCapability<&FTConverter{IFRC20Converter}>(self.getFTConverterPublicPath())
+            .borrow()
     }
 
     /// Get the prefix for the storage paths

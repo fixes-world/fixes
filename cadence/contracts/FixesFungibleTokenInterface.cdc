@@ -233,7 +233,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         // ---- Optional ----
 
         /// update the balance ranking
-        access(account)
+        access(contract)
         fun onBalanceChanged(_ address: Address): Bool {
             return false
         }
@@ -242,15 +242,20 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// The admin interface for the FT
     ///
     access(all) resource interface IAdminWritable {
-        /// Create a new Minter resource
-        ///
+        /// Check if the address is the admin
         access(all)
-        fun createMinter(allowedAmount: UFix64): @{IMinter}
+        view fun isAuthorizedUser(_ addr: Address): Bool
 
         /// Update the authorized users
         ///
         access(all)
         fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool)
+
+        /// Create a new Minter resource
+        ///
+        access(all)
+        fun createMinter(allowedAmount: UFix64): @{IMinter}
+
 
         /// Borrow the super minter resource
         ///
@@ -309,7 +314,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         fun mintTokens(amount: UFix64): @FungibleToken.Vault {
             pre {
-                amount > 0.0: "The amount must be greater than zero"
                 amount <= self.getMaxSupply() - self.getTotalSupply(): "The amount must be less than or equal to the remaining supply"
             }
         }

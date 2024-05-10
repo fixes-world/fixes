@@ -650,6 +650,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(all)
         fun mintTokens(amount: UFix64): @FRC20FungibleToken.Vault {
+            pre {
+                amount == 0.0: "The amount must be zero"
+            }
             // Whatever the amount is, it is not mintable, always return empty vault
             return <- FRC20FungibleToken.createEmptyVault()
         }
