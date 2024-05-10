@@ -20,6 +20,18 @@ access(all) contract FRC20Converter {
 
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
+    /// Event emitted when the FRC20 Converter is created
+    access(all) event FRC20ConverterCreated(
+        _ ticker: String,
+        tokenType: Type
+    )
+    /// Event emitted when the FRC20 tokens are burned
+    access(all) event FRC20TokenBurned(
+        _ ticker: String,
+        amount: UFix64,
+        flowRefund: UFix64,
+        receiver: Type
+    )
 
     /** --- Interfaces & Resources --- */
 
@@ -84,10 +96,21 @@ access(all) contract FRC20Converter {
                 self.isTickerBurnable(tick),
                 message: "The token is not burnable by the system burner."
             )
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             // burn the tokens
             let frc20Indexer = FRC20Indexer.getIndexer()
             let flowVault <- frc20Indexer.burnFromTreasury(ins: ins)
+            let flowRefundAmount = flowVault.balance
+            // deposit the flow tokens
             recipient.depositFlowToken(<- flowVault)
+
+            // emit the event
+            emit FRC20TokenBurned(
+                tick,
+                amount: amt,
+                flowRefund: flowRefundAmount,
+                receiver: recipient.getType()
+            )
         }
     }
 
@@ -124,7 +147,7 @@ access(all) contract FRC20Converter {
         }
     }
 
-    /// FRC20 Converter
+    /// The general FRC20 Converter for arbitrary FRC20 Token
     ///
     access(all) resource FTConverter: IConverter {
         access(self)
@@ -134,6 +157,13 @@ access(all) contract FRC20Converter {
             _ cap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>
         ) {
             self.adminCap = cap
+
+            // emit the event
+            let minter = self.borrowMinterRef()
+            emit FRC20ConverterCreated(
+                minter.getSymbol(),
+                tokenType: minter.getTokenType()
+            )
         }
 
         // ---- IConverter ----
