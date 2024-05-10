@@ -29,9 +29,9 @@ import "FixesTradablePool"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 
-/// Fixes Rug Royale Contract
+/// Rug Royale Game Contract
 ///
-access(all) contract FixesRugRoyale {
+access(all) contract FGameRugRoyale {
 
     // ------ Events -------
     /// Event emitted when the contract is initialized
@@ -42,22 +42,31 @@ access(all) contract FixesRugRoyale {
 
     /// The public interface for the Game
     ///
-    access(all) resource interface GamePublic {
+    access(all) resource interface GameCenterPublic {
 
     }
 
     /// The Game Resource
     ///
-    access(all) resource GameCenter: GamePublic {
+    access(all) resource GameCenter: GameCenterPublic, FixesHeartbeat.IHeartbeatHook {
 
+        // ----- Implement IHeartbeatHook -----
+
+        /// The methods that is invoked when the heartbeat is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            // TODO: Implement the heartbeat logic
+        }
     }
 
     /// ------ Public Methods ------
 
     access(all)
-    view fun borrowGameCenter(): &GameCenter{GamePublic} {
+    view fun borrowGameCenter(): &GameCenter{GameCenterPublic, FixesHeartbeat.IHeartbeatHook} {
         return getAccount(self.account.address)
-            .getCapability<&GameCenter{GamePublic}>(self.getGameCenterPublicPath())
+            .getCapability<&GameCenter{GameCenterPublic, FixesHeartbeat.IHeartbeatHook}>(self.getGameCenterPublicPath())
             .borrow()
             ?? panic("GameCenter not found")
     }
@@ -89,7 +98,12 @@ access(all) contract FixesRugRoyale {
         // Create the GameCenter
         let storagePath = self.getGameCenterStoragePath()
         self.account.save(<- create GameCenter(), to: storagePath)
-        self.account.link<&GameCenter{GamePublic}>(self.getGameCenterPublicPath(), target: storagePath)
+        // Link the GameCenter to the public path
+        // @deprecated in Cadence 1.0
+        self.account.link<&GameCenter{GameCenterPublic, FixesHeartbeat.IHeartbeatHook}>(
+            self.getGameCenterPublicPath(),
+            target: storagePath
+        )
 
         emit ContractInitialized()
     }

@@ -217,8 +217,8 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FixesRugRoyale": {
-			"source": "cadence/contracts/FixesRugRoyale.cdc",
+		"FGameRugRoyale": {
+			"source": "cadence/contracts/FGameRugRoyale.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
@@ -841,7 +841,7 @@
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
 				"FixesTokenAirDrops",
-				"FixesRugRoyale",
+				"FGameRugRoyale",
 				"FungibleTokenManager"
 			]
 		},
