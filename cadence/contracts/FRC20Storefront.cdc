@@ -621,7 +621,9 @@ access(all) contract FRC20Storefront {
             )
 
             let detailRef = &self.details as &ListingDetails
-            var payment: @FlowToken.Vault? <- nil
+            var payment <- FlowToken.createEmptyVault() as! @FlowToken.Vault
+            let paymentRef = &payment as &FlowToken.Vault
+
             var transactedAmt: UFix64? = nil
             let restChange <- frc20Indexer.applySellNowOrder(
                 makerIns: buyerIns,
@@ -638,7 +640,7 @@ access(all) contract FRC20Storefront {
                     // cache the transacted amount
                     transactedAmt = realTransactedAmt
                     // cache the payment vault to the caller
-                    payment <-! flowToPay
+                    paymentRef.deposit(from: <- flowToPay)
                     // return true if the listing is fully transacted
                     return detailRef.isFullyTransacted()
                 }
@@ -647,14 +649,14 @@ access(all) contract FRC20Storefront {
             // re-store the change
             self.frozenChange <-! restChange
 
-            let transactedPrice = payment?.balance ?? panic("Unable to fetch the payment balance")
+            let transactedPrice = payment.balance
             // The payment vault for the sale is from the taker's address
             let paymentRecipient = Fixes.borrowFlowTokenReceiver(seller)
                 ?? panic("Unable to fetch the payment recipient")
 
             // Pay the sale cuts to the recipients.
             let commissionAmount = self._payToSaleCuts(
-                payment: <- (payment ?? panic("Payment is nil")),
+                payment: <- payment,
                 commissionRecipient: commissionRecipient,
                 paymentRecipient: paymentRecipient,
             )
