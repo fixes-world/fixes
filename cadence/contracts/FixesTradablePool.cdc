@@ -48,8 +48,14 @@ access(all) contract FixesTradablePool {
     // Event that is emitted when the liquidity pool is initialized.
     access(all) event LiquidityPoolInitialized(subject: Address, tokenType: Type, mintedAmount: UFix64)
 
-    // Event that is emitted when the liquidity pool is transferred.
-    access(all) event LiquidityPoolTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
+    /// Event that is emitted when the liquidity pool is activated.
+    access(all) event LiquidityPoolInactivated(subject: Address, tokenType: Type)
+
+    /// Event that is emitted when the liquidity is added.
+    access(all) event LiquidityAdded(subject: Address, tokenType: Type, flowAmount: UFix64)
+
+    // Event that is emitted when the liquidity is transferred.
+    access(all) event LiquidityTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
 
     // Event that is emitted when a user buys or sells tokens.
     access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, ticker: String, tokenAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
@@ -599,6 +605,60 @@ access(all) contract FixesTradablePool {
             return self.tradedCount
         }
 
+        /// Pull liquidity from the pool
+        access(account)
+        fun pullLiquidity(): @FungibleToken.Vault {
+            if self.flowVault.balance < 0.02 {
+                return <- FlowToken.createEmptyVault()
+            }
+
+            // only leave 0.02 $FLOW to setup the liquidity pair
+            let liquidityAmount = self.flowVault.balance - 0.02
+            let liquidityVault <- self.flowVault.withdraw(amount: liquidityAmount)
+
+            // All Liquidity is pulled, so the pool should be set to be inactive
+            self.transferLiquidity()
+
+            return <- liquidityVault
+        }
+
+        /// Push liquidity to the pool
+        ///
+        access(account)
+        fun addLiquidity(_ vault: @FungibleToken.Vault) {
+            let amount = vault.balance
+            self.flowVault.deposit(from: <- vault)
+
+            // if not active, then try to add liquidity
+            let swapThreshold = 10.0
+            if self.isLiquidityHandovered() && self.flowVault.balance >= swapThreshold {
+                self._transferLiquidity()
+            }
+
+            // Emit the event
+            emit LiquidityAdded(
+                subject: self.getPoolAddress(),
+                tokenType: self.getTokenType(),
+                flowAmount: amount
+            )
+        }
+
+        /// Transfer liquidity to swap pair
+        ///
+        access(account)
+        fun transferLiquidity() {
+            // check if flow vault has enough liquidity, if not then do nothing
+            if self.flowVault.balance < 0.02 {
+                // DO NOT PANIC
+                return
+            }
+
+            // Ensure the swap pair is created
+            self._ensureSwapPair()
+            // Transfer the liquidity to the swap pair
+            self._transferLiquidity()
+        }
+
         // ----- Implement FungibleToken.Receiver -----
 
         /// Returns whether or not the given type is accepted by the Receiver
@@ -624,14 +684,9 @@ access(all) contract FixesTradablePool {
         // Function that takes a Vault object as an argument and forwards
         // it to the recipient's Vault using the stored reference
         //
-        access(all) fun deposit(from: @FungibleToken.Vault) {
-            self.flowVault.deposit(from: <- from)
-
-            // if not active, then try to add liquidity
-            let swapThreshold = 10.0
-            if !self.isLocalActive() && self.flowVault.balance >= swapThreshold {
-                self._ensureSwapPairAndAddLiquidity()
-            }
+        access(all)
+        fun deposit(from: @FungibleToken.Vault) {
+            self.addLiquidity(<- from)
         }
 
         // ----- Trade (Writable) -----
@@ -943,13 +998,6 @@ access(all) contract FixesTradablePool {
         access(account)
         fun onHeartbeat(_ deltaTime: UFix64) {
             // if active, then move the liquidity pool to the next stage
-            self._ensureSwapPairAndAddLiquidity()
-        }
-
-        /// Create a new pair and add liquidity
-        ///
-        access(self)
-        fun _ensureSwapPairAndAddLiquidity() {
             if self.isLocalActive() {
                 // Check the market cap
                 let localMarketCap = self.getLiquidityMarketCap()
@@ -960,24 +1008,31 @@ access(all) contract FixesTradablePool {
                     // DO NOT PANIC
                     return
                 }
-            } else {
-                // check if flow vault has enough liquidity, if not then do nothing
-                if self.flowVault.balance < 1.0 {
-                    // DO NOT PANIC
-                    return
-                }
             }
 
-            // Now we can add liquidity to the swap pair
-            let minterRef = self.borrowMinter()
-            let vaultData = minterRef.getVaultData()
+            // if the liquidity is handovered but the flow vault is empty, then do nothing
+            if self.isLiquidityHandovered() && self.flowVault.balance < 1.0 {
+                // DO NOT PANIC
+                return
+            }
 
-            // check if the token paire is created, if not then create the pair
-            // Token0 => self.vault, Token1 => self.flowVault
+            // Transfer the liquidity to the swap pair
+            self.transferLiquidity()
+        }
 
+        // ----- Internal Methods -----
+
+        /// Ensure the swap pair is created
+        ///
+        access(self)
+        fun _ensureSwapPair() {
             var pairAddr = self.getSwapPairAddress()
             // if the pair is not created, then create the pair
-            if pairAddr == nil {
+            if pairAddr == nil && self.flowVault.balance >= 0.01 {
+                // Now we can add liquidity to the swap pair
+                let minterRef = self.borrowMinter()
+                let vaultData = minterRef.getVaultData()
+
                 // create the account creation fee vault
                 let acctCreateFeeVault <- self.flowVault.withdraw(amount: 0.01)
                 // create the pair
@@ -987,20 +1042,25 @@ access(all) contract FixesTradablePool {
                     accountCreationFee: <- acctCreateFeeVault,
                     stableMode: false
                 )
-                // set the pair address again
-                pairAddr = self.getSwapPairAddress()
             }
-            // check again
-            if pairAddr == nil {
-                // DO NOT PANIC
-                return
-            }
+        }
+
+        /// Create a new pair and add liquidity
+        ///
+        access(self)
+        fun _transferLiquidity() {
+            // Now we can add liquidity to the swap pair
+            let minterRef = self.borrowMinter()
+            let vaultData = minterRef.getVaultData()
+
             // add all liquidity to the pair
             let pairPublicRef = self.borrowSwapPairRef()
             if pairPublicRef == nil {
                 // DO NOT PANIC
                 return
             }
+
+            // Token0 => self.vault, Token1 => self.flowVault
             let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
             // get the pair info
             let pairInfo = pairPublicRef!.getPairInfo()
@@ -1024,20 +1084,28 @@ access(all) contract FixesTradablePool {
                 var token1In = self.getFlowBalanceInPool()
                 // add all the token to the pair
                 if token0Reserve != 0.0 || token1Reserve != 0.0 {
-                    token1In = SwapConfig.quote(amountA: token0In, reserveA: token0Reserve, reserveB: token1Reserve)
-                    if token1In > token1In {
+                    let estimatedToken1In = SwapConfig.quote(amountA: token0In, reserveA: token0Reserve, reserveB: token1Reserve)
+                    if estimatedToken1In > token1In {
                         destroy token0Vault
                         destroy token1Vault
                         // DO NOT PANIC
                         return
                     }
+                    token1In = estimatedToken1In
                 }
                 if token0In > 0.0 {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: token0In))
                 }
                 token1Vault.deposit(from: <- self.flowVault.withdraw(amount: token1In))
+
                 // set the local liquidity pool to inactive
                 self.acitve = false
+
+                // emit the liquidity pool inactivated event
+                emit LiquidityPoolInactivated(
+                    subject: self.getPoolAddress(),
+                    tokenType: self.getTokenType(),
+                )
             } else {
                 // All Token0 is added to the pair, so we need to calculate the optimized zapped amount through dex
                 let allFlowAmount = self.flowVault.balance
@@ -1073,9 +1141,9 @@ access(all) contract FixesTradablePool {
             FixesTradablePool.softBurnVault(<- lpTokenVault)
 
             // emit the liquidity pool transferred event
-            emit LiquidityPoolTransferred(
+            emit LiquidityTransferred(
                 subject: self.getPoolAddress(),
-                pairAddr: pairAddr!,
+                pairAddr: self.getSwapPairAddress()!,
                 tokenType: self.getTokenType(),
                 tokenAmount: token0Amount,
                 flowAmount: token1Amount

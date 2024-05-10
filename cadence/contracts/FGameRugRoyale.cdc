@@ -20,13 +20,13 @@ Game Schedule:
 - The same token can participate in multiple game epoches, but after elimination in one game, it can only participate again in the next game.
 */
 import "FungibleToken"
+import "FlowToken"
 // Fixes
 import "Fixes"
 import "FixesHeartbeat"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
-import "FRC20AccountsPool"
 
 /// Rug Royale Game Contract
 ///
@@ -53,18 +53,50 @@ access(all) contract FGameRugRoyale {
     /// The public interface for the liquidity holder
     ///
     access(all) resource interface LiquidityHolder {
+        // --- read methods ---
+
         /// Get the liquidity market cap
         access(all)
         view fun getLiquidityMarketCap(): UFix64
         /// Get the liquidity pool value
         access(all)
         view fun getLiquidityValue(): UFix64
+
         /// Get the token holders
         access(all)
         view fun getHolders(): UInt64
         /// Get the trade count
         access(all)
         view fun getTrades(): UInt64
+
+        // --- write methods ---
+
+        /// Pull liquidity from the pool
+        access(account)
+        fun pullLiquidity(): @FungibleToken.Vault {
+            pre {
+                self.getLiquidityValue() > 0.0: "No liquidity to pull"
+            }
+            post {
+                result.balance == before(self.getLiquidityValue()): "Invalid result balance"
+                result.isInstance(Type<@FlowToken.Vault>()): "Invalid result type"
+            }
+        }
+        /// Push liquidity to the pool
+        access(account)
+        fun addLiquidity(_ vault: @FungibleToken.Vault) {
+            pre {
+                vault.balance > 0.0: "No liquidity to push"
+                vault.isInstance(Type<@FlowToken.Vault>()): "Invalid result type"
+            }
+        }
+        /// Transfer liquidity to swap pair
+        access(account)
+        fun transferLiquidity() {
+            post {
+                self.getLiquidityValue() == 0.0: "Liquidity not transferred"
+            }
+        }
     }
 
     /// The public interface for the game
