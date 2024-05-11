@@ -35,6 +35,13 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
+		"FGameRugRoyale": {
+			"source": "cadence/contracts/FGameRugRoyale.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
@@ -212,13 +219,6 @@
 		},
 		"FixesInscriptionFactory": {
 			"source": "cadence/contracts/FixesInscriptionFactory.cdc",
-			"aliases": {
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
-			}
-		},
-		"FGameRugRoyale": {
-			"source": "cadence/contracts/FGameRugRoyale.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
@@ -677,6 +677,14 @@
 				"testnet": "ddb929038d45d4b3"
 			}
 		},
+		"SwapPair": {
+			"source": "mainnet://ecbda466e7f191c7.SwapPair",
+			"hash": "50e4a366779607ed47c4b855e3bca1a6c9af975a774ed31ff57a952842186727",
+			"aliases": {
+				"mainnet": "ecbda466e7f191c7",
+				"testnet": "c20df20fabe06457"
+			}
+		},
 		"TokenList": {
 			"source": "mainnet://15a918087ab12d86.TokenList",
 			"hash": "b0569e11763c23e97fd073baeffaa6539c7d7035b6c5c6180243285bc5c92f1c",
@@ -794,6 +802,24 @@
 				"stFlowToken",
 				"SwapConfig",
 				"SwapInterfaces",
+				"SwapError",
+				{
+					"name": "SwapFactory",
+					"args": [
+						{
+							"type": "Address",
+							"value": "0xf8d6e0586b0a20c7"
+						}
+					]
+				},
+				"StableSwapFactory",
+				"LiquidStakingConfig",
+				"LiquidStakingError",
+				"DelegatorManager",
+				"LiquidStaking",
+				"OracleConfig",
+				"OracleInterface",
+				"PublicPriceOracle",
 				"BlackHole",
 				"ViewResolvers",
 				"FTViewUtils",
@@ -828,7 +854,11 @@
 				"FRC20Converter",
 				"FixesFungibleTokenInterface",
 				"FixesBondingCurve",
-				"FGameRugRoyale"
+				"FGameRugRoyale",
+				"FixesTradablePool",
+				"FixesTokenLockDrops",
+				"FixesTokenAirDrops",
+				"FRC20Agents"
 			]
 		},
 		"mainnet": {
@@ -893,9 +923,6 @@
 				"FRC20Converter",
 				"FixesFungibleTokenInterface",
 				"FixesBondingCurve",
-				"FixesTradablePool",
-				"FixesTokenLockDrops",
-				"FixesTokenAirDrops",
 				"FGameRugRoyale",
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
