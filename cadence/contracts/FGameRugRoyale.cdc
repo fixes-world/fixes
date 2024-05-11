@@ -42,12 +42,14 @@ access(all) contract FGameRugRoyale {
     /// -------- Resources and Interfaces --------
 
     /// Enum for the game phases
-    access(all) enum GamePhases: UInt8 {
-        access(all) case Phase1To32
-        access(all) case Phase2To16
-        access(all) case Phase3To8
-        access(all) case Phase4To4
-        access(all) case Phase5To1
+    access(all) enum GamePhase: UInt8 {
+        access(all) case P0_Waiting
+        access(all) case P1_Nto32
+        access(all) case P2_32to16
+        access(all) case P3_16to8
+        access(all) case P4_8to4
+        access(all) case P5_4to1
+        access(all) case Ended
     }
 
     /// The public interface for the liquidity holder
@@ -58,9 +60,18 @@ access(all) contract FGameRugRoyale {
         /// Get the liquidity market cap
         access(all)
         view fun getLiquidityMarketCap(): UFix64
+
         /// Get the liquidity pool value
         access(all)
         view fun getLiquidityValue(): UFix64
+
+        /// Get the total token market cap
+        access(all)
+        view fun getTotalTokenMarketCap(): UFix64
+
+        /// Get the total token supply value
+        access(all)
+        view fun getTotalTokenValue(): UFix64
 
         /// Get the token holders
         access(all)
@@ -99,31 +110,201 @@ access(all) contract FGameRugRoyale {
         }
     }
 
+    /// Struct for the game phase record
+    ///
+    access(all) struct BattlePhaseResult {
+        access(all) let phase: GamePhase
+        access(all) let participents: [Address]
+        access(all) let winners: [Address]
+
+        init(
+            _ phase: GamePhase,
+            _ participents: [Address],
+            _ winners: [Address]
+        ) {
+            self.phase = phase
+            self.participents = participents
+            self.winners = winners
+        }
+    }
+
+    /// Struct for the game information
+    ///
+    access(all) struct BattleRoyaleInfo {
+        access(all) let epochIndex: UInt64
+        access(all) let epochStartAt: UFix64
+        access(all) let activatedAt: UFix64?
+        access(all) let phase: GamePhase
+        access(all) let participantAmount: Int
+        access(all) let phaseRecords: [BattlePhaseResult]
+
+        init(
+            _ epochIndex: UInt64,
+            _ epochStartAt: UFix64,
+            _ activatedAt: UFix64?,
+            _ phase: GamePhase,
+            _ participantAmount: Int,
+            _ phaseRecords: [BattlePhaseResult]
+        ) {
+            self.epochIndex = epochIndex
+            self.epochStartAt = epochStartAt
+            self.activatedAt = activatedAt
+            self.participantAmount = participantAmount
+            self.phase = phase
+            self.phaseRecords = phaseRecords
+        }
+    }
+
     /// The public interface for the game
     ///
     access(all) resource interface BattleRoyalePublic {
+        // ------ read methods ------
 
+        /// Game info - public view
+        access(all)
+        view fun getInfo(): BattleRoyaleInfo
+        /// get current game phase
+        access(all)
+        view fun getCurrentPhase(): GamePhase
+        /// get game start time
+        access(all)
+        view fun getGameStartTime(): UFix64?
+        /// get game end time
+        access(all)
+        view fun getGameEndTime(): UFix64?
+        /// Return the participant addresses
+        access(all)
+        view fun getParticipants(): [Address]
+        /// Return the participant amount
+        access(all)
+        view fun getParticipantAmount(): Int
+        /// Return the alive participant addresses
+        access(all)
+        view fun getAliveParticipants(): [Address]
+        /// Return the phase records
+        access(all)
+        view fun getPhaseRecords(): [BattlePhaseResult]
+
+        // ------ read methods: default implement ------
+
+        access(all)
+        view fun isStarted(): Bool {
+            return self.getGameStartTime() != nil
+        }
     }
 
     /// The resource of rug royale game
     ///
     access(all) resource BattleRoyale: BattleRoyalePublic {
-        /// Lottery epoch index
+        /// Game epoch index
         access(all)
         let epochIndex: UInt64
-        /// Lottery epoch start time
+        /// Game epoch start time
         access(all)
         let epochStartAt: UFix64
-        access(all)
-        var gameActivatedAt: UFix64?
+        /// Game activated time
+        access(self)
+        var activatedAt: UFix64?
+        /// All memecoin participants: FT Address => Is Alive
+        access(self)
+        let participants: {Address: Bool}
+        /// Game phase records
+        access(self)
+        let phaseRecords: [BattlePhaseResult]
 
         init(
             _ epochIndex: UInt64,
         ) {
             self.epochIndex = epochIndex
             self.epochStartAt = getCurrentBlock().timestamp
-            self.gameActivatedAt = nil
+            self.activatedAt = nil
+            self.participants = {}
+            self.phaseRecords = []
         }
+
+        // ------- Implement BattleRoyalePublic -------
+
+        /// Game info - public view
+        ///
+        access(all)
+        view fun getInfo(): BattleRoyaleInfo {
+            return BattleRoyaleInfo(
+                self.epochIndex,
+                self.epochStartAt,
+                self.activatedAt,
+                self.getCurrentPhase(),
+                self.getParticipantAmount(),
+                self.getPhaseRecords()
+            )
+        }
+
+        /// get current game phase
+        access(all)
+        view fun getCurrentPhase(): GamePhase {
+            if let startedAt = self.activatedAt {
+                let gamePassed = getCurrentBlock().timestamp - startedAt
+                var phase = GamePhase.P1_Nto32
+                var currentDuration = FGameRugRoyale.getGamePhaseDuration(phase)
+                while gamePassed > currentDuration {
+                    phase = GamePhase(rawValue: phase.rawValue + 1)!
+                    if phase == GamePhase.Ended {
+                        break
+                    }
+                    currentDuration = currentDuration + FGameRugRoyale.getGamePhaseDuration(phase)
+                }
+                return phase
+            }
+            return GamePhase.P0_Waiting
+        }
+
+        /// get game start time
+        access(all)
+        view fun getGameStartTime(): UFix64? {
+            return self.activatedAt
+        }
+
+        /// get game end time
+        access(all)
+        view fun getGameEndTime(): UFix64? {
+            if let startedAt = self.activatedAt {
+                return startedAt + FGameRugRoyale.getGameDurationUtil(GamePhase.Ended, from: GamePhase.P1_Nto32)
+            }
+            return nil
+        }
+
+        /// Return the participant addresses
+        access(all)
+        view fun getParticipants(): [Address] {
+            return self.participants.keys
+        }
+
+        /// Return the participant amount
+        access(all)
+        view fun getParticipantAmount(): Int {
+            return self.participants.length
+        }
+
+        /// Return the alive participant addresses
+        access(all)
+        view fun getAliveParticipants(): [Address] {
+            var ret: [Address] = []
+            let ref = &self.participants as &{Address: Bool}
+            self.participants.forEachKey(fun (key: Address): Bool {
+                if ref[key] == true {
+                    ret = ret.concat([key])
+                }
+                return true
+            })
+            return ret
+        }
+
+        /// Return the phase records
+        access(all)
+        view fun getPhaseRecords(): [BattlePhaseResult] {
+            return self.phaseRecords
+        }
+
+        // ------- Contract access methods -------
 
     }
 
@@ -139,9 +320,9 @@ access(all) contract FGameRugRoyale {
 
         // --- read methods: default implement ---
 
-        /// Check if the current lottery is finished
+        /// Check if the current Game is finished
         access(all)
-        view fun isCurrentLotteryFinished(): Bool {
+        view fun isCurrentGameFinished(): Bool {
             let currentGame = self.borrowCurrentGame()
             // TODO
             return false
@@ -196,17 +377,17 @@ access(all) contract FGameRugRoyale {
         access(all)
         fun startNewEpoch() {
             pre {
-                self.isCurrentLotteryFinished(): "The current lottery is not finished"
+                self.isCurrentGameFinished(): "The current Game is not finished"
             }
 
-            // Create a new lottery
+            // Create a new Game
             let newEpochIndex = self.currentEpochIndex + 1
-            let newLottery <- create BattleRoyale(newEpochIndex)
+            let newOne <- create BattleRoyale(newEpochIndex)
 
-            let startedAt = newLottery.epochStartAt
+            let startedAt = newOne.epochStartAt
 
-            // Save the new lottery
-            self.games[newEpochIndex] <-! newLottery
+            // Save the new Game
+            self.games[newEpochIndex] <-! newOne
             self.currentEpochIndex = newEpochIndex
 
             // emit event
@@ -244,14 +425,45 @@ access(all) contract FGameRugRoyale {
     /// Get the duration of a game period
     ///
     access(all)
-    view fun getGamePhaseDuration(_ phase: GamePhases): UFix64 {
+    view fun getGamePhaseDuration(_ phase: GamePhase): UFix64 {
         // Seconds in half a day
         let halfaday = 60.0 * 60.0 * 12.0
-        if phase == GamePhases.Phase1To32 {
+        switch phase {
+        case GamePhase.P0_Waiting:
+            return UFix64.max
+        case GamePhase.Ended:
+            return 0.0
+        case GamePhase.P1_Nto32:
             return halfaday * 2.0
-        } else {
+        default:
             return halfaday
         }
+    }
+
+    /// Get the duration of a game period
+    ///
+    access(all)
+    view fun getGameDurationUtil(_ endPhase: GamePhase, from: GamePhase?): UFix64 {
+        var currentPhase = from ?? GamePhase.P0_Waiting
+        if currentPhase == GamePhase.Ended {
+            return 0.0
+        }
+        if currentPhase == GamePhase.P0_Waiting {
+            return UFix64.max
+        }
+        if endPhase.rawValue <= currentPhase.rawValue {
+            return 0.0
+        }
+        var gameDuration = self.getGamePhaseDuration(currentPhase)
+        // Calculate to the target phase, how long the game has passed
+        while currentPhase.rawValue < endPhase.rawValue {
+            currentPhase = GamePhase(rawValue: currentPhase.rawValue + 1)!
+            if currentPhase.rawValue == GamePhase.Ended.rawValue {
+                break
+            }
+            gameDuration = gameDuration + self.getGamePhaseDuration(currentPhase)
+        }
+        return gameDuration
     }
 
     /// Borrow the GameCenter
