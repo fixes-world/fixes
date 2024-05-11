@@ -794,8 +794,6 @@
 				"stFlowToken",
 				"SwapConfig",
 				"SwapInterfaces",
-				"SwapFactory",
-				"LiquidStaking",
 				"BlackHole",
 				"ViewResolvers",
 				"FTViewUtils",
@@ -826,18 +824,11 @@
 				"FGameLottery",
 				"FGameLotteryRegistry",
 				"FGameLotteryFactory",
-				"FRC20Agents",
 				"FixesAssetMeta",
-				"FixesFungibleTokenInterface",
-				"FixesFungibleToken",
-				"FRC20FungibleToken",
 				"FRC20Converter",
+				"FixesFungibleTokenInterface",
 				"FixesBondingCurve",
-				"FixesTradablePool",
-				"FixesTokenLockDrops",
-				"FixesTokenAirDrops",
-				"FGameRugRoyale",
-				"FungibleTokenManager"
+				"FGameRugRoyale"
 			]
 		},
 		"mainnet": {
@@ -898,18 +889,18 @@
 				"FGameLottery",
 				"FGameLotteryRegistry",
 				"FGameLotteryFactory",
-				"FRC20Agents",
 				"FixesAssetMeta",
-				"FixesFungibleTokenInterface",
-				"FixesFungibleToken",
-				"FRC20FungibleToken",
 				"FRC20Converter",
+				"FixesFungibleTokenInterface",
 				"FixesBondingCurve",
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
 				"FixesTokenAirDrops",
 				"FGameRugRoyale",
-				"FungibleTokenManager"
+				"FixesTradablePool",
+				"FixesTokenLockDrops",
+				"FixesTokenAirDrops",
+				"FRC20Agents"
 			]
 		}
 	}
