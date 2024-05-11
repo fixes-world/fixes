@@ -63,6 +63,39 @@ access(all) contract FixesTradablePool {
 
     /// -------- Resources and Interfaces --------
 
+    /// The refund agent resource.
+    ///
+    access(all) resource FRC20RefundAgent: FRC20Converter.FRC20TreasuryReceiver {
+        /// The refund pool
+        access(self)
+        let flowPool: @FungibleToken.Vault
+
+        init() {
+            self.flowPool <- FlowToken.createEmptyVault()
+        }
+
+        // @deprecated in Cadence v1.0
+        destroy() {
+            destroy self.flowPool
+        }
+
+        // ----- Implement FRC20Converter.FRC20TreasuryReceiver -----
+
+        access(all)
+        fun depositFlowToken(_ token: @FungibleToken.Vault) {
+            self.flowPool.deposit(from: <- token)
+        }
+
+        // ----- Internal Methods -----
+
+        /// Extract the Flow token from the pool
+        ///
+        access(contract)
+        fun extract(): @FungibleToken.Vault {
+            return <- self.flowPool.withdraw(amount: self.flowPool.balance)
+        }
+    }
+
     /// The liquidity pool interface.
     ///
     access(all) resource interface LiquidityPoolInterface {
@@ -323,6 +356,9 @@ access(all) contract FixesTradablePool {
         // The minter of the token
         access(self)
         let minter: @{FixesFungibleTokenInterface.IMinter}
+        // The frc20 refund agent
+        access(self)
+        let refundAgent: @FRC20RefundAgent
         // The vault for the token
         access(self)
         let vault: @FungibleToken.Vault
@@ -348,9 +384,11 @@ access(all) contract FixesTradablePool {
             _ subjectFeePerc: UFix64?
         ) {
             pre {
+                minter.getTotalAllowedMintableAmount() > 0.0: "The mint amount must be greater than 0"
                 subjectFeePerc == nil || subjectFeePerc! < 0.01: "Invalid Subject Fee"
             }
             self.minter <- minter
+            self.refundAgent <- create FRC20RefundAgent()
             self.curve = curve
             self.subjectFeePercentage = subjectFeePerc ?? 0.0
 
@@ -365,6 +403,7 @@ access(all) contract FixesTradablePool {
         // @deprecated in Cadence v1.0
         destroy() {
             destroy self.minter
+            destroy self.refundAgent
             destroy self.vault
             destroy self.flowVault
         }
@@ -700,11 +739,34 @@ access(all) contract FixesTradablePool {
             _ amount: UFix64?,
             recipient: &{FungibleToken.Receiver},
         ) {
-            let minter = self.borrowMinter()
-            // TODO: support system burner
-            // extract all Flow tokens from the inscription
+            let flowPaymentVault <- FlowToken.createEmptyVault()
             let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
-            let flowAvailableVault <- ins.partialExtract(flowAvailableAmount)
+            // deposit the available Flow tokens in the inscription to the flow vault
+            if flowAvailableAmount > 0.0 {
+                flowPaymentVault.deposit(from: <- ins.partialExtract(flowAvailableAmount))
+            }
+
+            // check inscription command
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let op = meta["op"] ?? panic("The inscription operation is missing")
+            assert(
+                op == "exec" || op == "burn",
+                message: "Only the 'exec' or 'burn' operation is allowed"
+            )
+            // if the operation is burn, then burn the frc20 token and get the flow token refunded
+            if op == "burn" {
+                // borrow the system burner
+                let systemBurner = FRC20Converter.borrowSystemBurner()
+                let refundAgent = self.borrowRefundAgent()
+                // this method will execute the inscription command and refund the Flow tokens
+                systemBurner.burnAndSend(ins, recipient: refundAgent)
+                // extract the refunded $FLOW and deposit to the payment flow vault
+                flowPaymentVault.deposit(from: <- refundAgent.extract())
+            }
+
+            // borrow the minter
+            let minter = self.borrowMinter()
+
             // calculate the price
             var price: UFix64 = 0.0
             var protocolFee: UFix64 = 0.0
@@ -716,19 +778,19 @@ access(all) contract FixesTradablePool {
                 protocolFee = price * FixesTradablePool.getProtocolTradingFee()
                 subjectFee = price * self.getSubjectFeePercentage()
             } else {
-                protocolFee = flowAvailableVault.balance * FixesTradablePool.getProtocolTradingFee()
-                subjectFee = flowAvailableVault.balance * self.getSubjectFeePercentage()
-                price = flowAvailableVault.balance - protocolFee - subjectFee
+                protocolFee = flowPaymentVault.balance * FixesTradablePool.getProtocolTradingFee()
+                subjectFee = flowPaymentVault.balance * self.getSubjectFeePercentage()
+                price = flowPaymentVault.balance - protocolFee - subjectFee
                 buyAmount = self.getBuyAmount(price)
             }
 
             // check the total cost
             let totalCost = price + protocolFee + subjectFee
             assert(
-                totalCost <= flowAvailableVault.balance,
+                totalCost <= flowPaymentVault.balance,
                 message: "Insufficient payment: The total cost is greater than the available Flow tokens"
             )
-            let payment <- flowAvailableVault.withdraw(amount: totalCost)
+            let payment <- flowPaymentVault.withdraw(amount: totalCost)
             if protocolFee > 0.0 {
                 let protocolFeeVault <- payment.withdraw(amount: protocolFee)
                 let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformFeeDestination())
@@ -744,14 +806,14 @@ access(all) contract FixesTradablePool {
             // deposit the payment to the flow vault in the liquidity pool
             self.flowVault.deposit(from: <- payment)
 
-            let insOwner = ins.owner?.address ?? panic("The inscription owner is missing")
+            let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
             // return remaining Flow tokens to the inscription owner
-            if flowAvailableVault.balance > 0.0 {
-                let ownerFlowVaultRef = Fixes.borrowFlowTokenReceiver(insOwner)
+            if flowPaymentVault.balance > 0.0 {
+                let ownerFlowVaultRef = Fixes.borrowFlowTokenReceiver(callerAddr)
                     ?? panic("The inscription owner does not have a FlowTokenReceiver capability")
-                ownerFlowVaultRef.deposit(from: <- flowAvailableVault)
+                ownerFlowVaultRef.deposit(from: <- flowPaymentVault)
             } else {
-                destroy flowAvailableVault
+                destroy flowPaymentVault
             }
 
             // check the BuyAmount
@@ -764,6 +826,7 @@ access(all) contract FixesTradablePool {
                 self.vault.balance >= buyAmount,
                 message: "Insufficient token balance: The vault does not have enough tokens"
             )
+            // initialize the vault by the inscription (the extracted inscription is also valid)
             let returnVault <- minter.initializeVaultByInscription(
                 vault: <- self.vault.withdraw(amount: buyAmount),
                 ins: ins
@@ -773,7 +836,7 @@ access(all) contract FixesTradablePool {
 
             // the variables for the trade event
             let poolAddr = self.getPoolAddress()
-            let traderAddr = recipient.owner?.address ?? insOwner
+            let traderAddr = recipient.owner?.address ?? callerAddr
 
             // invoke the transaction hook
             self._onTransactionDeal(
@@ -983,6 +1046,13 @@ access(all) contract FixesTradablePool {
                     listingId: nil,
                 )
             }
+        }
+
+        /// Borrow the refund agent
+        ///
+        access(self)
+        view fun borrowRefundAgent(): &FRC20RefundAgent {
+            return &self.refundAgent as &FRC20RefundAgent
         }
 
         // ----- Implement IMinterHolder -----

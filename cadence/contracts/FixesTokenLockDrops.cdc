@@ -632,6 +632,9 @@ access(all) contract FixesTokenLockDrops {
             activateTime: UFix64?,
             failureDeprecatedTime: UFix64?
         ) {
+            pre {
+                minter.getTotalAllowedMintableAmount() > 0.0: "The mint amount must be greater than 0"
+            }
             for one in lockingExchangeRates.keys {
                 assert(
                     lockingExchangeRates[one]! > 0.0,

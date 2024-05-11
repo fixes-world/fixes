@@ -130,6 +130,9 @@ access(all) contract FixesTokenAirDrops {
         init(
             _ minter: @{FixesFungibleTokenInterface.IMinter},
         ) {
+            pre {
+                minter.getTotalAllowedMintableAmount() > 0.0: "The mint amount must be greater than 0"
+            }
             self.minter <- minter
             self.claimableRecords = {}
             self.grantedClaimableAmount = 0.0
