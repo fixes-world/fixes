@@ -81,7 +81,7 @@ access(all) contract FixesHeartbeat {
                 // iterate all the hooks
                 for hookAddr in hooks.keys {
                     if let hookRef = getAccount(hookAddr)
-                        .getCapability<&AnyResource{IHeartbeatHook}>(hooks[hookAddr]!)
+                        .getCapability<&{IHeartbeatHook}>(hooks[hookAddr]!)
                         .borrow()
                     {
                         hookRef.onHeartbeat(deltaTime)

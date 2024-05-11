@@ -24,8 +24,8 @@ fun main(
         }
 
         let acct = getAuthAccount(userAddr)
-        var collectionWithResolverRef: &AnyResource{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}? = nil
-        var collectionRef: &AnyResource{NonFungibleToken.CollectionPublic}? = nil
+        var collectionWithResolverRef: &{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}? = nil
+        var collectionRef: &{NonFungibleToken.CollectionPublic}? = nil
 
         let nftType = FRC20NFTWrapper.asNFTType(nftIdentifier)
         // get from NFTCatalog first
@@ -48,11 +48,11 @@ fun main(
             var found = false
             acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
                 if type.identifier == collectionType.identifier {
-                    if acct.check<@AnyResource{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path) {
-                        collectionWithResolverRef = acct.borrow<&AnyResource{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path)
+                    if acct.check<@{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path) {
+                        collectionWithResolverRef = acct.borrow<&{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path)
                     }
-                    if acct.check<@AnyResource{NonFungibleToken.CollectionPublic}>(from: path) {
-                        collectionRef = acct.borrow<&AnyResource{NonFungibleToken.CollectionPublic}>(from: path)
+                    if acct.check<@{NonFungibleToken.CollectionPublic}>(from: path) {
+                        collectionRef = acct.borrow<&{NonFungibleToken.CollectionPublic}>(from: path)
                     }
                     if collectionRef != nil {
                         found = true  // stop

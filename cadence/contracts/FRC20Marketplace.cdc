@@ -250,7 +250,7 @@ access(all) contract FRC20Marketplace {
         /// Update the admin whitelist
         access(account)
         fun updateAdminWhitelist(
-            mananger: &AnyResource{MarketManager},
+            mananger: &{MarketManager},
             address: Address,
             isWhitelisted: Bool
         )
@@ -258,7 +258,7 @@ access(all) contract FRC20Marketplace {
         /// Update the marketplace properties
         access(account)
         fun updateMarketplaceProperties(
-            mananger: &AnyResource{MarketManager},
+            mananger: &{MarketManager},
             _ props: {FRC20FTShared.ConfigType: String}
         )
     }

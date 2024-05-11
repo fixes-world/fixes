@@ -278,7 +278,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Borrow the super minter resource
         ///
         access(all)
-        fun borrowSuperMinter(): &AnyResource{IMinter}
+        fun borrowSuperMinter(): &{IMinter}
     }
 
     /// The minter resource interface
@@ -540,9 +540,9 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// Borrow the vault receiver of the address
     ///
     access(all)
-    view fun borrowVaultReceiver(_ addr: Address): &AnyResource{FungibleToken.Receiver}? {
+    view fun borrowVaultReceiver(_ addr: Address): &{FungibleToken.Receiver}? {
         return getAccount(addr)
-            .getCapability<&AnyResource{FungibleToken.Receiver}>(self.getReceiverPublicPath())
+            .getCapability<&{FungibleToken.Receiver}>(self.getReceiverPublicPath())
             .borrow()
     }
 

@@ -30,6 +30,7 @@ import "FixesBondingCurve"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20StakingManager"
+import "FRC20Converter"
 import "FGameRugRoyale"
 
 /// The bonding curve contract.
@@ -551,10 +552,10 @@ access(all) contract FixesTradablePool {
         /// Borrow the swap pair reference
         ///
         access(all)
-        view fun borrowSwapPairRef(): &AnyResource{SwapInterfaces.PairPublic}? {
+        view fun borrowSwapPairRef(): &{SwapInterfaces.PairPublic}? {
             if let pairAddr = self.getSwapPairAddress() {
                 return getAccount(pairAddr)
-                    .getCapability<&AnyResource{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
+                    .getCapability<&{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
                     .borrow()
             }
             return nil
@@ -563,7 +564,7 @@ access(all) contract FixesTradablePool {
         /// Borrow the token global public reference
         ///
         access(all)
-        view fun borrowTokenGlobalPublic(): &AnyResource{FixesFungibleTokenInterface.IGlobalPublic} {
+        view fun borrowTokenGlobalPublic(): &{FixesFungibleTokenInterface.IGlobalPublic} {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let key = self.minter.getAccountsPoolKey() ?? panic("The accounts pool key is missing")
             let contractRef = acctsPool.borrowFTContract(key)
@@ -700,6 +701,7 @@ access(all) contract FixesTradablePool {
             recipient: &{FungibleToken.Receiver},
         ) {
             let minter = self.borrowMinter()
+            // TODO: support system burner
             // extract all Flow tokens from the inscription
             let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
             let flowAvailableVault <- ins.partialExtract(flowAvailableAmount)
@@ -986,8 +988,8 @@ access(all) contract FixesTradablePool {
         // ----- Implement IMinterHolder -----
 
         access(contract)
-        view fun borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {
-            return &self.minter as &AnyResource{FixesFungibleTokenInterface.IMinter}
+        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
+            return &self.minter as &{FixesFungibleTokenInterface.IMinter}
         }
 
         // ----- Implement IHeartbeatHook -----
@@ -1177,7 +1179,7 @@ access(all) contract FixesTradablePool {
     access(account)
     fun createTradableLiquidityPool(
         ins: &Fixes.Inscription,
-        _ minter: @AnyResource{FixesFungibleTokenInterface.IMinter},
+        _ minter: @{FixesFungibleTokenInterface.IMinter},
     ): @TradableLiquidityPool {
         pre {
             ins.isExtractable(): "The inscription is not extractable"

@@ -792,10 +792,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// @return The resource reference conforming to the Resolver interface
         ///
         access(all)
-        fun borrowViewResolver(id: UInt64): &AnyResource{MetadataViews.Resolver} {
+        fun borrowViewResolver(id: UInt64): &{MetadataViews.Resolver} {
             let nft = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
             let FRC20SemiNFT = nft as! &FRC20SemiNFT.NFT
-            return FRC20SemiNFT as &AnyResource{MetadataViews.Resolver}
+            return FRC20SemiNFT as &{MetadataViews.Resolver}
         }
 
         /** ------ Internal Methods ------ */

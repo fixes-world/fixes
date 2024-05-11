@@ -289,8 +289,8 @@ access(all) contract FixesTokenAirDrops {
 
         /// Borrow the minter
         access(contract)
-        view fun borrowMinter(): &AnyResource{FixesFungibleTokenInterface.IMinter} {
-            return &self.minter as &AnyResource{FixesFungibleTokenInterface.IMinter}
+        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
+            return &self.minter as &{FixesFungibleTokenInterface.IMinter}
         }
 
         // ----- Internal Methods -----

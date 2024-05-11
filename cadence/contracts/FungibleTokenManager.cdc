@@ -645,7 +645,7 @@ access(all) contract FungibleTokenManager {
     /// Borrow the Fixes Fungible Token Admin Resource
     ///
     access(self)
-    view fun borrowWritableTokenAdmin(tick: String): &AnyResource{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable} {
+    view fun borrowWritableTokenAdmin(tick: String): &{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable} {
         // try to borrow the account to check if it was created
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)

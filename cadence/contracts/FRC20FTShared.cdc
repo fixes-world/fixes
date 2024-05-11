@@ -969,7 +969,7 @@ access(all) contract FRC20FTShared {
 
     access(account)
     fun registerHookType(_ type: Type) {
-        if type.isSubtype(of: Type<@AnyResource{TransactionHook}>()) {
+        if type.isSubtype(of: Type<@{TransactionHook}>()) {
             self.validatedHookTypes[type] = true
             emit VaildatedHookTypeAdded(type: type)
         }
@@ -989,7 +989,7 @@ access(all) contract FRC20FTShared {
     ///
     access(all) resource Hooks: TransactionHook, FixesHeartbeat.IHeartbeatHook {
         access(self)
-        let hooks: {Type: Capability<&AnyResource{TransactionHook}>}
+        let hooks: {Type: Capability<&{TransactionHook}>}
 
         init() {
             self.hooks = {}
@@ -1007,7 +1007,7 @@ access(all) contract FRC20FTShared {
         // --- Account Methods ---
 
         access(all)
-        fun addHook(_ hook: Capability<&AnyResource{TransactionHook}>) {
+        fun addHook(_ hook: Capability<&{TransactionHook}>) {
             pre {
                 hook.check(): "The hook must be valid"
             }
@@ -1042,7 +1042,7 @@ access(all) contract FRC20FTShared {
                 return
             }
             // iterate all hooks
-            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+            self._iterateHooks(fun (type: Type, ref: &{FRC20FTShared.TransactionHook}) {
                 // call hook
                 ref.onDeal(
                     seller: seller,
@@ -1073,7 +1073,7 @@ access(all) contract FRC20FTShared {
                 return
             }
             // iterate all hooks
-            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+            self._iterateHooks(fun (type: Type, ref: &{FRC20FTShared.TransactionHook}) {
                 // call hook
                 ref.onHeartbeat(deltaTime)
 
@@ -1089,7 +1089,7 @@ access(all) contract FRC20FTShared {
         /// Iterate all hooks
         ///
         access(self)
-        fun _iterateHooks(_ func: ((Type, &AnyResource{FRC20FTShared.TransactionHook}): Void)) {
+        fun _iterateHooks(_ func: ((Type, &{FRC20FTShared.TransactionHook}): Void)) {
             // call all hooks
             for type in self.hooks.keys {
                 // check if the hook type is validated
@@ -1102,7 +1102,7 @@ access(all) contract FRC20FTShared {
                     if !valid {
                         continue
                     }
-                    if let ref: &AnyResource{FRC20FTShared.TransactionHook} = hookCap.borrow() {
+                    if let ref: &{FRC20FTShared.TransactionHook} = hookCap.borrow() {
                         func(type, ref)
                     }
                 }
@@ -1121,9 +1121,9 @@ access(all) contract FRC20FTShared {
     /// Only the owner of the account can call this method
     ///
     access(account)
-    fun borrowTransactionHook(_ address: Address): &AnyResource{TransactionHook}? {
+    fun borrowTransactionHook(_ address: Address): &{TransactionHook}? {
         return getAccount(address)
-            .getCapability<&AnyResource{TransactionHook}>(self.TransactionHookPublicPath)
+            .getCapability<&{TransactionHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
@@ -1131,9 +1131,9 @@ access(all) contract FRC20FTShared {
     /// Only the owner of the account can call this method
     ///
     access(account)
-    fun borrowTransactionHookWithHeartbeat(_ address: Address): &AnyResource{TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
+    fun borrowTransactionHookWithHeartbeat(_ address: Address): &{TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
         return getAccount(address)
-            .getCapability<&AnyResource{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
+            .getCapability<&{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
