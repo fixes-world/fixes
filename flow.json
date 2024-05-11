@@ -795,12 +795,7 @@
 				"SwapConfig",
 				"SwapInterfaces",
 				"SwapFactory",
-				"SwapError",
-				"StableSwapFactory",
 				"LiquidStaking",
-				"LiquidStakingConfig",
-				"LiquidStakingError",
-				"DelegatorManager",
 				"BlackHole",
 				"ViewResolvers",
 				"FTViewUtils",
@@ -902,7 +897,19 @@
 				"EVMAgent",
 				"FGameLottery",
 				"FGameLotteryRegistry",
-				"FGameLotteryFactory"
+				"FGameLotteryFactory",
+				"FRC20Agents",
+				"FixesAssetMeta",
+				"FixesFungibleTokenInterface",
+				"FixesFungibleToken",
+				"FRC20FungibleToken",
+				"FRC20Converter",
+				"FixesBondingCurve",
+				"FixesTradablePool",
+				"FixesTokenLockDrops",
+				"FixesTokenAirDrops",
+				"FGameRugRoyale",
+				"FungibleTokenManager"
 			]
 		}
 	}
