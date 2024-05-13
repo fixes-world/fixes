@@ -8,14 +8,14 @@ There will only be one Rug Royale Game at the same time.
 Only FixesFungibleToken can participate in the game.
 
 Game Schedule:
-- The game epoch will last for at least 3 days
+- The game epoch will last for at least 7 days
 - The game will start if more 32 coins are joined
 - The game lasts for a maximum of 5 rounds:
-    - Phase 1: N -> 32, at least 1 days
-    - Phase 2: 32 -> 16, 0.5 day
-    - Phase 3: 16 -> 8, 0.5 day
-    - Phase 4: 8 -> 4, 0.5 day
-    - Phase 5: 4 -> #1, #4 will be winner, 0.5 day
+    - Phase 1: N -> 32, at least 3 days
+    - Phase 2: 32 -> 16
+    - Phase 3: 16 -> 8
+    - Phase 4: 8 -> 4
+    - Phase 5: 4 -> #1, #4 will be winner
 - All liquidity will gradually be aggregated towards the winners of each round, and losers will lose all liquidity in its' TradablePool.
 - The same token can participate in multiple game epoches, but after elimination in one game, it can only participate again in the next game.
 */
@@ -64,6 +64,28 @@ access(all) contract FGameRugRoyale {
         /// Get the liquidity pool value
         access(all)
         view fun getLiquidityValue(): UFix64
+
+        /// Get the flow balance in pool
+        access(all)
+        view fun getFlowBalanceInPool(): UFix64
+
+        /// Get the token balance in pool
+        access(all)
+        view fun getTokenBalanceInPool(): UFix64
+
+        /// Get the token price in flow
+        access(all)
+        view fun getTokenPriceInFlow(): UFix64
+
+        /// Get the token price by current liquidity
+        access(all)
+        view fun getTokenPriceByInPoolLiquidity(): UFix64 {
+            let currentFlowBalance = self.getFlowBalanceInPool()
+            if currentFlowBalance == 0.0 {
+                return 0.0
+            }
+            return self.getTokenBalanceInPool() / currentFlowBalance
+        }
 
         /// Get the total token market cap
         access(all)
@@ -427,16 +449,16 @@ access(all) contract FGameRugRoyale {
     access(all)
     view fun getGamePhaseDuration(_ phase: GamePhase): UFix64 {
         // Seconds in half a day
-        let halfaday = 60.0 * 60.0 * 12.0
+        let oneday = 60.0 * 60.0 * 24.0
         switch phase {
         case GamePhase.P0_Waiting:
             return UFix64.max
         case GamePhase.Ended:
             return 0.0
         case GamePhase.P1_Nto32:
-            return halfaday * 2.0
+            return oneday * 3.0
         default:
-            return halfaday
+            return oneday
         }
     }
 
