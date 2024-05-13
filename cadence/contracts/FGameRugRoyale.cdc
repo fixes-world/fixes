@@ -39,6 +39,9 @@ access(all) contract FGameRugRoyale {
     /// Event emitted when a new game is started
     access(all) event GameStarted(epochId: UInt64, startAt: UFix64)
 
+    /// Event emitted when a new participant joined the game
+    access(all) event GameParticipantJoined(epochId: UInt64, participant: Address)
+
     /// -------- Resources and Interfaces --------
 
     /// Enum for the game phases
@@ -209,10 +212,28 @@ access(all) contract FGameRugRoyale {
 
         // ------ read methods: default implement ------
 
+        /// Check if the game is joinable
+        access(all)
+        view fun isJoinable(): Bool {
+            let phase = self.getCurrentPhase()
+            return phase == GamePhase.P0_Waiting || phase == GamePhase.P1_Nto32
+        }
+
+        /// Check if the game is started
         access(all)
         view fun isStarted(): Bool {
             return self.getGameStartTime() != nil
         }
+
+        // ------ write methods ------
+
+        /// Join the game
+        access(contract)
+        fun joinGame(_ cap: Capability<&{LiquidityHolder}>)
+
+        /// Go to the next phase
+        access(contract)
+        fun nextPhase()
     }
 
     /// The resource of rug royale game
@@ -227,9 +248,12 @@ access(all) contract FGameRugRoyale {
         /// Game activated time
         access(self)
         var activatedAt: UFix64?
-        /// All memecoin participants: FT Address => Is Alive
+        /// All memecoin participants: FT Address => Capability
         access(self)
-        let participants: {Address: Bool}
+        let participants: {Address: Capability<&{LiquidityHolder}>}
+        /// Current alive participants: FT Address => Is Alive
+        access(self)
+        let participantsAlive: {Address: Bool}
         /// Game phase records
         access(self)
         let phaseRecords: [BattlePhaseResult]
@@ -241,6 +265,7 @@ access(all) contract FGameRugRoyale {
             self.epochStartAt = getCurrentBlock().timestamp
             self.activatedAt = nil
             self.participants = {}
+            self.participantsAlive = {}
             self.phaseRecords = []
         }
 
@@ -310,7 +335,7 @@ access(all) contract FGameRugRoyale {
         access(all)
         view fun getAliveParticipants(): [Address] {
             var ret: [Address] = []
-            let ref = &self.participants as &{Address: Bool}
+            let ref = &self.participantsAlive as &{Address: Bool}
             self.participants.forEachKey(fun (key: Address): Bool {
                 if ref[key] == true {
                     ret = ret.concat([key])
@@ -327,6 +352,41 @@ access(all) contract FGameRugRoyale {
         }
 
         // ------- Contract access methods -------
+
+        /// Join the game
+        access(contract)
+        fun joinGame(_ cap: Capability<&{LiquidityHolder}>) {
+            pre {
+                self.isJoinable(): "The game is not joinable"
+                cap.check() == true: "Invalid capability"
+            }
+            // Add the participant
+            self.participants[cap.address] = cap
+            self.participantsAlive[cap.address] = true
+
+            // emit event
+            emit GameParticipantJoined(
+                epochId: self.epochIndex,
+                participant: cap.address
+            )
+        }
+
+        /// Go to the next phase
+        ///
+        access(contract)
+        fun nextPhase() {
+            // TODO
+        }
+
+        // ------- Internal methods -------
+
+        /// Get the liquidity holder reference
+        ///
+        access(self)
+        fun borrowLiquidHolderRef(_ address: Address): &{LiquidityHolder} {
+            let cap = self.participants[address] ?? panic("LiquidityHolder not found")
+            return cap.borrow() ?? panic("LiquidityHolder not found")
+        }
 
     }
 
