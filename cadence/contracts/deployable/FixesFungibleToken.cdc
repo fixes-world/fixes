@@ -580,7 +580,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
             // insert the address
             self.top100Accounts.insert(at: highBalanceIdx, address)
-            if self.top100Accounts.length >= 100 {
+            if self.top100Accounts.length > 100 {
                 self.top100Accounts.removeLast()
             }
             return true

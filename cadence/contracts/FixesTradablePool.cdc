@@ -567,7 +567,7 @@ access(all) contract FixesTradablePool {
                 let lpTokenSupply = pairInfo[5] as! UFix64
                 let price0 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
                 let totalValueInFlow = price0 * reserve0 + reserve1 * 1.0
-                return totalValueInFlow / lpTokenSupply
+                return lpTokenSupply == 0.0 ? 0.0 : totalValueInFlow / lpTokenSupply
             }
         }
 
@@ -656,12 +656,12 @@ access(all) contract FixesTradablePool {
         /// Pull liquidity from the pool
         access(account)
         fun pullLiquidity(): @FungibleToken.Vault {
-            if self.flowVault.balance < 0.02 {
+            if self.flowVault.balance < 1.0 {
                 return <- FlowToken.createEmptyVault()
             }
 
-            // only leave 0.02 $FLOW to setup the liquidity pair
-            let liquidityAmount = self.flowVault.balance - 0.02
+            // only leave 1.0 $FLOW to setup the liquidity pair
+            let liquidityAmount = self.flowVault.balance - 1.0
             let liquidityVault <- self.flowVault.withdraw(amount: liquidityAmount)
 
             // All Liquidity is pulled, so the pool should be set to be inactive
