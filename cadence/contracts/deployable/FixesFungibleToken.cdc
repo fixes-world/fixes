@@ -451,9 +451,21 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
     }
 
+    /// The interface for the FungibleTokenAdmin's global internal writable methods
+    ///
+    access(all) resource interface GlobalInternalWritable {
+        /// update the token holder
+        access(contract)
+        fun onTokenDeposited(_ address: Address): Bool
+
+        /// update the balance ranking
+        access(contract)
+        fun onBalanceChanged(_ address: Address): Bool
+    }
+
     /// The admin resource for the FRC20 FT
     ///
-    access(all) resource FungibleTokenAdmin: FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder, FixesFungibleTokenInterface.IAdminWritable {
+    access(all) resource FungibleTokenAdmin: GlobalInternalWritable, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder, FixesFungibleTokenInterface.IAdminWritable {
         access(self)
         let minter: @Minter
         /// The amount of tokens that all created minters are allowed to mint
@@ -619,7 +631,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the super minter resource
         ///
         access(all)
-        fun borrowSuperMinter(): &Minter {
+        view fun borrowSuperMinter(): &Minter {
             return &self.minter as &Minter
         }
     }
@@ -949,9 +961,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the admin public reference
     ///
     access(contract)
-    view fun borrowAdminPublic(): &FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder} {
+    view fun borrowAdminPublic(): &FungibleTokenAdmin{GlobalInternalWritable, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder} {
         return self.account
-            .getCapability<&FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
+            .getCapability<&FungibleTokenAdmin{GlobalInternalWritable, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -1030,9 +1042,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         let adminStoragePath = self.getAdminStoragePath()
         self.account.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
+        let adminPublicPath = self.getAdminPublicPath()
         // @deprecated after Cadence 1.0
-        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(
-            self.getAdminPublicPath(),
+        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{GlobalInternalWritable, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(
+            adminPublicPath,
             target: adminStoragePath
         )
 

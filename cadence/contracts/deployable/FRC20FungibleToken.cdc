@@ -584,7 +584,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the super minter resource
         ///
         access(all)
-        fun borrowSuperMinter(): &Minter {
+        view fun borrowSuperMinter(): &Minter {
             return &self.minter as &Minter
         }
 

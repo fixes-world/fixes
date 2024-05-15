@@ -858,7 +858,9 @@
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
 				"FixesTokenAirDrops",
-				"FRC20Agents"
+				"FRC20Agents",
+				"FixesFungibleToken",
+				"FRC20FungibleToken"
 			]
 		},
 		"mainnet": {
@@ -927,7 +929,9 @@
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
 				"FixesTokenAirDrops",
-				"FRC20Agents"
+				"FRC20Agents",
+				"FixesFungibleToken",
+				"FRC20FungibleToken"
 			]
 		}
 	}

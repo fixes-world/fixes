@@ -241,20 +241,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         view fun getHoldersAmount(): UInt64 {
             return 0
         }
-
-        // ---- Optional ----
-
-        /// update the token holder
-        access(contract)
-        fun onTokenDeposited(_ address: Address): Bool {
-            return false
-        }
-
-        /// update the balance ranking
-        access(contract)
-        fun onBalanceChanged(_ address: Address): Bool {
-            return false
-        }
     }
 
     /// The admin interface for the FT
@@ -263,6 +249,11 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Check if the address is the admin
         access(all)
         view fun isAuthorizedUser(_ addr: Address): Bool
+
+        /// Borrow the super minter resource
+        ///
+        access(all)
+        view fun borrowSuperMinter(): &{IMinter}
 
         /// Update the authorized users
         ///
@@ -273,12 +264,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         ///
         access(all)
         fun createMinter(allowedAmount: UFix64): @{IMinter}
-
-
-        /// Borrow the super minter resource
-        ///
-        access(all)
-        fun borrowSuperMinter(): &{IMinter}
     }
 
     /// The minter resource interface
