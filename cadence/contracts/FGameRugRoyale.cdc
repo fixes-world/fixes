@@ -325,13 +325,18 @@ access(all) contract FGameRugRoyale {
 
         // ------ write methods ------
 
-        /// Join the game
-        access(contract)
-        fun joinGame(_ cap: Capability<&{LiquidityHolder}>)
+        /// Calculate the phase winners
+        /// (Readonly) - This method will not change the state
+        access(all)
+        fun calculateCurrentPhaseWinners(): [WinnerStatus]
 
         /// Go to the next phase
         access(contract)
         fun tryUpdateByPhase()
+
+        /// Join the game
+        access(contract)
+        fun joinGame(_ cap: Capability<&{LiquidityHolder}>)
     }
 
     /// The resource of rug royale game
@@ -512,27 +517,78 @@ access(all) contract FGameRugRoyale {
             return self.finalWinners
         }
 
-        // ------- Contract access methods -------
-
-        /// Join the game
-        access(contract)
-        fun joinGame(_ cap: Capability<&{LiquidityHolder}>) {
-            pre {
-                self.isJoinable(): "The game is not joinable"
-                cap.check() == true: "Invalid capability"
-                self.participants[cap.address] == nil: "The participant already joined"
+        /// Calculate the phase winners
+        access(all)
+        fun calculateCurrentPhaseWinners(): [WinnerStatus] {
+            let currentPhase = self.getCurrentPhase()
+            if currentPhase == GamePhase.P0_Waiting {
+                return []
+            } else if currentPhase == GamePhase.Ended {
+                return self.phaseRecords[0].winners
             }
+            // Calculate the winners
 
-            // Add the participant
-            self.participants[cap.address] = cap
-            self.participantsAlive[cap.address] = true
+            // Now we need to update the game data to the next phase
+            let currentPhaseWinnerAmount = FGameRugRoyale.getGamePhaseWinners(currentPhase)
 
-            // emit event
-            emit GameParticipantJoined(
-                epochId: self.epochIndex,
-                participant: cap.address
-            )
+            // Record all liquidity value for all participants
+            let activeParticipants = self.getAliveParticipants()
+            let winners: [WinnerStatus] = []
+            // find the winners
+            for address in activeParticipants {
+                if let liquidityHolder = self.borrowLiquidHolderRef(address) {
+                    let liquidity = liquidityHolder.getLiquidityValue()
+                    let holders = liquidityHolder.getHolders()
+                    let trades = liquidityHolder.getTrades()
+                    // if the liquidity is 0, that means no liquidity in the pool or transferred to the swap pair
+                    if liquidity > 0.0 {
+                        // if liquidity > 0.0, we need to check if the participant is a winner
+                        let lastIndex = winners.length - 1
+                        // check the winners first
+                        var minLiquidity = 0.0
+                        if winners.length > 0 {
+                            minLiquidity = winners[lastIndex].liquidity
+                        }
+                        if winners.length >= Int(currentPhaseWinnerAmount) && liquidity <= minLiquidity {
+                            continue
+                        }
+
+                        // find the position
+                        var highBalanceIdx = 0
+                        var lowBalanceIdx = lastIndex
+                        // use binary search to find the position
+                        while lowBalanceIdx >= highBalanceIdx {
+                            let mid = (lowBalanceIdx + highBalanceIdx) / 2
+                            let minRecord = &winners[mid] as &WinnerStatus
+                            let midBalance = minRecord.liquidity
+                            // find the position
+                            if liquidity > midBalance {
+                                lowBalanceIdx = mid - 1
+                            } else if liquidity < midBalance {
+                                highBalanceIdx = mid + 1
+                            } else {
+                                break
+                            }
+                        }
+                        // insert the address
+                        winners.insert(at: highBalanceIdx, WinnerStatus(
+                            address,
+                            liquidity,
+                            holders,
+                            trades
+                        ))
+
+                        // remove the last one if the winners are more than the limit
+                        if winners.length > Int(currentPhaseWinnerAmount) {
+                            winners.removeLast()
+                        }
+                    } // end if liquidity > 0.0
+                } // end if liquidityHolder exists
+            } // end for
+            return winners
         }
+
+        // ------- Contract access methods -------
 
         /// Go to the next phase
         ///
@@ -569,7 +625,6 @@ access(all) contract FGameRugRoyale {
                 }
                 // Now we need to update the game data to the next phase
                 let currentPhaseWinnerAmount = FGameRugRoyale.getGamePhaseWinners(currentPhase)
-                let nextPhase = GamePhase(rawValue: currentPhase.rawValue + 1) ?? GamePhase.Ended
 
                 // Record all liquidity value for all participants
                 let activeParticipants = self.getAliveParticipants()
@@ -741,6 +796,9 @@ access(all) contract FGameRugRoyale {
                     }
                 }
 
+                // the next phase
+                let nextPhase = GamePhase(rawValue: currentPhase.rawValue + 1) ?? GamePhase.Ended
+
                 // emit event
                 emit GamePhaseChanged(
                     epochId: self.epochIndex,
@@ -752,6 +810,26 @@ access(all) contract FGameRugRoyale {
                 )
                 break
             }
+        }
+
+        /// Join the game
+        access(contract)
+        fun joinGame(_ cap: Capability<&{LiquidityHolder}>) {
+            pre {
+                self.isJoinable(): "The game is not joinable"
+                cap.check() == true: "Invalid capability"
+                self.participants[cap.address] == nil: "The participant already joined"
+            }
+
+            // Add the participant
+            self.participants[cap.address] = cap
+            self.participantsAlive[cap.address] = true
+
+            // emit event
+            emit GameParticipantJoined(
+                epochId: self.epochIndex,
+                participant: cap.address
+            )
         }
 
         // ------- Internal methods -------

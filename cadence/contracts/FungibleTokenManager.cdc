@@ -126,6 +126,27 @@ access(all) contract FungibleTokenManager {
         return acctsPool.getFTContractAddress(tick)
     }
 
+    /// Borrow the global public of Fixes Fungible Token contract
+    ///
+    access(all)
+    veiw fun borrowFTGlobalPublic(_ tick: String): &{FixesFungibleTokenInterface.IGlobalPublic}? {
+        // singleton resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        // borrow the contract
+        if let contractRef = acctsPool.borrowFTContract(tick) {
+            return contractRef.borrowGlobalPublic()
+        }
+        return nil
+    }
+
+    /// Check if the user is authorized to access the Fixes Fungible Token manager
+    ///
+    access(all)
+    view fun isFTContractAuthorizedUser(_ tick: String, _ callerAddr: Address): Bool {
+        let globalPublicRef = self.borrowFTGlobalPublic(tick)
+        return globalPublicRef?.isAuthorizedUser(callerAddr) ?? false
+    }
+
     /// Enable the Fixes Fungible Token
     ///
     access(all)
@@ -510,10 +531,7 @@ access(all) contract FungibleTokenManager {
     /// Enable the FRC20 Fungible Token
     ///
     access(all)
-    fun initializeFRC20FungibleTokenAccount(
-        _ ins: &Fixes.Inscription,
-        newAccount: Capability<&AuthAccount>,
-    ) {
+    fun initializeFRC20FungibleTokenAccount(_ ins: &Fixes.Inscription, newAccount: Capability<&AuthAccount>) {
         // singletoken resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -581,6 +599,7 @@ access(all) contract FungibleTokenManager {
         let privPath = /private/FRC20ConverterPrivate
         if childAcctRef.getCapability<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(privPath) == nil {
             let contractRef = acctsPool.borrowFTContract(tickerName)
+                ?? panic("The staking account was not created")
             // Check if the admin resource is available
             let adminStoragePath = contractRef.getAdminStoragePath()
             // link the admin resource to the private path
@@ -651,6 +670,7 @@ access(all) contract FungibleTokenManager {
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
             ?? panic("The staking account was not created")
         let contractRef = acctsPool.borrowFTContract(tick)
+            ?? panic("The staking account was not created")
         // Check if the admin resource is available
         let adminStoragePath = contractRef.getAdminStoragePath()
         return childAcctRef.borrow<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(from: adminStoragePath)

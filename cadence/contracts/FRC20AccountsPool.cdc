@@ -107,7 +107,7 @@ access(all) contract FRC20AccountsPool {
         view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}?
         /// Borrow the Fixes Fungible Token contract interface
         access(all)
-        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface
+        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface?
 
         /// Execute inscription and extract FlowToken in the inscription
         access(all)
@@ -305,15 +305,15 @@ access(all) contract FRC20AccountsPool {
         /// If no contract is found, it will panic
         ///
         access(all)
-        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface {
+        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface? {
             // try to borrow the account to check if it was created
-            let childAcctRef = self.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
-                ?? panic("The staking account was not created")
-            let name = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
-            // try to borrow the contract
-            let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: name)
-                ?? panic("The Fungible Token contract was not deployed for tick: ".concat(tick))
-            return contractRef
+            if let childAcctRef = self.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick) {
+                let name = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+                // try to borrow the contract
+                let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: name)
+                return contractRef
+            }
+            return nil
         }
 
         /// Execute inscription and extract FlowToken in the inscription

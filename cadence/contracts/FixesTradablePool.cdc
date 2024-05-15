@@ -598,7 +598,7 @@ access(all) contract FixesTradablePool {
         view fun borrowTokenGlobalPublic(): &{FixesFungibleTokenInterface.IGlobalPublic} {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let key = self.minter.getAccountsPoolKey() ?? panic("The accounts pool key is missing")
-            let contractRef = acctsPool.borrowFTContract(key)
+            let contractRef = acctsPool.borrowFTContract(key) ?? panic("The FT contract reference is missing")
             return contractRef.borrowGlobalPublic()
         }
 

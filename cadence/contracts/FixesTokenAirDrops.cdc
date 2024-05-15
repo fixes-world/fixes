@@ -178,25 +178,16 @@ access(all) contract FixesTokenAirDrops {
             claimables: {Address: UFix64}
         ) {
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
+            assert(
+                self.isAuthorizedUser(callerAddr),
+                message: "The caller is not an authorized user"
+            )
 
             // extract the inscription
             FixesTradablePool.verifyAndExecuteInscription(
                 ins,
                 symbol: self.minter.getSymbol(),
                 usage: "set-claimables"
-            )
-
-            // singleton resources
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-
-            // The caller should be authorized user for the token
-            // borrow the contract
-            let key = self.minter.getAccountsPoolKey() ?? panic("The accounts pool key is missing")
-            let contractRef = acctsPool.borrowFTContract(key)
-            let globalPublicRef = contractRef.borrowGlobalPublic()
-            assert(
-                globalPublicRef.isAuthorizedUser(callerAddr),
-                message: "The caller is not authorized to set the claimable amount"
             )
 
             // Total claimable amount
@@ -297,6 +288,20 @@ access(all) contract FixesTokenAirDrops {
         }
 
         // ----- Internal Methods -----
+
+        /// Check if the caller is an authorized user
+        ///
+        access(self)
+        view fun isAuthorizedUser(_ callerAddr: Address): Bool {
+            // singleton resources
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            // The caller should be authorized user for the token
+            let key = self.minter.getAccountsPoolKey() ?? panic("The accounts pool key is missing")
+            // borrow the contract
+            let contractRef = acctsPool.borrowFTContract(key) ?? panic("The contract is missing")
+            let globalPublicRef = contractRef.borrowGlobalPublic()
+            return globalPublicRef.isAuthorizedUser(callerAddr)
+        }
     }
 
 
