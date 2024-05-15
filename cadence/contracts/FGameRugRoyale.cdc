@@ -347,12 +347,12 @@ access(all) contract FGameRugRoyale {
             return self.getGameStartTime() != nil
         }
 
-        // ------ write methods ------
-
         /// Calculate the phase winners
         /// (Readonly) - This method will not change the state
         access(all)
         fun calculateCurrentPhaseWinners(): [WinnerStatus]
+
+        // ------ write methods ------
 
         /// Go to the next phase
         access(contract)
