@@ -30,5 +30,9 @@ transaction() {
         self.heartbeat.tick(scope: "FGameLottery")
         // Tick for Votes
         self.heartbeat.tick(scope: "FRC20Votes")
+        // Tick for TradablePool
+        self.heartbeat.tick(scope: "TradablePool")
+        // Tick for rugroyale
+        self.heartbeat.tick(scope: "FGameRugRoyale")
     }
 }

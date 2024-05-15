@@ -885,6 +885,7 @@ access(all) contract FGameRugRoyale {
                 return currentPhase.rawValue >= GamePhase.P1_Nto24.rawValue
                     && currentPhase.rawValue < GamePhase.Ended.rawValue
             }
+            // If the game is not started, it is also considered as finished
             return false
         }
 
@@ -895,7 +896,8 @@ access(all) contract FGameRugRoyale {
                 let currentPhase = currentGame.getCurrentPhase()
                 return currentPhase.rawValue == GamePhase.Ended.rawValue
             }
-            return false
+            // If the game is not started, it is also considered as finished
+            return true
         }
 
         // --- write methods ---
@@ -940,18 +942,32 @@ access(all) contract FGameRugRoyale {
             return self.borrowBattleRoyaleRef(self.currentEpochIndex)
         }
 
-        /** ---- Admin Methods ----- */
+        // ----- Implement IHeartbeatHook -----
+
+        /// The methods that is invoked when the heartbeat is executed
+        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
+        ///
+        access(account)
+        fun onHeartbeat(_ deltaTime: UFix64) {
+            // Step 0. Handle the current game
+            self.ensureGameExisting()
+        }
+
+        // --- Internal Methods ---
 
         /// Start a new epoch
         ///
-        access(all)
-        fun startNewEpoch() {
-            pre {
-                self.isCurrentGameFinished(): "The current Game is not finished"
+        access(self)
+        fun ensureGameExisting() {
+            if self.isCurrentGameActivated() {
+                // DO NOTHING
+                return
             }
 
+            let currentGame = self.borrowBattleRoyaleRef(self.currentEpochIndex)
+            let newEpochIndex = currentGame == nil ? self.currentEpochIndex : self.currentEpochIndex + 1
+
             // Create a new Game
-            let newEpochIndex = self.currentEpochIndex + 1
             let newOne <- create BattleRoyale(newEpochIndex)
 
             let startedAt = newOne.epochStartAt
@@ -966,18 +982,6 @@ access(all) contract FGameRugRoyale {
                 startAt: startedAt
             )
         }
-
-        // ----- Implement IHeartbeatHook -----
-
-        /// The methods that is invoked when the heartbeat is executed
-        /// Before try-catch is deployed, please ensure that there will be no panic inside the method.
-        ///
-        access(account)
-        fun onHeartbeat(_ deltaTime: UFix64) {
-            // TODO: Implement the heartbeat logic
-        }
-
-        // --- Internal Methods ---
 
         access(contract)
         fun borrowSelf(): &GameCenter {
@@ -1096,11 +1100,25 @@ access(all) contract FGameRugRoyale {
         let storagePath = self.getGameCenterStoragePath()
         self.account.save(<- create GameCenter(), to: storagePath)
         // Link the GameCenter to the public path
+        let publicPath = self.getGameCenterPublicPath()
         // @deprecated in Cadence 1.0
         self.account.link<&GameCenter{GameCenterPublic, FixesHeartbeat.IHeartbeatHook}>(
-            self.getGameCenterPublicPath(),
+            publicPath,
             target: storagePath
         )
+
+        //   - Add Heartbeat Hook
+
+        // Register to FixesHeartbeat
+        let heartbeatScope = "FGameRugRoyale"
+        let contractAddr = self.account.address
+        if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: contractAddr) {
+            FixesHeartbeat.addHook(
+                scope: heartbeatScope,
+                hookAddr: contractAddr,
+                hookPath: publicPath
+            )
+        }
 
         emit ContractInitialized()
     }
