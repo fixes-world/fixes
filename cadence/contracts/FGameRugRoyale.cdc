@@ -317,6 +317,13 @@ access(all) contract FGameRugRoyale {
             return phase == GamePhase.P0_Waiting || phase == GamePhase.P1_Nto24
         }
 
+        /// Check if the game is ended
+        access(all)
+        view fun isEnded(): Bool {
+            let phase = self.getCurrentPhase()
+            return phase == GamePhase.Ended
+        }
+
         /// Check if the game is started
         access(all)
         view fun isStarted(): Bool {
@@ -618,8 +625,10 @@ access(all) contract FGameRugRoyale {
                 break
             default:
                 let estimatedPhase = self.getCurrentEstimatedPhase()
+                let isCurrentPhaseNotChanged = currentPhase.rawValue == estimatedPhase.rawValue
+                let isCurrentPhaseEnded = currentPhase.rawValue == GamePhase.Ended.rawValue
                 // This indicates that it is currently in this state or the game has ended
-                if currentPhase.rawValue + 1 == estimatedPhase.rawValue || currentPhase.rawValue == GamePhase.Ended.rawValue {
+                if isCurrentPhaseNotChanged || isCurrentPhaseEnded {
                     // DO nothing
                     return
                 }
@@ -949,17 +958,23 @@ access(all) contract FGameRugRoyale {
         ///
         access(account)
         fun onHeartbeat(_ deltaTime: UFix64) {
-            // Step 0. Handle the current game
-            self.ensureGameExisting()
+            let currentGame = self.borrowCurrentGame()
+            if currentGame != nil && !currentGame!.isEnded() {
+                // Update the game by phase
+                currentGame!.tryUpdateByPhase()
+            } else {
+                // Start a new game epoch
+                self.ensureGameExisting()
+            }
         }
 
         // --- Internal Methods ---
 
-        /// Start a new epoch
+        /// Start a new game epoch
         ///
         access(self)
         fun ensureGameExisting() {
-            if self.isCurrentGameActivated() {
+            if !self.isCurrentGameFinished() {
                 // DO NOTHING
                 return
             }
