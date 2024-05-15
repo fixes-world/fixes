@@ -27,6 +27,7 @@ import "FixesHeartbeat"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
+import "FRC20AccountsPool"
 
 /// Rug Royale Game Contract
 ///
@@ -77,6 +78,22 @@ access(all) contract FGameRugRoyale {
     ///
     access(all) resource interface LiquidityHolder {
         // --- read methods ---
+
+        /// Check if the address is authorized user for the liquidity holder
+        access(all)
+        view fun isAuthorizedUser(_ addr: Address): Bool
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type
+
+        /// Get the token symbol
+        access(all)
+        view fun getTokenSymbol(): String
+
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String?
 
         /// Get the liquidity market cap
         access(all)
@@ -911,9 +928,22 @@ access(all) contract FGameRugRoyale {
 
         // --- write methods ---
 
+        /// Let the liquidity holder join the game
+        access(all)
+        fun joinGame(
+            ins: &Fixes.Inscription,
+            _ cap: Capability<&{LiquidityHolder}>
+        ) {
+            pre {
+                ins.isExtractable(): "The inscription is not extractable"
+                cap.check() == true: "Invalid capability"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+        }
+
         // --- Internal methods ---
-        access(contract)
-        fun borrowSelf(): &GameCenter
     }
 
     /// The GameCenter Resource
@@ -951,6 +981,53 @@ access(all) contract FGameRugRoyale {
             return self.borrowBattleRoyaleRef(self.currentEpochIndex)
         }
 
+        /** ---- Implement GameCenterPublic - writable ---- */
+
+        /// Let the liquidity holder join the game
+        ///
+        access(all)
+        fun joinGame(
+            ins: &Fixes.Inscription,
+            _ cap: Capability<&{LiquidityHolder}>
+        ) {
+            let currentGame = self.borrowCurrentGame()
+            assert(
+                currentGame?.isJoinable() == true,
+                message: "Currently the game is not joinable"
+            )
+
+            let callerAddr = ins.owner?.address ?? panic("Invalid inscription owner")
+            let liquidityHolder = cap.borrow() ?? panic("Invalid capability")
+            assert(
+                liquidityHolder.isAuthorizedUser(callerAddr),
+                message: "The caller is not authorized user"
+            )
+
+            // borrow the accounts pool
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+            // inscription data
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            // check the symbol
+            let tick = meta["tick"] ?? panic("The token symbol is not found")
+            let acctKey = liquidityHolder.getAccountsPoolKey()
+            assert(
+                tick == acctKey,
+                message: "The token symbol is not matched"
+            )
+            // check the usage
+            let usageInMeta = meta["usage"] ?? panic("The token operation is not found")
+            assert(
+                usageInMeta == "join-rug-royale",
+                message: "The inscription is not for initialize a Fungible Token account"
+            )
+            // execute the inscription
+            acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
+
+            // Join the game
+            currentGame!.joinGame(cap)
+        }
+
         // ----- Implement IHeartbeatHook -----
 
         /// The methods that is invoked when the heartbeat is executed
@@ -964,7 +1041,7 @@ access(all) contract FGameRugRoyale {
                 currentGame!.tryUpdateByPhase()
             } else {
                 // Start a new game epoch
-                self.ensureGameExisting()
+                self.ensureNewGameEpoch()
             }
         }
 
@@ -973,12 +1050,13 @@ access(all) contract FGameRugRoyale {
         /// Start a new game epoch
         ///
         access(self)
-        fun ensureGameExisting() {
+        fun ensureNewGameEpoch() {
             if !self.isCurrentGameFinished() {
                 // DO NOTHING
                 return
             }
 
+            // check if the current game exists
             let currentGame = self.borrowBattleRoyaleRef(self.currentEpochIndex)
             let newEpochIndex = currentGame == nil ? self.currentEpochIndex : self.currentEpochIndex + 1
 

@@ -325,23 +325,9 @@ access(all) contract FixesTradablePool {
         }
     }
 
-    /// The liquidity pool admin interface.
-    ///
-    access(all) resource interface LiquidityPoolAdmin {
-        /// Initialize the liquidity pool
-        ///
-        access(all)
-        fun initialize()
-
-        // The admin can set the subject fee percentage
-        //
-        access(all)
-        fun setSubjectFeePercentage(_ subjectFeePerc: UFix64)
-    }
-
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, LiquidityPoolAdmin, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver {
         /// The bonding curve of the liquidity pool
         access(contract)
         let curve: {FixesBondingCurve.CurveInterface}
@@ -403,6 +389,7 @@ access(all) contract FixesTradablePool {
         // ----- Implement LiquidityPoolAdmin -----
 
         /// Initialize the liquidity pool
+        /// TODO: Change to entitlement in Cadence 1.0
         ///
         access(all)
         fun initialize() {
@@ -429,9 +416,10 @@ access(all) contract FixesTradablePool {
             )
         }
 
-        // The admin can set the subject fee percentage
-        // The subject fee percentage must be greater than or equal to 0 and less than or equal to 0.01
-        //
+        /// The admin can set the subject fee percentage
+        /// The subject fee percentage must be greater than or equal to 0 and less than or equal to 0.01
+        /// TODO: Change to entitlement in Cadence 1.0
+        ///
         access(all)
         fun setSubjectFeePercentage(_ subjectFeePerc: UFix64) {
             pre {
@@ -603,6 +591,32 @@ access(all) contract FixesTradablePool {
         }
 
         // ----- Implement FGameRugRoyale.LiquidityHolder -----
+
+        /// Get the token symbol
+        access(all)
+        view fun getTokenSymbol(): String {
+            return self.minter.getSymbol()
+        }
+
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String? {
+            return self.minter.getAccountsPoolKey()
+        }
+
+        /// Check if the address is authorized user for the liquidity holder
+        ///
+        access(all)
+        view fun isAuthorizedUser(_ callerAddr: Address): Bool {
+            // singleton resources
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            // The caller should be authorized user for the token
+            let key = self.minter.getAccountsPoolKey() ?? panic("The accounts pool key is missing")
+            // borrow the contract
+            let contractRef = acctsPool.borrowFTContract(key) ?? panic("The contract is missing")
+            let globalPublicRef = contractRef.borrowGlobalPublic()
+            return globalPublicRef.isAuthorizedUser(callerAddr)
+        }
 
         /// Get the liquidity market cap
         access(all)
