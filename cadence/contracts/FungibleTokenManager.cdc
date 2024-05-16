@@ -189,10 +189,6 @@ access(all) contract FungibleTokenManager {
         // deploy the contract of Fixes Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
 
-        // set the authorized account
-        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
-        tokenAdminRef.updateAuthorizedUsers(callerAddr, true)
-
         // register token to the tokenlist
         TokenList.ensureFungibleTokenRegistered(newAddr, "FixesFungibleToken")
 

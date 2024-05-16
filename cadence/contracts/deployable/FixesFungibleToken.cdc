@@ -1050,6 +1050,13 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             target: adminStoragePath
         )
 
+        // ensure the admin resource exists
+        let adminRef = self.account.borrow<&FungibleTokenAdmin>(from: adminStoragePath)
+            ?? panic("The FungibleToken Admin is not found")
+        let deployer = self.getDeployerAddress()
+        // add the deployer as the authorized user
+        adminRef.updateAuthorizedUsers(deployer, true)
+
         // Step.2 Setup the vault and receiver for the contract account
 
         let storagePath = self.getVaultStoragePath()
