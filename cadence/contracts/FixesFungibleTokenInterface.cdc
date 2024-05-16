@@ -428,6 +428,15 @@ access(all) contract interface FixesFungibleTokenInterface {
         return FRC20FTShared.borrowStoreRef(self.account.address) ?? panic("Config store not found")
     }
 
+    /// Get the deployer address
+    ///
+    access(all)
+    view fun getDeployerAddress(): Address {
+        let store = self.borrowSharedStore()
+        let deployer = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDeployer) as! Address?
+        return deployer ?? panic("Deployer address not found")
+    }
+
     /// Get the ticker name of the token
     ///
     access(all)

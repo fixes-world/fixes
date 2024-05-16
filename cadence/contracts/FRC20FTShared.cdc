@@ -727,6 +727,7 @@ access(all) contract FRC20FTShared {
         access(all) case GameLotteryAutoStart
         access(all) case GameLotteryServiceFee
         // FungibleToken config type
+        access(all) case FungibleTokenDeployer
         access(all) case FungibleTokenSymbol
         access(all) case FungibleTokenDisplayName
         access(all) case FungibleTokenDescription
@@ -737,7 +738,6 @@ access(all) contract FRC20FTShared {
         // TradablePool config type
         access(all) case TradablePoolCreateLPTargetMarketCap
         access(all) case TradablePoolTradingFee
-        // Rug Royale config type
     }
 
     /* --- Public Methods --- */
@@ -797,6 +797,9 @@ access(all) contract FRC20FTShared {
                 break
             case ConfigType.GameLotteryServiceFee:
                 key = "gameLottery:ServiceFee"
+                break
+            case ConfigType.FungibleTokenDeployer:
+                key = "fungibleToken:Deployer"
                 break
             case ConfigType.FungibleTokenSymbol:
                 key = "fungibleToken:Symbol"

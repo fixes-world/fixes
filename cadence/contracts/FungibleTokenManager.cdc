@@ -185,7 +185,7 @@ access(all) contract FungibleTokenManager {
         acctsPool.setupNewChildForFungibleToken(tick: tick, newAccount)
 
         // update the resources in the account
-        self._ensureFungibleTokenAccountResourcesAvailable(tick)
+        self._ensureFungibleTokenAccountResourcesAvailable(tick, caller: callerAddr)
         // deploy the contract of Fixes Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
 
@@ -577,7 +577,7 @@ access(all) contract FungibleTokenManager {
         )
 
         // update the resources in the account
-        self._ensureFungibleTokenAccountResourcesAvailable(tickerName)
+        self._ensureFungibleTokenAccountResourcesAvailable(tickerName, caller: callerAddr)
 
         // try to borrow the account to check if it was created
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tickerName)
@@ -681,7 +681,7 @@ access(all) contract FungibleTokenManager {
     /// Ensure all resources are available
     ///
     access(self)
-    fun _ensureFungibleTokenAccountResourcesAvailable(_ tick: String) {
+    fun _ensureFungibleTokenAccountResourcesAvailable(_ tick: String, caller: Address) {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
@@ -711,15 +711,14 @@ access(all) contract FungibleTokenManager {
         }
 
         // borrow the shared store
-        let store = self.account.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
-            ?? panic("The shared store was not created")
-        if store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) == nil {
+        if let store = self.account.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath) {
             // ensure the symbol is without the '$' sign
             var symbol = tick
             if symbol[0] == "$" {
                 symbol = symbol.slice(from: 1, upTo: symbol.length)
             }
-            // set the symbol
+            // set the configuration
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDeployer, value: caller)
             store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol, value: symbol)
 
             isUpdated = true || isUpdated
