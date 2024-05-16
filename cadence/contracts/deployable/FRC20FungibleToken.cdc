@@ -1110,7 +1110,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         // setup the indexer controller
         let controlerPath = FRC20Agents.getIndexerControllerStoragePath()
         assert(
-            self.account.check<&FRC20Agents.IndexerController>(from: controlerPath),
+            self.account.check<@FRC20Agents.IndexerController>(from: controlerPath),
             message: "The FRC20 Indexer Controller is not found"
         )
         // @deprecated in Cadence 1.0
@@ -1150,7 +1150,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         let receiverPath = self.getReceiverPublicPath()
 
         // Create the Vault with the total supply of tokens and save it in storage.
-        let vault <- create Vault(balance: self.totalSupply)
+        let vault <- create Vault(balance: 0.0)
         self.account.save(<-vault, to: storagePath)
 
         // @deprecated after Cadence 1.0

@@ -425,7 +425,6 @@ access(all) contract interface FixesFungibleTokenInterface {
     ///
     access(all)
     view fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
-        log("Borrowing shared store: ".concat(self.account.address.toString()))
         return FRC20FTShared.borrowStoreRef(self.account.address) ?? panic("Config store not found")
     }
 

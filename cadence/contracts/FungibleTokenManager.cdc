@@ -9,6 +9,7 @@ This contract is used to manage the account and contract of Fixes' Fungible Toke
 // Third Party Imports
 import "FungibleToken"
 import "FlowToken"
+import "StringUtils"
 import "TokenList"
 // Fixes imports
 import "Fixes"
@@ -595,20 +596,20 @@ access(all) contract FungibleTokenManager {
 
         // --- Create the FRC20 Converter ---
 
+        // Check if the admin resource is available
+        let contractRef = acctsPool.borrowFTContract(tickerName)
+            ?? panic("The Fungible Token account was not created")
+        let adminStoragePath = contractRef.getAdminStoragePath()
         // @deprecated in Cadence 1.0
         let privPath = /private/FRC20ConverterPrivate
-        if childAcctRef.getCapability<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(privPath) == nil {
-            let contractRef = acctsPool.borrowFTContract(tickerName)
-                ?? panic("The staking account was not created")
-            // Check if the admin resource is available
-            let adminStoragePath = contractRef.getAdminStoragePath()
-            // link the admin resource to the private path
-            childAcctRef.link<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(
-                privPath,
-                target: adminStoragePath
-            )
-        }
-        let adminCap = childAcctRef.getCapability<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(privPath)
+        childAcctRef.unlink(privPath)
+        // link the admin resource to the private path
+        childAcctRef.link<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(
+            privPath,
+            target: adminStoragePath
+        )
+        let adminCap = childAcctRef
+            .getCapability<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(privPath)
         assert(
             adminCap.check(),
             message: "The admin resource is not available"
@@ -668,9 +669,9 @@ access(all) contract FungibleTokenManager {
         // try to borrow the account to check if it was created
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
-            ?? panic("The staking account was not created")
+            ?? panic("The Fungible token account was not created")
         let contractRef = acctsPool.borrowFTContract(tick)
-            ?? panic("The staking account was not created")
+            ?? panic("The Fungible Token contract is not deployed")
         // Check if the admin resource is available
         let adminStoragePath = contractRef.getAdminStoragePath()
         return childAcctRef.borrow<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(from: adminStoragePath)
@@ -795,17 +796,27 @@ access(all) contract FungibleTokenManager {
         // Load contract from the account
         if let ftContract = self.account.contracts.get(name: contractName) {
             // try to deploy the contract of FRC20 Fungible Token to the child account
-            if childAcctRef.contracts.get(name: contractName) != nil {
+            let deployedContracts = childAcctRef.contracts.names
+            if deployedContracts.contains(contractName) {
+                log("Updating the contract in the account: ".concat(childAddr.toString()))
                 // update the contract
                 // This method will update the contract, but it maybe deprecated in Cadence 1.0
                 childAcctRef.contracts.update__experimental(name: contractName, code: ftContract.code)
                 // childAcctRef.contracts.update(name: contractName, code: ftContract.code)
             } else {
+                log("Deploying the contract to the account: ".concat(childAddr.toString()))
                 // add the contract
                 childAcctRef.contracts.add(name: contractName, code: ftContract.code)
+                // check if the contract is deployed
+                let names = childAcctRef.contracts.names
+                if names.length > 0 {
+                    log("The contracts in the account: ".concat(StringUtils.join(names, ",")))
+                } else {
+                    log("No contract is deployed in the account")
+                }
             }
         } else {
-            panic("The contract of FRC20 Fungible Token is not deployed")
+            panic("The contract of Fungible Token is not deployed")
         }
 
         // emit the event

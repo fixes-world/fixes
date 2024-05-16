@@ -9,6 +9,7 @@ The Hybrid Custody Account Pool
 
 // Third-party imports
 import "MetadataViews"
+import "ViewResolver"
 import "FungibleToken"
 import "FlowToken"
 import "HybridCustody"
@@ -310,11 +311,10 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface? {
             // try to borrow the account to check if it was created
-            if let childAcctRef = self.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick) {
+            if let childAcctRef = self.borrowChildAccount(type: ChildAccountType.FungibleToken, tick) {
                 let name = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
                 // try to borrow the contract
-                let contractRef = childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: name)
-                return contractRef
+                return childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: name)
             }
             return nil
         }
