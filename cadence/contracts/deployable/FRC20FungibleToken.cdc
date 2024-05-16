@@ -258,16 +258,17 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 message: "The owner of the inscription is not matched"
             )
 
+            // singleton FRC20 controller
+            let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
             // ensure the vault is valid
             if !self.isValidVault() {
-                let newChange <- FRC20FTShared.createEmptyChange(
+                let newChange <- frc20CtrlRef.createEmptyChange(
                     tick: self.getSymbol(),
                     from: insOwner
                 )
                 self.initialize(<- newChange, false)
             }
 
-            let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
             let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["tick"]?.toLower() == self.getSymbol(),
@@ -386,9 +387,11 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             let vault <- from as! @FRC20FungibleToken.Vault
             let change <- vault.extract()
 
+            // singleton FRC20 controller
+            let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
             // initialize current vault if it is not initialized
             if !self.isValidVault() {
-                let newChange <- FRC20FTShared.createEmptyChange(
+                let newChange <- frc20CtrlRef.createEmptyChange(
                     tick: change.tick,
                     from: change.from
                 )
@@ -428,10 +431,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
             // borrow the change reference
             let changeRef = self.borrowChangeRef()!
-            FRC20FTShared.depositToChange(
-                receiver: changeRef,
-                change: <- change
-            )
+            changeRef.forceMerge(from: <- change)
+
             // update balance
             self.syncBalance()
 
@@ -502,7 +503,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     access(all) resource interface AdminInterface {
         // Only access by the contract
         access(contract)
-        fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}
+        fun borrowFRC20Controller(): &FRC20Agents.IndexerController
     }
 
     /// The admin resource for the FRC20 FT
@@ -511,10 +512,10 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(self)
         let minter: @Minter
         access(contract)
-        var frc20IndexerController: Capability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>
+        var frc20IndexerController: Capability<&FRC20Agents.IndexerController>
 
         init(
-            cap: Capability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>
+            cap: Capability<&FRC20Agents.IndexerController>
         ) {
             pre {
                 cap.check(): "The capability must be valid"
@@ -533,7 +534,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the FRC20 Indexer Controller
         ///
         access(contract)
-        fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
+        fun borrowFRC20Controller(): &FRC20Agents.IndexerController {
             return self.frc20IndexerController.borrow() ?? panic("The FRC20 Indexer Controller is not found")
         }
 
@@ -828,7 +829,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the FRC20 Indexer Controller
     ///
     access(contract)
-    view fun borrowFRC20Controller(): &FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface} {
+    view fun borrowFRC20Controller(): &FRC20Agents.IndexerController {
         let adminRef = self.borrowAdminPublic()
         return adminRef.borrowFRC20Controller()
     }
@@ -1114,13 +1115,17 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         )
         // @deprecated in Cadence 1.0
         let privPath = /private/FRC20IndxerController
-        self.account.link<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>(
+        self.account.link<&FRC20Agents.IndexerController>(
             privPath,
             target: controlerPath
         )
 
         // setup admin resource
-        let cap = self.account.getCapability<&FRC20Agents.IndexerController{FRC20Agents.IndexerControllerInterface}>(privPath)
+        let cap = self.account.getCapability<&FRC20Agents.IndexerController>(privPath)
+        assert(
+            cap.check(),
+            message: "The capability must be valid"
+        )
         let admin <- create FungibleTokenAdmin(cap: cap)
         let adminStoragePath = self.getAdminStoragePath()
         self.account.save(<-admin, to: adminStoragePath)

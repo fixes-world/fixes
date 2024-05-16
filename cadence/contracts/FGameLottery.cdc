@@ -942,10 +942,8 @@ access(all) contract FGameLottery {
             }
 
             // deposit the payment to the total bought
-            FRC20FTShared.depositToChange(
-                receiver: self.borrowCurrentLotteryChange(),
-                change: <- payment
-            )
+            let ref = self.borrowCurrentLotteryChange()
+            ref.forceMerge(from: <- payment)
 
             // Create a new ticket
             let collection = recipient.borrow() ?? panic("Recipient not found")
@@ -1123,10 +1121,7 @@ access(all) contract FGameLottery {
                     self.drawnResult?.updateJackpot(newJackpotAmount)
 
                     // deposit the new added amount to the jackpot pool
-                    FRC20FTShared.depositToChange(
-                        receiver: jackpotRef,
-                        change: <- self.current.withdrawAsChange(amount: restAmount)
-                    )
+                    jackpotRef.forceMerge(from: <- self.current.withdrawAsChange(amount: restAmount))
                     // all remaining non-jackpot prize will be added to the jackpot
                 } else if totalBought < nonJackpotTotal && oldJackpotAmount + totalBought - nonJackpotTotal >= minNewJackpotAmount {
                     // withdraw from the jackpot pool to cover the non-jackpot prize
@@ -1137,11 +1132,10 @@ access(all) contract FGameLottery {
 
                     // withdraw the required amount from the jackpot pool
                     let change <- jackpotRef.withdrawAsChange(amount: requiredAmount)
+
                     // deposit the required amount to the total bought
-                    FRC20FTShared.depositToChange(
-                        receiver: self.borrowCurrentLotteryChange(),
-                        change: <- change
-                    )
+                    let currRef = self.borrowCurrentLotteryChange()
+                    currRef.forceMerge(from: <- change)
                 } else {
                     // ensure the jackpot amount is at least 50% of the total bought
                     if minNewJackpotAmount > oldJackpotAmount {
@@ -1149,19 +1143,14 @@ access(all) contract FGameLottery {
                         // withdraw the required amount from the current pool to ensure the jackpot
                         let change <- self.current.withdrawAsChange(amount: jackpotRequired)
                         // deposit the required amount to the jackpot pool
-                        FRC20FTShared.depositToChange(
-                            receiver: jackpotRef,
-                            change: <- change
-                        )
+                        jackpotRef.forceMerge(from: <- change)
                     } else if minNewJackpotAmount < oldJackpotAmount {
                         let jackpotRest = oldJackpotAmount - minNewJackpotAmount
                         // withdraw the rest amount from the jackpot pool
                         let change <- jackpotRef.withdrawAsChange(amount: jackpotRest)
                         // deposit the rest amount to the current pool
-                        FRC20FTShared.depositToChange(
-                            receiver: self.borrowCurrentLotteryChange(),
-                            change: <- change
-                        )
+                        let currRef = self.borrowCurrentLotteryChange()
+                        currRef.forceMerge(from: <- change)
                     }
                     newJackpotAmount = minNewJackpotAmount
                     // finalize the jackpot, the new jackpot amount is the min new jackpot amount
@@ -1288,16 +1277,10 @@ access(all) contract FGameLottery {
 
                 // 16% (default) of prize will be charged as the service fee
                 let serviceFee = prizeChange.getBalance() * feeRatio
-                FRC20FTShared.depositToChange(
-                    receiver: feeChangeRef,
-                    change: <- prizeChange.withdrawAsChange(amount: serviceFee)
-                )
+                feeChangeRef.forceMerge(from: <- prizeChange.withdrawAsChange(amount: serviceFee))
 
                 // Deposit the prize to the ticket owner
-                FRC20FTShared.depositToChange(
-                    receiver: rewardChangeRef,
-                    change: <- prizeChange
-                )
+                rewardChangeRef.forceMerge(from: <- prizeChange)
             } else {
                 // Get the base prize amount
                 let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
@@ -1311,17 +1294,11 @@ access(all) contract FGameLottery {
                 // if PrizeRank is lower than 3rd, no service fee will be charged
                 if prizeRank!.rawValue <= PrizeRank.THIRD.rawValue {
                     let serviceFee = prizeChange.getBalance() * feeRatio
-                    FRC20FTShared.depositToChange(
-                        receiver: feeChangeRef,
-                        change: <- prizeChange.withdrawAsChange(amount: serviceFee)
-                    )
+                    feeChangeRef.forceMerge(from: <- prizeChange.withdrawAsChange(amount: serviceFee))
                 }
 
                 // Deposit the prize to the ticket owner
-                FRC20FTShared.depositToChange(
-                    receiver: rewardChangeRef,
-                    change: <- prizeChange
-                )
+                rewardChangeRef.forceMerge(from: <- prizeChange)
             }
 
             // deposit the fee to the service pools
@@ -1697,10 +1674,7 @@ access(all) contract FGameLottery {
             let donatableAmount = payment.getBalance()
 
             // deposit the new added amount to the jackpot pool
-            FRC20FTShared.depositToChange(
-                receiver: jackpotRef,
-                change: <- payment
-            )
+            jackpotRef.forceMerge(from: <- payment)
 
             emit LotteryJackpotDonated(
                 poolAddr: self.getAddress(),

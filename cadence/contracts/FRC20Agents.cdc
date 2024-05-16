@@ -92,6 +92,14 @@ access(all) contract FRC20Agents {
             self.acceptTicks.append(tick)
         }
 
+        access(all)
+        fun createEmptyChange(tick: String, from: Address): @FRC20FTShared.Change {
+            pre {
+                self.isTickAccepted(tick: tick): "The tick is not accepted"
+            }
+            return <- FRC20FTShared.createEmptyChange(tick: tick, from: from)
+        }
+
         /// ------- Public methods for some access(account) methods of FRC20Indexer -------
 
         access(all)

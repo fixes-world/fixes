@@ -392,6 +392,43 @@ access(all) contract FRC20FTShared {
             destroy from
         }
 
+        /// Force merge the input Change to self with checking the from address
+        ///
+        access(all)
+        fun forceMerge(from: @Change) {
+            pre {
+                from.isBackedByVault() == self.isBackedByVault():
+                    "The Change must be backed by a Vault if and only if the input Change is backed by a Vault"
+                from.tick == self.tick: "Tick must be equal to the provided tick"
+            }
+            post {
+                self.getBalance() == before(self.getBalance()) + before(from.getBalance()):
+                    "New Vault balance must be the sum of the previous balance and the deposited Vault"
+            }
+            if from.from == self.from {
+                self.merge(from: <- from)
+            } else {
+                if from.isBackedByVault() {
+                    // withdraw from the input Change
+                    let extracted <- from.extractAsVault()
+                    // deposit to the receiver
+                    self.borrowVault().deposit(from: <- extracted)
+                } else {
+                    // withdraw from the input Change
+                    let extracted = from.extract()
+                    // create a same source Change and deposit to the receiver
+                    self.merge(from: <- FRC20FTShared.createChange(
+                        tick: self.tick,
+                        from: self.from,
+                        balance: extracted,
+                        ftVault: nil
+                    ))
+                }
+                // destroy the input Change
+                destroy from
+            }
+        }
+
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
         access(all)
@@ -583,44 +620,6 @@ access(all) contract FRC20FTShared {
             balance: nil,
             ftVault: <- ftVault
         )
-    }
-
-    /// Deposit one Change to another Change
-    /// Only the owner of the account can call this method
-    ///
-    access(account)
-    fun depositToChange(
-        receiver: &Change,
-        change: @Change
-    ) {
-        pre {
-            change.isBackedByVault() == receiver.isBackedByVault():
-                "The Change must be backed by a Vault if and only if the input Change is backed by a Vault"
-            change.tick == receiver.tick: "Tick must be equal to the provided tick"
-        }
-        if change.from == receiver.from {
-            receiver.merge(from: <- change)
-        } else {
-            if change.isBackedByVault() {
-                // withdraw from the input Change
-                let extracted <- change.extractAsVault()
-                // deposit to the receiver
-                let vaultRef = receiver.borrowVault()
-                vaultRef.deposit(from: <- extracted)
-            } else {
-                // withdraw from the input Change
-                let extracted = change.extract()
-                // create a same source Change and deposit to the receiver
-                receiver.merge(from: <- self.createChange(
-                    tick: receiver.tick,
-                    from: receiver.from,
-                    balance: extracted,
-                    ftVault: nil
-                ))
-            }
-            // destroy the input Change
-            destroy change
-        }
     }
 
     /** --- Temporary order resources --- */

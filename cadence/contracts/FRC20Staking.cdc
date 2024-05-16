@@ -319,10 +319,8 @@ access(all) contract FRC20Staking {
             )
 
             // update staked change
-            FRC20FTShared.depositToChange(
-                receiver: self.borrowTotalStaked(),
-                change: <- change
-            )
+            let totalStakeRef = self.borrowTotalStaked()
+            totalStakeRef.forceMerge(from: <- change)
 
             // update staked change for delegator
             let delegatorRef = delegatorRecordRef.borrowDelegatorRef()
@@ -726,10 +724,7 @@ access(all) contract FRC20Staking {
                         // merge to ret change
                         let amount = unwrappedChange.getBalance()
                         // deposit to change
-                        FRC20FTShared.depositToChange(
-                            receiver: retRef,
-                            change: <- unwrappedChange
-                        )
+                        retRef.forceMerge(from: <- unwrappedChange)
 
                         // emit event
                         emit DelegatorUnStakingUnlocked(
@@ -899,10 +894,7 @@ access(all) contract FRC20Staking {
 
                 if newAddedYieldRate > 0.0 {
                     // add to total reward
-                    FRC20FTShared.depositToChange(
-                        receiver: self.borrowRewardRef(),
-                        change: <- income
-                    )
+                    self.totalReward.forceMerge(from: <- income)
 
                     // emit event
                     emit RewardIncomeAdded(
@@ -921,10 +913,8 @@ access(all) contract FRC20Staking {
                         from: poolAddr
                     )
                     // Deposit pool address for accumulating enough values
-                    FRC20FTShared.depositToChange(
-                        receiver: &newChange as &FRC20FTShared.Change,
-                        change: <- income
-                    )
+                    newChange.forceMerge(from: <- income)
+
                     let indexer = FRC20Indexer.getIndexer()
                     // deposit change to indexer
                     indexer.returnChange(change: <- newChange)
@@ -1009,10 +999,8 @@ access(all) contract FRC20Staking {
             )
 
             // Deposit the reward to delegatorRewardChange's change
-            FRC20FTShared.depositToChange(
-                receiver: &delegatorRewardChange as &FRC20FTShared.Change,
-                change: <- withdrawnChange
-            )
+            delegatorRewardChange.forceMerge(from: <- withdrawnChange)
+
             // return the change
             return <- delegatorRewardChange
         }
