@@ -59,7 +59,7 @@ access(all) contract FRC20Agents {
         }
 
         /// Deposit a FRC20 token change to indexer
-        access(account)
+        access(all)
         fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change) {
             pre {
                 self.isInscriptionAccepted(ins: ins): "The inscription is not accepted"
@@ -106,7 +106,7 @@ access(all) contract FRC20Agents {
             return <- indexer.withdrawChange(ins: ins)
         }
 
-        access(account)
+        access(all)
         fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change) {
             let indexer = FRC20Indexer.getIndexer()
             indexer.depositChange(ins: ins, change: <- change)

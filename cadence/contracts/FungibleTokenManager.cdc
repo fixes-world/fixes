@@ -709,7 +709,8 @@ access(all) contract FungibleTokenManager {
             isUpdated = true || isUpdated
         }
 
-        let store = FRC20FTShared.borrowStoreRef(childAddr)
+        // borrow the shared store
+        let store = self.account.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
             ?? panic("The shared store was not created")
         if store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) == nil {
             // ensure the symbol is without the '$' sign

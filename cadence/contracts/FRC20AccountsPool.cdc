@@ -117,6 +117,9 @@ access(all) contract FRC20AccountsPool {
         /// Borrow child's AuthAccount
         access(account)
         fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount?
+        /// Borrow the writable config store
+        access(account)
+        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): &FRC20FTShared.SharedStore?
         /// Sets up a new child account for market
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
@@ -389,6 +392,16 @@ access(all) contract FRC20AccountsPool {
                         return ownedChild.borrowAccount()
                     }
                 }
+            }
+            return nil
+        }
+
+        /// Borrow the writable config store
+        ///
+        access(account)
+        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): &FRC20FTShared.SharedStore? {
+            if let child = self.borrowChildAccount(type: type, key) {
+                return child.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
             }
             return nil
         }

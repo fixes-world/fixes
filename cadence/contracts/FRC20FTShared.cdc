@@ -197,12 +197,12 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
         ///
-        access(account)
+        access(all)
         fun merge(from: @Change)
 
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(account)
+        access(all)
         fun withdrawAsChange(amount: UFix64): @Change {
             post {
                 // `result` refers to the return value
@@ -213,7 +213,7 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change
         ///
-        access(account)
+        access(all)
         fun extract(): UFix64
     }
 
@@ -347,7 +347,7 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
         ///
-        access(account)
+        access(all)
         fun merge(from: @Change) {
             pre {
                 self.isBackedByVault() == from.isBackedByVault():
@@ -394,7 +394,7 @@ access(all) contract FRC20FTShared {
 
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(account)
+        access(all)
         fun withdrawAsChange(amount: UFix64): @Change {
             pre {
                 self.getBalance() >= amount:
@@ -439,7 +439,7 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change, this method is only available for the contracts in the same account
         ///
-        access(account)
+        access(all)
         fun extract(): UFix64 {
             pre {
                 !self.isBackedByVault(): "The Change must not be backed by a Vault"
@@ -832,25 +832,16 @@ access(all) contract FRC20FTShared {
 
         // getter for the shared store
         access(all)
-        fun get(_ key: String): AnyStruct?
+        view fun get(_ key: String): AnyStruct?
 
         // getter for the shared store
         access(all)
-        fun getByEnum(_ type: ConfigType): AnyStruct? {
+        view fun getByEnum(_ type: ConfigType): AnyStruct? {
             if let key = self.getKeyByEnum(type)  {
                 return self.get(key)
             }
             return nil
         }
-
-        // --- Account Methods ---
-
-        /// Set the value
-        access(account)
-        fun set(_ key: String, value: AnyStruct)
-        /// Set the value by type
-        access(account)
-        fun setByEnum(_ type: ConfigType, value: AnyStruct)
     }
 
     access(all) resource SharedStore: SharedStorePublic {
@@ -864,13 +855,15 @@ access(all) contract FRC20FTShared {
         /// getter for the shared store
         ///
         access(all)
-        fun get(_ key: String): AnyStruct? {
+        view fun get(_ key: String): AnyStruct? {
             return self.data[key]
         }
 
+        // ------ Write methods ------
+
         /// Set the value
         ///
-        access(account)
+        access(all)
         fun set(_ key: String, value: AnyStruct) {
             self.data[key] = value
 
@@ -879,7 +872,7 @@ access(all) contract FRC20FTShared {
 
         /// Set the value by type
         ///
-        access(account)
+        access(all)
         fun setByEnum(_ type: ConfigType, value: AnyStruct) {
             if let key = self.getKeyByEnum(type)  {
                 self.set(key, value: value)
@@ -888,6 +881,13 @@ access(all) contract FRC20FTShared {
     }
 
     /* --- Public Methods --- */
+
+    /// Create the instance of the shared store
+    ///
+    access(all)
+    fun createSharedStore(): @SharedStore {
+        return <- create SharedStore()
+    }
 
     /// Get the shared store
     ///
@@ -923,15 +923,6 @@ access(all) contract FRC20FTShared {
         let globalSharedStore = self.borrowGlobalStoreRef()
         let tick = globalSharedStore.get("platform:UtilityToken") as! String?
         return tick ?? "fixes"
-    }
-
-    /* --- Account Methods --- */
-
-    /// Create the instance of the shared store
-    ///
-    access(account)
-    fun createSharedStore(): @SharedStore {
-        return <- create SharedStore()
     }
 
     /** Transaction hooks */

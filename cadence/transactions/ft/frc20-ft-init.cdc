@@ -21,6 +21,7 @@ transaction(
     telegramUrl: String?,
     githubUrl: String?,
 ) {
+    let newAcctRef: &AuthAccount
     let newAcctCap: Capability<&AuthAccount>
     let initFtIns: &Fixes.Inscription
 
@@ -48,6 +49,7 @@ transaction(
             ?? panic("Could not borrow receiver reference to the newly created account")
         receiverRef.deposit(from: <- flowVaultRef.withdraw(amount: initialFundingAmt))
 
+        self.newAcctRef = &newAccount as &AuthAccount
         self.newAcctCap = newAccount.linkAccount(HybridCustody.LinkedAccountPrivatePath)
             ?? panic("problem linking account Capability for new account")
         /** ------------- End --------------------------------------- */
@@ -84,11 +86,14 @@ transaction(
         FungibleTokenManager.initializeFRC20FungibleTokenAccount(self.initFtIns, newAccount: self.newAcctCap)
 
         // Step.2 update token metadata
-        let ftContractAddr = FungibleTokenManager.getFTContractAddress(tick)
-            ?? panic("Could not get the Fungible Token contract address")
+        assert(
+            FungibleTokenManager.getFTContractAddress(tick) != nil,
+            message: "Fungible Token contract address is not set"
+        )
 
-        let store = FRC20FTShared.borrowStoreRef(ftContractAddr)
-            ?? panic("The shared store was not created")
+        let store = self.newAcctRef.borrow<&FRC20FTShared.SharedStore>(
+            from: FRC20FTShared.SharedStoreStoragePath
+        ) ?? panic("The shared store was not created")
 
         let tickerName = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
             ?? panic("Symbol is not set")

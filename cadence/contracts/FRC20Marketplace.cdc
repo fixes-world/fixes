@@ -501,8 +501,10 @@ access(all) contract FRC20Marketplace {
             pre {
                 self.isInAdminWhitelist(mananger.getOwnerAddress()): "The manager is not in the admin whitelist"
             }
+            // borrow the account pool
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // save the properties to the shared store
-            if let storeRef = self.borrowSharedStore() {
+            if let storeRef = acctsPool.borrowWritableConfigStore(type: FRC20AccountsPool.ChildAccountType.Market, self.getTickerName()) {
                 for key in props.keys {
                     var value: AnyStruct? = nil
                     switch key {

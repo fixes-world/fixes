@@ -1002,7 +1002,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.account.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
         }
         // borrow the shared store
-        let store = self.borrowSharedStore()
+        let store = self.account.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
+            ?? panic("The shared store is not found")
 
         // Step.1 Try get the ticker name from the shared store
         var tickerName = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
