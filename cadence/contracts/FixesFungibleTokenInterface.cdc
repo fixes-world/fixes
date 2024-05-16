@@ -579,4 +579,8 @@ access(all) contract interface FixesFungibleTokenInterface {
         let prefix = self.getPathPrefix()
         return PublicPath(identifier: prefix.concat("Admin"))!
     }
+
+    /// Create a new vault
+    access(all)
+    fun createEmptyVault(): @FungibleToken.Vault
 }

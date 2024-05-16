@@ -1,17 +1,22 @@
 import "FlowToken"
 import "FungibleToken"
+import "MetadataViews"
 // Fixes Imports
-import "FungibleTokenManager"
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FixesFungibleTokenInterface"
+import "FungibleTokenManager"
 import "FRC20FTShared"
-import "FRC20Indexer"
+import "FRC20AccountsPool"
+import "FRC20Converter"
 
 transaction(
     tick: String,
     amount: UFix64,
 ) {
     let ins: &Fixes.Inscription
+    let converter: &FRC20Converter.FTConverter{FRC20Converter.IConverter}
+    let tokenReceiver: &{FungibleToken.Receiver}
 
     prepare(acct: AuthAccount) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -43,7 +48,54 @@ transaction(
         // borrow a reference to the new Inscription
         self.ins = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow a reference to the newly created Inscription!")
-        /** ------------- End --------------------------------------- */
+        /** ------------- End ----------------------------------------- */
+
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        /** ------------- Prepare the FRC20 Converter - Start ---------------- */
+        let tickAddr = acctsPool.getFTContractAddress(tick)
+            ?? panic("Could not get the FRC20 contract address for the given token ticker: ".concat(tick))
+
+        self.converter = FRC20Converter.borrowConverter(tickAddr)
+            ?? panic("Could not load the FRC20Converter for the given token symbol")
+        /** ------------- End -------------------------------------------------- */
+
+        /** ------------- Prepare the Token Vault - Start ---------------- */
+        let ftContract = acctsPool.borrowFTContract(tick)
+            ?? panic("Could not get the FRC20 contract for the given token ticker: ".concat(tick))
+        let storagePath = ftContract.getVaultStoragePath()
+        let recieverPath = ftContract.getReceiverPublicPath()
+
+        // ensure the Vault Resource exists
+        if acct.borrow<&AnyResource>(from: storagePath) == nil {
+            acct.save(<- ftContract.createEmptyVault(), to: storagePath)
+
+            // @deprecated after Cadence 1.0
+            // Create a public capability to the stored Vault that exposes
+            // the `deposit` method through the `Receiver` interface.
+            acct.unlink(recieverPath)
+            acct.link<&{FungibleToken.Receiver}>(recieverPath, target: storagePath)
+
+            // Create a public capability to the stored Vault that only exposes
+            // the `balance` field and the `resolveView` method through the `Balance` interface
+            let metadataPath = ftContract.getVaultPublicPath()
+            acct.unlink(metadataPath)
+            acct.link<&{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(
+                metadataPath,
+                target: storagePath
+            )
+        }
+        /** ------------- End ----------------------------------------------- */
+
+        // Borrow a reference to the stored Vault
+        self.tokenReceiver = acct.getCapability<&{FungibleToken.Receiver}>(recieverPath).borrow()
+            ?? panic("Could not borrow a reference to the token receiver")
+
+        let supportedTypes = self.tokenReceiver.getSupportedVaultTypes()
+        assert(
+            supportedTypes[self.converter.getTokenType()] == true,
+            message: "Token Receiver does not support the given token type"
+        )
     }
 
     pre {
@@ -51,6 +103,10 @@ transaction(
     }
 
     execute {
-        // TODO
+        self.converter.convertFromIndexer(
+            ins: self.ins,
+            recipient: self.tokenReceiver
+        )
+        log("FRC20 Conversion completed successfully!")
     }
 }
