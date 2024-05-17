@@ -109,7 +109,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 // update the total supply for the FungibleToken
                 FixesFungibleToken.totalSupply = FixesFungibleToken.totalSupply - self.balance
             }
-            self.balance = 0.0
         }
 
         /// createEmptyVault

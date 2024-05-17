@@ -120,7 +120,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 // update the total supply for the FungibleToken
                 FRC20FungibleToken.totalFungibleTokenSupply = FRC20FungibleToken.totalFungibleTokenSupply - self.balance
             }
-            self.balance = 0.0
         }
 
         /// createEmptyVault

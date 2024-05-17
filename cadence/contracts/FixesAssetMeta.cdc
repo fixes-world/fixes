@@ -226,7 +226,7 @@ access(all) contract FixesAssetMeta {
             for key in self.genes.keys {
                 genes.append(self.genes[key]!.toString())
             }
-            return StringUtils.join(genes, ",")
+            return genes.length > 0 ? StringUtils.join(genes, ",") : ""
         }
 
         /// Get the data keys
