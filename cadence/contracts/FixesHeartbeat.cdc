@@ -66,9 +66,14 @@ access(all) contract FixesHeartbeat {
         ///
         access(all)
         fun tick(scope: String) {
-            pre {
-                FixesHeartbeat.heartbeatScopes[scope] != nil: "The scope does not exist"
+            // Check if the scope exists
+            if FixesHeartbeat.heartbeatScopes[scope] == nil {
+                log("The scope does not exist: ".concat(scope))
+                return
+            } else {
+                log("Ticking Heartbeart for scope: ".concat(scope))
             }
+
             if let hooks = FixesHeartbeat.borrowHooksDictRef(scope: scope) {
                 let now = getCurrentBlock().timestamp
                 let lastHeartbeatTime = FixesHeartbeat.lastHeartbeatTime[scope] ?? (now - FixesHeartbeat.heartbeatMinInterval)
