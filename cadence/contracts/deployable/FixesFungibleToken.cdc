@@ -14,6 +14,7 @@ import "ViewResolver"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
 import "BlackHole"
+import "TokenList"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -796,6 +797,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             tick[0] == "$" && tick == "$".concat(self.getSymbol()),
             message: "The ticker name is not matched"
         )
+
+        // register token to the tokenlist
+        TokenList.ensureFungibleTokenRegistered(self.account.address, "FixesFungibleToken")
+
         // execute the inscription
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
@@ -1037,6 +1042,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             tickerName != nil,
             message: "The ticker name is not found"
         )
+        log("Init the Fungible Token symbol:".concat(tickerName!))
 
         // setup admin resource
         let admin <- create FungibleTokenAdmin()

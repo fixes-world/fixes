@@ -102,33 +102,33 @@ transaction(
         if logoUrl != nil && logoImageType != nil {
             let logoKeyPrefix = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenLogoPrefix)!
             let logoStoreKey = logoKeyPrefix.concat(logoImageType!)
-            store.set(logoStoreKey, value: logoUrl)
+            store.set(logoStoreKey, value: logoUrl!)
         }
         // set display name
         if displayName != nil {
-            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDisplayName, value: displayName)
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDisplayName, value: displayName!)
         }
         // set description
         if description != nil {
-            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDescription, value: description)
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDescription, value: description!)
         }
         // set external url
         if externalUrl != nil {
-            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenExternalUrl, value: externalUrl)
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenExternalUrl, value: externalUrl!)
         }
         // set socials
         let socialKey = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenSocialPrefix)!
         if twitterUrl != nil {
-            store.set(socialKey.concat("twitter"), value: twitterUrl)
+            store.set(socialKey.concat("twitter"), value: twitterUrl!)
         }
         if discordUrl != nil {
-            store.set(socialKey.concat("discord"), value: discordUrl)
+            store.set(socialKey.concat("discord"), value: discordUrl!)
         }
         if telegramUrl != nil {
-            store.set(socialKey.concat("telegram"), value: telegramUrl)
+            store.set(socialKey.concat("telegram"), value: telegramUrl!)
         }
         if githubUrl != nil {
-            store.set(socialKey.concat("github"), value: githubUrl)
+            store.set(socialKey.concat("github"), value: githubUrl!)
         }
     }
 }

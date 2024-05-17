@@ -12,6 +12,7 @@ import "FungibleToken"
 import "ViewResolver"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
+import "TokenList"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -719,6 +720,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         pre {
             ins.isExtractable(): "The inscription must be extractable"
         }
+
+        // register token to the tokenlist
+        TokenList.ensureFungibleTokenRegistered(self.account.address, "FRC20FungibleToken")
 
         let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
         let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)

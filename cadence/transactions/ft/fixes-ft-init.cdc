@@ -21,16 +21,11 @@ transaction(
     discordUrl: String?,
     telegramUrl: String?,
     githubUrl: String?,
-    isCreateTradablePool: Bool,
-    tradablePoolSupply: UFix64,
-    creatorFeePercentage: UFix64,
-    feeMintAmount: UFix64,
 ) {
     let tickerName: String
     let newAcctRef: &AuthAccount
     let newAcctCap: Capability<&AuthAccount>
     let initFtIns: &Fixes.Inscription
-    let setupTradablePoolIns: &Fixes.Inscription?
 
     prepare(acct: AuthAccount) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -79,47 +74,11 @@ transaction(
         self.initFtIns = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow a reference to the newly created Inscription!")
         /** ------------- End --------------------------------------- */
-
-        /** ------------- Create the Inscription 2 - Start ------------- */
-        if isCreateTradablePool {
-            let fields: {String: String} = {}
-            if tradablePoolSupply > 0.0 {
-                fields["supply"] = tradablePoolSupply.toString()
-            }
-            if creatorFeePercentage > 0.0 {
-                fields["feePerc"] = creatorFeePercentage.toString()
-            }
-            if feeMintAmount > 0.0 {
-                fields["freeAmount"] = feeMintAmount.toString()
-            }
-            let tradablePoolInsDataStr = FixesInscriptionFactory.buildPureExecuting(
-                tick: self.tickerName,
-                usage: "setup-tradable-pool",
-                fields
-            )
-            // estimate the required storage
-            let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(tradablePoolInsDataStr)
-            // get reserved cost
-            let flowToReserve <- (flowVaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
-            // Create the Inscription first
-            let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
-                tradablePoolInsDataStr,
-                <- flowToReserve,
-                store
-            )
-            // borrow a reference to the new Inscription
-            self.setupTradablePoolIns = store.borrowInscriptionWritableRef(newInsId)
-                ?? panic("Could not borrow a reference to the newly created Inscription!")
-        } else {
-            self.setupTradablePoolIns = nil
-        }
-        /** ------------- End --------------------------------------- */
     }
 
     pre {
         FungibleTokenManager.isTokenSymbolEnabled(self.tickerName) == false: "Token is already enabled"
         logoImageType == "svg" || logoImageType == "png" || logoImageType == "jpg" || logoImageType == "gif": "Invalid logo image type"
-        !isCreateTradablePool || self.setupTradablePoolIns != nil: "Invalid Tradable Pool Inscription"
     }
 
     post {
@@ -154,34 +113,29 @@ transaction(
         store.set(logoStoreKey, value: logoUrl)
         // set display name
         if displayName != nil {
-            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDisplayName, value: displayName)
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDisplayName, value: displayName!)
         }
         // set description
         if description != nil {
-            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDescription, value: description)
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDescription, value: description!)
         }
         // set external url
         if externalUrl != nil {
-            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenExternalUrl, value: externalUrl)
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenExternalUrl, value: externalUrl!)
         }
         // set socials
         let socialKey = store.getKeyByEnum(FRC20FTShared.ConfigType.FungibleTokenSocialPrefix)!
         if twitterUrl != nil {
-            store.set(socialKey.concat("twitter"), value: twitterUrl)
+            store.set(socialKey.concat("twitter"), value: twitterUrl!)
         }
         if discordUrl != nil {
-            store.set(socialKey.concat("discord"), value: discordUrl)
+            store.set(socialKey.concat("discord"), value: discordUrl!)
         }
         if telegramUrl != nil {
-            store.set(socialKey.concat("telegram"), value: telegramUrl)
+            store.set(socialKey.concat("telegram"), value: telegramUrl!)
         }
         if githubUrl != nil {
-            store.set(socialKey.concat("github"), value: githubUrl)
-        }
-
-        // Step.3 Setup Tradable Pool
-        if isCreateTradablePool && self.setupTradablePoolIns != nil {
-            FungibleTokenManager.setupTradablePoolResources(self.setupTradablePoolIns!)
+            store.set(socialKey.concat("github"), value: githubUrl!)
         }
     }
 }
