@@ -547,6 +547,9 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         view fun getExchangeRate(_ lockingPeriod: UFix64): UFix64
 
+        access(all)
+        view fun estimateMintableAmount(_ lockingPeriod: UFix64, amount: UFix64): UFix64
+
         // --- Writable ---
 
         /// Locking for token drops
@@ -761,6 +764,22 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         view fun getExchangeRate(_ lockingPeriod: UFix64): UFix64 {
             return self.lockingExchangeRates[lockingPeriod] ?? 0.0
+        }
+
+        /// Estimate the mintable amount
+        ///
+        access(all)
+        view fun estimateMintableAmount(_ lockingPeriod: UFix64, amount: UFix64): UFix64 {
+            if let exchangeRate = self.lockingExchangeRates[lockingPeriod] {
+                let minter = self.borrowMinter()
+                var mintAmount = amount * exchangeRate
+                let maxMintAmount = self.minter.getCurrentMintableAmount()
+                if mintAmount > maxMintAmount {
+                    mintAmount = maxMintAmount
+                }
+                return mintAmount
+            }
+            return 0.0
         }
 
         // ------ Writeable ------
@@ -1074,6 +1093,39 @@ access(all) contract FixesTokenLockDrops {
         )
 
         return <- pool
+    }
+
+    /// Get the default locking period plan
+    ///
+    access(all)
+    view fun getDefaultLockingPeriodPlan(): [UFix64] {
+        // 1 month, 3 months, 6 months, 12 months
+        let oneday = 60.0 * 60.0 * 24.0
+        return [
+            oneday * 30.0,
+            oneday * 90.0,
+            oneday * 182.0,
+            oneday * 365.0
+        ]
+    }
+
+    /// Get the default exchange rates plan
+    ///
+    access(all)
+    view fun getDefaultExchangeRatesPlan(_ coefficientMul: UFix64): {UFix64: UFix64} {
+        let ret: {UFix64: UFix64} = {}
+        let periods = self.getDefaultLockingPeriodPlan()
+        /*
+            1 month reward = LockingValue * coefficientMul * 1.0
+            3 months reward = LockingValue * coefficientMul * (1.5 * 3) = LockingValue * coefficientMul * 4.5
+            6 months reward = LockingValue * coefficientMul * (2.0 * 6) = LockingValue * coefficientMul * 12
+            12 months reward = LockingValue * coefficientMul * (2.5 * 12) = LockingValue * coefficientMul * 30
+         */
+        let onemonth = periods[0]
+        for i, period in periods {
+            ret[period] = coefficientMul * (1.0 + UFix64(i) * 0.5) * period / onemonth
+        }
+        return ret
     }
 
     /// Borrow the Locking Center
