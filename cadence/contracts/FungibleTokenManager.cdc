@@ -347,7 +347,7 @@ access(all) contract FungibleTokenManager {
         let minter <- self._initializeMinter(
             ins,
             usage: "setup-lockdrops",
-            extrafields: ["supply"]
+            extrafields: ["supply", "lockingTick"]
         )
 
         var activateTime: UFix64? = nil
