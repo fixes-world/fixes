@@ -1076,11 +1076,6 @@ access(all) contract FGameRugRoyale {
             )
         }
 
-        access(contract)
-        fun borrowSelf(): &GameCenter {
-            return &self as &GameCenter
-        }
-
         access(self)
         fun borrowBattleRoyaleRef(_ epochIndex: UInt64): &BattleRoyale? {
             return &self.games[epochIndex] as &BattleRoyale?

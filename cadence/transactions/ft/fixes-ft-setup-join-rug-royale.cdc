@@ -5,23 +5,12 @@ import "stFlowToken"
 import "Fixes"
 import "FixesInscriptionFactory"
 import "FRC20FTShared"
-import "FungibleTokenManager"
-import "FixesTokenLockDrops"
+import "FRC20AccountsPool"
+import "FixesTradablePool"
+import "FGameRugRoyale"
 
-// This transaction is used to setup lockdrop pool for a token
-// - Parameters:
-//   - symbol: The symbol of the token
-//   - mintableSupply: The total supply of the token
-//   - lockingTickType: [0, 1, 2] The type of the locking tick, 0 = $FLOW, 1 = fixes, 2 = $stFlow
-//   - activateAt: The time when the pool will be activated
-//   - deprecatedAt: The time when the pool will be deprecated if not fully locked
 transaction(
     symbol: String,
-    mintableSupply: UFix64,
-    lockingTickType: UInt8,
-    lockingRewardMultiply: UFix64,
-    activateAt: UFix64?,
-    deprecatedAt: UFix64?,
 ) {
     let tickerName: String
     let ins: &Fixes.Inscription
@@ -43,20 +32,11 @@ transaction(
 
         self.tickerName = "$".concat(symbol)
 
-        /** ------------- Create the Inscription 2 - Start ------------- */
-        let fields: {String: String} = {}
-        fields["supply"] = mintableSupply.toString()
-        fields["lockingTick"] = getLockingTickName(lockingTickType)
-        if activateAt != nil {
-            fields["activateAt"] = activateAt!.toString()
-        }
-        if deprecatedAt != nil {
-            fields["deprecatedAt"] = deprecatedAt!.toString()
-        }
+        /** ------------- Create the Inscription - Start ------------ */
         let dataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: self.tickerName,
-            usage: "setup-lockdrop",
-            fields
+            usage: "join-rug-royale",
+            {}
         )
         // estimate the required storage
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
@@ -74,26 +54,18 @@ transaction(
         /** ------------- End --------------------------------------- */
     }
 
-    pre {
-        FungibleTokenManager.isTokenSymbolEnabled(self.tickerName) == true: "Token symbol is not enabled"
-    }
-
     execute {
-        FungibleTokenManager.setupLockDropsPool(
-            self.ins,
-            lockingExchangeRates: FixesTokenLockDrops.getDefaultExchangeRatesPlan(lockingRewardMultiply)
-        )
-    }
-}
+        // Get the liquidity cap capability
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        let addr = acctsPool.getFTContractAddress(self.tickerName)
+            ?? panic("Could not get the FRC20 contract address!")
+        // Get the liquidity cap capability
+        let liquidityCap = getAccount(addr)
+            .getCapability<&{FGameRugRoyale.LiquidityHolder}>(FixesTradablePool.getLiquidityPoolPublicPath())
 
-access(all)
-fun getLockingTickName(_ lockingTickType: UInt8): String {
-    if lockingTickType == 0 {
-        return ""
-    } else if lockingTickType == 1 {
-        return FRC20FTShared.getPlatformUtilityTickerName()
-    } else if lockingTickType == 2 {
-        return "@".concat(Type<@stFlowToken.Vault>().identifier)
+        assert(liquidityCap.check(), message: "Failed to get the liquidity capability!")
+
+        let gameCenter = FGameRugRoyale.borrowGameCenter()
+        gameCenter.joinGame(ins: self.ins, liquidityCap)
     }
-    panic("Invalid locking tick type")
 }

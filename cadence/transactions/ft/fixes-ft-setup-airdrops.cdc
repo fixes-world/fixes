@@ -6,22 +6,11 @@ import "Fixes"
 import "FixesInscriptionFactory"
 import "FRC20FTShared"
 import "FungibleTokenManager"
-import "FixesTokenLockDrops"
 
-// This transaction is used to setup lockdrop pool for a token
-// - Parameters:
-//   - symbol: The symbol of the token
-//   - mintableSupply: The total supply of the token
-//   - lockingTickType: [0, 1, 2] The type of the locking tick, 0 = $FLOW, 1 = fixes, 2 = $stFlow
-//   - activateAt: The time when the pool will be activated
-//   - deprecatedAt: The time when the pool will be deprecated if not fully locked
+// This transaction is used to setup airdrop pool for a token
 transaction(
     symbol: String,
     mintableSupply: UFix64,
-    lockingTickType: UInt8,
-    lockingRewardMultiply: UFix64,
-    activateAt: UFix64?,
-    deprecatedAt: UFix64?,
 ) {
     let tickerName: String
     let ins: &Fixes.Inscription
@@ -43,19 +32,13 @@ transaction(
 
         self.tickerName = "$".concat(symbol)
 
-        /** ------------- Create the Inscription 2 - Start ------------- */
+        /** ------------- Create the Inscription - Start ------------- */
         let fields: {String: String} = {}
         fields["supply"] = mintableSupply.toString()
-        fields["lockingTick"] = getLockingTickName(lockingTickType)
-        if activateAt != nil {
-            fields["activateAt"] = activateAt!.toString()
-        }
-        if deprecatedAt != nil {
-            fields["deprecatedAt"] = deprecatedAt!.toString()
-        }
+
         let dataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: self.tickerName,
-            usage: "setup-lockdrop",
+            usage: "setup-airdrop",
             fields
         )
         // estimate the required storage
@@ -79,21 +62,6 @@ transaction(
     }
 
     execute {
-        FungibleTokenManager.setupLockDropsPool(
-            self.ins,
-            lockingExchangeRates: FixesTokenLockDrops.getDefaultExchangeRatesPlan(lockingRewardMultiply)
-        )
+        FungibleTokenManager.setupAirdropsPool(self.ins)
     }
-}
-
-access(all)
-fun getLockingTickName(_ lockingTickType: UInt8): String {
-    if lockingTickType == 0 {
-        return ""
-    } else if lockingTickType == 1 {
-        return FRC20FTShared.getPlatformUtilityTickerName()
-    } else if lockingTickType == 2 {
-        return "@".concat(Type<@stFlowToken.Vault>().identifier)
-    }
-    panic("Invalid locking tick type")
 }
