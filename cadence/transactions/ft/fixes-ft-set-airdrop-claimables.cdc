@@ -1,27 +1,15 @@
 import "FungibleToken"
 import "FlowToken"
-import "stFlowToken"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
 import "FRC20FTShared"
-import "FungibleTokenManager"
-import "FixesTokenLockDrops"
+import "FRC20AccountsPool"
+import "FixesTokenAirDrops"
 
-// This transaction is used to setup lockdrop pool for a token
-// - Parameters:
-//   - symbol: The symbol of the token
-//   - mintableSupply: The total supply of the token
-//   - lockingTickType: [0, 1, 2] The type of the locking tick, 0 = $FLOW, 1 = $stFlow, 2 = fixes
-//   - activateAt: The time when the pool will be activated
-//   - deprecatedAt: The time when the pool will be deprecated if not fully locked
 transaction(
     symbol: String,
-    mintableSupply: UFix64,
-    lockingTickType: UInt8,
-    lockingRewardMultiply: UFix64,
-    activateAt: UFix64?,
-    deprecatedAt: UFix64?,
+    claimables: {Address: UFix64}
 ) {
     let tickerName: String
     let ins: &Fixes.Inscription
@@ -43,21 +31,11 @@ transaction(
 
         self.tickerName = "$".concat(symbol)
 
-        /** ------------- Create the Inscription 2 - Start ------------- */
+        /** ------------- Create the Inscription - Start ------------- */
         let fields: {String: String} = {}
-        fields["supply"] = mintableSupply.toString()
-        let type = FixesTokenLockDrops.SupportedLockingTick(rawValue: lockingTickType)
-            ?? panic("Invalid locking tick type")
-        fields["lockingTick"] = FixesTokenLockDrops.getLockingTickerName(type)
-        if activateAt != nil {
-            fields["activateAt"] = activateAt!.toString()
-        }
-        if deprecatedAt != nil {
-            fields["deprecatedAt"] = deprecatedAt!.toString()
-        }
         let dataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: self.tickerName,
-            usage: "setup-lockdrop",
+            usage: "set-claimables",
             fields
         )
         // estimate the required storage
@@ -76,14 +54,13 @@ transaction(
         /** ------------- End --------------------------------------- */
     }
 
-    pre {
-        FungibleTokenManager.isTokenSymbolEnabled(self.tickerName) == true: "Token symbol is not enabled"
-    }
-
     execute {
-        FungibleTokenManager.setupLockDropsPool(
-            self.ins,
-            lockingExchangeRates: FixesTokenLockDrops.getDefaultExchangeRatesPlan(lockingRewardMultiply)
-        )
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        let addr = acctsPool.getFTContractAddress(self.tickerName)
+            ?? panic("Could not get the FRC20 contract address!")
+        // Set the claimables
+        let pool = FixesTokenAirDrops.borrowAirdropPool(addr)
+            ?? panic("Could not get the Airdrop Pool!")
+        pool.setClaimableDict(self.ins, claimables: claimables)
     }
 }

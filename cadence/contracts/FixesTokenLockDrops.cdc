@@ -998,6 +998,42 @@ access(all) contract FixesTokenLockDrops {
 
     /// ------ Public Methods ------
 
+    /// The enum for the supported locking tick
+    access(all) enum SupportedLockingTick: UInt8 {
+        access(all) case FlowToken
+        access(all) case stFlowToken
+        access(all) case fixesFRC20Token
+    }
+
+    /// Get the locking ticker name
+    ///
+    access(all)
+    view fun getLockingTickerName(_ tick: SupportedLockingTick): String {
+        switch tick {
+        case SupportedLockingTick.FlowToken:
+            return ""
+        case SupportedLockingTick.stFlowToken:
+            return "@".concat(Type<@stFlowToken.Vault>().identifier)
+        case SupportedLockingTick.fixesFRC20Token:
+            return FRC20FTShared.getPlatformUtilityTickerName()
+        }
+        panic("The locking ticker name is not supported")
+    }
+
+    /// Get the locking ticker type
+    ///
+    access(all)
+    view fun getLockingTickType(_ lockingTick: String): SupportedLockingTick? {
+        if lockingTick == "" {
+            return SupportedLockingTick.FlowToken
+        } else if lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
+            return SupportedLockingTick.stFlowToken
+        } else if lockingTick == FRC20FTShared.getPlatformUtilityTickerName() {
+            return SupportedLockingTick.fixesFRC20Token
+        }
+        return nil
+    }
+
     /// Check if the locking tick is supported
     /// Currently, only three types of lockingTick are supported
     /// 1. empty string: the token is a flow token
@@ -1006,8 +1042,7 @@ access(all) contract FixesTokenLockDrops {
     ///
     access(all)
     view fun isSupportedLockingTick(_ lockingTick: String): Bool {
-        let utilityTick = FRC20FTShared.getPlatformUtilityTickerName()
-        return lockingTick == "" || lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) || lockingTick == utilityTick
+        return self.getLockingTickType(lockingTick) != nil
     }
 
     /// Create an empty change for acceptable locking tick
