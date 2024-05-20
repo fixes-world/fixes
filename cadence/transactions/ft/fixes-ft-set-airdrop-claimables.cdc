@@ -11,8 +11,9 @@ transaction(
     symbol: String,
     claimables: {Address: UFix64}
 ) {
-    let tickerName: String
     let ins: &Fixes.Inscription
+    let tickerName: String
+    let poolAddress: Address
 
     prepare(acct: AuthAccount) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -52,14 +53,15 @@ transaction(
         self.ins = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow a reference to the newly created Inscription!")
         /** ------------- End --------------------------------------- */
-    }
+
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        self.poolAddress = acctsPool.getFTContractAddress(self.tickerName)
+            ?? panic("Could not get the FRC20 contract address!")
+     }
 
     execute {
-        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-        let addr = acctsPool.getFTContractAddress(self.tickerName)
-            ?? panic("Could not get the FRC20 contract address!")
         // Set the claimables
-        let pool = FixesTokenAirDrops.borrowAirdropPool(addr)
+        let pool = FixesTokenAirDrops.borrowAirdropPool(self.poolAddress)
             ?? panic("Could not get the Airdrop Pool!")
         pool.setClaimableDict(self.ins, claimables: claimables)
     }
