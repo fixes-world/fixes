@@ -379,6 +379,13 @@ access(all) contract interface FixesFungibleTokenInterface {
             return minterRef.getTokenType()
         }
 
+        /// Get the token vault data
+        access(all)
+        view fun getTokenVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            let minterRef = self.borrowMinter()
+            return minterRef.getVaultData()
+        }
+
         /// Get the max supply of the token
         access(all)
         view fun getMaxSupply(): UFix64 {
