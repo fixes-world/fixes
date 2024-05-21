@@ -12,8 +12,9 @@ import "FixesTradablePool"
 
 transaction(
     symbol: String,
-    cost: UFix64?,
-    amount: UFix64?,
+    burningTick: String,
+    burningAmount: UFix64,
+    extraCost: UFix64,
 ) {
     let tickerName: String
     let ins: &Fixes.Inscription
@@ -38,13 +39,7 @@ transaction(
         self.tickerName = "$".concat(symbol)
 
         /** ------------- Create the Inscription - Start ------------- */
-        let fields: {String: String} = {}
-
-        let dataStr = FixesInscriptionFactory.buildPureExecuting(
-            tick: self.tickerName,
-            usage: "buy-tokens",
-            fields
-        )
+        let dataStr = FixesInscriptionFactory.buildBurnFRC20(tick: burningTick, amt: burningAmount)
         // estimate the required storage
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
         // get reserved cost
@@ -93,25 +88,14 @@ transaction(
             ?? panic("Could not borrow a reference to the recipient's Receiver!")
         /** ------------- End ----------------------------------------------- */
 
-        /// calculate the cost or amount
-        var costAmount = cost
-        if costAmount == nil{
-            assert(
-                amount != nil,
-                message: "Either cost or amount should be provided!"
-            )
-            costAmount = self.pool.getBuyPriceAfterFee(amount!)
+        // withdraw the cost to ins
+        if extraCost > 0.0 {
+            let costVault <- flowVaultRef.withdraw(amount: extraCost)
+            self.ins.deposit(<- (costVault as! @FlowToken.Vault))
         }
-        assert(
-            costAmount != nil,
-            message: "Cost amount should be provided!"
-        )
-        let costVault <- flowVaultRef.withdraw(amount: costAmount!)
-        self.ins.deposit(<- (costVault as! @FlowToken.Vault))
     }
 
     execute {
-        // buy tokens
-        self.pool.buyTokens(self.ins, amount, recipient: self.recipient)
+        self.pool.buyTokens(self.ins, nil, recipient: self.recipient)
     }
 }
