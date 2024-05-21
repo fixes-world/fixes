@@ -12,12 +12,11 @@ import "FixesTradablePool"
 
 transaction(
     symbol: String,
-    cost: UFix64?,
-    amount: UFix64?,
+    amount: UFix64,
 ) {
     let tickerName: String
-    let ins: &Fixes.Inscription
     let pool: &FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface, FixesFungibleTokenInterface.IMinterHolder, FungibleToken.Receiver}
+    let provider: &{FungibleToken.Provider}
     let recipient: &{FungibleToken.Receiver}
 
     prepare(acct: AuthAccount) {
@@ -31,34 +30,7 @@ transaction(
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
-        // Get a reference to the signer's stored vault
-        let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
-            ?? panic("Could not borrow reference to the owner's Vault!")
-
         self.tickerName = "$".concat(symbol)
-
-        /** ------------- Create the Inscription - Start ------------- */
-        let fields: {String: String} = {}
-
-        let dataStr = FixesInscriptionFactory.buildPureExecuting(
-            tick: self.tickerName,
-            usage: "init",
-            fields
-        )
-        // estimate the required storage
-        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
-        // get reserved cost
-        let flowToReserve <- (flowVaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
-        // Create the Inscription first
-        let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
-            dataStr,
-            <- flowToReserve,
-            store
-        )
-        // borrow a reference to the new Inscription
-        self.ins = store.borrowInscriptionWritableRef(newInsId)
-            ?? panic("Could not borrow a reference to the newly created Inscription!")
-        /** ------------- End --------------------------------------- */
 
         /** ------------- Prepare the pool reference - Start -------------- */
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -87,31 +59,20 @@ transaction(
                 target: tokenVaultData.storagePath
             )
         }
-
-        self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath)
-            .borrow()
-            ?? panic("Could not borrow a reference to the recipient's Receiver!")
         /** ------------- End ----------------------------------------------- */
 
-        /// calculate the cost or amount
-        var costAmount = cost
-        if costAmount == nil{
-            assert(
-                amount != nil,
-                message: "Either cost or amount should be provided!"
-            )
-            costAmount = self.pool.getBuyPriceAfterFee(amount!)
-        }
-        assert(
-            costAmount != nil,
-            message: "Cost amount should be provided!"
-        )
-        let costVault <- flowVaultRef.withdraw(amount: costAmount!)
-        self.ins.deposit(<- (costVault as! @FlowToken.Vault))
+        self.provider = acct.borrow<&{FungibleToken.Provider}>(from: tokenVaultData.storagePath)
+            ?? panic("Could not borrow a reference to the Token Provider!")
+
+        self.recipient = Fixes.borrowFlowTokenReceiver(acct.address)
+            ?? panic("Could not get the FlowToken Receiver!")
     }
 
     execute {
-        // buy tokens
-        self.pool.buyTokens(self.ins, amount, recipient: self.recipient)
+        // sell tokens
+        self.pool.quickSwapToken(
+            <- self.provider.withdraw(amount: amount),
+            self.recipient
+        )
     }
 }
