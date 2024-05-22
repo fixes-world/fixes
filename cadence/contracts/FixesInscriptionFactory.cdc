@@ -215,13 +215,22 @@ access(all) contract FixesInscriptionFactory {
         tick: String,
         amount: UFix64,
     ): String {
-        return "op=withdraw,tick=".concat(tick)
-            .concat(",amt=").concat(amount.toString())
-            .concat(",usage=staking")
+        return self.buildWithdraw(tick: tick, amount: amount, usage: "staking")
     }
 
     access(all)
-    view fun buildStakeDeposit(
+    view fun buildWithdraw(
+        tick: String,
+        amount: UFix64,
+        usage: String,
+    ): String {
+        return "op=withdraw,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+            .concat(",usage=").concat(usage)
+    }
+
+    access(all)
+    view fun buildDeposit(
         tick: String,
     ): String {
         return "op=deposit,tick=".concat(tick)
@@ -261,9 +270,7 @@ access(all) contract FixesInscriptionFactory {
         _ powerup: UFix64?
     ): String {
         let amount = self.estimateLotteryFIXESTicketsCost(ticketAmount, powerup)
-        return "op=withdraw,tick=fixes"
-            .concat(",amt=").concat(amount.toString())
-            .concat(",usage=lottery")
+        return self.buildWithdraw(tick: "fixes", amount: amount, usage: "lottery")
     }
 
     // FRC20 Voting Commands
@@ -325,18 +332,7 @@ access(all) contract FixesInscriptionFactory {
         tick: String,
         amount: UFix64,
     ): String {
-        return "op=withdraw,tick=".concat(tick)
-            .concat(",amt=").concat(amount.toString())
-            .concat(",usage=convert")
-    }
-
-    /// Build the inscription for converting fungible token back to indexer
-    ///
-    access(all)
-    view fun buildDepositFRC20(
-        tick: String,
-    ): String {
-        return "op=deposit,tick=".concat(tick)
+        return self.buildWithdraw(tick: tick, amount: amount, usage: "convert")
     }
 
     /// Build the inscription for pure executing methods

@@ -72,7 +72,7 @@ transaction(
 
         /** ------------- Start -- Inscription Initialization -------------  */
         // create the metadata
-        let dataStr = FixesInscriptionFactory.buildStakeDeposit(tick: tick)
+        let dataStr = FixesInscriptionFactory.buildDeposit(tick: tick)
 
         // estimate the required storage
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)

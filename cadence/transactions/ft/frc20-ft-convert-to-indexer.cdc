@@ -34,7 +34,7 @@ transaction(
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         /** ------------- Create the Inscription - Start ------------- */
-        let insDataStr = FixesInscriptionFactory.buildDepositFRC20(tick: tick)
+        let insDataStr = FixesInscriptionFactory.buildDeposit(tick: tick)
         // estimate the required storage
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(insDataStr)
         // get reserved cost
