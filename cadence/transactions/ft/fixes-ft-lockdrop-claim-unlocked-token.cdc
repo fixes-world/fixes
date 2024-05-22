@@ -2,6 +2,7 @@ import "FungibleToken"
 import "MetadataViews"
 import "ViewResolver"
 import "FlowToken"
+import "stFlowToken"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -15,7 +16,7 @@ transaction(
 ) {
     let ins: &Fixes.Inscription
     let pool: &FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}
-    let recipient: &{FungibleToken.Receiver}
+    let recipient: &{FungibleToken.Receiver}?
 
     prepare(acct: AuthAccount) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -38,34 +39,26 @@ transaction(
             ?? panic("Could not get the Pool Resource!")
         /** ------------- End ----------------------------------------------- */
 
+        let lockingCenter = FixesTokenLockDrops.borrowLockingCenter()
         assert(
-            self.pool.getClaimableTokenAmount(acct.address) > 0.0,
-            message: "No claimable tokens available!"
+            lockingCenter.hasUnlockedEntries(tokenFTAddr, acct.address),
+            message: "No unlocked entries found!"
         )
 
-        /** ------------- Prepare the token recipient - Start -------------- */
-        let tokenVaultData = self.pool.getTokenVaultData()
-        // ensure storage path
-        if acct.check<&AnyResource>(from: tokenVaultData.storagePath) == false {
-            // save the empty vault
-            acct.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
-            // save the public capability
+        /** ------------- Prepare the recipient reference - Start -------------- */
+        let lockingTickerName = self.pool.getLockingTokenTicker()
+        let lockingType = FixesTokenLockDrops.getLockingTickType(lockingTickerName)
 
-            // @deprecated after Cadence 1.0
-            // Create a public capability to the stored Vault that exposes
-            // the `deposit` method through the `Receiver` interface.
-            acct.link<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath, target: tokenVaultData.storagePath)
-            // Create a public capability to the stored Vault that only exposes
-            // the `balance` field and the `resolveView` method through the `Balance` interface
-            acct.link<&{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(
-                tokenVaultData.metadataPath,
-                target: tokenVaultData.storagePath
-            )
+        if lockingType != FixesTokenLockDrops.SupportedLockingTick.fixesFRC20Token {
+            // the locking assets are managed by the vault
+            let recieverPath = lockingType == FixesTokenLockDrops.SupportedLockingTick.FlowToken
+                ? /public/flowTokenReceiver
+                : stFlowToken.tokenReceiverPath
+            self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(recieverPath)
+                .borrow() ?? panic("Could not borrow a reference to the recipient's Receiver!")
+        } else {
+            self.recipient = nil
         }
-
-        self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath)
-            .borrow()
-            ?? panic("Could not borrow a reference to the recipient's Receiver!")
         /** ------------- End ----------------------------------------------- */
 
         // Get a reference to the signer's stored vault
@@ -75,7 +68,7 @@ transaction(
         /** ------------- Create the Inscription - Start ------------- */
         var dataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: tickerName,
-            usage: "init",
+            usage: "claim-unlocked",
             {}
         )
         // estimate the required storage
@@ -95,6 +88,6 @@ transaction(
     }
 
     execute {
-        self.pool.claimDrops(self.ins, recipient: self.recipient)
+        self.pool.claimUnlockedTokens(self.ins, recipient: self.recipient)
     }
 }
