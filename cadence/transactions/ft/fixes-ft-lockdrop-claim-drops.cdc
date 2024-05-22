@@ -94,6 +94,10 @@ transaction(
         /** ------------- End --------------------------------------- */
     }
 
+    pre {
+        self.pool.isClaimable(): "The pool is not claimable!"
+    }
+
     execute {
         self.pool.claimDrops(self.ins, recipient: self.recipient)
     }

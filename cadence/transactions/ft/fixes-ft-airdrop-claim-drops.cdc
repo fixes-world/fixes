@@ -1,22 +1,22 @@
 import "FungibleToken"
+import "FlowToken"
 import "MetadataViews"
 import "ViewResolver"
-import "FlowToken"
-import "stFlowToken"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
-import "FixesTokenLockDrops"
+import "FixesTokenAirDrops"
 
 transaction(
     symbol: String,
 ) {
+
     let ins: &Fixes.Inscription
-    let pool: &FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}
-    let recipient: &{FungibleToken.Receiver}?
+    let pool: &FixesTokenAirDrops.AirdropPool{FixesTokenAirDrops.AirdropPoolPoolPublic, FixesFungibleTokenInterface.IMinterHolder}
+    let recipient: &{FungibleToken.Receiver}
 
     prepare(acct: AuthAccount) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -35,30 +35,38 @@ transaction(
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         let tokenFTAddr = acctsPool.getFTContractAddress(tickerName)
             ?? panic("Could not get the Fungible Token Address!")
-        self.pool = FixesTokenLockDrops.borrowDropsPool(tokenFTAddr)
+        self.pool = FixesTokenAirDrops.borrowAirdropPool(tokenFTAddr)
             ?? panic("Could not get the Pool Resource!")
         /** ------------- End ----------------------------------------------- */
 
-        let lockingCenter = FixesTokenLockDrops.borrowLockingCenter()
         assert(
-            lockingCenter.hasUnlockedEntries(tokenFTAddr, acct.address),
-            message: "No unlocked entries found!"
+            self.pool.getClaimableTokenAmount(acct.address) > 0.0,
+            message: "No claimable tokens available!"
         )
 
-        /** ------------- Prepare the recipient reference - Start -------------- */
-        let lockingTickerName = self.pool.getLockingTokenTicker()
-        let lockingType = FixesTokenLockDrops.getLockingTickType(lockingTickerName)
+        /** ------------- Prepare the token recipient - Start -------------- */
+        let tokenVaultData = self.pool.getTokenVaultData()
+        // ensure storage path
+        if acct.check<&AnyResource>(from: tokenVaultData.storagePath) == false {
+            // save the empty vault
+            acct.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
+            // save the public capability
 
-        if lockingType != FixesTokenLockDrops.SupportedLockingTick.fixesFRC20Token {
-            // the locking assets are managed by the vault
-            let recieverPath = lockingType == FixesTokenLockDrops.SupportedLockingTick.FlowToken
-                ? /public/flowTokenReceiver
-                : stFlowToken.tokenReceiverPath
-            self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(recieverPath)
-                .borrow() ?? panic("Could not borrow a reference to the recipient's Receiver!")
-        } else {
-            self.recipient = nil
+            // @deprecated after Cadence 1.0
+            // Create a public capability to the stored Vault that exposes
+            // the `deposit` method through the `Receiver` interface.
+            acct.link<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath, target: tokenVaultData.storagePath)
+            // Create a public capability to the stored Vault that only exposes
+            // the `balance` field and the `resolveView` method through the `Balance` interface
+            acct.link<&{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(
+                tokenVaultData.metadataPath,
+                target: tokenVaultData.storagePath
+            )
         }
+
+        self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath)
+            .borrow()
+            ?? panic("Could not borrow a reference to the recipient's Receiver!")
         /** ------------- End ----------------------------------------------- */
 
         // Get a reference to the signer's stored vault
@@ -68,7 +76,7 @@ transaction(
         /** ------------- Create the Inscription - Start ------------- */
         var dataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: tickerName,
-            usage: "claim-unlocked",
+            usage: "init",
             {}
         )
         // estimate the required storage
@@ -92,6 +100,6 @@ transaction(
     }
 
     execute {
-        self.pool.claimUnlockedTokens(self.ins, recipient: self.recipient)
+        self.pool.claimDrops(self.ins, recipient: self.recipient)
     }
 }
