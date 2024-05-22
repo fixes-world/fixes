@@ -449,7 +449,7 @@ access(all) contract EVMAgent {
             timestamp: UInt64
         ): &AuthAccount {
             let message = "op=".concat(methodFingerprint)
-                .concat(",params=").concat(StringUtils.join(params, "|"))
+                .concat(",params=").concat(params.length > 0 ? StringUtils.join(params, "|") : "")
             return self._verifyAndBorrowEntrustedAccount(
                 message: message,
                 hexPublicKey: hexPublicKey,
