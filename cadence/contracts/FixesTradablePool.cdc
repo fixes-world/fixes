@@ -1406,8 +1406,8 @@ access(all) contract FixesTradablePool {
         // use the shared store to get the sale fee
         let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
         let valueInStore = sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolCreateLPTargetMarketCap) as! UFix64?
-        // Default is 6480 USD
-        let defaultTargetMarketCap = 100_000.0
+        // Default is 32800 USD
+        let defaultTargetMarketCap = 32_800.0
         return valueInStore ?? defaultTargetMarketCap
     }
 
