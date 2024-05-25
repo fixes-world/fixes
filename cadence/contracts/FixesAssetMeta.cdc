@@ -98,10 +98,10 @@ access(all) contract FixesAssetMeta {
             } else {
                 let dnaKeys: [Character] = ["A", "C", "G", "T"]
                 self.id = [
-                    dnaKeys[UInt32(revertibleRandom() % 4)],
-                    dnaKeys[UInt32(revertibleRandom() % 4)],
-                    dnaKeys[UInt32(revertibleRandom() % 4)],
-                    dnaKeys[UInt32(revertibleRandom() % 4)]
+                    dnaKeys[revertibleRandom<UInt32>(modulo: 4)],
+                    dnaKeys[revertibleRandom<UInt32>(modulo: 4)],
+                    dnaKeys[revertibleRandom<UInt32>(modulo: 4)],
+                    dnaKeys[revertibleRandom<UInt32>(modulo: 4)]
                 ]
             }
             self.quality = quality ?? GeneQuality.Nascent
@@ -146,7 +146,7 @@ access(all) contract FixesAssetMeta {
         }
 
         /// Split the data into another instance
-        access(all)
+        access(FixesTraits.Write)
         fun split(_ perc: UFix64): {FixesTraits.MergeableData} {
             post {
                 self.getId() == result.getId(): "The gene id is not the same so cannot split"
@@ -169,7 +169,7 @@ access(all) contract FixesAssetMeta {
         /// Merge the data from another instance
         /// From and Self must have the same id and same type(Ensured by interface)
         ///
-        access(all)
+        access(FixesTraits.Write)
         fun merge(_ from: {FixesTraits.MergeableData}): Void {
             pre {
                 self.getId() == from.getId(): "The gene id is not the same so cannot merge"
@@ -200,7 +200,7 @@ access(all) contract FixesAssetMeta {
         access(all) let genes: {String: Gene}
         access(all) var mutatableAmount: UInt64
 
-        init(
+        view init(
             _ identifier: String,
             _ owner: Address,
             _ mutatableAmount: UInt64?
@@ -222,11 +222,15 @@ access(all) contract FixesAssetMeta {
         ///
         access(all)
         view fun toString(): String {
-            let genes: [String] = []
+            var genes: String = ""
             for key in self.genes.keys {
-                genes.append(self.genes[key]!.toString())
+                let geneStr = self.genes[key]!.toString()
+                if genes != "" {
+                    genes = genes.concat(",")
+                }
+                genes = genes.concat(geneStr)
             }
-            return genes.length > 0 ? StringUtils.join(genes, ",") : ""
+            return genes
         }
 
         /// Get the data keys
@@ -262,7 +266,7 @@ access(all) contract FixesAssetMeta {
 
         /// Set the value of the data
         ///
-        access(all)
+        access(FixesTraits.Write)
         fun setValue(_ key: String, _ value: AnyStruct) {
             if key == "mutatableAmount" {
                 self.mutatableAmount = value as! UInt64
@@ -271,7 +275,7 @@ access(all) contract FixesAssetMeta {
 
         /// Split the data into another instance
         ///
-        access(all)
+        access(FixesTraits.Write)
         fun split(_ perc: UFix64): {FixesTraits.MergeableData} {
             post {
                 self.getId() == result.getId(): "The result id is not the same so cannot split"
@@ -279,7 +283,7 @@ access(all) contract FixesAssetMeta {
             let newDna = DNA(self.identifier, self.owner, nil)
             for key in self.genes.keys {
                 // Split the gene, use reference to ensure data consistency
-                if let geneRef = &self.genes[key] as &Gene? {
+                if let geneRef = &self.genes[key] as auth(FixesTraits.Write) &Gene? {
                     let geneId = geneRef.getId()
                     // add the new gene to the new DNA
                     newDna.genes[geneId] = geneRef.split(perc) as! Gene
@@ -291,7 +295,7 @@ access(all) contract FixesAssetMeta {
         /// Merge the data from another instance
         /// The type of the data must be the same(Ensured by interface)
         ///
-        access(all)
+        access(FixesTraits.Write)
         fun merge(_ from: {FixesTraits.MergeableData}): Void {
             let fromDna = from as! DNA
             // identifer must be the same
@@ -324,7 +328,7 @@ access(all) contract FixesAssetMeta {
             }
             let geneId = gene.getId()
             // Merge the gene, use reference to ensure data consistency
-            if let geneRef = &self.genes[geneId] as &Gene? {
+            if let geneRef = &self.genes[geneId] as auth(FixesTraits.Write) &Gene? {
                 geneRef.merge(gene)
             } else {
                 // If the gene is not exist, just copy it
@@ -340,7 +344,7 @@ access(all) contract FixesAssetMeta {
     access(all)
     fun attemptToGenerateGene(): Gene? {
         // 30% to generate a gene
-        let rand = UInt64(revertibleRandom() % 10000)
+        let rand = revertibleRandom<UInt64>(modulo: 10000)
         var quality = GeneQuality.Nascent
         if rand < 2 {
             // 0.02% to generate a gene with quality Miraculous
@@ -385,7 +389,7 @@ access(all) contract FixesAssetMeta {
             return nil
         }
         let threshold = FixesAssetMeta.getQualityLevelUpThreshold(quality)
-        let exp = revertibleRandom() % (threshold / 5) // random exp from 20% of the threshold
+        let exp = revertibleRandom<UInt64>(modulo: threshold / 5) // random exp from 20% of the threshold
         return Gene(id: nil, quality: GeneQuality.Empowered, exp: exp)
     }
 
@@ -415,11 +419,15 @@ access(all) contract FixesAssetMeta {
         ///
         access(all)
         view fun toString(): String {
-            var flags: [String] = []
+            var flags: String = ""
             for key in self.flags.keys {
-                flags.append(key.concat("=").concat(self.flags[key] == true ? "1" : "0"))
+                let str = key.concat("=").concat(self.flags[key] == true ? "1" : "0")
+                if flags != "" {
+                    flags = flags.concat(",")
+                }
+                flags = flags.concat(str)
             }
-            return StringUtils.join(flags, ",")
+            return flags
         }
 
         /// Get the data keys
@@ -449,7 +457,7 @@ access(all) contract FixesAssetMeta {
 
         /// Set the value of the data
         ///
-        access(all)
+        access(FixesTraits.Write)
         fun setValue(_ key: String, _ value: AnyStruct) {
             if key == "enabled" {
                 self.flags["enabled"] = value as! Bool
@@ -458,7 +466,7 @@ access(all) contract FixesAssetMeta {
 
         /// Split the data into another instance
         ///
-        access(all)
+        access(FixesTraits.Write)
         fun split(_ perc: UFix64): {FixesTraits.MergeableData} {
             post {
                 self.getId() == result.getId(): "The result id is not the same so cannot split"
@@ -469,7 +477,7 @@ access(all) contract FixesAssetMeta {
         /// Merge the data from another instance
         /// The type of the data must be the same(Ensured by interface)
         ///
-        access(all)
+        access(FixesTraits.Write)
         fun merge(_ from: {FixesTraits.MergeableData}): Void {
             // Nothing to merge
         }
