@@ -932,7 +932,8 @@
 				"FixesTokenAirDrops",
 				"FRC20Agents",
 				"FixesFungibleToken",
-				"FRC20FungibleToken"
+				"FRC20FungibleToken",
+				"FungibleTokenManager"
 			]
 		}
 	}
