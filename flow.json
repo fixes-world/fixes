@@ -292,6 +292,14 @@
 				"testnet": "ad26718c4b6b921b"
 			}
 		},
+		"Burner": {
+			"source": "mainnet://f233dcee88fe0abe.Burner",
+			"hash": "f88f3c08d5d02a74e84b175c5f82f30ed0cb8f651a1fa1c2fabd3a02d076e02f",
+			"aliases": {
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
 		"CapabilityDelegator": {
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityDelegator",
 			"hash": "026019cb04d32e65fca7f40f700f2d46d16a41521f38db27bbf5963816b5d971",
@@ -790,6 +798,7 @@
 		"emulator": {
 			"default": [],
 			"emulator-account": [
+				"Burner",
 				"FungibleTokenMetadataViews",
 				"NFTCatalog",
 				"StringUtils",
@@ -807,8 +816,8 @@
 					"name": "SwapFactory",
 					"args": [
 						{
-							"type": "Address",
-							"value": "0xf8d6e0586b0a20c7"
+							"value": "0xf8d6e0586b0a20c7",
+							"type": "Address"
 						}
 					]
 				},
