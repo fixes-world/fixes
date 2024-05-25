@@ -8,10 +8,13 @@ This contract mainly includes commonly used Structs related to Asset Traits.
 */
 // Thirdparty Imports
 import "MetadataViews"
+import "ViewResolver"
 
 /// The `FixesTraits` contract
 ///
 access(all) contract FixesTraits {
+
+    access(all) entitlement Write;
 
     /// =============  Trait: Fungible Token =============
 
@@ -36,7 +39,7 @@ access(all) contract FixesTraits {
             return []
         }
         /// Set the value of the data
-        access(all)
+        access(Write)
         fun setValue(_ key: String, _ value: AnyStruct) {
             pre {
                 self.getWritableKeys().contains(key): "The key is not writable"
@@ -47,7 +50,7 @@ access(all) contract FixesTraits {
             }
         }
         /// Split the data into another instance
-        access(all)
+        access(Write)
         fun split(_ perc: UFix64): {MergeableData} {
             pre {
                 perc > 0.0 && perc <= 1.0: "The percentage should be between 0 and 1"
@@ -57,7 +60,7 @@ access(all) contract FixesTraits {
             }
         }
         /// Merge the data from another instance
-        access(all)
+        access(Write)
         fun merge(_ from: {MergeableData}): Void {
             pre {
                 self.getType().identifier == from.getType().identifier: "The data type must be the same"
@@ -213,9 +216,8 @@ access(all) contract FixesTraits {
 
     access(account)
     fun attemptToGenerateRandomEntryForSeason0(): @Entry? {
-        let randForType = revertibleRandom()
         // 5% for secret places, 10% for ability, 15% for weapons, 70% for nothing
-        let randForTypePercent = UInt8(randForType % 100)
+        let randForTypePercent = revertibleRandom<UInt8>(modulo: 100)
         if randForTypePercent >= 30 {
             return nil
         }
@@ -238,7 +240,7 @@ access(all) contract FixesTraits {
     /// The higher the rarity in front.
     ///
     access(all)
-    fun getRarityDefinition(_ series: Type): [Definition]? {
+    view fun getRarityDefinition(_ series: Type): [Definition]? {
         switch series {
         case Type<Season0SecretPlaces>():
             return self.getSeason0SecretPlacesDefs()
@@ -253,7 +255,7 @@ access(all) contract FixesTraits {
     /// Get the maximum rarity for a given series
     ///
     access(all)
-    fun getMaxRarity(_ series: Type): UInt8 {
+    view fun getMaxRarity(_ series: Type): UInt8 {
         if let arr = self.getRarityDefinition(series) {
             return UInt8(arr.length - 1)
         }
@@ -272,7 +274,7 @@ access(all) contract FixesTraits {
         access(all)
         let weight: UInt64 // weight of this rarity
 
-        init (
+        view init (
             _ threshold: UInt8,
             _ weight: UInt64
         ) {
@@ -306,14 +308,14 @@ access(all) contract FixesTraits {
             self.value = value
             self.rarity = rarity
             // Offset is random between -20 and 20
-            let rand = revertibleRandom()
-            self.offset = Int8(rand % 40) - 20
+            let rand = revertibleRandom<UInt8>(modulo: 40)
+            self.offset = Int8(rand) - 20
         }
     }
 
     /// The `Entry` resource
     ///
-    access(all) resource Entry: MetadataViews.Resolver {
+    access(all) resource Entry: ViewResolver.Resolver {
         access(self)
         let trait: TraitWithOffset
 
@@ -341,7 +343,7 @@ access(all) contract FixesTraits {
         /// Function that returns all the Metadata Views available for this profile
         ///
         access(all)
-        fun getViews(): [Type] {
+        view fun getViews(): [Type] {
             return [
                 Type<TraitWithOffset>(),
                 Type<MetadataViews.Trait>()
@@ -392,7 +394,8 @@ access(all) contract FixesTraits {
         }
 
         // generate a random number for the entry
-        let randForEntry = revertibleRandom() % 10000
+        let randForEntry = revertibleRandom<UInt64>(modulo: 10000)
+
         // calculate the rarity
         var totalWeight: UInt64 = 0
         var lastThreshold: UInt8 = 0
