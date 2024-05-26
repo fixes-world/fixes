@@ -334,7 +334,7 @@ access(all) contract FixesTraits {
         /// Get the trait
         ///
         access(all)
-        fun getTrait(): TraitWithOffset {
+        view fun getTrait(): TraitWithOffset {
             return self.trait
         }
 
