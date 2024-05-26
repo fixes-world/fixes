@@ -416,7 +416,7 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Borrow the minter reference
         access(contract)
-        view fun borrowMinter(): &{IMinter}
+        view fun borrowMinter(): auth(Manage) &{IMinter}
     }
 
     /// ------------ Public Functions - no default implementation ------------
