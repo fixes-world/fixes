@@ -147,7 +147,7 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// The Implementation some method for the Metadata
     ///
-    access(all) resource interface IVault: Metadata, MetadataGenerator {
+    access(all) resource interface Vault: Metadata, MetadataGenerator {
         /// Attempt to generate a new gene
         ///
         access(MetadataUpdate)
@@ -194,9 +194,6 @@ access(all) contract interface FixesFungibleTokenInterface {
             return newDNA
         }
     }
-
-    // The Vault Resource is removed after C1.0
-    // access(all) resource Vault: IVault {}
 
     /// The admin interface for the FT
     ///
