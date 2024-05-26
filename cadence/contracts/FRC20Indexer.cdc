@@ -1597,7 +1597,7 @@ access(all) contract FRC20Indexer {
     /// Get the inscription indexer
     ///
     access(all)
-    fun getIndexer(): &{IndexerPublic} {
+    view fun getIndexer(): &{IndexerPublic} {
         let addr = self.account.address
         let cap = getAccount(addr)
             .capabilities.get<&{IndexerPublic}>(self.IndexerPublicPath)
