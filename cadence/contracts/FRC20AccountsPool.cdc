@@ -22,6 +22,8 @@ import "FRC20Indexer"
 
 access(all) contract FRC20AccountsPool {
 
+    access(all) entitlement Admin
+
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -108,60 +110,60 @@ access(all) contract FRC20AccountsPool {
         view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}?
         /// Borrow the Fixes Fungible Token contract interface
         access(all)
-        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface?
+        fun borrowFTContract(_ tick: String): &{FixesFungibleTokenInterface}?
 
         /// Execute inscription and extract FlowToken in the inscription
         access(all)
-        fun executeInscription(type: ChildAccountType, _ ins: &Fixes.Inscription)
+        fun executeInscription(type: ChildAccountType, _ ins: auth(Fixes.Extractable) &Fixes.Inscription)
 
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount?
+        fun borrowChildAccount(type: ChildAccountType, _ key: String?): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account?
         /// Borrow the writable config store
         access(account)
-        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): &FRC20FTShared.SharedStore?
+        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore?
         /// Sets up a new child account for market
         access(account)
-        fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForMarket(tick: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
         /// Sets up a new child account for staking
         access(account)
-        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
         /// Sets up a new child account for EVM agent
         access(account)
-        fun setupNewChildForEVMAgency(owner: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForEVMAgency(owner: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
         /// Sets up a new child account for EVM entrusted account
         access(account)
-        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
         /// Sets up a new child account for some Game World
         access(account)
-        fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
         /// Sets up a new child account for FungibleToken
         access(account)
-        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<&AuthAccount>)
+        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
     ///
     access(all) resource interface PoolAdmin {
         /// Sets up a new child account
-        access(all)
+        access(Admin)
         fun setupNewSharedChildByType(
             type: ChildAccountType,
-            _ acctCap: Capability<&AuthAccount>,
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
         )
         /// Sets up a new child account
-        access(all)
+        access(Admin)
         fun setupNewChildByKey(
             type: ChildAccountType,
             key: String,
-            _ acctCap: Capability<&AuthAccount>,
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
         )
     }
 
     access(all) resource Pool: PoolPublic, PoolAdmin {
         access(self)
-        let hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
+        let hcManagerCap: Capability<auth(HybridCustody.Manage) &HybridCustody.Manager>
         // AccountType -> Tick -> Address
         access(self)
         let addressMapping: {ChildAccountType: {String: Address}}
@@ -170,7 +172,7 @@ access(all) contract FRC20AccountsPool {
         let sharedAddressMappping: {ChildAccountType: Address}
 
         init(
-            _ hcManagerCap: Capability<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>
+            _ hcManagerCap: Capability<auth(HybridCustody.Manage) &HybridCustody.Manager>
         ) {
             self.hcManagerCap = hcManagerCap
             self.addressMapping = {}
@@ -309,12 +311,12 @@ access(all) contract FRC20AccountsPool {
         /// If no contract is found, it will panic
         ///
         access(all)
-        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface? {
+        fun borrowFTContract(_ tick: String): &{FixesFungibleTokenInterface}? {
             // try to borrow the account to check if it was created
             if let childAcctRef = self.borrowChildAccount(type: ChildAccountType.FungibleToken, tick) {
                 let name = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
                 // try to borrow the contract
-                return childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: name)
+                return childAcctRef.contracts.borrow<&{FixesFungibleTokenInterface}>(name: name)
             }
             return nil
         }
@@ -322,14 +324,14 @@ access(all) contract FRC20AccountsPool {
         /// Execute inscription and extract FlowToken in the inscription
         ///
         access(all)
-        fun executeInscription(type: ChildAccountType, _ ins: &Fixes.Inscription) {
+        fun executeInscription(type: ChildAccountType, _ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
             pre {
                 ins.isExtractable(): "The inscription must be extractable"
             }
             post {
                 ins.isExtracted(): "The inscription must be extracted"
             }
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             assert(
                 meta["op"] == "exec",
                 message: "The inscription operation must be 'exec'"
@@ -373,7 +375,7 @@ access(all) contract FRC20AccountsPool {
         /// Borrow child's AuthAccount
         ///
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount? {
+        fun borrowChildAccount(type: ChildAccountType, _ key: String?): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account? {
             let hcManagerRef = self.hcManagerCap.borrow()
                 ?? panic("Failed to borrow hcManager")
             if let specified = key {
@@ -399,9 +401,12 @@ access(all) contract FRC20AccountsPool {
         /// Borrow the writable config store
         ///
         access(account)
-        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): &FRC20FTShared.SharedStore? {
+        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore? {
             if let child = self.borrowChildAccount(type: type, key) {
-                return child.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
+                return child.storage
+                    .borrow<auth(FRC20FTShared.Write)&FRC20FTShared.SharedStore>(
+                        from: FRC20FTShared.SharedStoreStoragePath
+                    )
             }
             return nil
         }
@@ -409,38 +414,38 @@ access(all) contract FRC20AccountsPool {
         /// Sets up a new child account for market
         ///
         access(account)
-        fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>) {
+        fun setupNewChildForMarket(tick: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
             self.setupNewChildByKey(type: ChildAccountType.Market, key: tick, acctCap)
         }
 
         /// Sets up a new child account for staking
         ///
         access(account)
-        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<&AuthAccount>) {
+        fun setupNewChildForStaking(tick: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
             self.setupNewChildByKey(type: ChildAccountType.Staking, key: tick, acctCap)
         }
 
         /// Sets up a new child account for EVM agency
         access(account)
-        fun setupNewChildForEVMAgency(owner: String, _ acctCap: Capability<&AuthAccount>) {
+        fun setupNewChildForEVMAgency(owner: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
             self.setupNewChildByKey(type: ChildAccountType.EVMAgency, key: owner, acctCap)
         }
 
         /// Sets up a new child account for EVM entrusted account
         access(account)
-        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<&AuthAccount>) {
+        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
             self.setupNewChildByKey(type: ChildAccountType.EVMEntrustedAccount, key: evmAddr, acctCap)
         }
 
         /// Sets up a new child account for some Game World
         access(account)
-        fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>) {
+        fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
             self.setupNewChildByKey(type: ChildAccountType.GameWorld, key: key, acctCap)
         }
 
         /// Sets up a new child account for FungibleToken
         access(account)
-        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<&AuthAccount>) {
+        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
             self.setupNewChildByKey(type: ChildAccountType.FungibleToken, key: tick, acctCap)
         }
 
@@ -448,10 +453,10 @@ access(all) contract FRC20AccountsPool {
 
         /// Sets up a new shared child account
         ///
-        access(all)
+        access(Admin)
         fun setupNewSharedChildByType(
             type: ChildAccountType,
-            _ childAcctCap: Capability<&AuthAccount>,
+            _ childAcctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
         ) {
             pre {
                 childAcctCap.check(): "Child account capability is invalid"
@@ -474,11 +479,11 @@ access(all) contract FRC20AccountsPool {
 
         /// Sets up a new child account
         ///
-        access(all)
+        access(Admin)
         fun setupNewChildByKey(
             type: ChildAccountType,
             key: String,
-            _ childAcctCap: Capability<&AuthAccount>,
+            _ childAcctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
         ) {
             pre {
                 childAcctCap.check(): "Child account capability is invalid"
@@ -525,7 +530,7 @@ access(all) contract FRC20AccountsPool {
         ///
         access(self)
         fun _setupChildAccount(
-            _ childAcctCap: Capability<&AuthAccount>,
+            _ childAcctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
         ) {
 
             let hcManager = self.hcManagerCap.borrow() ?? panic("Failed to borrow hcManager")
@@ -536,25 +541,24 @@ access(all) contract FRC20AccountsPool {
                 ?? panic("Failed to borrow child account")
 
             // >>> [1] Child: createOwnedAccount
-            if child.borrow<&AnyResource>(from: HybridCustody.OwnedAccountStoragePath) == nil {
+            if child.storage.borrow<&AnyResource>(from: HybridCustody.OwnedAccountStoragePath) == nil {
                 let ownedAccount <- HybridCustody.createOwnedAccount(acct: childAcctCap)
-                child.save(<-ownedAccount, to: HybridCustody.OwnedAccountStoragePath)
+                child.storage.save(<-ownedAccount, to: HybridCustody.OwnedAccountStoragePath)
             }
 
             // ensure owned account exists
-            let childRef = child.borrow<&HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath)
+            let childRef = child.storage
+                .borrow<auth(HybridCustody.Owner) &HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath)
                 ?? panic("owned account not found")
 
             // check that paths are all configured properly
             // public path
             // @deprecated after Cadence 1.0
-            child.unlink(HybridCustody.OwnedAccountPublicPath)
-            child.link<&HybridCustody.OwnedAccount{HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPublicPath, target: HybridCustody.OwnedAccountStoragePath)
-
-            // private path(will deperated in the future)
-            // @deprecated after Cadence 1.0
-            child.unlink(HybridCustody.OwnedAccountPrivatePath)
-            child.link<&HybridCustody.OwnedAccount{HybridCustody.BorrowableAccount, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(HybridCustody.OwnedAccountPrivatePath, target: HybridCustody.OwnedAccountStoragePath)
+            child.capabilities.unpublish(HybridCustody.OwnedAccountPublicPath)
+            child.capabilities.publish(
+                child.capabilities.storage.issue<&HybridCustody.OwnedAccount>(HybridCustody.OwnedAccountStoragePath),
+                at: HybridCustody.OwnedAccountPublicPath
+            )
 
             let publishIdentifier = HybridCustody.getOwnerIdentifier(hcManagerAddr)
             // give ownership to manager
@@ -565,14 +569,14 @@ access(all) contract FRC20AccountsPool {
 
             // unpublish the priv capability
             child.inbox.unpublish<
-                &{HybridCustody.OwnedAccountPrivate, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}
+                auth(HybridCustody.Owner) &{HybridCustody.OwnedAccountPrivate, HybridCustody.OwnedAccountPublic, ViewResolver.Resolver}
             >(publishIdentifier)
 
             // >> [2] manager: add owned child account
 
             // Link a Capability for the new owner, retrieve & publish
-            let ownedPrivCap = child
-                .getCapability<&{HybridCustody.OwnedAccountPrivate, HybridCustody.OwnedAccountPublic, MetadataViews.Resolver}>(PrivatePath(identifier: publishIdentifier)!)
+            let ownedPrivCap = child.capabilities.storage
+                .issue<auth(HybridCustody.Owner) &{HybridCustody.OwnedAccountPrivate, HybridCustody.OwnedAccountPublic, ViewResolver.Resolver}>(HybridCustody.OwnedAccountStoragePath)
             assert(ownedPrivCap.check(), message: "Failed to get owned account capability")
 
             // add owned account to manager
@@ -582,8 +586,8 @@ access(all) contract FRC20AccountsPool {
         /// Borrow dictioinary
         ///
         access(self)
-        fun borrowDict(type: ChildAccountType): &{String: Address}? {
-            return &self.addressMapping[type] as &{String: Address}?
+        view fun borrowDict(type: ChildAccountType): auth(Mutate) &{String: Address}? {
+            return &self.addressMapping[type]
         }
 
         /// ensure type dict exists
@@ -601,9 +605,9 @@ access(all) contract FRC20AccountsPool {
     /// Returns the public account manager interface
     ///
     access(all)
-    fun borrowAccountsPool(): &Pool{PoolPublic} {
+    fun borrowAccountsPool(): &{PoolPublic} {
         return self.account
-            .getCapability<&Pool{PoolPublic}>(self.AccountsPoolPublicPath)
+            .capabilities.get<&{PoolPublic}>(self.AccountsPoolPublicPath)
             .borrow()
             ?? panic("Could not borrow accounts pool reference")
     }
@@ -614,28 +618,29 @@ access(all) contract FRC20AccountsPool {
         self.AccountsPoolPublicPath = PublicPath(identifier: identifier)!
 
         // create account manager with hybrid custody manager capability
-        if self.account.borrow<&HybridCustody.Manager>(from: HybridCustody.ManagerStoragePath) == nil {
+        if self.account.storage.borrow<&HybridCustody.Manager>(from: HybridCustody.ManagerStoragePath) == nil {
             let m <- HybridCustody.createManager(filter: nil)
-            self.account.save(<- m, to: HybridCustody.ManagerStoragePath)
+            self.account.storage.save(<- m, to: HybridCustody.ManagerStoragePath)
         }
 
         // reset account manager paths
-        self.account.unlink(HybridCustody.ManagerPublicPath)
-        self.account.link<&HybridCustody.Manager{HybridCustody.ManagerPublic}>(HybridCustody.ManagerPublicPath, target: HybridCustody.ManagerStoragePath)
+        self.account.capabilities.unpublish(HybridCustody.ManagerPublicPath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&{HybridCustody.ManagerPublic}>(HybridCustody.ManagerStoragePath),
+            at: HybridCustody.ManagerPublicPath
+        )
 
-        self.account.unlink(HybridCustody.ManagerPrivatePath)
-        let cap = self.account
-            .link<&HybridCustody.Manager{HybridCustody.ManagerPrivate, HybridCustody.ManagerPublic}>(
-                HybridCustody.ManagerPrivatePath,
-                target: HybridCustody.ManagerStoragePath
-            )
-            ?? panic("failed to link account manager capability")
+        let cap = self.account.capabilities.storage
+            .issue<auth(HybridCustody.Manage) &HybridCustody.Manager>(HybridCustody.ManagerStoragePath)
 
         // init account manager
         let acctPool <- create Pool(cap)
-        self.account.save(<- acctPool, to: self.AccountsPoolStoragePath)
+        self.account.storage.save(<- acctPool, to: self.AccountsPoolStoragePath)
         // link public capability
-        self.account.link<&Pool{PoolPublic}>(self.AccountsPoolPublicPath, target: self.AccountsPoolStoragePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&{PoolPublic}>(self.AccountsPoolStoragePath),
+            at: self.AccountsPoolPublicPath
+        )
 
         emit ContractInitialized()
     }
