@@ -3,14 +3,16 @@
 
 # FRC20 Staking Contract
 
-TODO: Add description
+This contract is a FRC20 token staking contract, which allows users to stake their FRC20 tokens and earn rewards.
 
 */
 // Third Party Imports
 import "FungibleToken"
 import "FlowToken"
 import "MetadataViews"
+import "ViewResolver"
 import "NonFungibleToken"
+import "Burner"
 // Fixes Imports
 import "Fixes"
 import "FRC20Indexer"
@@ -70,7 +72,7 @@ access(all) contract FRC20Staking {
         access(all)
         let rewardStrategies: [String]
 
-        init(
+        view init(
             tick: String,
             totalStaked: UFix64,
             totalUnstakingLocked: UFix64,
@@ -113,7 +115,7 @@ access(all) contract FRC20Staking {
 
         /// Borrow the Reward Strategy
         access(account)
-        fun borrowRewardStrategy(_ rewardTick: String): &RewardStrategy?
+        view fun borrowRewardStrategy(_ rewardTick: String): &RewardStrategy?
 
         /** ---- Delegators ---- */
 
@@ -134,7 +136,7 @@ access(all) contract FRC20Staking {
         /// Unstake FRC20 token
         access(account)
         fun unstake(
-            _ semiNFTCol: &FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection},
+            _ semiNFTCol: auth(NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection,
             nftId: UInt64
         )
 
@@ -146,13 +148,9 @@ access(all) contract FRC20Staking {
 
         /** ---- Contract Level Methods ---- */
 
-        /// Borrow the Pool reference
-        access(contract)
-        fun borrowSelf(): &Pool
-
         /// Borrow Delegator Record
         access(contract)
-        fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord?
+        view fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord?
     }
 
     access(all) resource Pool: PoolPublic {
@@ -195,16 +193,9 @@ access(all) contract FRC20Staking {
             self.rewards <- {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.totalStaked
-            destroy self.delegators
-            destroy self.rewards
-        }
-
         /// Initialize the staking record
         ///
-        access(all)
+        access(account)
         fun initialize() {
             pre {
                 self.totalStaked == nil: "Total staked must be nil"
@@ -227,7 +218,7 @@ access(all) contract FRC20Staking {
                 tick: self.tick,
                 totalStaked: totalStakedRef.getBalance(),
                 totalUnstakingLocked: self.totalUnstakingLocked,
-                delegatorsAmount: UInt32(self.delegators.keys.length),
+                delegatorsAmount: UInt32(self.delegators.length),
                 rewardStrategies: self.getRewardNames()
             )
         }
@@ -341,13 +332,13 @@ access(all) contract FRC20Staking {
         ///
         access(account)
         fun unstake(
-            _ semiNFTCol: &FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection},
+            _ semiNFTCol: auth(NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection,
             nftId: UInt64
         ) {
             let poolAddr = self.owner?.address ?? panic("Pool owner must exist")
             let delegator = semiNFTCol.owner?.address ?? panic("Delegator must exist")
             // ensure the nft is valid
-            let nftRef = semiNFTCol.borrowFRC20SemiNFT(id: nftId)
+            let nftRef = semiNFTCol.borrowFRC20SemiNFTPublic(id: nftId)
                 ?? panic("Staked NFT must exist")
             assert(
                 nftRef.getOriginalTick() == self.tick,
@@ -384,7 +375,7 @@ access(all) contract FRC20Staking {
                 // extract all unlocked staked change
                 let amount = unlockedStakedChange.extract()
                 // destroy the unlocked staked change
-                destroy unlockedStakedChange
+                Burner.burn(<- unlockedStakedChange)
 
                 let totalStakedRef = self.borrowTotalStaked()
                 // withdraw from totalStaked
@@ -409,8 +400,8 @@ access(all) contract FRC20Staking {
         /// Borrow Reward Strategy
         ///
         access(account)
-        fun borrowRewardStrategy(_ rewardTick: String): &RewardStrategy? {
-            return &self.rewards[rewardTick] as &RewardStrategy?
+        view fun borrowRewardStrategy(_ rewardTick: String): &RewardStrategy? {
+            return &self.rewards[rewardTick]
         }
 
         /** ---- Contract Level Methods ----- */
@@ -433,22 +424,16 @@ access(all) contract FRC20Staking {
         /// Borrow Delegator Record
         ///
         access(contract)
-        fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord? {
-            return &self.delegators[addr] as &DelegatorRecord?
-        }
-
-        /// Borrow Staking Reference
-        ///
-        access(contract)
-        fun borrowSelf(): &Pool {
-            return &self as &Pool
+        view fun borrowDelegatorRecord(_ addr: Address): &DelegatorRecord? {
+            return &self.delegators[addr]
         }
 
         /// Borrow Staked Change
         ///
         access(contract)
-        fun borrowTotalStaked(): &FRC20FTShared.Change {
-            return &self.totalStaked as &FRC20FTShared.Change? ?? panic("Total staked must exist")
+        view fun borrowTotalStaked(): auth(FRC20FTShared.Write) &FRC20FTShared.Change {
+            return &self.totalStaked as auth(FRC20FTShared.Write) &FRC20FTShared.Change?
+                ?? panic("Total staked must exist")
         }
 
         /** ---- Internal Methods */
@@ -489,7 +474,7 @@ access(all) contract FRC20Staking {
         access(all) let unstakingEntriesNFTIds: [UInt64]
         access(all) let totalUnstakingBalance: UFix64
         access(all) let totalUnlockedClaimableBalance: UFix64
-        init(
+        view init(
             delegator: Address,
             delegatorId: UInt32,
             stakeTick: String,
@@ -513,21 +498,21 @@ access(all) contract FRC20Staking {
         let unlockTime: UInt64
 
         access(all)
-        fun getNFTId(): UInt64?
+        view fun getNFTId(): UInt64?
 
         access(all)
-        fun isUnlocked(): Bool
+        view fun isUnlocked(): Bool
 
         access(all)
-        fun unlockingBalance(): UFix64
+        view fun unlockingBalance(): UFix64
 
         access(all)
-        fun isExtracted(): Bool
+        view fun isExtracted(): Bool
     }
 
     /// Unstaking Entry Resource, represents a unstaking entry for a FRC20 token
     ///
-    access(all) resource UnstakingEntry: UnstakingEntryPublic {
+    access(all) resource UnstakingEntry: UnstakingEntryPublic, Burner.Burnable {
         access(all)
         let unlockTime: UInt64
         access(all)
@@ -541,27 +526,31 @@ access(all) contract FRC20Staking {
             self.unstakingNFT <- unstakingNFT
         }
 
-        destroy () {
-            destroy self.unstakingNFT
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.isExtracted(): "Unstaking NFT must be extracted"
+            }
+            // NOTHING
         }
 
         access(all)
-        fun getNFTId(): UInt64? {
+        view fun getNFTId(): UInt64? {
             return self.unstakingNFT?.id
         }
 
         access(all)
-        fun isUnlocked(): Bool {
+        view fun isUnlocked(): Bool {
             return UInt64(getCurrentBlock().timestamp) >= self.unlockTime
         }
 
         access(all)
-        fun unlockingBalance(): UFix64 {
+        view fun unlockingBalance(): UFix64 {
             return self.unstakingNFT?.getBalance() ?? 0.0
         }
 
         access(all)
-        fun isExtracted(): Bool {
+        view fun isExtracted(): Bool {
             return self.unstakingNFT == nil
         }
 
@@ -583,7 +572,7 @@ access(all) contract FRC20Staking {
 
     /// Delegator Record Resource, represents a delegator record for a FRC20 token and store in pool's account
     ///
-    access(all) resource DelegatorRecord {
+    access(all) resource DelegatorRecord: Burner.Burnable {
         // The delegator ID
         access(all)
         let id: UInt32
@@ -594,7 +583,7 @@ access(all) contract FRC20Staking {
         access(all)
         let stakeTick: String
         // The delegator's unstaking entries
-        access(all)
+        access(contract)
         let unstakingEntries: @[UnstakingEntry]
 
         init(
@@ -611,20 +600,23 @@ access(all) contract FRC20Staking {
             self.unstakingEntries <- []
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.unstakingEntries
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.unstakingEntries.length == 0: "Unstaking entries must be empty"
+            }
+            // NOTHING
         }
 
         access(all)
-        fun entriesLength(): UInt64 {
+        view fun entriesLength(): UInt64 {
             return UInt64(self.unstakingEntries.length)
         }
 
         /// Is the frist unstaking entry unlocked
         ///
         access(all)
-        fun isFirstUnlocked(): Bool {
+        view fun isFirstUnlocked(): Bool {
             if self.unstakingEntries.length > 0 {
                 return self.unstakingEntries[0].isUnlocked()
             }
@@ -634,7 +626,7 @@ access(all) contract FRC20Staking {
         /// Get all unlocked balance
         ///
         access(all)
-        fun getDetails(): DelegatorUnstakingInfo {
+        view fun getDetails(): DelegatorUnstakingInfo {
             var totalUnlockedBalance = 0.0
             var totalBalance = 0.0
             var nftIds: [UInt64] = []
@@ -645,7 +637,7 @@ access(all) contract FRC20Staking {
                 let unlockingBalance = entryRef.unlockingBalance()
                 // add to NFTIds
                 if let nftId = entryRef.getNFTId() {
-                    nftIds.append(nftId)
+                    nftIds = nftIds.concat([nftId])
                 }
                 // add to unlocked balance
                 if entryRef.isUnlocked() {
@@ -704,7 +696,6 @@ access(all) contract FRC20Staking {
                     tick: "!".concat(self.stakeTick),
                     from: self.owner?.address ?? panic("Pool owner must exist"),
                 )
-                let retRef = &ret as &FRC20FTShared.Change
 
                 let len = self.unstakingEntries.length
                 var isFirstUnlocked = self.isFirstUnlocked()
@@ -720,11 +711,11 @@ access(all) contract FRC20Staking {
                             entry.isExtracted(),
                             message: "Unstaking entry must be extracted"
                         )
-                        destroy entry
+                        Burner.burn(<- entry)
                         // merge to ret change
                         let amount = unwrappedChange.getBalance()
                         // deposit to change
-                        retRef.forceMerge(from: <- unwrappedChange)
+                        ret.forceMerge(from: <- unwrappedChange)
 
                         // emit event
                         emit DelegatorUnStakingUnlocked(
@@ -747,16 +738,16 @@ access(all) contract FRC20Staking {
         /// Borrow Delegator reference
         ///
         access(contract)
-        fun borrowDelegatorRef(): &Delegator{DelegatorPublic} {
+        view fun borrowDelegatorRef(): &Delegator {
             return FRC20Staking.borrowDelegator(self.delegator) ?? panic("Delegator must exist")
         }
 
         access(self)
-        fun borrowEntry(_ index: Int): &UnstakingEntry {
+        view fun borrowEntry(_ index: Int): &UnstakingEntry {
             pre {
                 index < self.unstakingEntries.length: "Index must be less than entries length"
             }
-            return &self.unstakingEntries[index] as &UnstakingEntry
+            return &self.unstakingEntries[index]
         }
     }
 
@@ -776,7 +767,7 @@ access(all) contract FRC20Staking {
         access(all)
         let registeredAt: UFix64
 
-        init(
+        view init(
             stakeTick: String,
             totalReward: UFix64,
             globalYieldRate: UFix64,
@@ -801,10 +792,10 @@ access(all) contract FRC20Staking {
 
     /// Reward Strategy Resource, represents a reward strategy for a FRC20 token and store in pool's account
     ///
-    access(all) resource RewardStrategy {
+    access(all) resource RewardStrategy: Burner.Burnable {
         /// The pool capability
         access(self)
-        let poolCap: Capability<&Pool{PoolPublic}>
+        let poolCap: Capability<&Pool>
         /// The ticker name of staking pool
         access(all)
         let stakeTick: String
@@ -822,7 +813,7 @@ access(all) contract FRC20Staking {
         let totalReward: @FRC20FTShared.Change
 
         init(
-            pool: Capability<&Pool{PoolPublic}>,
+            pool: Capability<&Pool>,
             rewardTick: String,
         ) {
             pre {
@@ -865,9 +856,12 @@ access(all) contract FRC20Staking {
             )
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.totalReward
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.totalReward.getBalance() == 0.0: "Total reward must be zero"
+            }
+            // NOTHING
         }
 
         access(account)
@@ -878,7 +872,7 @@ access(all) contract FRC20Staking {
                 income.tick == self.rewardTick: "Income tick must match with reward strategy tick"
             }
 
-            let pool = (self.poolCap.borrow() ?? panic("Pool must exist")).borrowSelf()
+            let pool = self.poolCap.borrow() ?? panic("Pool must exist")
 
             let incomeFrom = income.from
             let incomeValue = income.getBalance()
@@ -920,7 +914,7 @@ access(all) contract FRC20Staking {
                     indexer.returnChange(change: <- newChange)
                 }
             } else {
-                destroy income
+                Burner.burn(<- income)
             }
         }
 
@@ -928,7 +922,7 @@ access(all) contract FRC20Staking {
         ///
         access(account)
         fun claim(
-            byNft: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT},
+            byNft: &FRC20SemiNFT.NFT,
         ): @FRC20FTShared.Change {
             pre {
                 self.poolCap.check(): "Pool must be valid"
@@ -938,7 +932,7 @@ access(all) contract FRC20Staking {
             post {
                 byNft.owner?.address == result.from: "Result from must match with NFT owner"
             }
-            let pool = (self.poolCap.borrow() ?? panic("Pool must exist")).borrowSelf()
+            let pool = self.poolCap.borrow() ?? panic("Pool must exist")
 
             // global info
             let totalStakedRef = pool.borrowTotalStaked()
@@ -983,7 +977,7 @@ access(all) contract FRC20Staking {
 
             // update delegator claiming record
             delegatorRef.onClaimingReward(
-                reward: self.borrowSelf(),
+                reward: &self as &RewardStrategy,
                 byNftId: byNft.id,
                 amount: yieldReward,
                 currentGlobalYieldRate: self.globalYieldRate
@@ -1008,13 +1002,8 @@ access(all) contract FRC20Staking {
         /** ---- Internal Methods ---- */
 
         access(self)
-        fun borrowRewardRef(): &FRC20FTShared.Change {
-            return &self.totalReward as &FRC20FTShared.Change
-        }
-
-        access(self)
-        fun borrowSelf(): &RewardStrategy {
-            return &self as &RewardStrategy
+        view fun borrowRewardRef(): &FRC20FTShared.Change {
+            return &self.totalReward
         }
     }
 
@@ -1053,10 +1042,10 @@ access(all) contract FRC20Staking {
     ///
     access(all) resource Delegator: DelegatorPublic {
         access(self)
-        let semiNFTcolCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+        let semiNFTcolCap: Capability<auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection>
 
         init(
-            _ semiNFTCol: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+            _ semiNFTCol: Capability<auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection>
         ) {
             pre {
                 semiNFTCol.check(): "SemiNFT Collection must be valid"
@@ -1171,7 +1160,7 @@ access(all) contract FRC20Staking {
         /// Borrow Staked Change
         ///
         access(self)
-        fun borrowSemiNFTCollection(): &FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection} {
+        view fun borrowSemiNFTCollection(): auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection {
             return self.semiNFTcolCap.borrow() ?? panic("The SemiNFT Collection must exist")
         }
     }
@@ -1190,7 +1179,7 @@ access(all) contract FRC20Staking {
     /// Get the lock time of unstaking
     ///
     access(all)
-    fun getUnstakingLockTime(): UInt64 {
+    view fun getUnstakingLockTime(): UInt64 {
         // 1 day = 86400 seconds
         return 86400
     }
@@ -1198,24 +1187,24 @@ access(all) contract FRC20Staking {
     /// Borrow Pool by address
     ///
     access(all)
-    fun borrowPool(_ addr: Address): &Pool{PoolPublic}? {
+    view fun borrowPool(_ addr: Address): &Pool? {
         return self.getPoolCap(addr).borrow()
     }
 
     /// Borrow Pool Capability by address
     ///
     access(all)
-    fun getPoolCap(_ addr: Address): Capability<&Pool{PoolPublic}> {
+    view fun getPoolCap(_ addr: Address): Capability<&Pool> {
         return getAccount(addr)
-            .getCapability<&Pool{PoolPublic}>(self.StakingPoolPublicPath)
+            .capabilities.get<&Pool>(self.StakingPoolPublicPath)
     }
 
     /// Borrow Delegate by address
     ///
     access(all)
-    fun borrowDelegator(_ addr: Address): &Delegator{DelegatorPublic}? {
+    view fun borrowDelegator(_ addr: Address): &Delegator? {
         return getAccount(addr)
-            .getCapability<&Delegator{DelegatorPublic}>(self.DelegatorPublicPath)
+            .capabilities.get<&Delegator>(self.DelegatorPublicPath)
             .borrow()
     }
 
@@ -1223,7 +1212,7 @@ access(all) contract FRC20Staking {
     ///
     access(all)
     fun createDelegator(
-        _ semiNFTCol: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+        _ semiNFTCol: Capability<auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection>
     ): @Delegator {
         pre {
             semiNFTCol.check(): "SemiNFT Collection must be valid"
