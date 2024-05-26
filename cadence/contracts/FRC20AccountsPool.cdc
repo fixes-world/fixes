@@ -605,7 +605,7 @@ access(all) contract FRC20AccountsPool {
     /// Returns the public account manager interface
     ///
     access(all)
-    fun borrowAccountsPool(): &{PoolPublic} {
+    view fun borrowAccountsPool(): &{PoolPublic} {
         return self.account
             .capabilities.get<&{PoolPublic}>(self.AccountsPoolPublicPath)
             .borrow()

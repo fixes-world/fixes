@@ -725,7 +725,7 @@ access(all) contract FRC20Marketplace {
     /// The helper method to get the market resource reference
     ///
     access(all)
-    fun borrowMarket(_ addr: Address): &{MarketPublic}? {
+    view fun borrowMarket(_ addr: Address): &{MarketPublic}? {
         return getAccount(addr)
             .capabilities.get<&{MarketPublic}>(self.FRC20MarketPublicPath)
             .borrow()

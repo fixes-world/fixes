@@ -16,6 +16,9 @@ import "FRC20Marketplace"
 import "FRC20TradingRecord"
 
 access(all) contract FRC20MarketManager {
+
+    access(all) entitlement Manage
+
     /* --- Events --- */
 
     /// Event emitted when the contract is initialized
@@ -33,10 +36,11 @@ access(all) contract FRC20MarketManager {
 
     /// The resource manager for the FRC20MarketManager
     ///
-    access(all) resource Manager: FRC20Marketplace.MarketManager {
+    access(all)
+    resource Manager: FRC20Marketplace.MarketManager {
         /// Update the admin whitelist
         ///
-        access(all)
+        access(Manage)
         fun updateAdminWhitelist(
             tick: String,
             address: Address,
@@ -53,7 +57,7 @@ access(all) contract FRC20MarketManager {
 
         /// Update the marketplace properties
         ///
-        access(all)
+        access(Manage)
         fun updateMarketplaceProperties(
             tick: String,
             _ props: {FRC20FTShared.ConfigType: String}
@@ -84,7 +88,7 @@ access(all) contract FRC20MarketManager {
         // - FRC20TradingRecord.TradingRecordingHook: Hook for the trading records
         // - FRC20TradingRecord.TradingRecords: Trading records resource
 
-        if let market = childAcctRef.borrow<&FRC20Marketplace.Market>(from: FRC20Marketplace.FRC20MarketStoragePath) {
+        if let market = childAcctRef.storage.borrow<&FRC20Marketplace.Market>(from: FRC20Marketplace.FRC20MarketStoragePath) {
             assert(
                 market.tick == tick,
                 message: "The market tick is not the same as the expected one"
@@ -93,55 +97,65 @@ access(all) contract FRC20MarketManager {
             // create the market and save it in the account
             let market <- FRC20Marketplace.createMarket(tick)
             // save the market in the account
-            childAcctRef.save(<- market, to: FRC20Marketplace.FRC20MarketStoragePath)
+            childAcctRef.storage.save(<- market, to: FRC20Marketplace.FRC20MarketStoragePath)
+
             // link the market to the public path
-            childAcctRef.unlink(FRC20Marketplace.FRC20MarketPublicPath)
-            childAcctRef.link<&FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}>(FRC20Marketplace.FRC20MarketPublicPath, target: FRC20Marketplace.FRC20MarketStoragePath)
+            childAcctRef.capabilities.unpublish(FRC20Marketplace.FRC20MarketPublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20Marketplace.Market>(FRC20Marketplace.FRC20MarketStoragePath),
+                at: FRC20Marketplace.FRC20MarketPublicPath
+            )
         }
 
         // create the shared store and save it in the account
-        if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
             let sharedStore <- FRC20FTShared.createSharedStore()
-            childAcctRef.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+            childAcctRef.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
             // link the shared store to the public path
-            childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
-            childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+            childAcctRef.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
+                at: FRC20FTShared.SharedStorePublicPath
+            )
         }
 
         // create the hooks and save it in the account
-        if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
-            childAcctRef.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+            childAcctRef.storage.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
         }
         // link the hooks to the public path
         if childAcctRef
-            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .capabilities.get<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookPublicPath)
             .borrow() == nil {
             // link the hooks to the public path
-            childAcctRef.unlink(FRC20FTShared.TransactionHookPublicPath)
-            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
-                FRC20FTShared.TransactionHookPublicPath,
-                target: FRC20FTShared.TransactionHookStoragePath
+            childAcctRef.capabilities.unpublish(FRC20FTShared.TransactionHookPublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookStoragePath),
+                at: FRC20FTShared.TransactionHookPublicPath
             )
         }
 
         // borrow the hooks reference
-        let hooksRef = childAcctRef.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+        let hooksRef = childAcctRef.storage.borrow<auth(FRC20FTShared.Manage) &FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
 
         // ensure trading records are available
-        if childAcctRef.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
             let tradingRecords <- FRC20TradingRecord.createTradingRecords(tick)
-            childAcctRef.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
+            childAcctRef.storage.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
             // link the trading records to the public path
-            childAcctRef.unlink(FRC20TradingRecord.TradingRecordsPublicPath)
-            childAcctRef.link<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(FRC20TradingRecord.TradingRecordsPublicPath, target: FRC20TradingRecord.TradingRecordsStoragePath)
+            childAcctRef.capabilities.unpublish(FRC20TradingRecord.TradingRecordsPublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20TradingRecord.TradingRecords>(FRC20TradingRecord.TradingRecordsStoragePath),
+                at: FRC20TradingRecord.TradingRecordsPublicPath
+            )
         }
 
         // add the trading records to the hooks, if it is not added yet
         // get the public capability of the trading record hook
         let tradingRecordsCap = childAcctRef
-            .getCapability<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(
+            .capabilities.get<&FRC20TradingRecord.TradingRecords>(
                 FRC20TradingRecord.TradingRecordsPublicPath
             )
         assert(tradingRecordsCap.check(), message: "The trading record hook is not valid")
@@ -160,15 +174,15 @@ access(all) contract FRC20MarketManager {
     ///
     access(all)
     fun enableAndCreateFRC20Market(
-        ins: &Fixes.Inscription,
-        newAccount: Capability<&AuthAccount>,
+        ins: auth(Fixes.Extractable) &Fixes.Inscription,
+        newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
     ) {
         // singletoken resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "enable-market",
@@ -219,7 +233,7 @@ access(all) contract FRC20MarketManager {
     /// Borrow the market reference
     ///
     access(all)
-    fun borrowMarket(_ tick: String): &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}? {
+    view fun borrowMarket(_ tick: String): &{FRC20Marketplace.MarketPublic}? {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         if let address = acctsPool.getFRC20MarketAddress(tick: tick) {
             return FRC20Marketplace.borrowMarket(address)
