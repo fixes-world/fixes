@@ -8,11 +8,18 @@ This contract is a shared library for FRC20 Fungible Token.
 */
 import "FlowToken"
 import "FungibleToken"
+import "Burner"
 // Fixes Imports
 import "FixesHeartbeat"
 
 access(all) contract FRC20FTShared {
+
+    // entitlements
+    access(all) entitlement Write
+    access(all) entitlement Manage
+
     /* --- Events --- */
+
     /// The event that is emitted when the shared store is updated
     access(all) event SharedStoreKeyUpdated(key: String, valueType: Type)
 
@@ -80,7 +87,7 @@ access(all) contract FRC20FTShared {
         access(all)
         let receiver: Capability<&{FungibleToken.Receiver}>?
 
-        init(
+        view init(
             type: SaleCutType,
             ratio: UFix64,
             receiver: Capability<&{FungibleToken.Receiver}>?
@@ -106,8 +113,8 @@ access(all) contract FRC20FTShared {
         let tick: String
         /// The type of the FT Vault, Optional
         ///
-        access(all)
-        var ftVault: @FungibleToken.Vault?
+        access(contract)
+        var ftVault: @{FungibleToken.Vault}?
         /// The balance of this change
         ///
         access(all)
@@ -120,7 +127,7 @@ access(all) contract FRC20FTShared {
             tick: String,
             from: Address,
             balance: UFix64?,
-            ftVault: @FungibleToken.Vault?
+            ftVault: @{FungibleToken.Vault}?
         )
 
         /// Check if this Change is a staked tick's change
@@ -181,8 +188,8 @@ access(all) contract FRC20FTShared {
     access(all) resource interface Settler {
         /// Withdraw the given amount of tokens, as a FungibleToken Vault
         ///
-        access(all)
-        fun withdrawAsVault(amount: UFix64): @FungibleToken.Vault {
+        access(Write)
+        fun withdrawAsVault(amount: UFix64): @{FungibleToken.Vault} {
             post {
                 // `result` refers to the return value
                 result.balance == amount:
@@ -192,17 +199,17 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change
         ///
-        access(all)
-        fun extractAsVault(): @FungibleToken.Vault
+        access(Write)
+        fun extractAsVault(): @{FungibleToken.Vault}
 
         /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
         ///
-        access(all)
+        access(Write)
         fun merge(from: @Change)
 
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(all)
+        access(Write)
         fun withdrawAsChange(amount: UFix64): @Change {
             post {
                 // `result` refers to the return value
@@ -213,13 +220,13 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change
         ///
-        access(all)
+        access(Write)
         fun extract(): UFix64
     }
 
     /// It a general resource for the Change of FRC20 Fungible Token
     ///
-    access(all) resource Change: Balance, Settler {
+    access(all) resource Change: Balance, Settler, Burner.Burnable {
         /// The ticker symbol of this change
         access(all)
         let tick: String
@@ -227,8 +234,8 @@ access(all) contract FRC20FTShared {
         access(all)
         let from: Address
         /// The type of the FT Vault, Optional
-        access(all)
-        var ftVault: @FungibleToken.Vault?
+        access(contract)
+        var ftVault: @{FungibleToken.Vault}?
         // The token balance of this Change
         access(all)
         var balance: UFix64?
@@ -237,7 +244,7 @@ access(all) contract FRC20FTShared {
             tick: String,
             from: Address,
             balance: UFix64?,
-            ftVault: @FungibleToken.Vault?
+            ftVault: @{FungibleToken.Vault}?
         ) {
             pre {
                 balance != nil || ftVault != nil:
@@ -276,21 +283,21 @@ access(all) contract FRC20FTShared {
             )
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
+        /// Burn the Change
+        access(contract)
+        fun burnCallback() {
             // You can not destroy a Change with a non-zero balance
             pre {
-                self.getBalance() == UFix64(0): "Balance must be zero for destroy"
+                self.getBalance() == 0.0: "Balance must be zero for destroy"
             }
-            // Destroy the FT Vault if it is not nil
-            destroy self.ftVault
+            // DO NOTHING
         }
 
         /// Subtracts `amount` from the Vault's balance
         /// and returns a new Vault with the subtracted balance
         ///
-        access(all)
-        fun withdrawAsVault(amount: UFix64): @FungibleToken.Vault {
+        access(Write)
+        fun withdrawAsVault(amount: UFix64): @{FungibleToken.Vault} {
             pre {
                 self.balance == nil: "Balance must be nil for withdrawAsVault"
                 self.isBackedByVault() == true: "The Change must be backed by a Vault"
@@ -319,14 +326,14 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change
         ///
-        access(all)
-        fun extractAsVault(): @FungibleToken.Vault {
+        access(Write)
+        fun extractAsVault(): @{FungibleToken.Vault} {
             pre {
                 self.isBackedByVault() == true: "The Change must be backed by a Vault"
-                self.getBalance() > UFix64(0): "Balance must be greater than zero"
+                self.getBalance() > 0.0: "Balance must be greater than zero"
             }
             post {
-                self.getBalance() == UFix64(0):
+                self.getBalance() == 0.0:
                     "Balance must be zero after extraction"
                 result.balance == before(self.getBalance()):
                     "Extracted amount must be the same as the balance of the Change"
@@ -347,7 +354,7 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
         ///
-        access(all)
+        access(Write)
         fun merge(from: @Change) {
             pre {
                 self.isBackedByVault() == from.isBackedByVault():
@@ -394,7 +401,7 @@ access(all) contract FRC20FTShared {
 
         /// Force merge the input Change to self with checking the from address
         ///
-        access(all)
+        access(Write)
         fun forceMerge(from: @Change) {
             pre {
                 from.isBackedByVault() == self.isBackedByVault():
@@ -431,7 +438,7 @@ access(all) contract FRC20FTShared {
 
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(all)
+        access(Write)
         fun withdrawAsChange(amount: UFix64): @Change {
             pre {
                 self.getBalance() >= amount:
@@ -476,14 +483,14 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change, this method is only available for the contracts in the same account
         ///
-        access(all)
+        access(Write)
         fun extract(): UFix64 {
             pre {
                 !self.isBackedByVault(): "The Change must not be backed by a Vault"
-                self.getBalance() > UFix64(0): "Balance must be greater than zero"
+                self.getBalance() > 0.0: "Balance must be greater than zero"
             }
             post {
-                self.getBalance() == UFix64(0):
+                self.getBalance() == 0.0:
                     "Balance must be zero after extraction"
                 result == before(self.getBalance()):
                     "Extracted amount must be the same as the balance of the Change"
@@ -503,8 +510,8 @@ access(all) contract FRC20FTShared {
         /// Borrow the underlying Vault of this Change
         ///
         access(contract)
-        fun borrowVault(): &FungibleToken.Vault {
-            return &self.ftVault as &FungibleToken.Vault?
+        fun borrowVault(): auth(FungibleToken.Withdraw) &{FungibleToken.Vault} {
+            return &self.ftVault as auth(FungibleToken.Withdraw) &{FungibleToken.Vault}?
                 ?? panic("The Change is not backed by a Vault")
         }
     }
@@ -517,7 +524,7 @@ access(all) contract FRC20FTShared {
         tick: String,
         from: Address,
         balance: UFix64?,
-        ftVault: @FungibleToken.Vault?
+        ftVault: @{FungibleToken.Vault}?
     ): @Change {
         return <- create Change(
             tick: tick,
@@ -539,7 +546,7 @@ access(all) contract FRC20FTShared {
                 tick: "",
                 from: from,
                 balance: nil,
-                ftVault: <- FlowToken.createEmptyVault()
+                ftVault: <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             )
         } else {
             return <- self.createChange(
@@ -608,7 +615,7 @@ access(all) contract FRC20FTShared {
     ///
     access(account)
     fun wrapFungibleVaultChange(
-        ftVault: @FungibleToken.Vault,
+        ftVault: @{FungibleToken.Vault},
         from: Address,
     ): @Change {
         let tick = ftVault.isInstance(Type<@FlowToken.Vault>())
@@ -626,7 +633,7 @@ access(all) contract FRC20FTShared {
 
     /// It a temporary resource combining change and cuts
     ///
-    access(all) resource ValidFrozenOrder {
+    access(all) resource ValidFrozenOrder: Burner.Burnable {
         access(all)
         let tick: String
         access(all)
@@ -646,9 +653,9 @@ access(all) contract FRC20FTShared {
             _ change: @Change,
         ) {
             pre {
-                amount > UFix64(0): "Amount must be greater than zero"
+                amount > 0.0: "Amount must be greater than zero"
                 cuts.length > 0: "Cuts must not be empty"
-                change.getBalance() > UFix64(0): "Balance must be greater than zero"
+                change.getBalance() > 0.0: "Balance must be greater than zero"
             }
             self.tick = tick
             self.amount = amount
@@ -657,12 +664,13 @@ access(all) contract FRC20FTShared {
             self.cuts = cuts
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
+        /// Burn callback
+        access(contract)
+        fun burnCallback() {
             pre {
                 self.change == nil: "Change must be nil for destroy"
             }
-            destroy self.change
+            // DO NOTHING
         }
 
         /// Extract all balance of this Change, this method is only available for the contracts in the same account
@@ -865,7 +873,7 @@ access(all) contract FRC20FTShared {
 
         /// Set the value
         ///
-        access(all)
+        access(Write)
         fun set(_ key: String, value: AnyStruct) {
             self.data[key] = value
 
@@ -874,7 +882,7 @@ access(all) contract FRC20FTShared {
 
         /// Set the value by type
         ///
-        access(all)
+        access(Write)
         fun setByEnum(_ type: ConfigType, value: AnyStruct) {
             if let key = self.getKeyByEnum(type)  {
                 self.set(key, value: value)
@@ -894,7 +902,7 @@ access(all) contract FRC20FTShared {
     /// Get the shared store
     ///
     access(all)
-    fun borrowGlobalStoreRef(): &SharedStore{SharedStorePublic} {
+    view fun borrowGlobalStoreRef(): &SharedStore {
         let addr = self.account.address
         return self.borrowStoreRef(addr)
             ?? panic("Could not borrow capability from public store")
@@ -903,9 +911,9 @@ access(all) contract FRC20FTShared {
     /// Borrow the shared store
     ///
     access(all)
-    fun borrowStoreRef(_ address: Address): &SharedStore{SharedStorePublic}? {
+    view fun borrowStoreRef(_ address: Address): &SharedStore? {
         return getAccount(address)
-            .getCapability<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath)
+            .capabilities.get<&SharedStore>(self.SharedStorePublicPath)
             .borrow()
     }
 
@@ -969,12 +977,12 @@ access(all) contract FRC20FTShared {
     }
 
     access(all)
-    fun getAllValidatedHookTypes(): [Type] {
+    view fun getAllValidatedHookTypes(): [Type] {
         return self.validatedHookTypes.keys
     }
 
     access(all)
-    fun isHookTypeValidated(_ type: Type): Bool {
+    view fun isHookTypeValidated(_ type: Type): Bool {
         return self.validatedHookTypes[type] == true
     }
 
@@ -993,13 +1001,13 @@ access(all) contract FRC20FTShared {
         /// Check if the hook exists
         ///
         access(all)
-        fun hasHook(_ type: Type): Bool {
+        view fun hasHook(_ type: Type): Bool {
             return self.hooks[type] != nil
         }
 
         // --- Account Methods ---
 
-        access(all)
+        access(Manage)
         fun addHook(_ hook: Capability<&{TransactionHook}>) {
             pre {
                 hook.check(): "The hook must be valid"
@@ -1082,7 +1090,7 @@ access(all) contract FRC20FTShared {
         /// Iterate all hooks
         ///
         access(self)
-        fun _iterateHooks(_ func: ((Type, &{FRC20FTShared.TransactionHook}): Void)) {
+        fun _iterateHooks(_ func: (fun (Type, &{FRC20FTShared.TransactionHook}): Void)) {
             // call all hooks
             for type in self.hooks.keys {
                 // check if the hook type is validated
@@ -1116,7 +1124,7 @@ access(all) contract FRC20FTShared {
     access(account)
     fun borrowTransactionHook(_ address: Address): &{TransactionHook}? {
         return getAccount(address)
-            .getCapability<&{TransactionHook}>(self.TransactionHookPublicPath)
+            .capabilities.get<&{TransactionHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
@@ -1126,7 +1134,7 @@ access(all) contract FRC20FTShared {
     access(account)
     fun borrowTransactionHookWithHeartbeat(_ address: Address): &{TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
         return getAccount(address)
-            .getCapability<&{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
+            .capabilities.get<&{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
@@ -1146,7 +1154,9 @@ access(all) contract FRC20FTShared {
         self.SharedStorePublicPath = PublicPath(identifier: identifier)!
 
         // create the indexer
-        self.account.save(<- self.createSharedStore(), to: self.SharedStoreStoragePath)
-        self.account.link<&SharedStore{SharedStorePublic}>(self.SharedStorePublicPath, target: self.SharedStoreStoragePath)
+        self.account.storage.save(<- self.createSharedStore(), to: self.SharedStoreStoragePath)
+        let cap = self.account.capabilities
+            .storage.issue<&SharedStore>(self.SharedStoreStoragePath)
+        self.account.capabilities.publish(cap, at: self.SharedStorePublicPath)
     }
 }
