@@ -19,6 +19,10 @@ import "FRC20FTShared"
 /// This is the contract interface for all Fixes Fungible Token
 ///
 access(all) contract interface FixesFungibleTokenInterface {
+
+    access(all) entitlement MetadataUpdate;
+    access(all) entitlement Manage;
+
     // ------ Events -------
 
     /// The event that is emitted when the metadata is updated
@@ -50,7 +54,7 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// DNA charging
         access(all)
-        fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription)
+        fun chargeDNAMutatableAttempts(_ ins: auth(Fixes.Extractable) &Fixes.Inscription)
 
         // ----- Public Methods - default implementation exsits -----
 
@@ -127,8 +131,8 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Borrow the mergeable data by key
         ///
         access(contract)
-        view fun borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
-            return &self.metadata[type] as &{FixesTraits.MergeableData}?
+        view fun borrowMergeableDataRef(_ type: Type): auth(FixesTraits.Write) &{FixesTraits.MergeableData}? {
+            return &self.metadata[type]
         }
     }
 
@@ -137,16 +141,16 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all) resource interface MetadataGenerator {
         /// Attempt to generate a new gene
         ///
-        access(all)
+        access(MetadataUpdate)
         fun attemptGenerateGene(_ attempt: UInt64): FixesAssetMeta.DNA?
     }
 
     /// The Implementation some method for the Metadata
     ///
-    access(all) resource Vault: Metadata, MetadataGenerator {
+    access(all) resource interface IVault: Metadata, MetadataGenerator {
         /// Attempt to generate a new gene
         ///
-        access(all)
+        access(MetadataUpdate)
         fun attemptGenerateGene(_ attempt: UInt64): FixesAssetMeta.DNA? {
             var max = attempt
             if max == 0 {
@@ -190,6 +194,9 @@ access(all) contract interface FixesFungibleTokenInterface {
             return newDNA
         }
     }
+
+    // The Vault Resource is removed after C1.0
+    // access(all) resource Vault: IVault {}
 
     /// The admin interface for the FT
     ///
@@ -252,17 +259,17 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Borrow the super minter resource
         ///
-        access(all)
-        view fun borrowSuperMinter(): &{IMinter}
+        access(Manage)
+        view fun borrowSuperMinter(): auth(Manage) &{IMinter}
 
         /// Update the authorized users
         ///
-        access(all)
+        access(Manage)
         fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool)
 
         /// Create a new Minter resource
         ///
-        access(all)
+        access(Manage)
         fun createMinter(allowedAmount: UFix64): @{IMinter}
     }
 
@@ -314,8 +321,8 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Function that mints new tokens, adds them to the total supply,
         /// and returns them to the calling context.
         ///
-        access(all)
-        fun mintTokens(amount: UFix64): @FungibleToken.Vault {
+        access(Manage)
+        fun mintTokens(amount: UFix64): @{FungibleToken.Vault} {
             pre {
                 amount <= self.getMaxSupply() - self.getTotalSupply(): "The amount must be less than or equal to the remaining supply"
             }
@@ -323,11 +330,11 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Mint tokens with user's inscription
         ///
-        access(all)
+        access(Manage)
         fun initializeVaultByInscription(
-            vault: @FungibleToken.Vault,
+            vault: @{FungibleToken.Vault},
             ins: &Fixes.Inscription
-        ): @FungibleToken.Vault {
+        ): @{FungibleToken.Vault} {
             pre {
                 ins.isExtractable(): "The inscription must be extractable"
                 vault.getType() == self.getTokenType(): "The vault type must be the same"
@@ -340,9 +347,9 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Burn tokens with user's inscription
         ///
-        access(all)
+        access(Manage)
         fun burnTokenWithInscription(
-            vault: @FungibleToken.Vault,
+            vault: @{FungibleToken.Vault},
             ins: &Fixes.Inscription
         ) {
             pre {
@@ -431,7 +438,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// Borrow the shared store
     ///
     access(all)
-    view fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
+    view fun borrowSharedStore(): &FRC20FTShared.SharedStore {
         return FRC20FTShared.borrowStoreRef(self.account.address) ?? panic("Config store not found")
     }
 
@@ -530,7 +537,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all)
     view fun getTokenBalance(_ addr: Address): UFix64 {
         if let ref = getAccount(addr)
-            .getCapability<&{FungibleToken.Balance}>(self.getVaultPublicPath())
+            .capabilities.get<&{FungibleToken.Balance}>(self.getVaultPublicPath())
             .borrow() {
             return ref.balance
         }
@@ -542,7 +549,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all)
     view fun borrowVaultReceiver(_ addr: Address): &{FungibleToken.Receiver}? {
         return getAccount(addr)
-            .getCapability<&{FungibleToken.Receiver}>(self.getReceiverPublicPath())
+            .capabilities.get<&{FungibleToken.Receiver}>(self.getReceiverPublicPath())
             .borrow()
     }
 
@@ -551,7 +558,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all)
     view fun borrowGlobalPublic(): &{IGlobalPublic} {
         return self.account
-            .getCapability<&{IGlobalPublic}>(self.getAdminPublicPath())
+            .capabilities.get<&{IGlobalPublic}>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -597,5 +604,5 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// Create a new vault
     access(all)
-    fun createEmptyVault(): @FungibleToken.Vault
+    fun createEmptyVault(): @{FungibleToken.Vault}
 }
