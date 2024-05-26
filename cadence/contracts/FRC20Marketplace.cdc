@@ -3,12 +3,13 @@
 
 # FRC20Marketplace
 
-TODO: Add description
+The marketplace contract for the FRC20 tokens.
 
 */
 // Third-party imports
 import "StringUtils"
 import "MetadataViews"
+import "ViewResolver"
 import "FlowToken"
 // Fixes imports
 import "FRC20FTShared"
@@ -87,7 +88,7 @@ access(all) contract FRC20Marketplace {
 
         /// Borrow the listing resource
         access(all)
-        view fun borrowListing(): &FRC20Storefront.Listing{FRC20Storefront.ListingPublic}? {
+        view fun borrowListing(): &FRC20Storefront.Listing? {
             if let storefront = self.borrowStorefront() {
                 return storefront.borrowListing(self.id)
             }
@@ -96,7 +97,7 @@ access(all) contract FRC20Marketplace {
 
         /// Borrow the storefront resource
         access(all)
-        view fun borrowStorefront(): &FRC20Storefront.Storefront{FRC20Storefront.StorefrontPublic}? {
+        view fun borrowStorefront(): &{FRC20Storefront.StorefrontPublic}? {
             return FRC20Storefront.borrowStorefront(address: self.storefront)
         }
     }
@@ -122,9 +123,11 @@ access(all) contract FRC20Marketplace {
     ///
     access(all) resource interface ListingCollectionPublic {
         access(all)
-        fun getListedIds(): [UInt64]
+        view fun getListedIds(): [UInt64]
         access(all)
-        fun getListedItem(_ id: UInt64): ListedItem?
+        view fun getListedItemLength(): Int
+        access(all)
+        view fun getListedItem(_ id: UInt64): ListedItem?
     }
 
     /// The Listing collection
@@ -141,12 +144,17 @@ access(all) contract FRC20Marketplace {
         // Public methods
 
         access(all)
-        fun getListedIds(): [UInt64] {
+        view fun getListedIds(): [UInt64] {
             return self.listingIDItems.keys
         }
 
         access(all)
-        fun getListedItem(_ id: UInt64): ListedItem? {
+        view fun getListedItemLength(): Int {
+            return self.listingIDItems.keys.length
+        }
+
+        access(all)
+        view fun getListedItem(_ id: UInt64): ListedItem? {
             return self.listingIDItems[id]
         }
 
@@ -154,7 +162,7 @@ access(all) contract FRC20Marketplace {
 
         access(contract)
         fun borrowListedItem(_ id: UInt64): &ListedItem? {
-            return &self.listingIDItems[id] as &ListedItem?
+            return &self.listingIDItems[id]
         }
 
         access(contract)
@@ -173,7 +181,7 @@ access(all) contract FRC20Marketplace {
     access(all) resource interface MarketManager {
         /// Get the owner address
         access(all)
-        fun getOwnerAddress(): Address {
+        view fun getOwnerAddress(): Address {
             return self.owner?.address ?? panic("The owner is not set")
         }
     }
@@ -197,13 +205,14 @@ access(all) contract FRC20Marketplace {
         access(all)
         view fun getListedItem(type: FRC20Storefront.ListingType, rank: UInt64, id: UInt64): ListedItem?
 
-        /// Get the listing item
-        access(all)
-        view fun getListedItemByRankdedId(rankedId: String): ListedItem?
-
         /// Get the listed item amount
         access(all)
         view fun getListedAmount(): UInt64
+
+        /// Get the listing item
+        /// Using StringUtils so it is not a view function
+        access(all)
+        fun getListedItemByRankdedId(rankedId: String): ListedItem?
 
         // ---- Market operations ----
 
@@ -295,11 +304,6 @@ access(all) contract FRC20Marketplace {
             self.adminWhitelist[meta.deployer] = true
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.collections
-        }
-
         /** ---- Public Methods ---- */
 
         /// The ticker name of the FRC20 market
@@ -343,17 +347,19 @@ access(all) contract FRC20Marketplace {
             return nil
         }
 
-        /// Get the listing item
+        /// Get the listed item amount
         ///
-        access(all)
-        view fun getListedItemByRankdedId(rankedId: String): ListedItem? {
-            let ret = self.parseRankedId(rankedId: rankedId)
-            return self.getListedItem(type: ret.type, rank: ret.rank, id: ret.listingId)
-        }
-
         access(all)
         view fun getListedAmount(): UInt64 {
             return self.listedItemAmount
+        }
+
+        /// Get the listing item
+        ///
+        access(all)
+        fun getListedItemByRankdedId(rankedId: String): ListedItem? {
+            let ret = self.parseRankedId(rankedId: rankedId)
+            return self.getListedItem(type: ret.type, rank: ret.rank, id: ret.listingId)
         }
 
         /// Add a listing to the market
@@ -543,8 +549,6 @@ access(all) contract FRC20Marketplace {
             }
         }
 
-        // TODO more admin operations
-
         // ---- Accessible settings ----
 
         /// Check if the address is in the whitelist or admin whitelist or the market is Accessible
@@ -646,14 +650,14 @@ access(all) contract FRC20Marketplace {
         /// Borrow the shared store
         ///
         access(self)
-        fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}? {
+        view fun borrowSharedStore(): &FRC20FTShared.SharedStore? {
             return FRC20FTShared.borrowStoreRef(self.owner!.address)
         }
 
         /// Parse the ranked id
         ///
         access(self)
-        view fun parseRankedId(rankedId: String): ItemIdentifier {
+        fun parseRankedId(rankedId: String): ItemIdentifier {
             let parts = StringUtils.split(rankedId, "-")
             assert(
                 parts.length == 3,
@@ -679,22 +683,20 @@ access(all) contract FRC20Marketplace {
                 tryDictRef = self._borrowCollectionDict(type)
             }
             let dictRef = tryDictRef!
-            var collRef = &dictRef[rank] as &ListingCollection?
-            if collRef == nil {
+            if dictRef[rank] == nil {
                 dictRef[rank] <-! create ListingCollection()
-                collRef = &dictRef[rank] as &ListingCollection?
             }
-            return collRef ?? panic("Failed to create collection")
+            return dictRef[rank] ?? panic("Failed to create collection")
         }
 
         /// Get the collection by rank
         access(self)
-        fun borrowCollection(
+        view fun borrowCollection(
             _ type: FRC20Storefront.ListingType,
             _ rank: UInt64
         ): &ListingCollection? {
-            if let colDictRef = self._borrowCollectionDict(type) {
-                return &colDictRef[rank] as &ListingCollection?
+            if let colDictRef = &self.collections[type] as &{UInt64: ListingCollection}? {
+                return colDictRef[rank]
             }
             return nil
         }
@@ -702,10 +704,9 @@ access(all) contract FRC20Marketplace {
         access(self)
         fun _borrowCollectionDict(
             _ type: FRC20Storefront.ListingType
-        ): &{UInt64: ListingCollection}? {
-            return &self.collections[type] as &{UInt64: ListingCollection}?
+        ): auth(Mutate) &{UInt64: ListingCollection}? {
+            return &self.collections[type]
         }
-
     }
 
     /** ---– Account Access methods ---- */
@@ -724,9 +725,9 @@ access(all) contract FRC20Marketplace {
     /// The helper method to get the market resource reference
     ///
     access(all)
-    fun borrowMarket(_ addr: Address): &Market{MarketPublic}? {
+    fun borrowMarket(_ addr: Address): &{MarketPublic}? {
         return getAccount(addr)
-            .getCapability<&Market{MarketPublic}>(self.FRC20MarketPublicPath)
+            .capabilities.get<&{MarketPublic}>(self.FRC20MarketPublicPath)
             .borrow()
     }
 

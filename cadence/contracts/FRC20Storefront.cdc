@@ -1334,7 +1334,7 @@ access(all) contract FRC20Storefront {
     /// Borrow a Storefront from an account.
     ///
     access(all)
-    fun borrowStorefront(address: Address): &{StorefrontPublic}? {
+    view fun borrowStorefront(address: Address): &{StorefrontPublic}? {
         return getAccount(address)
             .capabilities.get<&{StorefrontPublic}>(self.StorefrontPublicPath)
             .borrow()
