@@ -426,7 +426,7 @@ access(all) contract FRC20StakingVesting {
     /// Returns the `Vault` public capability
     ///
     access(all)
-    fun getVaultCap(_ addr: Address): Capability<&Vault> {
+    view fun getVaultCap(_ addr: Address): Capability<&Vault> {
         return getAccount(addr)
             .capabilities.get<&Vault>(self.publicPath)
     }
@@ -434,7 +434,7 @@ access(all) contract FRC20StakingVesting {
     /// Borrow the `Vault` resource
     ///
     access(all)
-    fun borrowVaultRef(_ addr: Address): &Vault? {
+    view fun borrowVaultRef(_ addr: Address): &Vault? {
         return self.getVaultCap(addr).borrow()
     }
 
