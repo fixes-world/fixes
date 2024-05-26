@@ -78,7 +78,10 @@ access(all) contract FRC20TradingRecord {
         }
 
         access(all)
-        fun getDealPricePerToken(): UFix64 {
+        view fun getDealPricePerToken(): UFix64 {
+            if self.dealAmount == 0.0 {
+                return 0.0
+            }
             return self.dealPrice / self.dealAmount
         }
     }
@@ -188,7 +191,7 @@ access(all) contract FRC20TradingRecord {
         view fun getMintesWithStatus(): [UInt64]
         /// Get the trading status
         access(all)
-        view fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}?
+        view fun borrowMinutesStatus(_ time: UInt64): &BasicRecord?
         /// Get the buyer addresses
         access(all)
         view fun getBuyerAddresses(): [Address]
@@ -234,11 +237,6 @@ access(all) contract FRC20TradingRecord {
             self.sellerVolumes = {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.minutes
-        }
-
         /** Public methods */
 
         access(all)
@@ -276,9 +274,9 @@ access(all) contract FRC20TradingRecord {
         /// Get the trading status
         ///
         access(all)
-        view fun borrowMinutesStatus(_ time: UInt64): &BasicRecord{TradingStatusViewer}? {
+        view fun borrowMinutesStatus(_ time: UInt64): &BasicRecord? {
             let minuteTime = self.convertToMinute(time)
-            return &self.minutes[minuteTime] as &BasicRecord{TradingStatusViewer}?
+            return &self.minutes[minuteTime]
         }
 
         /// Get the buyer addresses
@@ -356,19 +354,19 @@ access(all) contract FRC20TradingRecord {
         }
 
         access(self)
-        fun convertToMinute(_ time: UInt64): UInt64 {
+        view fun convertToMinute(_ time: UInt64): UInt64 {
             return time - time % 60
         }
 
         access(self)
-        fun borrowStatus(): &TradingStatus {
-            return &self.status as &TradingStatus
+        view fun borrowStatus(): &TradingStatus {
+            return &self.status
         }
 
         access(self)
-        fun borrowMinute(_ time: UInt64): &BasicRecord? {
+        view fun borrowMinute(_ time: UInt64): &BasicRecord? {
             let minuteTime = self.convertToMinute(time)
-            return &self.minutes[minuteTime] as &BasicRecord?
+            return &self.minutes[minuteTime]
         }
     }
 
@@ -381,7 +379,8 @@ access(all) contract FRC20TradingRecord {
         view fun getTickerName(): String?
 
         access(all)
-        fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
+        view fun borrowDailyRecords(_ date: UInt64): &DailyRecords?
+
         // ---- 2x Traders Points ----
         access(all)
         view fun getTraders(): [Address]
@@ -431,11 +430,6 @@ access(all) contract FRC20TradingRecord {
             self.traders100xBenchmark = {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.dailyRecords
-        }
-
         access(all)
         view fun getStatus(): TradingStatus {
             return self.status
@@ -456,8 +450,9 @@ access(all) contract FRC20TradingRecord {
         /// Get the public daily records
         ///
         access(all)
-        fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}? {
-            return self.borrowDailyRecordsPriv(date)
+        view fun borrowDailyRecords(_ date: UInt64): &DailyRecords? {
+            let date = self.convertToDate(date)
+            return &self.dailyRecords[date]
         }
 
         // ---- Traders Points ----
@@ -557,10 +552,10 @@ access(all) contract FRC20TradingRecord {
             let timestamp = record.timestamp
             let date = self.convertToDate(timestamp)
 
-            var dailyRecordsRef = self.borrowDailyRecordsPriv(date)
+            var dailyRecordsRef = self.borrowDailyRecords(date)
             if dailyRecordsRef == nil {
                 self.dailyRecords[date] <-! create DailyRecords(date: date)
-                dailyRecordsRef = self.borrowDailyRecordsPriv(date)
+                dailyRecordsRef = self.borrowDailyRecords(date)
             }
             if dailyRecordsRef == nil {
                 return // DO NOT PANIC
@@ -628,18 +623,12 @@ access(all) contract FRC20TradingRecord {
         }
 
         access(contract)
-        fun borrowStatus(): &TradingStatus {
-            return &self.status as &TradingStatus
+        view fun borrowStatus(): &TradingStatus {
+            return &self.status
         }
 
         access(self)
-        fun borrowDailyRecordsPriv(_ time: UInt64): &DailyRecords? {
-            let date = self.convertToDate(time)
-            return &self.dailyRecords[date] as &DailyRecords?
-        }
-
-        access(self)
-        fun convertToDate(_ time: UInt64): UInt64 {
+        view fun convertToDate(_ time: UInt64): UInt64 {
             // date is up to the timestamp of UTC 00:00:00
             return time - time % 86400
         }
@@ -650,9 +639,9 @@ access(all) contract FRC20TradingRecord {
     /// The helper method to get the market resource reference
     ///
     access(all)
-    fun borrowTradingRecords(_ addr: Address): &TradingRecords{TradingRecordsPublic, TradingStatusViewer}? {
+    fun borrowTradingRecords(_ addr: Address): &{TradingRecordsPublic, TradingStatusViewer}? {
         return getAccount(addr)
-            .getCapability<&TradingRecords{TradingRecordsPublic, TradingStatusViewer}>(self.TradingRecordsPublicPath)
+            .capabilities.get<&{TradingRecordsPublic, TradingStatusViewer}>(self.TradingRecordsPublicPath)
             .borrow()
     }
 
