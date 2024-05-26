@@ -18,13 +18,13 @@ access(all) contract FixesInscriptionFactory {
     /// Parse the metadata of a FRC20 inscription
     ///
     access(all)
-    view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
+    fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
         let ret: {String: String} = {}
         if data.encoding != nil && data.encoding != "utf8" {
             panic("The inscription is not encoded in utf8")
         }
         // parse the body
-        if let body = String.fromUTF8(data.metadata) {
+        if let body = String.fromUTF8(data.metadata.slice(from: 0, upTo: data.metadata.length)) {
             // split the pairs
             let pairs = StringUtils.split(body, ",")
             for pair in pairs {
@@ -59,7 +59,7 @@ access(all) contract FixesInscriptionFactory {
     /// This is the general factory method to create a fixes inscription
     ///
     access(all)
-    view fun createFrc20Inscription(
+    fun createFrc20Inscription(
         _ dataStr: String,
         _ costReserve: @FlowToken.Vault
     ): @Fixes.Inscription {
@@ -79,7 +79,7 @@ access(all) contract FixesInscriptionFactory {
     fun createAndStoreFrc20Inscription(
         _ dataStr: String,
         _ costReserve: @FlowToken.Vault,
-        _ store: &Fixes.InscriptionsStore
+        _ store: auth(Fixes.Manage) &Fixes.InscriptionsStore
     ): UInt64 {
         pre {
             store.owner?.address != nil: "Inscriptions store must be stored in a valid account."
