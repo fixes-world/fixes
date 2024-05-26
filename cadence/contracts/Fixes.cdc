@@ -127,6 +127,8 @@ access(all) contract Fixes {
         access(all)
         view fun getData(): InscriptionData
         access(all)
+        view fun borrowData(): &InscriptionData
+        access(all)
         view fun getMimeType(): String
         access(all)
         view fun getMetadata(): [UInt8]
@@ -344,6 +346,11 @@ access(all) contract Fixes {
         access(all)
         view fun getData(): InscriptionData {
             return self.data
+        }
+
+        access(all)
+        view fun borrowData(): &InscriptionData {
+            return &self.data
         }
 
         access(all)
