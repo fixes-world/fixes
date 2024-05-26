@@ -505,7 +505,7 @@ access(all) contract Fixes {
 
         access(all)
         view fun isFull(): Bool {
-            return self.inscriptions.keys.length >= 8000
+            return self.inscriptions.length >= 8000
         }
 
         access(all)
@@ -515,7 +515,7 @@ access(all) contract Fixes {
 
         access(all)
         view fun getLength(): Int {
-            return self.inscriptions.keys.length
+            return self.inscriptions.length
         }
 
         access(all)
@@ -591,7 +591,7 @@ access(all) contract Fixes {
 
         access(all)
         view fun getLength(): Int {
-            return self.inscriptions.keys.length
+            return self.inscriptions.length
         }
 
         access(all)

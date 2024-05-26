@@ -1122,7 +1122,7 @@ access(all) contract FRC20Storefront {
         /// get the length of the listing
         access(all)
         view fun getListingLength(): Int {
-            return self.listings.keys.length
+            return self.listings.length
         }
 
         /// borrowSaleItem

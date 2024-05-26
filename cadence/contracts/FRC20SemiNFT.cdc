@@ -3,7 +3,11 @@
 
 # FRC20SemiNFT
 
-TODO: Add description
+This is a semi-fungible token contract that wraps a FRC20FTShared.Change resource and provides additional functionalities to it.
+The contract is a Non-Fungible Token (NFT) that can be used to represent a semi-fungible token.
+It is a resource that represents a unique token that can be owned by a single account at a time.
+The contract provides the ability to wrap and unwrap a FRC20FTShared.Change resource, merge and split the token,
+and claim rewards from staked tokens.
 
 */
 // Third party imports
@@ -12,6 +16,7 @@ import "MetadataViews"
 import "ViewResolver"
 import "FungibleToken"
 import "FlowToken"
+import "Burner"
 // Fixes Import
 import "Fixes"
 import "FRC20FTShared"
@@ -25,12 +30,6 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
     /// The event that is emitted when the contract is created
     access(all) event ContractInitialized()
-
-    /// The event that is emitted when an NFT is withdrawn from a Collection
-    access(all) event Withdraw(id: UInt64, from: Address?)
-
-    /// The event that is emitted when an NFT is deposited to a Collection
-    access(all) event Deposit(id: UInt64, to: Address?)
 
     /// The event that is emitted when an NFT is wrapped
     access(all) event Wrapped(id: UInt64, pool: Address, tick: String, balance: UFix64)
@@ -145,7 +144,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// New instances will be created using the NFTMinter resource
     /// and stored in the Collection resource
     ///
-    access(all) resource NFT: IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver {
+    access(all) resource NFT: IFRC20SemiNFT, NonFungibleToken.NFT, Burner.Burnable {
         /// The unique ID that each NFT has
         access(all) let id: UInt64
 
@@ -194,12 +193,24 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             )
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.wrappedChange
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.wrappedChange.getBalance() == 0.0: "Cannot burn a non-empty NFT"
+            }
+            // decrease the total supply
+            FRC20SemiNFT.totalSupply = FRC20SemiNFT.totalSupply - 1
         }
 
-        /** ----- MetadataViews.Resolver ----- */
+        /// createEmptyCollection creates an empty Collection
+        /// and returns it to the caller so that they can own NFTs
+        /// @{NonFungibleToken.Collection}
+        access(all)
+        fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+            return <- FRC20SemiNFT.createEmptyCollection(nftType: Type<@FRC20SemiNFT.NFT>())
+        }
+
+        /** ----- ViewResolver.Resolver ----- */
 
         /// Function that returns all the Metadata Views implemented by a Non Fungible Token
         ///
@@ -207,7 +218,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         ///         developers to know which parameter to pass to the resolveView() method.
         ///
         access(all)
-        fun getViews(): [Type] {
+        view fun getViews(): [Type] {
             var nftViews: [Type] = [
                 // collection data
                 Type<MetadataViews.ExternalURL>(),
@@ -234,7 +245,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 Type<MetadataViews.NFTCollectionDisplay>()
             ]
             if colViews.contains(view) {
-                return FRC20SemiNFT.resolveView(view)
+                return FRC20SemiNFT.resolveContractView(resourceType: Type<@FRC20SemiNFT.NFT>(), viewType: view)
             } else {
                 switch view {
                 case Type<MetadataViews.Display>():
@@ -273,20 +284,20 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 case Type<MetadataViews.Traits>():
                     let traits = MetadataViews.Traits([])
                     let changeRef: &FRC20FTShared.Change = self.borrowChange()
-                    traits.addTrait(MetadataViews.Trait(name: "originTick", value: changeRef.getOriginalTick(), nil, nil))
-                    traits.addTrait(MetadataViews.Trait(name: "tick", value: changeRef.tick, nil, nil))
-                    traits.addTrait(MetadataViews.Trait(name: "balance", value: changeRef.getBalance(), nil, nil))
+                    traits.addTrait(MetadataViews.Trait(name: "originTick", value: changeRef.getOriginalTick(), displayType: nil, rarity: nil))
+                    traits.addTrait(MetadataViews.Trait(name: "tick", value: changeRef.tick, displayType: nil, rarity: nil))
+                    traits.addTrait(MetadataViews.Trait(name: "balance", value: changeRef.getBalance(), displayType: nil, rarity: nil))
                     let isVault = changeRef.isBackedByVault()
-                    traits.addTrait(MetadataViews.Trait(name: "isFlowFT", value: isVault, nil, nil))
+                    traits.addTrait(MetadataViews.Trait(name: "isFlowFT", value: isVault, displayType: nil, rarity: nil))
                     if isVault {
-                        traits.addTrait(MetadataViews.Trait(name: "ftType", value: changeRef.getVaultType()!.identifier, nil, nil))
+                        traits.addTrait(MetadataViews.Trait(name: "ftType", value: changeRef.getVaultType()!.identifier, displayType: nil, rarity: nil))
                     }
                     return traits
                 case Type<MetadataViews.Royalties>():
                     // Royalties for FRC20SemiNFT is 5% to Deployer account
                     let deployerAddr = FRC20SemiNFT.account.address
                     let flowCap = getAccount(deployerAddr)
-                        .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                        .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
                     return MetadataViews.Royalties([
                         MetadataViews.Royalty(
                             receiver: flowCap,
@@ -353,9 +364,17 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             return self.claimingRecords[uniqueName]
         }
 
+        /// Get the unique name of the reward strategy
+        ///
+        access(all)
+        view fun buildUniqueName(_ addr: Address, _ strategy: String): String {
+            let ref = self.borrowChange()
+            return addr.toString().concat("_").concat(ref.getOriginalTick()).concat("_").concat(strategy)
+        }
+
         // Merge the NFT
         //
-        access(all)
+        access(NonFungibleToken.Update)
         fun merge(_ other: @FRC20SemiNFT.NFT) {
             pre {
                 self.getTickerName() == other.getTickerName(): "The tick must be the same"
@@ -414,6 +433,9 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 message: "The merged balance must be correct"
             )
 
+            // call hook method
+            self.onMetadataUpdated()
+
             // emit event
             emit Merged(
                 id: self.id,
@@ -425,7 +447,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         }
 
         // Split the NFT
-        access(all)
+        access(NonFungibleToken.Update)
         fun split(_ percent: UFix64): @FRC20SemiNFT.NFT {
             pre {
                 percent > 0.0: "The split percent must be greater than 0"
@@ -476,6 +498,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 }
             }
 
+            // call hook method
+            self.onMetadataUpdated()
+
+
             // emit event
             emit Split(
                 id: self.id,
@@ -485,18 +511,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 splitBalance: splitBalance
             )
 
-            return <-newNFT
+            return <- newNFT
         }
 
         /** ---- Account level methods ---- */
-
-        /// Get the unique name of the reward strategy
-        ///
-        access(all)
-        view fun buildUniqueName(_ addr: Address, _ strategy: String): String {
-            let ref = self.borrowChange()
-            return addr.toString().concat("_").concat(ref.getOriginalTick()).concat("_").concat(strategy)
-        }
 
         /// Hook method: Update the claiming record
         ///
@@ -515,13 +533,30 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                 amount: amount,
                 isSubtract: false
             )
+
+            // call hook method
+            self.onMetadataUpdated()
         }
 
         /** Internal Method */
 
-        /// Update the claiming record
+        /// Borrow the wrapped FRC20FTShared.Change
         ///
         access(contract)
+        view fun borrowChange(): auth(FRC20FTShared.Write) &FRC20FTShared.Change {
+            return &self.wrappedChange
+        }
+
+        /// Invoke when the metadata is updated
+        access(contract)
+        fun onMetadataUpdated() {
+            let ref = &self as auth(NonFungibleToken.Update) &{NonFungibleToken.NFT}
+            FRC20SemiNFT.emitNFTUpdated(ref)
+        }
+
+        /// Update the claiming record
+        ///
+        access(self)
         fun _updateClaimingRecord(
             poolAddress: Address,
             rewardTick: String,
@@ -558,13 +593,6 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             )
         }
 
-        /// Borrow the wrapped FRC20FTShared.Change
-        ///
-        access(contract)
-        fun borrowChange(): &FRC20FTShared.Change {
-            return &self.wrappedChange as &FRC20FTShared.Change
-        }
-
         /// Borrow or create the claiming record(writeable reference) by the unique name
         ///
         access(self)
@@ -585,23 +613,15 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// Borrow the claiming record(writeable reference) by the unique name
         ///
         access(self)
-        fun _borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord? {
-            return &self.claimingRecords[uniqueName] as &RewardClaimRecord?
+        view fun _borrowClaimingRecord(_ uniqueName: String): &RewardClaimRecord? {
+            return &self.claimingRecords[uniqueName]
         }
     }
 
     /// Defines the public methods that are particular to this NFT contract collection
     ///
-    access(all) resource interface FRC20SemiNFTCollectionPublic {
-        access(all)
-        fun deposit(token: @NonFungibleToken.NFT)
-        access(all)
-        view fun getIDs(): [UInt64]
-        access(all)
-        fun borrowNFT(id: UInt64): &NonFungibleToken.NFT
-        access(all)
-        fun borrowNFTSafe(id: UInt64): &NonFungibleToken.NFT?
-        /** ----- Specific Methods For SemiNFT ----- */
+    access(all)
+    resource interface FRC20SemiNFTCollectionPublic: NonFungibleToken.CollectionPublic {
         access(all)
         view fun getIDsByTick(tick: String): [UInt64]
         /// Gets the staked balance of the tick
@@ -609,7 +629,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         view fun getStakedBalance(tick: String): UFix64
         /// Borrow the FRC20SemiNFT reference by the ID
         access(all)
-        fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT{IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver}? {
+        fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT? {
             post {
                 (result == nil) || (result?.id == id):
                     "Cannot borrow FRC20SemiNFT reference: the ID of the returned reference is incorrect"
@@ -621,10 +641,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     ///
     access(all) resource interface FRC20SemiNFTBorrowable {
         /** ----- Specific Methods For SemiNFT ----- */
-        access(all)
-        view fun getIDsByTick(tick: String): [UInt64]
-        access(all)
-        fun borrowFRC20SemiNFT(id: UInt64): &FRC20SemiNFT.NFT? {
+        access(NonFungibleToken.Update)
+        fun borrowFRC20SemiNFT(id: UInt64): auth(NonFungibleToken.Update) &FRC20SemiNFT.NFT? {
             post {
                 (result == nil) || (result?.id == id):
                     "Cannot borrow FRC20SemiNFT reference: the ID of the returned reference is incorrect"
@@ -636,10 +654,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// In order to be able to manage NFTs any account will need to create
     /// an empty collection first
     ///
-    access(all) resource Collection: FRC20SemiNFTCollectionPublic, FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection {
+    access(all) resource Collection: FRC20SemiNFTCollectionPublic, FRC20SemiNFTBorrowable, NonFungibleToken.Collection {
         // dictionary of NFT conforming tokens
         // NFT is a resource type with an `UInt64` ID field
-        access(all) var ownedNFTs: @{UInt64: NonFungibleToken.NFT}
+        access(all) var ownedNFTs: @{UInt64: {NonFungibleToken.NFT}}
         // Tick => NFT ID Array
         access(self)
         let tickIDsMapping: {String: [UInt64]}
@@ -649,18 +667,38 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             self.tickIDsMapping = {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.ownedNFTs
+        /// createEmptyCollection creates an empty Collection of the same type
+        /// and returns it to the caller
+        /// @return A an empty collection of the same type
+        access(all)
+        fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+            return <- FRC20SemiNFT.createEmptyCollection(nftType: Type<@FRC20SemiNFT.NFT>())
         }
+
+        // ---------- Implement NonFungibleToken.Receiver ----------
+
+        /// getSupportedNFTTypes returns a list of NFT types that this receiver accepts
+        access(all) view fun getSupportedNFTTypes(): {Type: Bool} {
+            let supportedTypes: {Type: Bool} = {}
+            supportedTypes[Type<@FRC20SemiNFT.NFT>()] = true
+            return supportedTypes
+        }
+
+        /// Returns whether or not the given type is accepted by the collection
+        /// A collection that can accept any type should just return true by default
+        access(all) view fun isSupportedNFTType(type: Type): Bool {
+            return type == Type<@FRC20SemiNFT.NFT>()
+        }
+
+        // ---------- Implement NonFungibleToken.Collection ----------
 
         /// Removes an NFT from the collection and moves it to the caller
         ///
         /// @param withdrawID: The ID of the NFT that wants to be withdrawn
         /// @return The NFT resource that has been taken out of the collection
         ///
-        access(all)
-        fun withdraw(withdrawID: UInt64): @NonFungibleToken.NFT {
+        access(NonFungibleToken.Withdraw)
+        fun withdraw(withdrawID: UInt64): @{NonFungibleToken.NFT} {
             let token <- (self.ownedNFTs.remove(key: withdrawID) ?? panic("missing NFT")) as! @FRC20SemiNFT.NFT
 
             // remove from tickIDsMapping
@@ -668,9 +706,6 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             let tickIDs = self._borrowTickIDs(tick) ?? panic("Tick IDs must exist")
             let index = tickIDs.firstIndex(of: token.id) ?? panic("Token ID must exist in tickIDs")
             tickIDs.remove(at: index)
-
-            // emit the event
-            emit Withdraw(id: token.id, from: self.owner?.address)
 
             return <-token
         }
@@ -680,7 +715,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// @param token: The NFT resource to be included in the collection
         ///
         access(all)
-        fun deposit(token: @NonFungibleToken.NFT) {
+        fun deposit(token: @{NonFungibleToken.NFT}) {
             let token <- token as! @FRC20SemiNFT.NFT
 
             let id: UInt64 = token.id
@@ -693,10 +728,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             let tickIDs = self._borrowOrCreateTickIDs(tick)
             tickIDs.append(id)
 
-            // emit the event
-            emit Deposit(id: id, to: self.owner?.address)
-
-            destroy oldToken
+            Burner.burn(<- oldToken)
         }
 
         /// Helper method for getting the collection IDs
@@ -708,15 +740,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
             return self.ownedNFTs.keys
         }
 
-        /// Gets a reference to an NFT in the collection so that
-        /// the caller can read its metadata and call its methods
-        ///
-        /// @param id: The ID of the wanted NFT
-        /// @return A reference to the wanted NFT resource
-        ///
+        /// Gets the amount of NFTs stored in the collection
         access(all)
-        fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
-            return self.borrowNFTSafe(id: id)!
+        view fun getLength(): Int {
+            return self.ownedNFTs.length
         }
 
         /// Gets a reference to an NFT in the collection so that
@@ -726,8 +753,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// @return A reference to the wanted NFT resource
         ///
         access(all)
-        fun borrowNFTSafe(id: UInt64): &NonFungibleToken.NFT? {
-            return &self.ownedNFTs[id] as &NonFungibleToken.NFT?
+        view fun borrowNFT(_ id: UInt64): &{NonFungibleToken.NFT}? {
+            return &self.ownedNFTs[id]
         }
 
         /// Gets an array of NFT IDs in the collection by the tick
@@ -766,25 +793,24 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// Gets a reference to an NFT in the collection with the public interface
         ///
         access(all)
-        fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT{IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver}? {
+        view fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT? {
             return self.borrowFRC20SemiNFT(id: id)
         }
 
         /// Gets a reference to an NFT in the collection for detailed operations
         ///
-        access(all)
-        fun borrowFRC20SemiNFT(id: UInt64): &FRC20SemiNFT.NFT? {
-            if self.ownedNFTs[id] != nil {
+        access(NonFungibleToken.Update)
+        view fun borrowFRC20SemiNFT(id: UInt64): auth(NonFungibleToken.Update) &FRC20SemiNFT.NFT? {
+            if let ref = &self.ownedNFTs[id] as auth(NonFungibleToken.Update) &{NonFungibleToken.NFT}? {
                 // Create an authorized reference to allow downcasting
-                let ref = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
-                return ref as! &FRC20SemiNFT.NFT
+                return ref as? auth(NonFungibleToken.Update) &FRC20SemiNFT.NFT
             }
             return nil
         }
 
         /** ----- ViewResolver ----- */
 
-        /// Gets a reference to the NFT only conforming to the `{MetadataViews.Resolver}`
+        /// Gets a reference to the NFT only conforming to the `{ViewResolver.Resolver}`
         /// interface so that the caller can retrieve the views that the NFT
         /// is implementing and resolve them
         ///
@@ -792,10 +818,11 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// @return The resource reference conforming to the Resolver interface
         ///
         access(all)
-        fun borrowViewResolver(id: UInt64): &{MetadataViews.Resolver} {
-            let nft = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
-            let FRC20SemiNFT = nft as! &FRC20SemiNFT.NFT
-            return FRC20SemiNFT as &{MetadataViews.Resolver}
+        view fun borrowViewResolver(id: UInt64): &{ViewResolver.Resolver}? {
+            if let nft = &self.ownedNFTs[id] as &{NonFungibleToken.NFT}? {
+                return nft as &{ViewResolver.Resolver}
+            }
+            return nil
         }
 
         /** ------ Internal Methods ------ */
@@ -803,14 +830,14 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         /// Borrow the tick IDs mapping
         ///
         access(self)
-        fun _borrowTickIDs(_ tick: String): &[UInt64]? {
-            return &self.tickIDsMapping[tick] as &[UInt64]?
+        view fun _borrowTickIDs(_ tick: String): auth(Mutate) &[UInt64]? {
+            return &self.tickIDsMapping[tick]
         }
 
         /// Borrow or create the tick IDs mapping
         ///
         access(self)
-        fun _borrowOrCreateTickIDs(_ tick: String): &[UInt64] {
+        fun _borrowOrCreateTickIDs(_ tick: String): auth(Mutate) &[UInt64] {
             if self.tickIDsMapping[tick] == nil {
                 self.tickIDsMapping[tick] = []
             }
@@ -823,7 +850,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// @return The new Collection resource
     ///
     access(all)
-    fun createEmptyCollection(): @NonFungibleToken.Collection {
+    fun createEmptyCollection(nftType: Type): @{NonFungibleToken.Collection} {
         return <- create Collection()
     }
 
@@ -833,7 +860,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     ///
     access(account)
     fun wrap(
-        recipient: &FRC20SemiNFT.Collection{NonFungibleToken.CollectionPublic},
+        recipient: &FRC20SemiNFT.Collection,
         change: @FRC20FTShared.Change,
         initialYieldRates: {String: UFix64}
     ): UInt64 {
@@ -883,11 +910,8 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
         // withdraw all balance from the wrapped change
         let newChange <- changeRef.withdrawAsChange(amount: allBalance)
 
-        // destroy the FRC20SemiNFT
-        destroy nftToUnwrap
-
-        // decrease the total supply
-        FRC20SemiNFT.totalSupply = FRC20SemiNFT.totalSupply - 1
+        // Burner.burn(the FRC20SemiNFT
+        Burner.burn(<- nftToUnwrap)
 
         // emit the event
         emit Unwrapped(
@@ -907,20 +931,18 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     /// @return A structure representing the requested view.
     ///
     access(all)
-    fun resolveView(_ view: Type): AnyStruct? {
-        switch view {
+    fun resolveContractView(resourceType: Type?, viewType: Type): AnyStruct? {
+        switch viewType {
             case Type<MetadataViews.ExternalURL>():
                 return MetadataViews.ExternalURL("https://fixes.world/")
             case Type<MetadataViews.NFTCollectionData>():
                 return MetadataViews.NFTCollectionData(
                     storagePath: FRC20SemiNFT.CollectionStoragePath,
                     publicPath: FRC20SemiNFT.CollectionPublicPath,
-                    providerPath: FRC20SemiNFT.CollectionPrivatePath,
-                    publicCollection: Type<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic}>(),
-                    publicLinkedType: Type<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(),
-                    providerLinkedType: Type<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(),
-                    createEmptyCollectionFunction: (fun (): @NonFungibleToken.Collection {
-                        return <-FRC20SemiNFT.createEmptyCollection()
+                    publicCollection: Type<&FRC20SemiNFT.Collection>(),
+                    publicLinkedType: Type<&FRC20SemiNFT.Collection>(),
+                    createEmptyCollectionFunction: (fun (): @{NonFungibleToken.Collection} {
+                        return <- FRC20SemiNFT.createEmptyCollection(nftType: Type<@FRC20SemiNFT.NFT>())
                     })
                 )
             case Type<MetadataViews.NFTCollectionDisplay>():
@@ -936,6 +958,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                     ),
                     mediaType: "image/png"
                 )
+                let twitter = MetadataViews.ExternalURL("https://twitter.com/fixesWorld")
                 return MetadataViews.NFTCollectionDisplay(
                     name: "FIXeS 𝔉rc20 Semi-NFT",
                     description: "This collection is used to wrap 𝔉rc20 token as semi-NFTs.",
@@ -943,7 +966,10 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
                     squareImage: squareMedia,
                     bannerImage: bannerMedia,
                     socials: {
-                        "twitter": MetadataViews.ExternalURL("https://twitter.com/fixesWorld")
+                        "linktree": MetadataViews.ExternalURL("https://linktr.ee/fixes.world"),
+                        "github": MetadataViews.ExternalURL("https://github.com/fixes-world"),
+                        "twitter": twitter,
+                        "x": twitter
                     }
                 )
         }
@@ -956,7 +982,7 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
     ///         developers to know which parameter to pass to the resolveView() method.
     ///
     access(all)
-    fun getViews(): [Type] {
+    view fun getContractViews(resourceType: Type?): [Type] {
         return [
             Type<MetadataViews.ExternalURL>(),
             Type<MetadataViews.NFTCollectionData>(),
@@ -976,12 +1002,12 @@ access(all) contract FRC20SemiNFT: NonFungibleToken, ViewResolver {
 
         // Create a Collection resource and save it to storage
         let collection <- create Collection()
-        self.account.save(<-collection, to: self.CollectionStoragePath)
+        self.account.storage.save(<-collection, to: self.CollectionStoragePath)
 
         // create a public capability for the collection
-        self.account.link<&FRC20SemiNFT.Collection{NonFungibleToken.CollectionPublic, FRC20SemiNFT.FRC20SemiNFTCollectionPublic, MetadataViews.ResolverCollection}>(
-            self.CollectionPublicPath,
-            target: self.CollectionStoragePath
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&FRC20SemiNFT.Collection>(self.CollectionStoragePath),
+            at: self.CollectionPublicPath
         )
 
         emit ContractInitialized()

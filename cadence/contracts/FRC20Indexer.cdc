@@ -328,7 +328,7 @@ access(all) contract FRC20Indexer {
         access(all)
         view fun getHoldersAmount(tick: String): UInt64 {
             let balancesRef = self._borrowBalancesRef(tick: tick.toLower())
-            return UInt64(balancesRef.keys.length)
+            return UInt64(balancesRef.length)
         }
 
         /// Get the pool balance of a FRC20 token

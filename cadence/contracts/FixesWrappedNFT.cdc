@@ -259,6 +259,14 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             self.ownedNFTs <- {}
         }
 
+        /// createEmptyCollection creates an empty Collection of the same type
+        /// and returns it to the caller
+        /// @return A an empty collection of the same type
+        access(all)
+        fun createEmptyCollection(): @{NonFungibleToken.Collection} {
+            return <- FixesWrappedNFT.createEmptyCollection(nftType: Type<@FixesWrappedNFT.NFT>())
+        }
+
         // ---------- Implement NonFungibleToken.Receiver ----------
 
         /// getSupportedNFTTypes returns a list of NFT types that this receiver accepts
@@ -350,17 +358,10 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         ///
         access(all)
         view fun borrowViewResolver(id: UInt64): &{ViewResolver.Resolver}? {
-            let nft = (&self.ownedNFTs[id] as &{NonFungibleToken.NFT}?)!
-            let FixesWrappedNFT = nft as! &FixesWrappedNFT.NFT
-            return FixesWrappedNFT as &{ViewResolver.Resolver}
-        }
-
-        /// createEmptyCollection creates an empty Collection of the same type
-        /// and returns it to the caller
-        /// @return A an empty collection of the same type
-        access(all)
-        fun createEmptyCollection(): @{NonFungibleToken.Collection} {
-            return <- FixesWrappedNFT.createEmptyCollection(nftType: Type<@FixesWrappedNFT.NFT>())
+            if let nft = &self.ownedNFTs[id] as &{NonFungibleToken.NFT}? {
+                return nft as &{ViewResolver.Resolver}
+            }
+            return nil
         }
     }
 

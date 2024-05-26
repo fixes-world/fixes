@@ -226,7 +226,7 @@ access(all) contract FRC20NFTWrapper {
         access(all)
         view fun getStrategiesAmount(all: Bool): UInt64 {
             if all {
-                return UInt64(self.strategies.keys.length)
+                return UInt64(self.strategies.length)
             }
             return UInt64(self.strategies.values.filter(view fun (s: FRC20Strategy): Bool {
                 return s.isUsedUp() == false

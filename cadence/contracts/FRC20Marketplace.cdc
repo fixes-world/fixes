@@ -150,7 +150,7 @@ access(all) contract FRC20Marketplace {
 
         access(all)
         view fun getListedItemLength(): Int {
-            return self.listingIDItems.keys.length
+            return self.listingIDItems.length
         }
 
         access(all)
@@ -618,7 +618,7 @@ access(all) contract FRC20Marketplace {
 
             let conds = self.whitelistClaimingConditions()
             // no conditions set, so you can not claim
-            if conds.keys.length == 0 {
+            if conds.length == 0 {
                 return false
             }
 
