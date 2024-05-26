@@ -224,7 +224,9 @@ access(all) contract Fixes {
             let otherValue <- other.extract()
             let from = other.getId()
             let fusedValue = otherValue.balance
-            destroy other
+            // destroy
+            Burner.burn(<- other)
+
             let selfValue = (&self.value as &FlowToken.Vault?)!
             selfValue.deposit(from: <- otherValue)
 
@@ -540,7 +542,7 @@ access(all) contract Fixes {
 
             emit InscriptionArchived(id: id)
 
-            destroy old
+            Burner.burn(<- old)
         }
     }
 
@@ -623,7 +625,8 @@ access(all) contract Fixes {
             // inscription id should be unique
             let id = ins.getId()
             let old <- self.inscriptions.insert(key: id, <- ins)
-            destroy old
+
+            Burner.burn(<- old)
         }
 
         /// Archive extracted inscription

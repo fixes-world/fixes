@@ -11,6 +11,7 @@ A wrapped NFT that is able to wrap any Flow NFT.
 import "NonFungibleToken"
 import "MetadataViews"
 import "ViewResolver"
+import "Burner"
 // Fixes Import
 import "Fixes"
 
@@ -298,7 +299,7 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             // add the new token to the dictionary which removes the old one
             let oldToken <- self.ownedNFTs[id] <- token
 
-            destroy oldToken
+            Burner.burn(<- oldToken)
         }
 
         /// Helper method for getting the collection IDs
@@ -436,10 +437,10 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             var ins: @Fixes.Inscription? <- nftToUnwrap.unwrapInscription()
             insId = ins?.getId()
             out <-> ins
-            destroy ins
+            Burner.burn(<- ins)
         }
-        // destroy the FixesWrappedNFT
-        destroy nftToUnwrap
+        // destroy the NFT
+        Burner.burn(<- nftToUnwrap)
         // decrease the total supply
         FixesWrappedNFT.totalSupply = FixesWrappedNFT.totalSupply - 1
 

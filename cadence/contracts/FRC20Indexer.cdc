@@ -12,6 +12,7 @@ import "ViewResolver"
 import "FungibleToken"
 import "FungibleTokenMetadataViews"
 import "FlowToken"
+import "Burner"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -1242,7 +1243,7 @@ access(all) contract FRC20Indexer {
         fun returnChange(change: @FRC20FTShared.Change) {
             // if the change is empty, destroy it and return
             if change.getBalance() == 0.0 {
-                destroy change
+                Burner.burn(<- change)
                 return
             }
             let fromAddr = change.from
@@ -1262,7 +1263,7 @@ access(all) contract FRC20Indexer {
                     message: "The receiver should support the $FLOW vault"
                 )
                 flowReceiver.deposit(from: <- (flowVault as! @FlowToken.Vault))
-                destroy change
+                Burner.burn(<- change)
             } else if !change.isBackedByVault() {
                 self._depositFromTokenChange(change: <- change, to: fromAddr)
             } else {
@@ -1497,7 +1498,7 @@ access(all) contract FRC20Indexer {
             )
 
             // destroy the empty change
-            destroy change
+            Burner.burn(<- change)
         }
 
         /// Internal Burn a FRC20 token

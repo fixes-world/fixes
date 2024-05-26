@@ -3,7 +3,7 @@
 
 # FixesAvatar
 
-TODO: Add description
+It is responsible for managing the user's profile, properties, and NFTs.
 
 */
 
@@ -12,6 +12,7 @@ import "NonFungibleToken"
 import "FungibleToken"
 import "MetadataViews"
 import "ViewResolver"
+import "Burner"
 // Fixes Imports
 import "FixesTraits"
 import "FRC20FTShared"
@@ -179,7 +180,7 @@ access(all) contract FixesAvatar {
         fun addTraitEntry(_ entry: @FixesTraits.Entry) {
             let uuid = entry.uuid
             if self.ownedEntities[uuid] != nil {
-                destroy entry
+                Burner.burn(<- entry)
                 return
             }
 

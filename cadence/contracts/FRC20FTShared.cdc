@@ -395,8 +395,8 @@ access(all) contract FRC20FTShared {
                 changeUuid: self.uuid,
                 fromChangeUuid: from.uuid
             )
-            // Destroy the Change that we extracted from
-            destroy from
+            // destroy the Change that we extracted from
+            Burner.burn(<- from)
         }
 
         /// Force merge the input Change to self with checking the from address
@@ -431,8 +431,7 @@ access(all) contract FRC20FTShared {
                         ftVault: nil
                     ))
                 }
-                // destroy the input Change
-                destroy from
+                Burner.burn(<- from)
             }
         }
 
