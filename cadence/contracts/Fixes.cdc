@@ -754,7 +754,7 @@ access(all) contract Fixes {
     /// Returns the fallback receiver assigned to the account
     ///
     access(all)
-    fun getFallbackFlowTokenPublicPath(): PublicPath {
+    view fun getFallbackFlowTokenPublicPath(): PublicPath {
         return PublicPath(identifier: "flowTokenReceiverDefault")!
     }
 
