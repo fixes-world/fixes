@@ -32,7 +32,7 @@ access(all) contract FRC20Agents {
 
         /// Check if the inscription is accepted.
         access(all)
-        view fun isInscriptionAccepted(ins: &Fixes.Inscription): Bool {
+        fun isInscriptionAccepted(ins: &Fixes.Inscription): Bool {
             let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             if let tick = meta["tick"]?.toLower() {
                 return self.isTickAccepted(tick: tick)
@@ -52,19 +52,11 @@ access(all) contract FRC20Agents {
 
         /// Withdraw amount of a FRC20 token by a FRC20 inscription
         access(all)
-        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change {
-            pre {
-                self.isInscriptionAccepted(ins: ins): "The inscription is not accepted"
-            }
-        }
+        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change
 
         /// Deposit a FRC20 token change to indexer
         access(all)
-        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change) {
-            pre {
-                self.isInscriptionAccepted(ins: ins): "The inscription is not accepted"
-            }
-        }
+        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change)
     }
 
     /// This resource provides some FRC20Indexer access(account) methods that can be invoked by the owner of this resource.
@@ -110,12 +102,20 @@ access(all) contract FRC20Agents {
 
         access(all)
         fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change {
+            assert(
+                self.isInscriptionAccepted(ins: ins),
+                message: "The inscription is not accepted"
+            )
             let indexer = FRC20Indexer.getIndexer()
             return <- indexer.withdrawChange(ins: ins)
         }
 
         access(all)
         fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change) {
+            assert(
+                self.isInscriptionAccepted(ins: ins),
+                message: "The inscription is not accepted"
+            )
             let indexer = FRC20Indexer.getIndexer()
             indexer.depositChange(ins: ins, change: <- change)
         }
