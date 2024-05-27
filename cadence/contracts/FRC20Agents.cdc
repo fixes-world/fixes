@@ -17,6 +17,8 @@ import "FRC20Indexer"
 ///
 access(all) contract FRC20Agents {
 
+    access(all) entitlement Manage
+
     /// The private resource interface for the IndexerController.
     ///
     access(all) resource interface IndexerControllerInterface {
@@ -33,7 +35,7 @@ access(all) contract FRC20Agents {
         /// Check if the inscription is accepted.
         access(all)
         fun isInscriptionAccepted(ins: &Fixes.Inscription): Bool {
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             if let tick = meta["tick"]?.toLower() {
                 return self.isTickAccepted(tick: tick)
             }
@@ -43,7 +45,7 @@ access(all) contract FRC20Agents {
         // ------ FRC20Indexer methods -------
 
         /// Ensure the balance of an address exists
-        access(all)
+        access(Manage)
         fun ensureBalanceExists(tick: String, addr: Address) {
             pre {
                 self.isTickAccepted(tick: tick): "The tick is not accepted"
@@ -51,12 +53,12 @@ access(all) contract FRC20Agents {
         }
 
         /// Withdraw amount of a FRC20 token by a FRC20 inscription
-        access(all)
-        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change
+        access(Manage)
+        fun withdrawChange(ins: auth(Fixes.Extractable) &Fixes.Inscription): @FRC20FTShared.Change
 
         /// Deposit a FRC20 token change to indexer
-        access(all)
-        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change)
+        access(Manage)
+        fun depositChange(ins: auth(Fixes.Extractable) &Fixes.Inscription, change: @FRC20FTShared.Change)
     }
 
     /// This resource provides some FRC20Indexer access(account) methods that can be invoked by the owner of this resource.
@@ -79,12 +81,12 @@ access(all) contract FRC20Agents {
 
         /// ------- Restricted methods for the resource -------
 
-        access(all)
+        access(Manage)
         fun addAcceptTick(tick: String) {
             self.acceptTicks.append(tick)
         }
 
-        access(all)
+        access(Manage)
         fun createEmptyChange(tick: String, from: Address): @FRC20FTShared.Change {
             pre {
                 self.isTickAccepted(tick: tick): "The tick is not accepted"
@@ -94,14 +96,14 @@ access(all) contract FRC20Agents {
 
         /// ------- Public methods for some access(account) methods of FRC20Indexer -------
 
-        access(all)
+        access(Manage)
         fun ensureBalanceExists(tick: String, addr: Address) {
             let indexer = FRC20Indexer.getIndexer()
             return indexer.ensureBalanceExists(tick: tick, addr: addr)
         }
 
-        access(all)
-        fun withdrawChange(ins: &Fixes.Inscription): @FRC20FTShared.Change {
+        access(Manage)
+        fun withdrawChange(ins: auth(Fixes.Extractable) &Fixes.Inscription): @FRC20FTShared.Change {
             assert(
                 self.isInscriptionAccepted(ins: ins),
                 message: "The inscription is not accepted"
@@ -110,8 +112,8 @@ access(all) contract FRC20Agents {
             return <- indexer.withdrawChange(ins: ins)
         }
 
-        access(all)
-        fun depositChange(ins: &Fixes.Inscription, change: @FRC20FTShared.Change) {
+        access(Manage)
+        fun depositChange(ins: auth(Fixes.Extractable) &Fixes.Inscription, change: @FRC20FTShared.Change) {
             assert(
                 self.isInscriptionAccepted(ins: ins),
                 message: "The inscription is not accepted"
