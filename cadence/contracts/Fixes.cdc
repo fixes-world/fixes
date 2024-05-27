@@ -117,6 +117,8 @@ access(all) contract Fixes {
         access(all)
         view fun getData(): InscriptionData
         access(all)
+        view fun borrowData(): &InscriptionData
+        access(all)
         view fun getMimeType(): String
         access(all)
         view fun getMetadata(): [UInt8]
@@ -332,6 +334,11 @@ access(all) contract Fixes {
         }
 
         access(all)
+        view fun borrowData(): &InscriptionData {
+            return &self.data as &InscriptionData
+        }
+
+        access(all)
         view fun getMimeType(): String {
             return self.data.mimeType
         }
@@ -354,7 +361,7 @@ access(all) contract Fixes {
         /** ---- Implementation of MetadataViews.Resolver ---- */
 
         access(all)
-        fun getViews(): [Type] {
+        view fun getViews(): [Type] {
             return [
                 Type<Fixes.InscriptionView>(),
                 Type<MetadataViews.Serial>(),
