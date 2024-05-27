@@ -266,9 +266,9 @@ access(all) contract interface FixesFungibleTokenInterface {
         fun createMinter(allowedAmount: UFix64): @{IMinter}
     }
 
-    /// The minter resource interface
+    /// The token identity resource interface
     ///
-    access(all) resource interface IMinter {
+    access(all) resource interface ITokenBasics {
         /// Get the symbol of the minting token
         access(all)
         view fun getSymbol(): String
@@ -285,6 +285,10 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getContractAddress(): Address
 
+        /// Get the vault data of the minting token
+        access(all)
+        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData
+
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64
@@ -292,6 +296,33 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Get the total supply of the minting token
         access(all)
         view fun getTotalSupply(): UFix64
+    }
+
+    /// The token liquidity resource interface
+    ///
+    access(all) resource interface ITokenLiquidity {
+        /// Get the in-pool liquidity market cap
+        /// Read-only buy using non-view function
+        access(all)
+        fun getLiquidityMarketCap(): UFix64
+
+        /// Get the in-pool liquidity value
+        access(all)
+        view fun getLiquidityValue(): UFix64
+
+        /// Get the total token market cap
+        /// Read-only buy using non-view function
+        access(all)
+        fun getTotalTokenMarketCap(): UFix64
+
+        /// Get the total token supply value
+        access(all)
+        view fun getTotalTokenValue(): UFix64
+    }
+
+    /// The minter resource interface
+    ///
+    access(all) resource interface IMinter: ITokenBasics {
 
         /// Get the unsupplied amount
         access(all)
@@ -306,10 +337,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Get the total allowed mintable amount
         access(all)
         view fun getTotalAllowedMintableAmount(): UFix64
-
-        /// Get the vault data of the minting token
-        access(all)
-        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData
 
         /// Function that mints new tokens, adds them to the total supply,
         /// and returns them to the calling context.
@@ -357,7 +384,62 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// The minter holder resource interface
     ///
-    access(all) resource interface IMinterHolder {
+    access(all) resource interface IMinterHolder: ITokenBasics {
+
+        // ----- Implement FixesFungibleTokenInterface.ITokenBasics -----
+
+        /// Get the token symbol
+        access(all)
+        view fun getSymbol(): String {
+            let minterRef = self.borrowMinter()
+            return minterRef.getSymbol()
+        }
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type {
+            let minterRef = self.borrowMinter()
+            return minterRef.getTokenType()
+        }
+
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String? {
+            let minterRef = self.borrowMinter()
+            return minterRef.getAccountsPoolKey()
+        }
+
+        /// Get the contract address of the minting token
+        access(all)
+        view fun getContractAddress(): Address {
+            let minterRef = self.borrowMinter()
+            return minterRef.getContractAddress()
+        }
+
+        /// Get the vault data of the minting token
+        access(all)
+        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            let minterRef = self.borrowMinter()
+            return minterRef.getVaultData()
+        }
+
+        /// Get the max supply of the token
+        access(all)
+        view fun getMaxSupply(): UFix64 {
+            let minter = self.borrowMinter()
+            return minter.getMaxSupply()
+        }
+
+        /// Get the total supply of the token
+        access(all)
+        view fun getTotalSupply(): UFix64 {
+            let minter = self.borrowMinter()
+            // The circulating supply is the total supply minus the balance in the vault
+            return minter.getTotalSupply()
+        }
+
+        // ----- Interfaces of IMinterHolder -----
+
         /// Get the total minted amount
         access(all)
         view fun getTotalMintedAmount(): UFix64 {
@@ -370,27 +452,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         view fun getTotalAllowedMintableAmount(): UFix64 {
             let minterRef = self.borrowMinter()
             return minterRef.getTotalAllowedMintableAmount()
-        }
-
-        /// Get the token type
-        access(all)
-        view fun getTokenType(): Type {
-            let minterRef = self.borrowMinter()
-            return minterRef.getTokenType()
-        }
-
-        /// Get the token vault data
-        access(all)
-        view fun getTokenVaultData(): FungibleTokenMetadataViews.FTVaultData {
-            let minterRef = self.borrowMinter()
-            return minterRef.getVaultData()
-        }
-
-        /// Get the max supply of the token
-        access(all)
-        view fun getMaxSupply(): UFix64 {
-            let minterRef = self.borrowMinter()
-            return minterRef.getMaxSupply()
         }
 
         /// Get the issued drops supply

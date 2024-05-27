@@ -110,7 +110,7 @@ access(all) contract FRC20AccountsPool {
         view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}?
         /// Borrow the Fixes Fungible Token contract interface
         access(all)
-        fun borrowFTContract(_ tick: String): &{FixesFungibleTokenInterface}?
+        view fun borrowFTContract(_ tick: String): &{FixesFungibleTokenInterface}?
 
         /// Execute inscription and extract FlowToken in the inscription
         access(all)
@@ -119,10 +119,10 @@ access(all) contract FRC20AccountsPool {
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, _ key: String?): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account?
+        view fun borrowChildAccount(type: ChildAccountType, _ key: String?): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account?
         /// Borrow the writable config store
         access(account)
-        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore?
+        view fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore?
         /// Sets up a new child account for market
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
@@ -311,7 +311,7 @@ access(all) contract FRC20AccountsPool {
         /// If no contract is found, it will panic
         ///
         access(all)
-        fun borrowFTContract(_ tick: String): &{FixesFungibleTokenInterface}? {
+        view fun borrowFTContract(_ tick: String): &{FixesFungibleTokenInterface}? {
             // try to borrow the account to check if it was created
             if let childAcctRef = self.borrowChildAccount(type: ChildAccountType.FungibleToken, tick) {
                 let name = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
@@ -375,7 +375,7 @@ access(all) contract FRC20AccountsPool {
         /// Borrow child's AuthAccount
         ///
         access(account)
-        fun borrowChildAccount(type: ChildAccountType, _ key: String?): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account? {
+        view fun borrowChildAccount(type: ChildAccountType, _ key: String?): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account? {
             let hcManagerRef = self.hcManagerCap.borrow()
                 ?? panic("Failed to borrow hcManager")
             if let specified = key {
@@ -401,7 +401,7 @@ access(all) contract FRC20AccountsPool {
         /// Borrow the writable config store
         ///
         access(account)
-        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore? {
+        view fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore? {
             if let child = self.borrowChildAccount(type: type, key) {
                 return child.storage
                     .borrow<auth(FRC20FTShared.Write)&FRC20FTShared.SharedStore>(

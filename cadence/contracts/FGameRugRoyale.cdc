@@ -77,32 +77,12 @@ access(all) contract FGameRugRoyale {
 
     /// The public interface for the liquidity holder
     ///
-    access(all) resource interface LiquidityHolder {
+    access(all) resource interface LiquidityHolder: FixesFungibleTokenInterface.ITokenBasics, FixesFungibleTokenInterface.ITokenLiquidity {
         // --- read methods ---
 
         /// Check if the address is authorized user for the liquidity holder
         access(all)
         view fun isAuthorizedUser(_ addr: Address): Bool
-
-        /// Get the token type
-        access(all)
-        view fun getTokenType(): Type
-
-        /// Get the token symbol
-        access(all)
-        view fun getTokenSymbol(): String
-
-        /// Get the key in the accounts pool
-        access(all)
-        view fun getAccountsPoolKey(): String?
-
-        /// Get the liquidity market cap
-        access(all)
-        view fun getLiquidityMarketCap(): UFix64
-
-        /// Get the liquidity pool value
-        access(all)
-        view fun getLiquidityValue(): UFix64
 
         /// Get the flow balance in pool
         access(all)
@@ -137,14 +117,6 @@ access(all) contract FGameRugRoyale {
             let currentFlowBalance = self.getFlowBalanceInPool() + extraLiquidity
             return currentFlowBalance / tokenBalance
         }
-
-        /// Get the total token market cap
-        access(all)
-        view fun getTotalTokenMarketCap(): UFix64
-
-        /// Get the total token supply value
-        access(all)
-        view fun getTotalTokenValue(): UFix64
 
         /// Get the token holders
         access(all)

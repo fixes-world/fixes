@@ -14,10 +14,11 @@ contract that allows users to create and manage fungible tokens.
 import "FungibleToken"
 import "FlowToken"
 import "FungibleTokenMetadataViews"
+import "Burner"
 // Third-party dependencies
 import "BlackHole"
 import "AddressUtils"
-import "PublicPriceOracle"
+// import "PublicPriceOracle"
 import "SwapFactory"
 import "SwapInterfaces"
 import "SwapConfig"
@@ -37,6 +38,8 @@ import "FGameRugRoyale"
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
 ///
 access(all) contract FixesTradablePool {
+
+    access(all) entitlement Manage
 
     // ------ Events -------
 
@@ -68,21 +71,16 @@ access(all) contract FixesTradablePool {
     access(all) resource FRC20RefundAgent: FRC20Converter.FRC20TreasuryReceiver {
         /// The refund pool
         access(self)
-        let flowPool: @FungibleToken.Vault
+        let flowPool: @{FungibleToken.Vault}
 
         init() {
-            self.flowPool <- FlowToken.createEmptyVault()
-        }
-
-        // @deprecated in Cadence v1.0
-        destroy() {
-            destroy self.flowPool
+            self.flowPool <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
         }
 
         // ----- Implement FRC20Converter.FRC20TreasuryReceiver -----
 
         access(all)
-        fun depositFlowToken(_ token: @FungibleToken.Vault) {
+        fun depositFlowToken(_ token: @{FungibleToken.Vault}) {
             self.flowPool.deposit(from: <- token)
         }
 
@@ -91,14 +89,14 @@ access(all) contract FixesTradablePool {
         /// Extract the Flow token from the pool
         ///
         access(contract)
-        fun extract(): @FungibleToken.Vault {
+        fun extract(): @{FungibleToken.Vault} {
             return <- self.flowPool.withdraw(amount: self.flowPool.balance)
         }
     }
 
     /// The liquidity pool interface.
     ///
-    access(all) resource interface LiquidityPoolInterface {
+    access(all) resource interface LiquidityPoolInterface: FixesFungibleTokenInterface.ITokenBasics, FixesFungibleTokenInterface.ITokenLiquidity {
         access(contract)
         let curve: {FixesBondingCurve.CurveInterface}
 
@@ -131,21 +129,9 @@ access(all) contract FixesTradablePool {
 
         // ----- Token in the liquidity pool -----
 
-        /// Get the token type
-        access(all)
-        view fun getTokenType(): Type
-
         /// Get the swap pair address
         access(all)
         view fun getSwapPairAddress(): Address?
-
-        /// Get the max supply of the token
-        access(all)
-        view fun getMaxSupply(): UFix64
-
-        /// Get the circulating supply of the token
-        access(all)
-        view fun getTotalSupply(): UFix64
 
         /// Get the circulating supply in the tradable pool
         access(all)
@@ -171,26 +157,10 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getBurnedLP(): UFix64
 
-        /// Get the liquidity market cap
-        access(all)
-        view fun getLiquidityMarketCap(): UFix64
-
-        /// Get the liquidity pool value
-        access(all)
-        view fun getLiquidityValue(): UFix64
-
-        /// Get the token market cap
-        access(all)
-        view fun getTotalTokenMarketCap(): UFix64
-
-        /// Get token supply value
-        access(all)
-        view fun getTotalTokenValue(): UFix64
-
         /// Get the locked liquidity market cap
         ///
         access(all)
-        view fun getBurnedLiquidityMarketCap(): UFix64 {
+        fun getBurnedLiquidityMarketCap(): UFix64 {
             return self.getBurnedLiquidityValue() * FixesTradablePool.getFlowPrice()
         }
 
@@ -214,7 +184,7 @@ access(all) contract FixesTradablePool {
         /// - amount: The amount of token to buy, if nil, use all the inscription value to buy the token
         access(all)
         fun buyTokens(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             _ amount: UFix64?,
             recipient: &{FungibleToken.Receiver},
         ) {
@@ -235,7 +205,7 @@ access(all) contract FixesTradablePool {
         /// - tokenVault: The token vault to sell
         access(all)
         fun sellTokens(
-            _ tokenVault: @FungibleToken.Vault,
+            _ tokenVault: @{FungibleToken.Vault},
             recipient: &{FungibleToken.Receiver},
         ) {
             pre {
@@ -254,7 +224,7 @@ access(all) contract FixesTradablePool {
         /// Swap all tokens in the vault and deposit to the token out recipient
         access(all)
         fun quickSwapToken(
-            _ tokenInVault: @FungibleToken.Vault,
+            _ tokenInVault: @{FungibleToken.Vault},
             _ tokenOutRecipient: &{FungibleToken.Receiver},
         ) {
             pre {
@@ -339,7 +309,7 @@ access(all) contract FixesTradablePool {
         let refundAgent: @FRC20RefundAgent
         // The vault for the token
         access(self)
-        let vault: @FungibleToken.Vault
+        let vault: @{FungibleToken.Vault}
         // The vault for the flow token in the liquidity pool
         access(self)
         let flowVault: @FlowToken.Vault
@@ -372,26 +342,17 @@ access(all) contract FixesTradablePool {
 
             let vaultData = self.minter.getVaultData()
             self.vault <- vaultData.createEmptyVault()
-            self.flowVault <- FlowToken.createEmptyVault() as! @FlowToken.Vault
+            self.flowVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             self.acitve = false
             self.lpBurned = 0.0
             self.tradedCount = 0
         }
 
-        // @deprecated in Cadence v1.0
-        destroy() {
-            destroy self.minter
-            destroy self.refundAgent
-            destroy self.vault
-            destroy self.flowVault
-        }
-
         // ----- Implement LiquidityPoolAdmin -----
 
         /// Initialize the liquidity pool
-        /// TODO: Change to entitlement in Cadence 1.0
         ///
-        access(all)
+        access(Manage)
         fun initialize() {
             pre {
                 self.acitve == false: "Tradable Pool is active"
@@ -418,9 +379,8 @@ access(all) contract FixesTradablePool {
 
         /// The admin can set the subject fee percentage
         /// The subject fee percentage must be greater than or equal to 0 and less than or equal to 0.01
-        /// TODO: Change to entitlement in Cadence 1.0
         ///
-        access(all)
+        access(Manage)
         fun setSubjectFeePercentage(_ subjectFeePerc: UFix64) {
             pre {
                 subjectFeePerc >= 0.0: "The subject fee percentage must be greater than or equal to 0"
@@ -453,27 +413,6 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getSubjectFeePercentage(): UFix64 {
             return self.subjectFeePercentage
-        }
-
-        /// Get the token type
-        access(all)
-        view fun getTokenType(): Type {
-            return self.vault.getType()
-        }
-
-        /// Get the max supply of the token
-        access(all)
-        view fun getMaxSupply(): UFix64 {
-            let minter = self.borrowMinter()
-            return minter.getMaxSupply()
-        }
-
-        /// Get the total supply of the token
-        access(all)
-        view fun getTotalSupply(): UFix64 {
-            let minter = self.borrowMinter()
-            // The circulating supply is the total supply minus the balance in the vault
-            return minter.getTotalSupply()
         }
 
         /// Get the circulating supply in the tradable pool
@@ -574,7 +513,7 @@ access(all) contract FixesTradablePool {
         view fun borrowSwapPairRef(): &{SwapInterfaces.PairPublic}? {
             if let pairAddr = self.getSwapPairAddress() {
                 return getAccount(pairAddr)
-                    .getCapability<&{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
+                    .capabilities.get<&{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
                     .borrow()
             }
             return nil
@@ -592,18 +531,6 @@ access(all) contract FixesTradablePool {
 
         // ----- Implement FGameRugRoyale.LiquidityHolder -----
 
-        /// Get the token symbol
-        access(all)
-        view fun getTokenSymbol(): String {
-            return self.minter.getSymbol()
-        }
-
-        /// Get the key in the accounts pool
-        access(all)
-        view fun getAccountsPoolKey(): String? {
-            return self.minter.getAccountsPoolKey()
-        }
-
         /// Check if the address is authorized user for the liquidity holder
         ///
         access(all)
@@ -620,7 +547,7 @@ access(all) contract FixesTradablePool {
 
         /// Get the liquidity market cap
         access(all)
-        view fun getLiquidityMarketCap(): UFix64 {
+        fun getLiquidityMarketCap(): UFix64 {
             return self.getLiquidityValue() * FixesTradablePool.getFlowPrice()
         }
 
@@ -641,7 +568,7 @@ access(all) contract FixesTradablePool {
         /// Get the token market cap
         ///
         access(all)
-        view fun getTotalTokenMarketCap(): UFix64 {
+        fun getTotalTokenMarketCap(): UFix64 {
             return self.getTotalTokenValue() * FixesTradablePool.getFlowPrice()
         }
 
@@ -669,9 +596,9 @@ access(all) contract FixesTradablePool {
 
         /// Pull liquidity from the pool
         access(account)
-        fun pullLiquidity(): @FungibleToken.Vault {
+        fun pullLiquidity(): @{FungibleToken.Vault} {
             if self.flowVault.balance < 1.0 {
-                return <- FlowToken.createEmptyVault()
+                return <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             }
 
             // only leave 1.0 $FLOW to setup the liquidity pair
@@ -687,7 +614,7 @@ access(all) contract FixesTradablePool {
         /// Push liquidity to the pool
         ///
         access(account)
-        fun addLiquidity(_ vault: @FungibleToken.Vault) {
+        fun addLiquidity(_ vault: @{FungibleToken.Vault}) {
             let amount = vault.balance
             self.flowVault.deposit(from: <- vault)
 
@@ -747,7 +674,7 @@ access(all) contract FixesTradablePool {
         // it to the recipient's Vault using the stored reference
         //
         access(all)
-        fun deposit(from: @FungibleToken.Vault) {
+        fun deposit(from: @{FungibleToken.Vault}) {
             self.addLiquidity(<- from)
         }
 
@@ -757,11 +684,11 @@ access(all) contract FixesTradablePool {
         ///
         access(all)
         fun buyTokens(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             _ amount: UFix64?,
             recipient: &{FungibleToken.Receiver},
         ) {
-            let flowPaymentVault <- FlowToken.createEmptyVault()
+            let flowPaymentVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
             // deposit the available Flow tokens in the inscription to the flow vault
             if flowAvailableAmount > 0.0 {
@@ -769,7 +696,7 @@ access(all) contract FixesTradablePool {
             }
 
             // check inscription command
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             let op = meta["op"] ?? panic("The inscription operation is missing")
             assert(
                 op == "exec" || op == "burn",
@@ -835,7 +762,7 @@ access(all) contract FixesTradablePool {
                     ?? panic("The inscription owner does not have a FlowTokenReceiver capability")
                 ownerFlowVaultRef.deposit(from: <- flowPaymentVault)
             } else {
-                destroy flowPaymentVault
+                Burner.burn(<- flowPaymentVault)
             }
 
             // check the BuyAmount
@@ -886,7 +813,7 @@ access(all) contract FixesTradablePool {
         ///
         access(all)
         fun sellTokens(
-            _ tokenVault: @FungibleToken.Vault,
+            _ tokenVault: @{FungibleToken.Vault},
             recipient: &{FungibleToken.Receiver},
         ) {
             let minter = self.borrowMinter()
@@ -954,7 +881,7 @@ access(all) contract FixesTradablePool {
         ///
         access(all)
         fun quickSwapToken(
-            _ tokenInVault: @FungibleToken.Vault,
+            _ tokenInVault: @{FungibleToken.Vault},
             _ tokenOutRecipient: &{FungibleToken.Receiver},
         ) {
             let supportTypes = tokenOutRecipient.getSupportedVaultTypes()
@@ -1074,14 +1001,14 @@ access(all) contract FixesTradablePool {
         ///
         access(self)
         view fun borrowRefundAgent(): &FRC20RefundAgent {
-            return &self.refundAgent as &FRC20RefundAgent
+            return &self.refundAgent
         }
 
         // ----- Implement IMinterHolder -----
 
         access(contract)
-        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
-            return &self.minter as &{FixesFungibleTokenInterface.IMinter}
+        view fun borrowMinter(): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IMinter} {
+            return &self.minter
         }
 
         // ----- Implement IHeartbeatHook -----
@@ -1132,7 +1059,7 @@ access(all) contract FixesTradablePool {
                 // create the pair
                 SwapFactory.createPair(
                     token0Vault: <- vaultData.createEmptyVault(),
-                    token1Vault: <- FlowToken.createEmptyVault(),
+                    token1Vault: <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>()),
                     accountCreationFee: <- acctCreateFeeVault,
                     stableMode: false
                 )
@@ -1170,7 +1097,7 @@ access(all) contract FixesTradablePool {
 
             // the vaults for adding liquidity
             let token0Vault <- vaultData.createEmptyVault()
-            let token1Vault <- FlowToken.createEmptyVault()
+            let token1Vault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
 
             // add all the token to the pair
             if self.isLocalActive() {
@@ -1180,8 +1107,8 @@ access(all) contract FixesTradablePool {
                 if token0Reserve != 0.0 || token1Reserve != 0.0 {
                     let estimatedToken1In = SwapConfig.quote(amountA: token0In, reserveA: token0Reserve, reserveB: token1Reserve)
                     if estimatedToken1In > token1In {
-                        destroy token0Vault
-                        destroy token1Vault
+                        Burner.burn(<- token0Vault)
+                        Burner.burn(<- token1Vault)
                         // DO NOT PANIC
                         return
                     }
@@ -1270,7 +1197,7 @@ access(all) contract FixesTradablePool {
     ///
     access(account)
     fun createTradableLiquidityPool(
-        ins: &Fixes.Inscription,
+        ins: auth(Fixes.Extractable) &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
     ): @TradableLiquidityPool {
         pre {
@@ -1313,7 +1240,7 @@ access(all) contract FixesTradablePool {
     /// Soft burn the vault
     ///
     access(all)
-    fun softBurnVault(_ vault: @FungibleToken.Vault) {
+    fun softBurnVault(_ vault: @{FungibleToken.Vault}) {
         let network = AddressUtils.currentNetwork()
 
         // Send the vault to the BlackHole
@@ -1334,7 +1261,7 @@ access(all) contract FixesTradablePool {
     ///
     access(all)
     fun verifyAndExecuteInscription(
-        _ ins: &Fixes.Inscription,
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         symbol: String,
         usage: String
     ): {String: String} {
@@ -1342,7 +1269,7 @@ access(all) contract FixesTradablePool {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         // check the operation
         assert(
             meta["op"] == "exec",
@@ -1383,7 +1310,7 @@ access(all) contract FixesTradablePool {
     /// Get the flow price from IncrementFi Oracle
     ///
     access(all)
-    view fun getFlowPrice(): UFix64 {
+    fun getFlowPrice(): UFix64 {
         let network = AddressUtils.currentNetwork()
         // reference: https://docs.increment.fi/protocols/decentralized-price-feed-oracle/deployment-addresses
         var oracleAddress: Address? = nil
@@ -1395,7 +1322,9 @@ access(all) contract FixesTradablePool {
             // Hack for testnet and emulator
             return 1.0
         } else {
-            return PublicPriceOracle.getLatestPrice(oracleAddr: oracleAddress!)
+            // Uncomment the following code when the oracle is available
+            // return PublicPriceOracle.getLatestPrice(oracleAddr: oracleAddress!)
+            return 1.0
         }
     }
 
@@ -1430,10 +1359,10 @@ access(all) contract FixesTradablePool {
     /// Get the public capability of Tradable Pool
     ///
     access(all)
-    view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool{LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}? {
+    view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool? {
         // @deprecated in Cadence 1.0
         return getAccount(addr)
-            .getCapability<&TradableLiquidityPool{LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}>(self.getLiquidityPoolPublicPath())
+            .capabilities.get<&TradableLiquidityPool>(self.getLiquidityPoolPublicPath())
             .borrow()
     }
 
