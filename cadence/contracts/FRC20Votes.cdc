@@ -7,7 +7,10 @@ This contract is used to manage the FRC20 votes.
 
 */
 import "MetadataViews"
+import "ViewResolver"
 import "NonFungibleToken"
+import "Burner"
+// Fixes Imports
 import "Fixes"
 import "FixesHeartbeat"
 import "FRC20Indexer"
@@ -19,6 +22,9 @@ import "FRC20StakingManager"
 import "FRC20VoteCommands"
 
 access(all) contract FRC20Votes {
+
+    access(all) entitlement Admin
+
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -115,35 +121,36 @@ access(all) contract FRC20Votes {
     }
 
     access(all) resource interface VoterPublic {
+        /// ---- Read: contract level ----
         access(all)
-        fun getVoterAddress(): Address
+        view fun getVoterAddress(): Address
         /// Get the voting power.
         access(all)
-        fun getVotingPower(): UFix64
+        view fun getVotingPower(): UFix64
         /// Check whether the proposal is voted.
         access(all)
-        fun hasVoted(_ proposalId: UInt64): Bool
+        view fun hasVoted(_ proposalId: UInt64): Bool
         /// Get the voted points.
         access(all)
-        fun getVotedPoints(_ proposalId: UInt64): UFix64?
+        view fun getVotedPoints(_ proposalId: UInt64): UFix64?
         /// Get the voted choice.
         access(all)
-        fun getVotedChoice(_ proposalId: UInt64): Int?
+        view fun getVotedChoice(_ proposalId: UInt64): Int?
         /// Get the voted proposals.
         access(all)
-        fun getVotedProposals(tick: String): [UInt64]
+        view fun getVotedProposals(tick: String): [UInt64]
         /// ---- Write: contract level ----
         access(contract)
-        fun onVote(choice: Int, proposal: &Proposal{ProposalPublic})
+        fun onVote(choice: Int, proposal: &Proposal)
         access(contract)
-        fun onProposalFinalized(proposal: &Proposal{ProposalPublic})
+        fun onProposalFinalized(proposal: &Proposal)
     }
 
     /// The resource of the FixesVotes voter identifier.
     ///
     access(all) resource VoterIdentity: VoterPublic, FRC20SemiNFT.FRC20SemiNFTCollectionPublic, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic {
         access(self)
-        let semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+        let semiNFTColCap: Capability<auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection>
         access(self)
         let lockedSemiNFTCollection: @FRC20SemiNFT.Collection
         // ----- Voting Info ----
@@ -161,47 +168,59 @@ access(all) contract FRC20Votes {
         let activeProposals: {UInt64: UFix64}
 
         init(
-            _ cap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+            _ cap: Capability<auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection>
         ) {
             pre {
                 cap.check(): "The capability is invalid"
             }
             self.semiNFTColCap = cap
-            self.lockedSemiNFTCollection <- (FRC20SemiNFT.createEmptyCollection() as! @FRC20SemiNFT.Collection)
+            self.lockedSemiNFTCollection <- (FRC20SemiNFT.createEmptyCollection(nftType: Type<@FRC20SemiNFT.NFT>()) as! @FRC20SemiNFT.Collection)
             self.voted = {}
             self.votedChoices = {}
             self.votedTicksMapping = {}
             self.activeProposals = {}
         }
 
-        destroy() {
-            destroy self.lockedSemiNFTCollection
-        }
         /** ----- Implement NFT Standard ----- */
 
         access(all)
-        fun deposit(token: @NonFungibleToken.NFT) {
+        fun deposit(token: @{NonFungibleToken.NFT}) {
             self.lockedSemiNFTCollection.deposit(token: <- token)
         }
 
-        access(all)
-        fun withdraw(withdrawID: UInt64): @NonFungibleToken.NFT {
+        access(NonFungibleToken.Withdraw)
+        fun withdraw(withdrawID: UInt64): @{NonFungibleToken.NFT} {
             return <- self.lockedSemiNFTCollection.withdraw(withdrawID: withdrawID)
         }
 
         access(all)
-        fun getIDs(): [UInt64] {
+        view fun getSupportedNFTTypes(): {Type: Bool} {
+            return self.lockedSemiNFTCollection.getSupportedNFTTypes()
+        }
+
+        access(all)
+        view fun isSupportedNFTType(type: Type): Bool {
+            return self.lockedSemiNFTCollection.isSupportedNFTType(type: type)
+        }
+
+        access(all)
+        view fun getIDs(): [UInt64] {
             return self.lockedSemiNFTCollection.getIDs()
         }
 
         access(all)
-        fun borrowNFT(id: UInt64): &NonFungibleToken.NFT {
-            return self.lockedSemiNFTCollection.borrowNFT(id: id)
+        view fun getLength(): Int {
+            return self.lockedSemiNFTCollection.getLength()
         }
 
         access(all)
-        fun borrowNFTSafe(id: UInt64): &NonFungibleToken.NFT? {
-            return self.lockedSemiNFTCollection.borrowNFTSafe(id: id)
+        fun forEachID(_ f: fun (UInt64): Bool): Void {
+            self.lockedSemiNFTCollection.forEachID(f)
+        }
+
+        access(all)
+        view fun borrowNFT(_ id: UInt64): &{NonFungibleToken.NFT}? {
+            return self.lockedSemiNFTCollection.borrowNFT(id)
         }
 
         access(all)
@@ -215,7 +234,7 @@ access(all) contract FRC20Votes {
         }
 
         access(all)
-        fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver}? {
+        view fun borrowFRC20SemiNFTPublic(id: UInt64): &FRC20SemiNFT.NFT? {
             return self.lockedSemiNFTCollection.borrowFRC20SemiNFTPublic(id: id)
         }
 
@@ -224,14 +243,14 @@ access(all) contract FRC20Votes {
         /// Get the voter address.
         ///
         access(all)
-        fun getVoterAddress(): Address {
+        view fun getVoterAddress(): Address {
             return self.owner?.address ?? panic("Voter's owner is not found")
         }
 
         /// Get the voting power.
         ///
         access(all)
-        fun getVotingPower(): UFix64 {
+        view fun getVotingPower(): UFix64 {
             let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
             let selfAddr = self.getVoterAddress()
 
@@ -246,28 +265,28 @@ access(all) contract FRC20Votes {
         /// Check whether the proposal is voted.
         ///
         access(all)
-        fun hasVoted(_ proposalId: UInt64): Bool {
+        view fun hasVoted(_ proposalId: UInt64): Bool {
             return self.voted[proposalId] != nil
         }
 
         /// Get the voted points.
         ///
         access(all)
-        fun getVotedPoints(_ proposalId: UInt64): UFix64? {
+        view fun getVotedPoints(_ proposalId: UInt64): UFix64? {
             return self.voted[proposalId]
         }
 
         /// Get the voted choice.
         ///
         access(all)
-        fun getVotedChoice(_ proposalId: UInt64): Int? {
+        view fun getVotedChoice(_ proposalId: UInt64): Int? {
             return self.votedChoices[proposalId]
         }
 
         /// Get the voted proposals.
         ///
         access(all)
-        fun getVotedProposals(tick: String): [UInt64] {
+        view fun getVotedProposals(tick: String): [UInt64] {
             if let voted = self.votedTicksMapping[tick] {
                 return voted
             } else {
@@ -278,7 +297,7 @@ access(all) contract FRC20Votes {
         /** ----- Write ----- */
 
         access(contract)
-        fun onVote(choice: Int, proposal: &Proposal{ProposalPublic}) {
+        fun onVote(choice: Int, proposal: &Proposal) {
             pre {
                 !self.hasVoted(proposal.uuid): "Proposal is already voted"
             }
@@ -336,7 +355,7 @@ access(all) contract FRC20Votes {
         }
 
         access(contract)
-        fun onProposalFinalized(proposal: &Proposal{ProposalPublic}) {
+        fun onProposalFinalized(proposal: &Proposal) {
             if !proposal.isFinalized() {
                 return
             }
@@ -344,7 +363,7 @@ access(all) contract FRC20Votes {
             self.activeProposals.remove(key: proposal.uuid)
 
             // check is no more active proposals
-            if self.activeProposals.keys.length == 0 {
+            if self.activeProposals.length == 0 {
                 // return all the staked NFTs to the staked collection
                 let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
                 let lockedNFTIds = self.lockedSemiNFTCollection.getIDsByTick(tick: stakeTick)
@@ -364,7 +383,7 @@ access(all) contract FRC20Votes {
         access(all)
         let command: {FRC20VoteCommands.IVoteCommand}
 
-        init(
+        view init(
             message: String,
             command: {FRC20VoteCommands.IVoteCommand},
         ) {
@@ -398,7 +417,7 @@ access(all) contract FRC20Votes {
         access(all)
         var isCancelled: Bool
 
-        init(
+        view init(
             proposer: Address,
             tick: String,
             title: String,
@@ -470,7 +489,7 @@ access(all) contract FRC20Votes {
         access(all)
         let timestamp: UFix64
 
-        init(
+        view init(
             _ status: ProposalStatus,
             _ timestamp: UFix64
         ) {
@@ -514,10 +533,10 @@ access(all) contract FRC20Votes {
         access(all)
         view fun isChoiceInscriptionsExtracted(choice: Int): Bool
         access(all)
-        view fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool
+        view fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT): Bool
         // --- Write Methods ---
         access(contract)
-        fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT})
+        fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT)
     }
 
     /// The struct of the FixesVotes proposal.
@@ -651,7 +670,7 @@ access(all) contract FRC20Votes {
         ///
         access(all)
         view fun getVotersAmount(): Int {
-            return self.votedAccounts.keys.length
+            return self.votedAccounts.length
         }
 
         /// Get the voters.
@@ -760,7 +779,7 @@ access(all) contract FRC20Votes {
         /// Check whether the NFT is voted.
         ///
         access(all)
-        view fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}): Bool {
+        view fun isVoted(_ semiNFT: &FRC20SemiNFT.NFT): Bool {
             return self.votedNFTs[semiNFT.id] != nil
         }
 
@@ -769,7 +788,7 @@ access(all) contract FRC20Votes {
         /// Vote on a proposal.
         ///
         access(contract)
-        fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT}) {
+        fun vote(choice: Int, semiNFT: &FRC20SemiNFT.NFT) {
             pre {
                 self.isVotingAllowed(): "Voting is not allowed for now"
                 choice < self.details.slots.length: "Choice is out of range"
@@ -838,7 +857,7 @@ access(all) contract FRC20Votes {
         /// Execute the proposal.
         ///
         access(contract)
-        fun execute() {
+        fun onExecute() {
             pre {
                 self.getStatus() == ProposalStatus.Successed: "Proposal is not successed"
             }
@@ -921,7 +940,7 @@ access(all) contract FRC20Votes {
                     let allVoters = self.getVoters()
                     for addr in allVoters {
                         if let voterRef = FRC20Votes.borrowVoterPublic(addr) {
-                            voterRef.onProposalFinalized(proposal: &self as &Proposal{ProposalPublic})
+                            voterRef.onProposalFinalized(proposal: &self as &Proposal)
                         }
                     }
                 } // end finalized
@@ -929,8 +948,8 @@ access(all) contract FRC20Votes {
         }
 
         access(contract)
-        fun borrowDetails(): &ProposalDetails {
-            return &self.details as &ProposalDetails
+        view fun borrowDetails(): &ProposalDetails {
+            return &self.details
         }
     }
 
@@ -951,7 +970,7 @@ access(all) contract FRC20Votes {
         view fun getProposalIdsByTick(tick: String): [UInt64]
         /// Borrow the proposal.
         access(all)
-        fun borrowProposal(_ proposalId: UInt64): &Proposal{ProposalPublic}?
+        view fun borrowProposal(_ proposalId: UInt64): &Proposal?
         /** ------ Write Methods ------ */
         /// Create a new proposal.
         access(all)
@@ -1003,11 +1022,6 @@ access(all) contract FRC20Votes {
             self.proposalIdsByTick = {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.proposals
-        }
-
         /** ----- Read ----- */
 
         /// Check whether the proposer is valid.
@@ -1035,7 +1049,7 @@ access(all) contract FRC20Votes {
 
         access(all)
         view fun getProposalLength(): Int {
-            return self.proposals.keys.length
+            return self.proposals.length
         }
 
         access(all)
@@ -1054,7 +1068,7 @@ access(all) contract FRC20Votes {
         }
 
         access(all)
-        fun borrowProposal(_ proposalId: UInt64): &Proposal{ProposalPublic}? {
+        view fun borrowProposal(_ proposalId: UInt64): &Proposal? {
             return self.borrowProposalRef(proposalId)
         }
 
@@ -1106,7 +1120,7 @@ access(all) contract FRC20Votes {
                     inscriptionsStore.store(<- ins)
                     j = j + 1
                 }
-                destroy insList
+                Burner.burn(<- insList)
 
                 slots.append(ChoiceSlotDetails(
                     message: messages[i],
@@ -1114,7 +1128,7 @@ access(all) contract FRC20Votes {
                 ))
                 i = i + 1
             }
-            destroy inscriptions
+            Burner.burn(<- inscriptions)
 
             let proposal <- create Proposal(
                 voter: voterAddr,
@@ -1223,18 +1237,18 @@ access(all) contract FRC20Votes {
                 status == ProposalStatus.Successed,
                 message: "The proposal is not successed"
             )
-            proposalRef.execute()
+            proposalRef.onExecute()
         }
 
         /** ----- Write: Private ----- */
 
-        access(all)
+        access(Admin)
         fun updateWhitelist(voter: Address, isWhitelisted: Bool) {
             self.whitelisted[voter] = isWhitelisted
             emit VotesManagerWhitelistUpdated(voter: voter, isWhitelisted: isWhitelisted)
         }
 
-        access(all)
+        access(Admin)
         fun forceHeartbeat() {
             let proposalIds = self.proposals.keys
             for proposalId in proposalIds {
@@ -1269,16 +1283,26 @@ access(all) contract FRC20Votes {
         /** ----- Internal ----- */
 
         access(self)
-        fun borrowProposalRef(_ proposalId: UInt64): &Proposal? {
-            return &self.proposals[proposalId] as &Proposal?
+        view fun borrowProposalRef(_ proposalId: UInt64): &Proposal? {
+            return &self.proposals[proposalId]
         }
+    }
+
+    /// Borrow the system inscriptions store.
+    ///
+    access(contract)
+    view fun borrowSystemInscriptionsStore(): auth(Fixes.Manage) &Fixes.InscriptionsStore {
+        let storePubPath = Fixes.getFixesStoreStoragePath()
+        return self.account.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePubPath)
+            ?? panic("Fixes.InscriptionsStore is not found")
     }
 
     /* --- Public Functions --- */
 
     access(all)
     fun createVoter(
-        _ cap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+        _ cap: Capability<auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection>
     ): @VoterIdentity {
         return <- create VoterIdentity(cap)
     }
@@ -1298,31 +1322,21 @@ access(all) contract FRC20Votes {
         return pool.getDetails().totalStaked
     }
 
-    /// Borrow the system inscriptions store.
-    ///
-    access(all)
-    fun borrowSystemInscriptionsStore(): &Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic} {
-        let storePubPath = Fixes.getFixesStorePublicPath()
-        return self.account
-            .getCapability<&Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic}>(storePubPath)
-            .borrow() ?? panic("Fixes.InscriptionsStore is not found")
-    }
-
     /// Borrow the voter resource.
     ///
     access(all)
-    fun borrowVoterPublic(_ addr: Address): &VoterIdentity{VoterPublic, FRC20SemiNFT.FRC20SemiNFTCollectionPublic, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}? {
+    view fun borrowVoterPublic(_ addr: Address): &VoterIdentity? {
         return getAccount(addr)
-            .getCapability<&VoterIdentity{VoterPublic, FRC20SemiNFT.FRC20SemiNFTCollectionPublic, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}>(self.VoterPublicPath)
+            .capabilities.get<&VoterIdentity>(self.VoterPublicPath)
             .borrow()
     }
 
     /// Borrow the VotesManager resource.
     ///
     access(all)
-    fun borrowVotesManager(): &VotesManager{VotesManagerPublic} {
+    view fun borrowVotesManager(): &VotesManager {
         return self.account
-            .getCapability<&VotesManager{VotesManagerPublic}>(self.FRC20VotesManagerPublicPath)
+            .capabilities.get<&VotesManager>(self.FRC20VotesManagerPublicPath)
             .borrow() ?? panic("VotesManager is not found")
     }
 
@@ -1332,10 +1346,10 @@ access(all) contract FRC20Votes {
         self.FRC20VotesManagerPublicPath = PublicPath(identifier: votesIdentifier)!
 
         // create the resource
-        self.account.save(<- create VotesManager(), to: self.FRC20VotesManagerStoragePath)
-        self.account.link<&VotesManager{VotesManagerPublic, FixesHeartbeat.IHeartbeatHook}>(
-            self.FRC20VotesManagerPublicPath,
-            target: self.FRC20VotesManagerStoragePath
+        self.account.storage.save(<- create VotesManager(), to: self.FRC20VotesManagerStoragePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&VotesManager>(self.FRC20VotesManagerStoragePath),
+            at: self.FRC20VotesManagerPublicPath
         )
 
         // Register to FixesHeartbeat
@@ -1351,18 +1365,18 @@ access(all) contract FRC20Votes {
 
         // Ensure InscriptionsStore resource
         let insStoreStoragePath = Fixes.getFixesStoreStoragePath()
-        if self.account.borrow<&AnyResource>(from: insStoreStoragePath) == nil {
-            self.account.save<@Fixes.InscriptionsStore>(<- Fixes.createInscriptionsStore(), to: insStoreStoragePath)
+        if self.account.storage.borrow<&AnyResource>(from: insStoreStoragePath) == nil {
+            self.account.storage.save<@Fixes.InscriptionsStore>(<- Fixes.createInscriptionsStore(), to: insStoreStoragePath)
         }
         let insStorePubPath = Fixes.getFixesStorePublicPath()
-        // @deprecated after Cadence 1.0
+
         if !self.account
-            .getCapability<&Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic}>(insStorePubPath)
+            .capabilities.get<&Fixes.InscriptionsStore>(insStorePubPath)
             .check() {
-            self.account.unlink(insStorePubPath)
-            self.account.link<&Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic}>(
-                insStorePubPath,
-                target: insStoreStoragePath
+            self.account.capabilities.unpublish(insStorePubPath)
+            self.account.capabilities.publish(
+                self.account.capabilities.storage.issue<&Fixes.InscriptionsStore>(insStoreStoragePath),
+                at: insStorePubPath
             )
         }
 
