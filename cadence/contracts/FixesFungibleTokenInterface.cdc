@@ -26,17 +26,55 @@ access(all) contract interface FixesFungibleTokenInterface {
     // ------ Events -------
 
     /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
+    access(all) event TokensMetadataInitialized(
+        ftIdentifier: String,
+        typeIdentifier: String,
+        id: String,
+        value: String,
+        owner: Address?
+    )
 
     /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataUpdated(typeIdentifier: String, id: String, value: String, owner: Address?)
+    access(all) event TokensMetadataUpdated(
+        ftIdentifier: String,
+        typeIdentifier: String,
+        id: String,
+        value: String,
+        owner: Address?,
+    )
 
     /// The event that is emitted when the dna metadata is updated
-    access(all) event TokenDNAGenerated(identifier: String, value: String, mutatableAmount: UInt64, owner: Address?)
+    access(all) event TokenDNAGenerated(
+        ftIdentifier: String,
+        identifier: String,
+        value: String,
+        mutatableAmount: UInt64,
+        owner: Address?
+    )
 
     /// The event that is emitted when the dna mutatable is updated
-    access(all) event TokenDNAMutatableCharged(identifier: String, mutatableAmount: UInt64, owner: Address?)
+    access(all) event TokenDNAMutatableCharged(
+        ftIdentifier: String,
+        identifier: String,
+        mutatableAmount: UInt64,
+        owner: Address?
+    )
 
+    /// Update the metadata
+    access(all) view
+    fun emitMetadataUpdated(
+        _ ref: auth(MetadataUpdate) &{FixesFungibleTokenInterface.Vault},
+        _ dataRef: &{FixesTraits.MergeableData},
+    ) {
+        // emit the event
+        emit TokensMetadataUpdated(
+            ftIdentifier: ref.getType().identifier,
+            typeIdentifier: dataRef.getType().identifier,
+            id: dataRef.getId(),
+            value: dataRef.toString(),
+            owner: ref.owner?.address
+        )
+    }
     /// -------- Resources and Interfaces --------
 
     /// The public interface for the Fungible Token
@@ -54,7 +92,17 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// DNA charging
         access(all)
-        fun chargeDNAMutatableAttempts(_ ins: auth(Fixes.Extractable) &Fixes.Inscription)
+        fun chargeDNAMutatableAttempts(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
+            post {
+                // emit the event
+                emit TokenDNAMutatableCharged(
+                    ftIdentifier: self.getType().identifier,
+                    identifier: self.getDNAIdentifier(),
+                    mutatableAmount: self.getDNAMutatableAmount(),
+                    owner: self.owner?.address
+                )
+            }
+        }
 
         // ----- Public Methods - default implementation exsits -----
 
@@ -126,6 +174,16 @@ access(all) contract interface FixesFungibleTokenInterface {
             pre {
                 self.borrowMergeableDataRef(data.getType()) == nil: "The metadata key already exists"
             }
+            post {
+                // emit the event
+                emit TokensMetadataInitialized(
+                    ftIdentifier: self.getType().identifier,
+                    typeIdentifier: data.getType().identifier,
+                    id: data.getId(),
+                    value: data.toString(),
+                    owner: self.owner?.address
+                )
+            }
         }
 
         /// Borrow the mergeable data by key
@@ -191,6 +249,16 @@ access(all) contract interface FixesFungibleTokenInterface {
                 let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64
                 dnaRef.setValue("mutatableAmount", newMutatableAmt)
             }
+
+            // emit the event
+            emit TokenDNAGenerated(
+                ftIdentifier: self.getType().identifier,
+                identifier: self.getDNAIdentifier(),
+                value: newDNA.toString(),
+                mutatableAmount: newDNA.mutatableAmount,
+                owner: self.owner?.address
+            )
+
             return newDNA
         }
     }
