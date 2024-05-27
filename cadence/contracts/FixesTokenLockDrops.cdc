@@ -11,6 +11,7 @@ It allows users to lock their frc20/fungible tokens for a certain period of time
 import "FungibleToken"
 import "FlowToken"
 import "stFlowToken"
+import "Burner"
 // FIXeS imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -23,6 +24,8 @@ import "FRC20AccountsPool"
 /// The contract definition
 ///
 access(all) contract FixesTokenLockDrops {
+
+    access(all) entitlement Manage
 
     // ------ Events -------
 
@@ -78,7 +81,7 @@ access(all) contract FixesTokenLockDrops {
 
     /// Locking Entry Resource
     ///
-    access(all) resource LockingEntry {
+    access(all) resource LockingEntry: Burner.Burnable {
         access(self)
         let locked: @FRC20FTShared.Change
         access(all)
@@ -92,8 +95,13 @@ access(all) contract FixesTokenLockDrops {
             self.unlockTime = unlockTime
         }
 
-        destroy() {
-            destroy self.locked
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.locked.isEmpty(): "The locked change is not empty"
+                self.isUnlocked(): "The entry is not unlocked"
+            }
+            // NOTHING
         }
 
         /// Get the locked balance
@@ -127,7 +135,7 @@ access(all) contract FixesTokenLockDrops {
 
     /// User Locking Info Resource
     ///
-    access(all) resource UserLockingInfo {
+    access(all) resource UserLockingInfo: Burner.Burnable {
         access(self)
         let belongsTo: Address
         access(self)
@@ -140,8 +148,12 @@ access(all) contract FixesTokenLockDrops {
             self.entries <- []
         }
 
-        destroy() {
-            destroy self.entries
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.entries.length == 0: "The entries are not empty"
+            }
+            // NOTHING
         }
 
         access(contract)
@@ -217,8 +229,7 @@ access(all) contract FixesTokenLockDrops {
                 } else {
                     unlocked?.merge(from: <- entry.extractLockedChange())
                 }
-                // destroy entry
-                destroy entry
+                Burner.burn(<- entry)
             }
             return <- unlocked!
         }
@@ -289,10 +300,6 @@ access(all) contract FixesTokenLockDrops {
             self.joinedPools = {}
         }
 
-        destroy() {
-            destroy self.lockingMapping
-        }
-
         // ------ Implment CeneterPublic ------
 
         /// Get the locked token ticker
@@ -322,7 +329,7 @@ access(all) contract FixesTokenLockDrops {
             var total: UFix64 = 0.0
             if let dictRef = self.borrowLockedDict(poolAddr) {
                 for userAddr in dictRef.keys {
-                    if let infoRef = &dictRef[userAddr] as &UserLockingInfo? {
+                    if let infoRef = dictRef[userAddr] {
                         total = total + infoRef.getTotalLockedBalance()
                     }
                 }
@@ -394,7 +401,7 @@ access(all) contract FixesTokenLockDrops {
                 let info <- create UserLockingInfo(userAddr)
                 poolDict[userAddr] <-! info
             }
-            let userLockingRef = &poolDict[userAddr] as &UserLockingInfo?
+            let userLockingRef = poolDict[userAddr]
                 ?? panic("The user locking info is missing")
 
             // lock the change
@@ -460,8 +467,8 @@ access(all) contract FixesTokenLockDrops {
         /// Borrow the locking dict
         ///
         access(self)
-        view fun borrowLockedDict(_ poolAddr: Address): &{Address: UserLockingInfo}? {
-            return &self.lockingMapping[poolAddr] as &{Address: UserLockingInfo}?
+        view fun borrowLockedDict(_ poolAddr: Address): auth(Mutate) &{Address: UserLockingInfo}? {
+            return &self.lockingMapping[poolAddr]
         }
 
         /// Borrow the locked token change
@@ -469,14 +476,14 @@ access(all) contract FixesTokenLockDrops {
         access(self)
         view fun borrowLockingInfo(_ poolAddr: Address, _ userAddr: Address): &UserLockingInfo? {
             if let poolDict = self.borrowLockedDict(poolAddr) {
-                return &poolDict[userAddr] as &UserLockingInfo?
+                return poolDict[userAddr]
             }
             return nil
         }
 
         access(self)
-        view fun borrowUserJoinedPools(_ userAddr: Address): &[Address]? {
-            return &self.joinedPools[userAddr] as &[Address]?
+        view fun borrowUserJoinedPools(_ userAddr: Address): auth(Mutate) &[Address]? {
+            return &self.joinedPools[userAddr]
         }
     }
 
@@ -493,7 +500,7 @@ access(all) contract FixesTokenLockDrops {
 
         // Borrow the tradable pool
         access(all)
-        view fun borrowRelavantTradablePool(): &FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface}? {
+        view fun borrowRelavantTradablePool(): &FixesTradablePool.TradableLiquidityPool? {
             return FixesTradablePool.borrowTradablePool(self.getPoolAddress())
         }
 
@@ -555,9 +562,9 @@ access(all) contract FixesTokenLockDrops {
         /// Locking for token drops
         access(all)
         fun lockAndMint(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             lockingPeriod: UFix64,
-            lockingVault: @FungibleToken.Vault?,
+            lockingVault: @{FungibleToken.Vault}?,
         ) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
@@ -572,7 +579,7 @@ access(all) contract FixesTokenLockDrops {
         /// Claim drops token
         access(all)
         fun claimDrops(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver},
         ) {
             pre {
@@ -589,7 +596,7 @@ access(all) contract FixesTokenLockDrops {
         ///
         access(all)
         fun claimUnlockedTokens(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver}?,
         ) {
             pre {
@@ -611,7 +618,7 @@ access(all) contract FixesTokenLockDrops {
         let minter: @{FixesFungibleTokenInterface.IMinter}
         // The vault for the token
         access(self)
-        let vault: @FungibleToken.Vault
+        let vault: @{FungibleToken.Vault}
         // Address => Record
         access(self)
         let claimableRecords: {Address: UFix64}
@@ -652,12 +659,6 @@ access(all) contract FixesTokenLockDrops {
             self.lockingExchangeRates = lockingExchangeRates
             self.activateTime = activateTime
             self.failureDeprecatedTime = failureDeprecatedTime
-        }
-
-        // @deprecated in Cadence 1.0
-        destroy() {
-            destroy self.minter
-            destroy self.vault
         }
 
         // ------ Implment DropsPoolPublic ------
@@ -788,9 +789,9 @@ access(all) contract FixesTokenLockDrops {
         ///
         access(all)
         fun lockAndMint(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             lockingPeriod: UFix64,
-            lockingVault: @FungibleToken.Vault?,
+            lockingVault: @{FungibleToken.Vault}?,
         ) {
             pre {
                 self.lockingExchangeRates[lockingPeriod] != nil: "The locking period is not supported"
@@ -826,7 +827,7 @@ access(all) contract FixesTokenLockDrops {
                     lockingVault == nil,
                     message: "The vault is not needed"
                 )
-                destroy lockingVault
+                Burner.burn(<- lockingVault)
                 // here is for FRC20 token
                 let frc20Indexer = FRC20Indexer.getIndexer()
                 // inscription should be op=withdraw for withdraw frc20 token
@@ -875,7 +876,7 @@ access(all) contract FixesTokenLockDrops {
         ///
         access(all)
         fun claimDrops(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver},
         ) {
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
@@ -923,7 +924,7 @@ access(all) contract FixesTokenLockDrops {
         ///
         access(all)
         fun claimUnlockedTokens(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver}?,
         ) {
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
@@ -955,7 +956,7 @@ access(all) contract FixesTokenLockDrops {
                     )
                     // deposit the released entry to the recipient
                     recipient!.deposit(from: <- releasedEntry.extractAsVault())
-                    destroy releasedEntry
+                    Burner.burn(<- releasedEntry)
                 } else {
                     // for FRC20 token and Flow, we can use FRC20Indexer.return
                     let frc20Indexer = FRC20Indexer.getIndexer()
@@ -988,8 +989,8 @@ access(all) contract FixesTokenLockDrops {
         }
 
         access(contract)
-        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
-            return &self.minter as &{FixesFungibleTokenInterface.IMinter}
+        view fun borrowMinter(): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IMinter} {
+            return &self.minter
         }
 
         // ----- Internal Methods -----
@@ -1057,7 +1058,7 @@ access(all) contract FixesTokenLockDrops {
             emptyChange <-! FRC20FTShared.createEmptyFlowChange(from: from)
         } else if lockingTick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
             // create an empty stFlowToken change
-            let vault <- stFlowToken.createEmptyVault()
+            let vault <- stFlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             emptyChange <-! FRC20FTShared.wrapFungibleVaultChange(ftVault: <- vault, from: from)
         } else if lockingTick == utilityTick {
             // create an empty fixes change
@@ -1081,7 +1082,7 @@ access(all) contract FixesTokenLockDrops {
     ///
     access(account)
     fun createDropsPool(
-        _ ins: &Fixes.Inscription,
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
         _ lockingExchangeRates: {UFix64: UFix64},
         _ activateTime: UFix64?,
@@ -1166,10 +1167,10 @@ access(all) contract FixesTokenLockDrops {
     /// Borrow the Locking Center
     ///
     access(all)
-    view fun borrowLockingCenter(): &LockingCenter{CeneterPublic} {
+    view fun borrowLockingCenter(): &LockingCenter {
         // @deprecated in Cadence 1.0
         return getAccount(self.account.address)
-            .getCapability<&LockingCenter{CeneterPublic}>(self.getLockingCenterPublicPath())
+            .capabilities.get<&LockingCenter>(self.getLockingCenterPublicPath())
             .borrow()
             ?? panic("The Locking Center is missing")
     }
@@ -1177,10 +1178,10 @@ access(all) contract FixesTokenLockDrops {
     /// Borrow the Drops Pool
     ///
     access(all)
-    view fun borrowDropsPool(_ addr: Address): &DropsPool{DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}? {
+    view fun borrowDropsPool(_ addr: Address): &DropsPool? {
         // @deprecated in Cadence 1.0
         return getAccount(addr)
-            .getCapability<&DropsPool{DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getDropsPoolPublicPath())
+            .capabilities.get<&DropsPool>(self.getDropsPoolPublicPath())
             .borrow()
     }
 
@@ -1224,10 +1225,10 @@ access(all) contract FixesTokenLockDrops {
     }
 
     init() {
-        self.account.save(<- create LockingCenter(), to: self.getLockingCenterStoragePath())
-        self.account.link<&LockingCenter{CeneterPublic}>(
-            self.getLockingCenterPublicPath(),
-            target: self.getLockingCenterStoragePath()
+        self.account.storage.save(<- create LockingCenter(), to: self.getLockingCenterStoragePath())
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&LockingCenter>(self.getLockingCenterStoragePath()),
+            at: self.getLockingCenterPublicPath()
         )
     }
 }
