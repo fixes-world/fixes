@@ -580,7 +580,7 @@
 			"source": "imports-c1/ec67451f8a58216a/PublicPriceOracle.cdc",
 			"aliases": {
 				"mainnet": "ec67451f8a58216a",
-				"testnet": "866a9f1e81898147"
+				"testnet": "8232ce4a3aff4e94"
 			}
 		},
 		"Sender": {

@@ -18,7 +18,7 @@ import "Burner"
 // Third-party dependencies
 import "BlackHole"
 import "AddressUtils"
-// import "PublicPriceOracle"
+import "PublicPriceOracle"
 import "SwapFactory"
 import "SwapInterfaces"
 import "SwapConfig"
@@ -1323,8 +1323,7 @@ access(all) contract FixesTradablePool {
             return 1.0
         } else {
             // Uncomment the following code when the oracle is available
-            // return PublicPriceOracle.getLatestPrice(oracleAddr: oracleAddress!)
-            return 1.0
+            return PublicPriceOracle.getLatestPrice(oracleAddr: oracleAddress!)
         }
     }
 
@@ -1334,7 +1333,7 @@ access(all) contract FixesTradablePool {
     view fun getTargetMarketCap(): UFix64 {
         // use the shared store to get the sale fee
         let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
-        let valueInStore = sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolCreateLPTargetMarketCap) as! UFix64?
+        let valueInStore: UFix64? = sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolCreateLPTargetMarketCap) as! UFix64?
         // Default is 32800 USD
         let defaultTargetMarketCap = 32_800.0
         return valueInStore ?? defaultTargetMarketCap
