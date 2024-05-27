@@ -64,7 +64,7 @@ access(all) contract FixesTokenAirDrops {
 
         // Borrow the tradable pool
         access(all)
-        view fun borrowRelavantTradablePool(): &FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface}? {
+        view fun borrowRelavantTradablePool(): &FixesTradablePool.TradableLiquidityPool? {
             return FixesTradablePool.borrowTradablePool(self.getPoolAddress())
         }
 
@@ -87,7 +87,7 @@ access(all) contract FixesTokenAirDrops {
         /// Set the claimable amount
         access(all)
         fun setClaimableDict(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             claimables: {Address: UFix64}
         ) {
             pre {
@@ -101,7 +101,7 @@ access(all) contract FixesTokenAirDrops {
         /// Claim drops token
         access(all)
         fun claimDrops(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver},
         ) {
             pre {
@@ -138,10 +138,6 @@ access(all) contract FixesTokenAirDrops {
             self.grantedClaimableAmount = 0.0
         }
 
-        destroy() {
-            destroy self.minter
-        }
-
         // ------ Implment AirdropPoolPoolPublic ------
 
         /// Check if the pool is claimable
@@ -174,7 +170,7 @@ access(all) contract FixesTokenAirDrops {
         /// Set the claimable amount
         access(all)
         fun setClaimableDict(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             claimables: {Address: UFix64}
         ) {
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
@@ -221,7 +217,7 @@ access(all) contract FixesTokenAirDrops {
         /// Claim drops token
         access(all)
         fun claimDrops(
-            _ ins: &Fixes.Inscription,
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver},
         ) {
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
@@ -283,8 +279,8 @@ access(all) contract FixesTokenAirDrops {
 
         /// Borrow the minter
         access(contract)
-        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
-            return &self.minter as &{FixesFungibleTokenInterface.IMinter}
+        view fun borrowMinter(): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IMinter} {
+            return &self.minter
         }
 
         // ----- Internal Methods -----
@@ -311,7 +307,7 @@ access(all) contract FixesTokenAirDrops {
     ///
     access(account)
     fun createDropsPool(
-        _ ins: &Fixes.Inscription,
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
     ): @AirdropPool {
         pre {
@@ -348,10 +344,10 @@ access(all) contract FixesTokenAirDrops {
     /// Borrow the Drops Pool
     ///
     access(all)
-    view fun borrowAirdropPool(_ addr: Address): &AirdropPool{AirdropPoolPoolPublic, FixesFungibleTokenInterface.IMinterHolder}? {
+    view fun borrowAirdropPool(_ addr: Address): &AirdropPool? {
         // @deprecated in Cadence 1.0
         return getAccount(addr)
-            .getCapability<&AirdropPool{AirdropPoolPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAirdropPoolPublicPath())
+            .capabilities.get<&AirdropPool>(self.getAirdropPoolPublicPath())
             .borrow()
     }
 
