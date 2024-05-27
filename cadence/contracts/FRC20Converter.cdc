@@ -39,7 +39,7 @@ access(all) contract FRC20Converter {
     ///
     access(all) resource interface FRC20TreasuryReceiver {
         access(all)
-        fun depositFlowToken(_ token: @FungibleToken.Vault) {
+        fun depositFlowToken(_ token: @{FungibleToken.Vault}) {
             pre {
                 token.isInstance(Type<@FlowToken.Vault>()): "Invalid token type"
             }
@@ -57,7 +57,7 @@ access(all) contract FRC20Converter {
         view fun getUnburnableTicks(): [String]
         /// burn and send the tokens
         access(all)
-        fun burnAndSend(_ ins: &Fixes.Inscription, recipient: &{FRC20TreasuryReceiver})
+        fun burnAndSend(_ ins: auth(Fixes.Extractable) &Fixes.Inscription, recipient: &{FRC20TreasuryReceiver})
     }
 
     /// System Burner
@@ -83,14 +83,14 @@ access(all) contract FRC20Converter {
         /// burn and send the tokens
         ///
         access(all)
-        fun burnAndSend(_ ins: &Fixes.Inscription, recipient: &{FRC20TreasuryReceiver}) {
+        fun burnAndSend(_ ins: auth(Fixes.Extractable) &Fixes.Inscription, recipient: &{FRC20TreasuryReceiver}) {
             pre {
                 ins.isExtractable(): "Inscription is not extractable"
             }
             post {
                 ins.isExtracted(): "Inscription is not extracted"
             }
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
             assert(
                 self.isTickerBurnable(tick),
@@ -125,7 +125,7 @@ access(all) contract FRC20Converter {
         view fun getTokenType(): Type
         /// convert the frc20 to the frc20 FT
         access(all)
-        fun convertFromIndexer(ins: &Fixes.Inscription, recipient: &{FungibleToken.Receiver}) {
+        fun convertFromIndexer(ins: auth(Fixes.Extractable) &Fixes.Inscription, recipient: &{FungibleToken.Receiver}) {
             pre {
                 ins.isExtractable(): "Inscription is not extractable"
                 recipient.getSupportedVaultTypes()[self.getTokenType()] == true: "Recipient does not support the token type"
@@ -136,7 +136,7 @@ access(all) contract FRC20Converter {
         }
         /// convert the frc20 FT to the frc20
         access(all)
-        fun convertBackToIndexer(ins: &Fixes.Inscription, vault: @FungibleToken.Vault) {
+        fun convertBackToIndexer(ins: auth(Fixes.Extractable) &Fixes.Inscription, vault: @{FungibleToken.Vault}) {
             pre {
                 ins.isExtractable(): "Inscription is not extractable"
                 vault.getType() == self.getTokenType(): "Vault does not support the token type"
@@ -151,10 +151,10 @@ access(all) contract FRC20Converter {
     ///
     access(all) resource FTConverter: IConverter {
         access(self)
-        let adminCap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>
+        let adminCap: Capability<auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IAdminWritable}>
 
         init(
-            _ cap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>
+            _ cap: Capability<auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IAdminWritable}>
         ) {
             self.adminCap = cap
 
@@ -186,12 +186,12 @@ access(all) contract FRC20Converter {
         /// convert the frc20 to the frc20 FT
         ///
         access(all)
-        fun convertFromIndexer(ins: &Fixes.Inscription, recipient: &{FungibleToken.Receiver}) {
+        fun convertFromIndexer(ins: auth(Fixes.Extractable) &Fixes.Inscription, recipient: &{FungibleToken.Receiver}) {
             // borrow the minter reference
             let minter = self.borrowMinterRef()
 
             // parse the metadata
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
             let minterTicker = minter.getSymbol()
             assert(
@@ -219,12 +219,12 @@ access(all) contract FRC20Converter {
         /// convert the frc20 FT to the frc20
         ///
         access(all)
-        fun convertBackToIndexer(ins: &Fixes.Inscription, vault: @FungibleToken.Vault) {
+        fun convertBackToIndexer(ins: auth(Fixes.Extractable) &Fixes.Inscription, vault: @{FungibleToken.Vault}) {
             // borrow the minter reference
             let minter = self.borrowMinterRef()
 
             // parse the metadata
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
             let minterTicker = minter.getSymbol()
             assert(
@@ -240,7 +240,7 @@ access(all) contract FRC20Converter {
         /// Borrow the admin reference
         ///
         access(self)
-        view fun borrowAdminRef(): &{FixesFungibleTokenInterface.IAdminWritable} {
+        view fun borrowAdminRef(): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IAdminWritable} {
             return self.adminCap.borrow()
                 ?? panic("Could not borrow the admin reference")
         }
@@ -248,7 +248,7 @@ access(all) contract FRC20Converter {
         /// Borrow the super minter reference
         ///
         access(self)
-        view fun borrowMinterRef(): &{FixesFungibleTokenInterface.IMinter} {
+        view fun borrowMinterRef(): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IMinter} {
             return self.borrowAdminRef().borrowSuperMinter()
         }
     }
@@ -258,9 +258,9 @@ access(all) contract FRC20Converter {
     /// Borrow the system burner reference
     ///
     access(all)
-    view fun borrowSystemBurner(): &SystemBurner{IFRC20Burner} {
+    view fun borrowSystemBurner(): &SystemBurner {
         return getAccount(self.account.address)
-            .getCapability<&SystemBurner{IFRC20Burner}>(self.getSystemBurnerPublicPath())
+            .capabilities.get<&SystemBurner>(self.getSystemBurnerPublicPath())
             .borrow()
             ?? panic("Could not borrow the SystemBurner reference")
     }
@@ -268,16 +268,18 @@ access(all) contract FRC20Converter {
     /// Create the FRC20 Converter
     ///
     access(all)
-    fun createConverter(_ privCap: Capability<&{FixesFungibleTokenInterface.IAdminWritable}>): @FTConverter {
+    fun createConverter(
+        _ privCap: Capability<auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IAdminWritable}>
+    ): @FTConverter {
         return <- create FTConverter(privCap)
     }
 
     /// Borrow the FRC20 Converter
     ///
     access(all)
-    view fun borrowConverter(_ addr: Address): &FTConverter{IConverter}? {
+    view fun borrowConverter(_ addr: Address): &FTConverter? {
         return getAccount(addr)
-            .getCapability<&FTConverter{IConverter}>(self.getFTConverterPublicPath())
+            .capabilities.get<&FTConverter>(self.getFTConverterPublicPath())
             .borrow()
     }
 
@@ -322,10 +324,12 @@ access(all) contract FRC20Converter {
 
     init() {
         let storagePath = self.getSystemBurnerStoragePath()
-        self.account.save(<- create SystemBurner(), to: storagePath)
-        // link the public path
-        // @deprecated in Cadence 1.0
-        self.account.link<&SystemBurner{IFRC20Burner}>(self.getSystemBurnerPublicPath(), target: storagePath)
+        self.account.storage.save(<- create SystemBurner(), to: storagePath)
+        // publish the public path
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&SystemBurner>(storagePath),
+            at: self.getSystemBurnerPublicPath()
+        )
 
         emit ContractInitialized()
     }

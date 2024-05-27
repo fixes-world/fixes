@@ -249,11 +249,7 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// The admin interface for the FT
     ///
-    access(all) resource interface IAdminWritable {
-        /// Check if the address is the admin
-        access(all)
-        view fun isAuthorizedUser(_ addr: Address): Bool
-
+    access(all) resource interface IAdminWritable: IGlobalPublic {
         /// Borrow the super minter resource
         ///
         access(Manage)
@@ -330,7 +326,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(Manage)
         fun initializeVaultByInscription(
             vault: @{FungibleToken.Vault},
-            ins: &Fixes.Inscription
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
         ): @{FungibleToken.Vault} {
             pre {
                 ins.isExtractable(): "The inscription must be extractable"
@@ -347,7 +343,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(Manage)
         fun burnTokenWithInscription(
             vault: @{FungibleToken.Vault},
-            ins: &Fixes.Inscription
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
         ) {
             pre {
                 ins.isExtractable(): "The inscription must be extractable"
