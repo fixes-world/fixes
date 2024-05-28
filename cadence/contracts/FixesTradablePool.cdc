@@ -815,7 +815,7 @@ access(all) contract FixesTradablePool {
             let payment <- flowPaymentVault.withdraw(amount: totalCost)
             if protocolFee > 0.0 {
                 let protocolFeeVault <- payment.withdraw(amount: protocolFee)
-                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformFeeDestination())
+                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformAddress())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
@@ -906,7 +906,7 @@ access(all) contract FixesTradablePool {
             // withdraw the protocol fee from the flow vault
             if protocolFee > 0.0 {
                 let protocolFeeVault <- self.flowVault.withdraw(amount: protocolFee)
-                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformFeeDestination())
+                let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformAddress())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
@@ -1059,6 +1059,18 @@ access(all) contract FixesTradablePool {
             let userAddr = buyer == poolAddr ? seller : buyer
             if let userTransactionHook = FRC20FTShared.borrowTransactionHook(userAddr) {
                 userTransactionHook.onDeal(
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tickerName,
+                    dealAmount: dealAmount,
+                    dealPrice: dealPrice,
+                    storefront: poolAddr,
+                    listingId: nil,
+                )
+            }
+            // invoke the system transaction hook
+            if let systemTransactionHook = FRC20FTShared.borrowTransactionHook(Fixes.getPlatformAddress()) {
+                systemTransactionHook.onDeal(
                     seller: seller,
                     buyer: buyer,
                     tick: tickerName,
