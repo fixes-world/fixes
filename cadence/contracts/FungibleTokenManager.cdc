@@ -129,7 +129,7 @@ access(all) contract FungibleTokenManager {
     /// Borrow the global public of Fixes Fungible Token contract
     ///
     access(all)
-    veiw fun borrowFTGlobalPublic(_ tick: String): &{FixesFungibleTokenInterface.IGlobalPublic}? {
+    view fun borrowFTGlobalPublic(_ tick: String): &{FixesFungibleTokenInterface.IGlobalPublic}? {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         // borrow the contract
