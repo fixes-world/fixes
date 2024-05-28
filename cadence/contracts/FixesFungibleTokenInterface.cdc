@@ -60,6 +60,19 @@ access(all) contract interface FixesFungibleTokenInterface {
         owner: Address?
     )
 
+    /// The event that is emitted when a new minter resource is created
+    access(all) event MinterCreated(
+        ftIdentifier: String,
+        allowedAmount: UFix64
+    )
+
+    /// The event that is emitted when the admin is updated
+    access(all) event AdminUserUpdated(
+        ftIdentifier: String,
+        addr: Address,
+        flag: Bool
+    )
+
     /// Update the metadata
     access(all) view
     fun emitMetadataUpdated(
@@ -326,12 +339,29 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Update the authorized users
         ///
         access(Manage)
-        fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool)
+        fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool) {
+            post {
+                // emit the event
+                emit AdminUserUpdated(
+                    ftIdentifier: self.borrowSuperMinter().getTokenType().identifier,
+                    addr: addr,
+                    flag: isAdd
+                )
+            }
+        }
 
         /// Create a new Minter resource
         ///
         access(Manage)
-        fun createMinter(allowedAmount: UFix64): @{IMinter}
+        fun createMinter(allowedAmount: UFix64): @{IMinter} {
+            post {
+                // emit the event
+                emit MinterCreated(
+                    ftIdentifier: self.borrowSuperMinter().getTokenType().identifier,
+                    allowedAmount: allowedAmount
+                )
+            }
+        }
     }
 
     /// The token identity resource interface

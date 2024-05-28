@@ -15,6 +15,7 @@ import "MetadataViews"
 import "FungibleTokenMetadataViews"
 import "BlackHole"
 import "TokenList"
+import "Burner"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -33,35 +34,11 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// The event that is emitted when the contract is created
     access(all) event TokensInitialized(initialSupply: UFix64)
 
-    /// The event that is emitted when tokens are withdrawn from a Vault
-    access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
-
-    /// The event that is emitted when tokens are deposited to a Vault
-    access(all) event TokensDeposited(amount: UFix64, to: Address?)
-
     /// The event that is emitted when new tokens are minted
     access(all) event TokensMinted(amount: UFix64)
 
     /// The event that is emitted when tokens are destroyed
     access(all) event TokensBurned(amount: UFix64)
-
-    /// The event that is emitted when a new minter resource is created
-    access(all) event MinterCreated(allowedAmount: UFix64)
-
-    /// The event that is emitted when the admin is updated
-    access(all) event AdminUserUpdated(addr: Address, flag: Bool)
-
-    /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
-
-    /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataUpdated(typeIdentifier: String, id: String, value: String, owner: Address?)
-
-    /// The event that is emitted when the dna metadata is updated
-    access(all) event TokenDNAGenerated(identifier: String, value: String, mutatableAmount: UInt64, owner: Address?)
-
-    /// The event that is emitted when the dna mutatable is updated
-    access(all) event TokenDNAMutatableCharged(identifier: String, mutatableAmount: UInt64, owner: Address?)
 
     /// -------- Parameters --------
 
@@ -84,7 +61,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    access(all) resource Vault: FixesFungibleTokenInterface.Metadata, FixesFungibleTokenInterface.MetadataGenerator, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: FixesFungibleTokenInterface.Vault, FungibleToken.Vault {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
@@ -98,10 +75,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.metadata = {}
         }
 
-        destroy() {
-            self.burnCallback()
-        }
-
         /// Called when a fungible token is burned via the `Burner.burn()` method
         ///
         access(contract) fun burnCallback() {
@@ -109,6 +82,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 // update the total supply for the FungibleToken
                 FixesFungibleToken.totalSupply = FixesFungibleToken.totalSupply - self.balance
             }
+            self.balance = 0.0
         }
 
         /// createEmptyVault
@@ -119,7 +93,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// account to be able to receive deposits of this token type.
         ///
         access(all) fun createEmptyVault(): @Vault {
-            return <- FixesFungibleToken.createEmptyVault()
+            return <- FixesFungibleToken.createEmptyVault(vaultType: Type<@Vault>())
         }
 
         /// ----- Internal Methods -----
@@ -158,14 +132,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         fun initializeMetadata(_ data: {FixesTraits.MergeableData}) {
             let key = data.getType()
             self.metadata[key] = data
-
-            // emit the event
-            emit TokensMetadataInitialized(
-                typeIdentifier: key.identifier,
-                id: data.getId(),
-                value: data.toString(),
-                owner: self.owner?.address
-            )
         }
 
         /// --------- Implement Metadata --------- ///
@@ -180,7 +146,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// One inscription can activate 5 DNA mutatable attempts.
         ///
         access(all)
-        fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription) {
+        fun chargeDNAMutatableAttempts(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
             let insOwner = ins.owner?.address ?? panic("The owner of the inscription is not found")
             assert(
                 insOwner == self.owner?.address,
@@ -198,13 +164,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 // update the DNA mutatable amount
                 let addAmt = self.getMaxGenerateGeneAttempts()
                 dnaRef.setValue("mutatableAmount", oldValue + addAmt)
-
-                // emit the event
-                emit TokenDNAMutatableCharged(
-                    identifier: self.getDNAIdentifier(),
-                    mutatableAmount: oldValue + addAmt,
-                    owner: self.owner?.address
-                )
             }
 
             // execute the inscription
@@ -229,8 +188,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// @param amount: The amount of tokens to be withdrawn from the vault
         /// @return The Vault resource containing the withdrawn funds
         ///
-        access(all)
-        fun withdraw(amount: UFix64): @FungibleToken.Vault {
+        access(FungibleToken.Withdraw)
+        fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
             pre {
                 self.isAvailableToWithdraw(amount: amount): "The amount withdrawn must be less than or equal to the balance"
             }
@@ -255,11 +214,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                     newVault.metadata[key] = splitData
 
                     // emit the event
-                    emit TokensMetadataUpdated(
-                        typeIdentifier: key.identifier,
-                        id: dataRef.getId(),
-                        value: dataRef.toString(),
-                        owner: self.owner?.address
+                    FixesFungibleToken.emitMetadataUpdated(
+                        &self as auth(FixesFungibleTokenInterface.MetadataUpdate) &{FixesFungibleTokenInterface.Vault},
+                        dataRef
                     )
                 }
             }
@@ -285,11 +242,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 }
             }
 
-            // emit the event
-            emit TokensWithdrawn(
-                amount: amount,
-                from: ownerAddr
-            )
             return <- newVault
         }
 
@@ -297,14 +249,14 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// Function that takes a Vault object as an argument and adds
         /// its balance to the balance of the owners Vault.
-        /// It is allowed to destroy the sent Vault because the Vault
+        /// It is allowed to Burner.burn(the sent Vault because the Vault
         /// was a temporary holder of the tokens. The Vault's balance has
         /// been consumed and therefore can be destroyed.
         ///
         /// @param from: The Vault resource containing the funds that will be deposited
         ///
         access(all)
-        fun deposit(from: @FungibleToken.Vault) {
+        fun deposit(from: @{FungibleToken.Vault}) {
             // the interface ensured that the vault is of the same type
             // so we can safely cast it
             let vault <- from as! @FixesFungibleToken.Vault
@@ -335,9 +287,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                             if BlackHole.isAnyBlackHoleAvailable() {
                                 BlackHole.vanish(<- taxVault)
                             } else {
-                                // Otherwise, destroy the taxVault
-                                // TODO: Using Burner to burn the taxVault in Cadence 1.0
-                                destroy taxVault
+                                // Otherwise, destory the taxVault
+                                Burner.burn(<- taxVault)
                             }
                         }
                     }
@@ -356,11 +307,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
                 let dataRef = self.borrowMergeableDataRef(key)!
                 // emit the event
-                emit TokensMetadataUpdated(
-                    typeIdentifier: key.identifier,
-                    id: dataRef.getId(),
-                    value: dataRef.toString(),
-                    owner: self.owner?.address
+                FixesFungibleToken.emitMetadataUpdated(
+                    &self as auth(FixesFungibleTokenInterface.MetadataUpdate) &{FixesFungibleTokenInterface.Vault},
+                    dataRef
                 )
             }
 
@@ -372,7 +321,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             // reset the balance of the from vault
             vault.balance = 0.0
             // vault is useless now
-            destroy vault
+            Burner.burn(<- vault)
 
             // Is the vault has DNA, then attempt to generate a new gene
             self._attemptGenerateGene(depositedBalance, self.balance)
@@ -390,14 +339,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                     }
                 }
             }
-
-            emit TokensDeposited(
-                amount: depositedBalance,
-                to: ownerAddr
-            )
         }
 
-        /// --------- Implement MetadataViews.Resolver --------- ///
+        /// --------- Implement ViewResolver.Resolver --------- ///
 
         /// The way of getting all the Metadata Views implemented by FixesFungibleToken
         ///
@@ -405,8 +349,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///         developers to know which parameter to pass to the resolveView() method.
         ///
         access(all)
-        fun getViews(): [Type] {
-            let contractViews = FixesFungibleToken.getViews()
+        view fun getViews(): [Type] {
+            let contractViews = FixesFungibleToken.getContractViews(resourceType: Type<@Vault>())
             return contractViews
         }
 
@@ -417,7 +361,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(all)
         fun resolveView(_ view: Type): AnyStruct? {
-            return FixesFungibleToken.resolveView(view)
+            return FixesFungibleToken.resolveContractView(resourceType: nil, viewType: view)
         }
 
         /// --------- Internal Methods --------- ///
@@ -425,8 +369,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the mergeable data by key
         ///
         access(contract)
-        view fun borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
-            return &self.metadata[type] as &{FixesTraits.MergeableData}?
+        view fun borrowMergeableDataRef(_ type: Type): auth(FixesTraits.Write) &{FixesTraits.MergeableData}? {
+            return &self.metadata[type]
         }
 
         /// Attempt to generate a new gene, Max attempts is 10
@@ -439,15 +383,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             // every 10% of balance change will get a new attempt to mutate the DNA
             let attempt = UInt64(transactedAmt / totalAmt / 0.1)
             // attempt to generate a new gene
-            if let newMergedDNA = self.attemptGenerateGene(attempt) {
-                // emit the event
-                emit TokenDNAGenerated(
-                    identifier: self.getDNAIdentifier(),
-                    value: newMergedDNA.toString(),
-                    mutatableAmount: newMergedDNA.mutatableAmount,
-                    owner: self.owner?.address
-                )
-            }
+            self.attemptGenerateGene(attempt)
         }
     }
 
@@ -487,11 +423,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.top100Accounts = []
             self.authorizedUsers = {}
             self.tokenHolders = {}
-        }
-
-        // @deprecated in Cadence 1.0
-        destroy() {
-            destroy self.minter
         }
 
         // ----- Implement AdminInterface -----
@@ -551,7 +482,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Get the holders amount
         access(all)
         view fun getHoldersAmount(): UInt64 {
-            return UInt64(self.tokenHolders.keys.length)
+            return UInt64(self.tokenHolders.length)
         }
 
         /// update the token holder
@@ -603,7 +534,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the minter reference
         ///
         access(contract)
-        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
+        view fun borrowMinter(): auth(FixesFungibleTokenInterface.Manage) &Minter {
             return self.borrowSuperMinter()
         }
 
@@ -611,28 +542,25 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// Create a new Minter resource
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun createMinter(allowedAmount: UFix64): @Minter {
             let minter <- create Minter(allowedAmount: allowedAmount)
             self.grantedMintableAmount = self.grantedMintableAmount + allowedAmount
-            emit MinterCreated(allowedAmount: allowedAmount)
             return <- minter
         }
 
         /// Update the authorized users
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool) {
             self.authorizedUsers[addr] = isAdd
-
-            emit AdminUserUpdated(addr: addr, flag: isAdd)
         }
 
         /// Borrow the super minter resource
         ///
-        access(all)
-        view fun borrowSuperMinter(): &Minter {
-            return &self.minter as &Minter
+        access(FixesFungibleTokenInterface.Manage)
+        view fun borrowSuperMinter(): auth(FixesFungibleTokenInterface.Manage) &Minter {
+            return &self.minter
         }
     }
 
@@ -708,8 +636,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Get the vault data of the minting token
         ///
         access(all)
-        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
-            return FixesFungibleToken.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+        fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            return FixesFungibleToken.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
                 ?? panic("The vault data is not found")
         }
 
@@ -719,7 +647,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// @param amount: The quantity of tokens to mint
         /// @return The Vault resource containing the minted tokens
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun mintTokens(amount: UFix64): @FixesFungibleToken.Vault {
             pre {
                 amount > 0.0: "Amount minted must be greater than zero"
@@ -737,11 +665,11 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// Mint tokens with user's inscription
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun initializeVaultByInscription(
-            vault: @FungibleToken.Vault,
-            ins: &Fixes.Inscription
-        ): @FungibleToken.Vault {
+            vault: @{FungibleToken.Vault},
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
+        ): @{FungibleToken.Vault} {
             pre {
                 vault.isInstance(Type<@FixesFungibleToken.Vault>()): "The vault must be an instance of FixesFungibleToken.Vault"
             }
@@ -764,10 +692,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// Burn tokens with user's inscription
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun burnTokenWithInscription(
-            vault: @FungibleToken.Vault,
-            ins: &Fixes.Inscription
+            vault: @{FungibleToken.Vault},
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
         ) {
             pre {
                 vault.isInstance(Type<@FixesFungibleToken.Vault>()): "The vault must be an instance of FixesFungibleToken.Vault"
@@ -776,7 +704,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             if ins.isExtractable() {
                 FixesFungibleToken.executeInscription(ins: ins, usage: "burn")
             }
-            destroy vault
+            Burner.burn(<- vault)
         }
     }
 
@@ -785,8 +713,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Exuecte and extract FlowToken in the inscription
     ///
     access(contract)
-    fun executeInscription(ins: &Fixes.Inscription, usage:String) {
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+    fun executeInscription(ins: auth(Fixes.Extractable) &Fixes.Inscription, usage:String) {
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         assert(
             meta["usage"] == usage || meta["usage"] == "*",
             message: "The inscription usage must be ".concat(usage)
@@ -815,7 +743,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// @return The new Vault resource
     ///
     access(all)
-    fun createEmptyVault(): @Vault {
+    fun createEmptyVault(vaultType: Type): @Vault {
         return <-create Vault(balance: 0.0)
     }
 
@@ -825,18 +753,18 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// @return A structure representing the requested view.
     ///
     access(all)
-    view fun resolveView(_ view: Type): AnyStruct? {
+    fun resolveContractView(resourceType: Type?, viewType: Type): AnyStruct? {
         // external url
         let externalUrl = FixesFungibleToken.getExternalUrl()
-        switch view {
+        switch viewType {
             case Type<MetadataViews.ExternalURL>():
                 return externalUrl != nil
                     ? MetadataViews.ExternalURL(externalUrl!)
                     : MetadataViews.ExternalURL("https://fixes.world/")
             case Type<FungibleTokenMetadataViews.FTView>():
                 return FungibleTokenMetadataViews.FTView(
-                    ftDisplay: self.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?,
-                    ftVaultData: self.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+                    ftDisplay: self.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?,
+                    ftVaultData: self.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
                 )
             case Type<FungibleTokenMetadataViews.FTDisplay>():
                 let store = FixesFungibleToken.borrowSharedStore()
@@ -910,24 +838,16 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                     storagePath: FixesFungibleToken.getVaultStoragePath(),
                     receiverPath: FixesFungibleToken.getReceiverPublicPath(),
                     metadataPath: FixesFungibleToken.getVaultPublicPath(),
-                    providerPath: PrivatePath(identifier: prefix.concat("Vault"))!,
-                    receiverLinkedType: Type<&FixesFungibleToken.Vault{FungibleToken.Receiver}>(),
-                    metadataLinkedType: Type<&FixesFungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(),
-                    providerLinkedType: Type<&FixesFungibleToken.Vault{FungibleToken.Provider}>(),
+                    receiverLinkedType: Type<&{FungibleToken.Receiver}>(),
+                    metadataLinkedType: Type<&FixesFungibleToken.Vault>(),
                     createEmptyVaultFunction: (fun (): @FixesFungibleToken.Vault {
-                        return <-FixesFungibleToken.createEmptyVault()
+                        return <-FixesFungibleToken.createEmptyVault(vaultType: Type<@Vault>())
                     })
                 )
-            // case Type<FungibleTokenMetadataViews.TotalSupply>():
-            //     let indexer = FRC20Indexer.getIndexer()
-            //     let tick = FixesFungibleToken.getTickerName()
-            //     if let tokenMeta = indexer.getTokenMeta(tick: tick) {
-            //         return FungibleTokenMetadataViews.TotalSupply(
-            //             totalSupply: tokenMeta.max
-            //         )
-            //     } else {
-            //         return nil
-            //     }
+            case Type<FungibleTokenMetadataViews.TotalSupply>():
+                return FungibleTokenMetadataViews.TotalSupply(
+                    totalSupply: FixesFungibleToken.totalSupply
+                )
         }
         return nil
     }
@@ -938,10 +858,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     ///         developers to know which parameter to pass to the resolveView() method.
     ///
     access(all)
-    view fun getViews(): [Type] {
+    view fun getContractViews(resourceType: Type?): [Type] {
         return [
-            // Type<FungibleTokenMetadataViews.TotalSupply>(),
             Type<MetadataViews.ExternalURL>(),
+            Type<FungibleTokenMetadataViews.TotalSupply>(),
             Type<FungibleTokenMetadataViews.FTView>(),
             Type<FungibleTokenMetadataViews.FTDisplay>(),
             Type<FungibleTokenMetadataViews.FTVaultData>()
@@ -965,9 +885,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the admin public reference
     ///
     access(contract)
-    view fun borrowAdminPublic(): &FungibleTokenAdmin{GlobalInternalWritable, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder} {
+    view fun borrowAdminPublic(): &FungibleTokenAdmin {
         return self.account
-            .getCapability<&FungibleTokenAdmin{GlobalInternalWritable, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
+            .capabilities.get<&FungibleTokenAdmin>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -993,20 +913,23 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         // Step.0 Ensure shared store exists
 
         // Initialize the shared store
-        if self.account.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+        if self.account.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
             let sharedStore <- FRC20FTShared.createSharedStore()
-            self.account.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+            self.account.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
         }
         // link the resource to the public path
-        // @deprecated after Cadence 1.0
         if self.account
-            .getCapability<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath)
+            .capabilities.get<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStorePublicPath)
             .borrow() == nil {
-            self.account.unlink(FRC20FTShared.SharedStorePublicPath)
-            self.account.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+            self.account.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
+            self.account.capabilities.publish(
+                self.account.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
+                at: FRC20FTShared.SharedStorePublicPath
+            )
         }
         // borrow the shared store
-        let store = self.account.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
+        let store = self.account.storage
+            .borrow<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
             ?? panic("The shared store is not found")
 
         // Step.1 Try get the ticker name from the shared store
@@ -1046,17 +969,17 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         // setup admin resource
         let admin <- create FungibleTokenAdmin()
         let adminStoragePath = self.getAdminStoragePath()
-        self.account.save(<-admin, to: adminStoragePath)
+        self.account.storage.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
         let adminPublicPath = self.getAdminPublicPath()
-        // @deprecated after Cadence 1.0
-        self.account.link<&FixesFungibleToken.FungibleTokenAdmin{GlobalInternalWritable, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(
-            adminPublicPath,
-            target: adminStoragePath
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&FungibleTokenAdmin>(adminStoragePath),
+            at: adminPublicPath
         )
 
         // ensure the admin resource exists
-        let adminRef = self.account.borrow<&FungibleTokenAdmin>(from: adminStoragePath)
+        let adminRef = self.account.storage
+            .borrow<auth(FixesFungibleTokenInterface.Manage) &FungibleTokenAdmin>(from: adminStoragePath)
             ?? panic("The FungibleToken Admin is not found")
         let deployer = self.getDeployerAddress()
         // add the deployer as the authorized user
@@ -1070,14 +993,19 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         // Create the Vault with the total supply of tokens and save it in storage.
         let vault <- create Vault(balance: self.totalSupply)
-        self.account.save(<-vault, to: storagePath)
+        self.account.storage.save(<-vault, to: storagePath)
 
-        // @deprecated after Cadence 1.0
         // Create a public capability to the stored Vault that exposes
         // the `deposit` method through the `Receiver` interface.
-        self.account.link<&{FungibleToken.Receiver}>(receiverPath, target: storagePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&{FungibleToken.Receiver}>(storagePath),
+            at: receiverPath
+        )
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field and the `resolveView` method through the `Balance` interface
-        self.account.link<&FixesFungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(publicPath, target: storagePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&FixesFungibleToken.Vault>(storagePath),
+            at: publicPath
+        )
     }
 }

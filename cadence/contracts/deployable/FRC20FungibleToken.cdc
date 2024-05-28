@@ -894,7 +894,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                     storagePath: FRC20FungibleToken.getVaultStoragePath(),
                     receiverPath: FRC20FungibleToken.getReceiverPublicPath(),
                     metadataPath: FRC20FungibleToken.getVaultPublicPath(),
-                    receiverLinkedType: Type<&FRC20FungibleToken.Vault>(),
+                    receiverLinkedType: Type<&{FungibleToken.Receiver}>(),
                     metadataLinkedType: Type<&FRC20FungibleToken.Vault>(),
                     createEmptyVaultFunction: (fun (): @FRC20FungibleToken.Vault {
                         return <-FRC20FungibleToken.createEmptyVault(vaultType: Type<@Vault>())
