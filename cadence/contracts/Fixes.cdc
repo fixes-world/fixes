@@ -739,7 +739,7 @@ access(all) contract Fixes {
     /// Get the platform destination
     ///
     access(all)
-    view fun getPlatformFeeDestination(): Address {
+    view fun getPlatformAddress(): Address {
         return self.account.address
     }
 
@@ -747,7 +747,7 @@ access(all) contract Fixes {
     ///
     access(all)
     view fun borrowPlatformFeeReceiver(): &{FungibleToken.Receiver} {
-        return self.borrowFlowTokenReceiver(self.getPlatformFeeDestination())
+        return self.borrowFlowTokenReceiver(self.getPlatformAddress())
             ?? panic("Platform fee receiver not found")
     }
 

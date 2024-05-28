@@ -732,8 +732,6 @@ access(all) contract FungibleTokenManager {
         // - FRC20FTShared.SharedStore: configuration
         //   - Store the Symbol, Name for the token
         //   - Store the Deployer of the token
-        // - FRC20FTShared.Hooks
-        //   - TradingRecord
 
         // create the shared store and save it in the account
         if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
@@ -764,21 +762,38 @@ access(all) contract FungibleTokenManager {
             isUpdated = true || isUpdated
         }
 
+        isUpdated = self._ensureTradingRecordResourcesAvailable(childAcctRef, tick: tick) || isUpdated
+
+        if isUpdated {
+            emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: childAddr)
+        }
+    }
+
+    /// Utility method to ensure the trading record resources are available
+    ///
+    access(self)
+    fun _ensureTradingRecordResourcesAvailable(_ acctRef: auth(Storage, Capabilities) &Account, tick: String?): Bool {
+        var isUpdated = false
+
+        // - FRC20FTShared.Hooks
+        //   - TradingRecord
+
         // create the hooks and save it in the account
-        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
+        if acctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
-            childAcctRef.storage.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+            acctRef.storage.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
 
             isUpdated = true || isUpdated
         }
+
         // link the hooks to the public path
-        if childAcctRef
+        if acctRef
             .capabilities.get<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookPublicPath)
             .borrow() == nil {
             // link the hooks to the public path
-            childAcctRef.capabilities.unpublish(FRC20FTShared.TransactionHookPublicPath)
-            childAcctRef.capabilities.publish(
-                childAcctRef.capabilities.storage.issue<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookStoragePath),
+            acctRef.capabilities.unpublish(FRC20FTShared.TransactionHookPublicPath)
+            acctRef.capabilities.publish(
+                acctRef.capabilities.storage.issue<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookStoragePath),
                 at: FRC20FTShared.TransactionHookPublicPath
             )
 
@@ -786,14 +801,14 @@ access(all) contract FungibleTokenManager {
         }
 
         // ensure trading records are available
-        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
+        if acctRef.storage.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
             let tradingRecords <- FRC20TradingRecord.createTradingRecords(tick)
-            childAcctRef.storage.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
+            acctRef.storage.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
 
             // link the trading records to the public path
-            childAcctRef.capabilities.unpublish(FRC20TradingRecord.TradingRecordsPublicPath)
-            childAcctRef.capabilities.publish(
-                childAcctRef.capabilities.storage.issue<&FRC20TradingRecord.TradingRecords>(FRC20TradingRecord.TradingRecordsStoragePath),
+            acctRef.capabilities.unpublish(FRC20TradingRecord.TradingRecordsPublicPath)
+            acctRef.capabilities.publish(
+                acctRef.capabilities.storage.issue<&FRC20TradingRecord.TradingRecords>(FRC20TradingRecord.TradingRecordsStoragePath),
                 at: FRC20TradingRecord.TradingRecordsPublicPath
             )
 
@@ -801,13 +816,13 @@ access(all) contract FungibleTokenManager {
         }
 
         // borrow the hooks reference
-        let hooksRef = childAcctRef.storage
+        let hooksRef = acctRef.storage
             .borrow<auth(FRC20FTShared.Manage) &FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
 
         // add the trading records to the hooks, if it is not added yet
         // get the public capability of the trading record hook
-        let tradingRecordsCap = childAcctRef
+        let tradingRecordsCap = acctRef
             .capabilities.get<&FRC20TradingRecord.TradingRecords>(
                 FRC20TradingRecord.TradingRecordsPublicPath
             )
@@ -819,9 +834,7 @@ access(all) contract FungibleTokenManager {
             hooksRef.addHook(tradingRecordsCap)
         }
 
-        if isUpdated {
-            emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: childAddr)
-        }
+        return isUpdated
     }
 
     /// Update the FRC20 Fungible Token contract in the account
@@ -869,6 +882,9 @@ access(all) contract FungibleTokenManager {
             self.account.capabilities.storage.issue<&Admin>(self.AdminStoragePath),
             at: self.AdminPublicPath
         )
+
+        // Setup FungibleToken Shared FRC20TradingRecord
+        self._ensureTradingRecordResourcesAvailable(self.account, tick: nil)
 
         emit ContractInitialized()
     }
