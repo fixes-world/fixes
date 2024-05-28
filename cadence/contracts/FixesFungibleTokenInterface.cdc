@@ -353,10 +353,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getContractAddress(): Address
 
-        /// Get the vault data of the minting token
-        access(all)
-        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData
-
         /// Get the max supply of the minting token
         access(all)
         view fun getMaxSupply(): UFix64
@@ -364,6 +360,11 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Get the total supply of the minting token
         access(all)
         view fun getTotalSupply(): UFix64
+
+        /// Get the vault data of the minting token
+        /// Read-only buy using non-view function
+        access(all)
+        fun getVaultData(): FungibleTokenMetadataViews.FTVaultData
     }
 
     /// The token liquidity resource interface
@@ -484,13 +485,6 @@ access(all) contract interface FixesFungibleTokenInterface {
             return minterRef.getContractAddress()
         }
 
-        /// Get the vault data of the minting token
-        access(all)
-        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
-            let minterRef = self.borrowMinter()
-            return minterRef.getVaultData()
-        }
-
         /// Get the max supply of the token
         access(all)
         view fun getMaxSupply(): UFix64 {
@@ -504,6 +498,14 @@ access(all) contract interface FixesFungibleTokenInterface {
             let minter = self.borrowMinter()
             // The circulating supply is the total supply minus the balance in the vault
             return minter.getTotalSupply()
+        }
+
+        /// Get the vault data of the minting token
+        /// Read-only buy using non-view function
+        access(all)
+        fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            let minterRef = self.borrowMinter()
+            return minterRef.getVaultData()
         }
 
         // ----- Interfaces of IMinterHolder -----
@@ -726,5 +728,5 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// Create a new vault
     access(all)
-    fun createEmptyVault(): @{FungibleToken.Vault}
+    fun createEmptyVault(vaultType: Type): @{FungibleToken.Vault}
 }
