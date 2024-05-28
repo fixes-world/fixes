@@ -12,7 +12,8 @@
     "deploy:emulator": "flow project deploy --update",
     "deploy:testnet": "flow project deploy --update --network testnet",
     "deploy:mainnet": "flow project deploy --update --network mainnet",
-    "fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
+		"lines": "find . \\( -name '*.cdc' -o -name '*.ts' -o -name '*.prisma' -o -name '*.vue' \\) -not -path '*/node_modules/*' -not -path '*/tests/*' -not -path '*/deps/*' -not -path '*/dist/*' -not -path '*/imports*' | xargs wc -l",
+		"lines:contracts": "find ./cadence/contracts \\( -name '*.cdc' \\) -not -path '*/node_modules/*' -not -path '*/tests/*' -not -path '*/deps/*' -not -path '*/dist/*' | xargs wc -l",
     "dev": "pnpm deploy:emulator && pnpm fund:emulator"
   }
 }
