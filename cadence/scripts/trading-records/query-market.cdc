@@ -27,13 +27,16 @@ fun main(
     let dateToQuery = datetime ?? UInt64(getCurrentBlock().timestamp)
 
     var ret: [FRC20TradingRecord.TransactionRecord] = []
-    var todayLen: UInt64 = 0
+    var totalLoaded: UInt64 = 0
     if let allData = marketRecords.borrowDailyRecords(dateToQuery) {
-        todayLen = allData.getRecordLength()
+        totalLoaded = allData.getRecordLength()
         ret = allData.getRecords(page: page, pageSize: size)
     }
     // to load yesterday's data if not enough
-    if ret.length < size {
+    var i = 0
+    var currentDate = dateToQuery
+    let maxRepeat = 30
+    while ret.length < size && i < maxRepeat {
         let prevDatetime = dateToQuery - 86400
         if let prevDateData = marketRecords.borrowDailyRecords(prevDatetime) {
             let prevLength = prevDateData.getRecordLength()
@@ -41,14 +44,17 @@ fun main(
                 // calculate how many records are loaded
                 let loadedCount = page * size
                 let needCount = size - ret.length
-                let prevPage = (page - (Int(todayLen) + needCount) / size)
+                let prevPage = (page - (Int(totalLoaded) + needCount) / size)
                 let prevData: [FRC20TradingRecord.TransactionRecord] = prevDateData.getRecords(page: prevPage, pageSize: size)
                 if prevData.length > 0 {
                     let upTo = prevData.length < needCount ? prevData.length : needCount
                     ret = ret.concat(prevData.slice(from: 0, upTo: upTo))
                 }
+                totalLoaded = totalLoaded + UInt64(prevData.length)
             }
         }
+        currentDate = prevDatetime
+        i = i + 1
     }
     return ret
 }
