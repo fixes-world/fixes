@@ -15,7 +15,6 @@ fun main(
     }
     let dateToQuery = datetime ?? UInt64(getCurrentBlock().timestamp)
 
-    let loadedCount = page * size
     var ret: [FRC20TradingRecord.TransactionRecord] = []
     var totalLoaded: UInt64 = 0
     if let allData = records!.borrowDailyRecords(dateToQuery) {

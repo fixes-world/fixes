@@ -15,35 +15,41 @@ fun main(
 ): [FRC20TradingRecord.TransactionRecord] {
     let indexer = FRC20Indexer.getIndexer()
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-    let userRecords = FRC20TradingRecord.borrowTradingRecords(address)
+    let records = FRC20TradingRecord.borrowTradingRecords(address)
 
-    if userRecords == nil {
+    if records == nil {
         return []
     }
 
     let dateToQuery = datetime ?? UInt64(getCurrentBlock().timestamp)
 
     var ret: [FRC20TradingRecord.TransactionRecord] = []
-    if let allData = userRecords!.borrowDailyRecords(dateToQuery) {
-        let todayLen = allData.getRecordLength()
+    var totalLoaded: UInt64 = 0
+    if let allData = records!.borrowDailyRecords(dateToQuery) {
+        totalLoaded = totalLoaded + allData.getRecordLength()
         ret = allData.getRecords(page: page, pageSize: size)
         // to load yesterday's data if not enough
-        if ret.length < size {
-            let prevDatetime = dateToQuery - 86400
-            if let prevDateData = userRecords!.borrowDailyRecords(prevDatetime) {
+        var i = 0
+        var currentDate = dateToQuery
+        let maxRepeat = 30
+        while ret.length < size && i < maxRepeat {
+            let prevDatetime = currentDate - 86400
+            if let prevDateData = records!.borrowDailyRecords(prevDatetime) {
                 let prevLength = prevDateData.getRecordLength()
                 if prevLength > 0 {
                     // calculate how many records are loaded
-                    let loadedCount = page * size
                     let needCount = size - ret.length
-                    let prevPage = (page - (Int(todayLen) + needCount) / size)
-                    let prevData: [FRC20TradingRecord.TransactionRecord] = prevDateData.getRecords(page: prevPage, pageSize: size)
+                    let prevPage = (page - (Int(totalLoaded) + needCount) / size)
+                    let prevData: [FRC20TradingRecord.TransactionRecord] = prevDateData.getRecords(page: prevPage, pageSize: needCount)
                     if prevData.length > 0 {
                         let upTo = prevData.length < needCount ? prevData.length : needCount
                         ret = ret.concat(prevData.slice(from: 0, upTo: upTo))
                     }
+                    totalLoaded = totalLoaded + UInt64(prevData.length)
                 }
             }
+            currentDate = prevDatetime
+            i = i + 1
         }
     }
     return ret
