@@ -6,11 +6,11 @@ import "FRC20AccountsPool"
 
 access(all)
 fun main(
-    symbol: String,
+    accountKey: String,
 ): FTViewUtils.StandardTokenView? {
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-    if let ftAddress = acctsPool.getFTContractAddress(symbol) {
-        let ftName = symbol[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+    if let ftAddress = acctsPool.getFTContractAddress(accountKey) {
+        let ftName = accountKey[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
         if let viewResolver = getAccount(ftAddress).contracts.borrow<&ViewResolver>(name: ftName) {
             let vaultData = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
             let display = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?
