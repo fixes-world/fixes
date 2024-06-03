@@ -3,13 +3,11 @@ import "ViewResolver"
 import "FungibleTokenMetadataViews"
 // Fixes Imports
 import "FixesFungibleTokenInterface"
-import "FRC20AccountsPool"
 
 access(all)
 fun main(
     ftAddress: Address,
 ): FTViewUtils.StandardTokenView? {
-    let acctsPool = FRC20AccountsPool.borrowAccountsPool()
     let ftAcct = getAccount(ftAddress)
     var ftName = "FixesFungibleToken"
     var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
