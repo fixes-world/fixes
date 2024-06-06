@@ -952,6 +952,15 @@
 				"testnet": "631e88ae7f1d7c20"
 			}
 		},
+		"MigrationContractStaging": {
+			"source": "mainnet://56100d46aa9b0212.MigrationContractStaging",
+			"hash": "be3d21e2e65cb4956a00528a14b2a569c3585b9c64bbb827bfca48e622979aba",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "56100d46aa9b0212",
+				"testnet": "2ceae959ed1a7e7a"
+			}
+		},
 		"NFTCatalog": {
 			"source": "mainnet://49a7cda3a1eecc29.NFTCatalog",
 			"hash": "1764304baead3b4c248073011c931e0f803c8961e0b8a19be48e8562461e6e3c",
@@ -1200,6 +1209,7 @@
 		"emulator": {
 			"default": [],
 			"emulator-account": [
+				"MigrationContractStaging",
 				"Burner",
 				"FungibleTokenMetadataViews",
 				"NFTCatalog",

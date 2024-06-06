@@ -6,18 +6,22 @@ import "FRC20AccountsPool"
 
 access(all)
 fun main(
-    accountKey: String,
-): FTViewUtils.StandardTokenView? {
+    _ name: String
+): [FTViewUtils.StandardTokenView] {
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-    if let ftAddress = acctsPool.getFTContractAddress(accountKey) {
-        let ftName = accountKey[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+    let addresses = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
+    let views: [FTViewUtils.StandardTokenView] = []
+
+    addresses.forEachKey(fun (key: String): Bool {
+        let ftAddress = addresses[key]!
+        let ftName = key[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
         if let viewResolver = getAccount(ftAddress).contracts.borrow<&ViewResolver>(name: ftName) {
             let vaultData = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
             let display = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?
             if vaultData == nil || display == nil {
-                return nil
+                return true
             }
-            return FTViewUtils.StandardTokenView(
+            views.append(FTViewUtils.StandardTokenView(
                 identity: FTViewUtils.FTIdentity(ftAddress, ftName),
                 decimals: 8,
                 tags: [],
@@ -28,8 +32,10 @@ fun main(
                     receiverPath: vaultData!.receiverPath,
                 ),
                 display: FTViewUtils.FTDisplayWithSource(ftAddress, display!),
-            )
+            ))
         }
-    }
-    return nil
+        return true
+    })
+
+    return views
 }
