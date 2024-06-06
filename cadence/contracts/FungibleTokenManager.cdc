@@ -138,11 +138,11 @@ access(all) contract FungibleTokenManager {
                 let ftContractName = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
                 let ftContractCode = codes[ftContractName]!
                 if let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick) {
-                    if acct.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath) == nil {
-                        acct.save(<-MigrationContractStaging.createHost(), to: MigrationContractStaging.HostStoragePath)
+                    if acct.storage.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath) == nil {
+                        acct.storage.save(<-MigrationContractStaging.createHost(), to: MigrationContractStaging.HostStoragePath)
                     }
                     // Assign Host reference
-                    let hostRef = acct.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath)!
+                    let hostRef = acct.storage.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath)!
                     MigrationContractStaging.stageContract(host: hostRef, name: ftContractName, code: ftContractCode)
                 }
             }
@@ -288,9 +288,9 @@ access(all) contract FungibleTokenManager {
     /// Borrow the Manager Resource
     ///
     access(all)
-    view fun borrowFTManager(_ addr: Address): &Manager{ManagerPublic}? {
+    view fun borrowFTManager(_ addr: Address): &Manager? {
         return getAccount(addr)
-            .getCapability<&Manager{ManagerPublic}>(self.getManagerPublicPath())
+            .capabilities.get<&Manager>(self.getManagerPublicPath())
             .borrow()
     }
 
