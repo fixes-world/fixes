@@ -36,6 +36,21 @@ transaction(
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
+        /** ------------- Prepare the Fungible Token Manager - Start ----------- */
+        let managerPath = FungibleTokenManager.getManagerStoragePath()
+        if acct.borrow<&FungibleTokenManager.Manager>(from: managerPath) == nil {
+            acct.save(<- FungibleTokenManager.createManager(), to: managerPath)
+
+            // create the public capability for the manager
+            let managerPubPath = FungibleTokenManager.getManagerPublicPath()
+            acct.unlink(managerPubPath)
+            acct.link<&FungibleTokenManager.Manager{FungibleTokenManager.ManagerPublic}>(
+                managerPubPath,
+                target: managerPath
+            )
+        }
+        /** ------------- End -------------------------------------------------- */
+
         // Get a reference to the signer's stored vault
         let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")

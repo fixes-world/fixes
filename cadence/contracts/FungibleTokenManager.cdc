@@ -36,18 +36,24 @@ access(all) contract FungibleTokenManager {
     access(all) event ContractInitialized()
     /// Event emitted when a new Fungible Token Account is created
     access(all) event FungibleTokenAccountCreated(
-        ticker: String,
+        symbol: String,
         account: Address,
         by: Address
     )
+    /// Event emitted when the contract of Fungible Token is updated
+    access(all) event FungibleTokenManagerUpdated(
+        symbol: String,
+        manager: Address,
+        flag: Bool
+    )
     /// Event emitted when the resources of a Fungible Token Account are updated
     access(all) event FungibleTokenAccountResourcesUpdated(
-        ticker: String,
+        symbol: String,
         account: Address,
     )
     /// Event emitted when the contract of FRC20 Fungible Token is updated
     access(all) event FungibleTokenContractUpdated(
-        ticker: String,
+        symbol: String,
         account: Address,
         contractName: String
     )
@@ -140,6 +146,151 @@ access(all) contract FungibleTokenManager {
         }
     }
 
+    // ---------- Manager Resource ----------
+
+    // Add deployer Resrouce to record all coins minted by the deployer
+
+    access(all) resource interface ManagerPublic {
+        access(all)
+        view fun getManagedFungibleTokens(): [String]
+        access(all)
+        view fun getManagedFungibleTokenAddresses(): [Address]
+        access(all)
+        view fun getManagedFungibleTokenAmount(): Int
+        access(all)
+        view fun getCreatedFungibleTokens(): [String]
+        access(all)
+        view fun getCreatedFungibleTokenAddresses(): [Address]
+        access(all)
+        view fun getCreatedFungibleTokenAmount(): Int
+        // ----- Internal Methods -----
+        access(contract)
+        fun setFungibleTokenManaged(_ symbol: String, flag: Bool)
+        access(contract)
+        fun addCreatedFungibleToken(_ symbol: String)
+    }
+
+    access(all) resource Manager: ManagerPublic {
+        access(self)
+        let managedSymbols: [String]
+        access(self)
+        let createdSymbols: [String]
+
+        init() {
+            self.managedSymbols = []
+            self.createdSymbols = []
+        }
+
+        // ---- Public Methods ----
+
+        access(all)
+        view fun getManagedFungibleTokens(): [String] {
+            return self.managedSymbols
+        }
+
+        access(all)
+        view fun getManagedFungibleTokenAddresses(): [Address] {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            var addrs: [Address] = []
+            for symbol in self.managedSymbols {
+                if let addr = acctsPool.getFTContractAddress(symbol) {
+                    addrs = addrs.concat([addr])
+                }
+            }
+            return addrs
+        }
+
+        access(all)
+        view fun getManagedFungibleTokenAmount(): Int {
+            return self.managedSymbols.length
+        }
+
+        access(all)
+        view fun getCreatedFungibleTokens(): [String] {
+            return self.createdSymbols
+        }
+
+        access(all)
+        view fun getCreatedFungibleTokenAddresses(): [Address] {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            var addrs: [Address] = []
+            for symbol in self.createdSymbols {
+                if let addr = acctsPool.getFTContractAddress(symbol) {
+                    addrs = addrs.concat([addr])
+                }
+            }
+            return addrs
+        }
+
+        access(all)
+        view fun getCreatedFungibleTokenAmount(): Int {
+            return self.createdSymbols.length
+        }
+
+        // ---- Internal Methods ----
+
+        /// set the managed fungible token
+        ///
+        access(contract)
+        fun setFungibleTokenManaged(_ symbol: String, flag: Bool) {
+            let isManaged = self.managedSymbols.contains(symbol)
+            var isUpdated = false
+            if flag && !isManaged {
+                self.managedSymbols.append(symbol)
+                isUpdated = true
+            } else if !flag && isManaged {
+                self.managedSymbols.remove(at: self.managedSymbols.firstIndex(of: symbol)!)
+                isUpdated = true
+            }
+
+            if isUpdated {
+                emit FungibleTokenManagerUpdated(symbol: symbol, manager: self.owner?.address!, flag: flag)
+            }
+        }
+
+        /// set the created fungible token
+        ///
+        access(contract)
+        fun addCreatedFungibleToken(_ symbol: String) {
+            if !self.createdSymbols.contains(symbol) {
+                self.createdSymbols.append(symbol)
+                self.setFungibleTokenManaged(symbol, flag: true)
+            }
+        }
+    }
+
+    /// Create the Manager Resource
+    ///
+    access(contract)
+    fun createManager(): @Manager {
+        return <- create Manager()
+    }
+
+    /// The storage path of Manager resource
+    ///
+    access(all)
+    view fun getManagerStoragePath(): StoragePath {
+        let identifier = "FungibleTokenManager_".concat(self.account.address.toString())
+        return StoragePath(identifier: identifier.concat("_manager"))!
+    }
+
+    /// The public path of Manager resource
+    ///
+    access(all)
+    view fun getManagerPublicPath(): PublicPath {
+        let identifier = "FungibleTokenManager_".concat(self.account.address.toString())
+        return PublicPath(identifier: identifier.concat("_manager"))!
+    }
+
+    /// Borrow the Manager Resource
+    ///
+    access(all)
+    view fun borrowFTManager(_ addr: Address): &Manager{ManagerPublic}? {
+        return getAccount(addr)
+            .getCapability<&Manager{ManagerPublic}>(self.getManagerPublicPath())
+            .borrow()
+    }
+
     /** ------- Public Methods ---- */
 
     /// Check if the Fungible Token Symbol is already enabled
@@ -219,9 +370,13 @@ access(all) contract FungibleTokenManager {
         // deploy the contract of Fixes Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
 
+        // Add token symbol to the managed list
+        let managerRef = self.borrowFTManager(callerAddr) ?? panic("The manager resource is not found")
+        managerRef.addCreatedFungibleToken(tick)
+
         // emit the event
         emit FungibleTokenAccountCreated(
-            ticker: tick,
+            symbol: tick,
             account: newAddr,
             by: callerAddr
         )
@@ -333,7 +488,7 @@ access(all) contract FungibleTokenManager {
         }
 
         // emit the event
-        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: ftContractAddr)
+        emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)
     }
 
     access(all)
@@ -409,7 +564,7 @@ access(all) contract FungibleTokenManager {
         )
 
         // emit the event
-        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: ftContractAddr)
+        emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)
     }
 
     /// Enable the Airdrop pool for the Fungible Token
@@ -472,7 +627,7 @@ access(all) contract FungibleTokenManager {
         )
 
         // emit the event
-        emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: ftContractAddr)
+        emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)
     }
 
     access(self)
@@ -617,9 +772,13 @@ access(all) contract FungibleTokenManager {
         // deploy the contract of FRC20 Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tickerName, contractName: "FRC20FungibleToken")
 
+        // Add token symbol to the managed list
+        let managerRef = self.borrowFTManager(callerAddr) ?? panic("The manager resource is not found")
+        managerRef.addCreatedFungibleToken(tickerName)
+
         // emit the event
         emit FungibleTokenAccountCreated(
-            ticker: tickerName,
+            symbol: tickerName,
             account: newAddr,
             by: callerAddr
         )
@@ -696,7 +855,7 @@ access(all) contract FungibleTokenManager {
         )
 
         // emit the event
-        emit FungibleTokenAccountResourcesUpdated(ticker: tickerName, account: ftContractAddr)
+        emit FungibleTokenAccountResourcesUpdated(symbol: tickerName, account: ftContractAddr)
     }
 
     /** ---- Internal Methods ---- */
@@ -790,7 +949,7 @@ access(all) contract FungibleTokenManager {
         isUpdated = self._ensureTradingRecordResourcesAvailable(childAcctRef, tick: tick) || isUpdated
 
         if isUpdated {
-            emit FungibleTokenAccountResourcesUpdated(ticker: tick, account: childAddr)
+            emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: childAddr)
         }
     }
 
@@ -890,7 +1049,7 @@ access(all) contract FungibleTokenManager {
         }
 
         // emit the event
-        emit FungibleTokenContractUpdated(ticker: tick, account: childAddr, contractName: contractName)
+        emit FungibleTokenContractUpdated(symbol: tick, account: childAddr, contractName: contractName)
     }
 
     init() {
