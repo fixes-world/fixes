@@ -1,3 +1,5 @@
-# FIXeS: Flow Inscriptions Xerox System
+# The contracts of FIXeS World
 
-The Inscriptions Protocol on Flow blockchain.
+The Autonomous Programable Token Universe #onFlow
+
+Links: <https://linktr.ee/fixes.world>
