@@ -1185,28 +1185,31 @@
 			"address": "d2abb5dbf5e08666",
 			"key": {
 				"type": "file",
-				"index": 1,
+				"index": 2,
 				"signatureAlgorithm": "ECDSA_P256",
 				"hashAlgorithm": "SHA3_256",
 				"location": "mainnet-admin.pkey"
 			}
 		},
 		"mainnet-user": {
-			"address": "d59667dc1a7cfecf",
+			"address": "d566590bf98ecab2",
 			"key": {
 				"type": "file",
-				"location": "mainnet-user.pkey"
+				"location": "mainnet-tick-user.pkey"
 			}
 		},
 		"testnet-admin": {
 			"address": "74ad08095d92192a",
 			"key": {
 				"type": "file",
+				"index": 1,
+				"signatureAlgorithm": "ECDSA_P256",
+				"hashAlgorithm": "SHA3_256",
 				"location": "testnet-admin.pkey"
 			}
 		},
 		"testnet-user": {
-			"address": "79c7233c8c2050d5",
+			"address": "9f8a355dc43ac63c",
 			"key": {
 				"type": "file",
 				"location": "testnet-user.pkey"
