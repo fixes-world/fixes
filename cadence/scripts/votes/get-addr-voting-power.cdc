@@ -1,3 +1,4 @@
+import "FRC20FTShared"
 import "FRC20Votes"
 import "FRC20Staking"
 import "FRC20StakingManager"
@@ -11,7 +12,7 @@ fun main(
     if let ref = FRC20Votes.borrowVoterPublic(addr) {
         votingPower = ref.getVotingPower()
     } else if let delegatorRef = FRC20Staking.borrowDelegator(addr) {
-        let stakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+        let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
         votingPower = delegatorRef.getStakedBalance(tick: stakeTick)
     }
     return VotingStatus(

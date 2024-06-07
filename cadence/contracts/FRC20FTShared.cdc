@@ -36,7 +36,7 @@ access(all) contract FRC20FTShared {
         hooksOwner: Address,
         executedHookType: Type,
         storefront: Address,
-        listingId: UInt64,
+        listingId: UInt64?,
     )
     /// The event that is emitted when a heartbeat is occurred
     access(all) event TransactionHooksOnHeartbeat(
@@ -125,13 +125,13 @@ access(all) contract FRC20FTShared {
 
         /// Check if this Change is a staked tick's change
         ///
-        access(all) view
-        fun isStakedTick(): Bool {
+        access(all)
+        view fun isStakedTick(): Bool {
             return self.isBackedByVault() == false && self.tick[0] == "!"
         }
 
-        access(all) view
-        fun getOriginalTick(): String {
+        access(all)
+        view fun getOriginalTick(): String {
             // if the tick is a staked tick, remove the first character
             if self.isStakedTick() {
                 return self.tick.slice(from: 1, upTo: self.tick.length)
@@ -142,36 +142,36 @@ access(all) contract FRC20FTShared {
 
         /// Get the balance of this Change
         ///
-        access(all) view
-        fun getBalance(): UFix64 {
+        access(all)
+        view fun getBalance(): UFix64 {
             return self.ftVault?.balance ?? self.balance!
         }
 
         /// Check if this Change is empty
         ///
-        access(all) view
-        fun isEmpty(): Bool {
+        access(all)
+        view fun isEmpty(): Bool {
             return self.getBalance() == 0.0
         }
 
         /// Check if this Change is backed by a Vault
         ///
-        access(all) view
-        fun isBackedByVault(): Bool {
+        access(all)
+        view fun isBackedByVault(): Bool {
             return self.ftVault != nil
         }
 
         /// Check if this Change is backed by a FlowToken Vault
         ///
-        access(all) view
-        fun isBackedByFlowTokenVault(): Bool {
+        access(all)
+        view fun isBackedByFlowTokenVault(): Bool {
             return self.tick == "" && self.isBackedByVault()
         }
 
         /// Get the type of the Vault
         ///
-        access(all) view
-        fun getVaultType(): Type? {
+        access(all)
+        view fun getVaultType(): Type? {
             return self.ftVault?.getType()
         }
     }
@@ -197,12 +197,12 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
         ///
-        access(account)
+        access(all)
         fun merge(from: @Change)
 
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(account)
+        access(all)
         fun withdrawAsChange(amount: UFix64): @Change {
             post {
                 // `result` refers to the return value
@@ -213,7 +213,7 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change
         ///
-        access(account)
+        access(all)
         fun extract(): UFix64
     }
 
@@ -347,7 +347,7 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of input Change and deposit to self, this method is only available for the contracts in the same account
         ///
-        access(account)
+        access(all)
         fun merge(from: @Change) {
             pre {
                 self.isBackedByVault() == from.isBackedByVault():
@@ -392,9 +392,46 @@ access(all) contract FRC20FTShared {
             destroy from
         }
 
+        /// Force merge the input Change to self with checking the from address
+        ///
+        access(all)
+        fun forceMerge(from: @Change) {
+            pre {
+                from.isBackedByVault() == self.isBackedByVault():
+                    "The Change must be backed by a Vault if and only if the input Change is backed by a Vault"
+                from.tick == self.tick: "Tick must be equal to the provided tick"
+            }
+            post {
+                self.getBalance() == before(self.getBalance()) + before(from.getBalance()):
+                    "New Vault balance must be the sum of the previous balance and the deposited Vault"
+            }
+            if from.from == self.from {
+                self.merge(from: <- from)
+            } else {
+                if from.isBackedByVault() {
+                    // withdraw from the input Change
+                    let extracted <- from.extractAsVault()
+                    // deposit to the receiver
+                    self.borrowVault().deposit(from: <- extracted)
+                } else {
+                    // withdraw from the input Change
+                    let extracted = from.extract()
+                    // create a same source Change and deposit to the receiver
+                    self.merge(from: <- FRC20FTShared.createChange(
+                        tick: self.tick,
+                        from: self.from,
+                        balance: extracted,
+                        ftVault: nil
+                    ))
+                }
+                // destroy the input Change
+                destroy from
+            }
+        }
+
         /// Withdraw the given amount of tokens, as a FRC20 Fungible Token Change
         ///
-        access(account)
+        access(all)
         fun withdrawAsChange(amount: UFix64): @Change {
             pre {
                 self.getBalance() >= amount:
@@ -439,7 +476,7 @@ access(all) contract FRC20FTShared {
 
         /// Extract all balance of this Change, this method is only available for the contracts in the same account
         ///
-        access(account)
+        access(all)
         fun extract(): UFix64 {
             pre {
                 !self.isBackedByVault(): "The Change must not be backed by a Vault"
@@ -490,6 +527,30 @@ access(all) contract FRC20FTShared {
         )
     }
 
+    /// Create a new empty Change
+    ///
+    access(account)
+    fun createEmptyChange(
+        tick: String,
+        from: Address,
+    ): @Change {
+        if tick == "" {
+            return <- self.createChange(
+                tick: "",
+                from: from,
+                balance: nil,
+                ftVault: <- FlowToken.createEmptyVault()
+            )
+        } else {
+            return <- self.createChange(
+                tick: tick,
+                from: from,
+                balance: 0.0,
+                ftVault: nil
+            )
+        }
+    }
+
     /// Create a new Change for staked tick
     ///
     access(account)
@@ -514,26 +575,20 @@ access(all) contract FRC20FTShared {
         )
     }
 
+    /// Create a new empty staked Change
+    ///
     access(account)
-    fun createEmptyChange(
+    fun createEmptyStakedChange(
         tick: String,
         from: Address,
     ): @Change {
-        if tick == "" {
-            return <- self.createChange(
-                tick: "",
-                from: from,
-                balance: nil,
-                ftVault: <- FlowToken.createEmptyVault()
-            )
-        } else {
-            return <- self.createChange(
-                tick: tick,
-                from: from,
-                balance: 0.0,
-                ftVault: nil
-            )
+        pre {
+            tick != "": "Tick must not be empty"
         }
+        return <- self.createEmptyChange(
+            tick: "!".concat(tick), // staked tick is prefixed with "!"
+            from: from
+        )
     }
 
     /// Create a new Change for FlowToken
@@ -565,44 +620,6 @@ access(all) contract FRC20FTShared {
             balance: nil,
             ftVault: <- ftVault
         )
-    }
-
-    /// Deposit one Change to another Change
-    /// Only the owner of the account can call this method
-    ///
-    access(account)
-    fun depositToChange(
-        receiver: &Change,
-        change: @Change
-    ) {
-        pre {
-            change.isBackedByVault() == receiver.isBackedByVault():
-                "The Change must be backed by a Vault if and only if the input Change is backed by a Vault"
-            change.tick == receiver.tick: "Tick must be equal to the provided tick"
-        }
-        if change.from == receiver.from {
-            receiver.merge(from: <- change)
-        } else {
-            if change.isBackedByVault() {
-                // withdraw from the input Change
-                let extracted <- change.extractAsVault()
-                // deposit to the receiver
-                let vaultRef = receiver.borrowVault()
-                vaultRef.deposit(from: <- extracted)
-            } else {
-                // withdraw from the input Change
-                let extracted = change.extract()
-                // create a same source Change and deposit to the receiver
-                receiver.merge(from: <- self.createChange(
-                    tick: receiver.tick,
-                    from: receiver.from,
-                    balance: extracted,
-                    ftVault: nil
-                ))
-            }
-            // destroy the input Change
-            destroy change
-        }
     }
 
     /** --- Temporary order resources --- */
@@ -709,6 +726,18 @@ access(all) contract FRC20FTShared {
         access(all) case GameLotteryEpochInterval
         access(all) case GameLotteryAutoStart
         access(all) case GameLotteryServiceFee
+        // FungibleToken config type
+        access(all) case FungibleTokenDeployer
+        access(all) case FungibleTokenSymbol
+        access(all) case FungibleTokenDisplayName
+        access(all) case FungibleTokenDescription
+        access(all) case FungibleTokenExternalUrl
+        access(all) case FungibleTokenLogoPrefix
+        access(all) case FungibleTokenSocialPrefix
+        access(all) case FungibleTokenMaxSupply
+        // TradablePool config type
+        access(all) case TradablePoolCreateLPTargetMarketCap
+        access(all) case TradablePoolTradingFee
     }
 
     /* --- Public Methods --- */
@@ -716,8 +745,8 @@ access(all) contract FRC20FTShared {
     access(all) resource interface SharedStorePublic {
         /// Get the key by type
         ///
-        access(all) view
-        fun getKeyByEnum(_ type: ConfigType): String? {
+        access(all)
+        view fun getKeyByEnum(_ type: ConfigType): String? {
             var key: String? = nil
             // get the key by type
             switch type {
@@ -769,31 +798,52 @@ access(all) contract FRC20FTShared {
             case ConfigType.GameLotteryServiceFee:
                 key = "gameLottery:ServiceFee"
                 break
+            case ConfigType.FungibleTokenDeployer:
+                key = "fungibleToken:Deployer"
+                break
+            case ConfigType.FungibleTokenSymbol:
+                key = "fungibleToken:Symbol"
+                break
+            case ConfigType.FungibleTokenDisplayName:
+                key = "fungibleToken:DisplayName"
+                break
+            case ConfigType.FungibleTokenDescription:
+                key = "fungibleToken:Description"
+                break
+            case ConfigType.FungibleTokenExternalUrl:
+                key = "fungibleToken:ExternalUrl"
+                break
+            case ConfigType.FungibleTokenLogoPrefix:
+                key = "fungibleToken:Logo:"
+                break
+            case ConfigType.FungibleTokenSocialPrefix:
+                key = "fungibleToken:Social:"
+                break
+            case ConfigType.FungibleTokenMaxSupply:
+                key = "fungibleToken:MaxSupply"
+                break
+            case ConfigType.TradablePoolCreateLPTargetMarketCap:
+                key = "tradablePool:CreateLPTargetMarketCap"
+                break
+            case ConfigType.TradablePoolTradingFee:
+                key = "tradablePool:TradingFee"
+                break
             }
             return key
         }
 
         // getter for the shared store
         access(all)
-        fun get(_ key: String): AnyStruct?
+        view fun get(_ key: String): AnyStruct?
 
         // getter for the shared store
         access(all)
-        fun getByEnum(_ type: ConfigType): AnyStruct? {
+        view fun getByEnum(_ type: ConfigType): AnyStruct? {
             if let key = self.getKeyByEnum(type)  {
                 return self.get(key)
             }
             return nil
         }
-
-        // --- Account Methods ---
-
-        /// Set the value
-        access(account)
-        fun set(_ key: String, value: AnyStruct)
-        /// Set the value by type
-        access(account)
-        fun setByEnum(_ type: ConfigType, value: AnyStruct)
     }
 
     access(all) resource SharedStore: SharedStorePublic {
@@ -807,13 +857,15 @@ access(all) contract FRC20FTShared {
         /// getter for the shared store
         ///
         access(all)
-        fun get(_ key: String): AnyStruct? {
+        view fun get(_ key: String): AnyStruct? {
             return self.data[key]
         }
 
+        // ------ Write methods ------
+
         /// Set the value
         ///
-        access(account)
+        access(all)
         fun set(_ key: String, value: AnyStruct) {
             self.data[key] = value
 
@@ -822,7 +874,7 @@ access(all) contract FRC20FTShared {
 
         /// Set the value by type
         ///
-        access(account)
+        access(all)
         fun setByEnum(_ type: ConfigType, value: AnyStruct) {
             if let key = self.getKeyByEnum(type)  {
                 self.set(key, value: value)
@@ -831,6 +883,13 @@ access(all) contract FRC20FTShared {
     }
 
     /* --- Public Methods --- */
+
+    /// Create the instance of the shared store
+    ///
+    access(all)
+    fun createSharedStore(): @SharedStore {
+        return <- create SharedStore()
+    }
 
     /// Get the shared store
     ///
@@ -850,13 +909,22 @@ access(all) contract FRC20FTShared {
             .borrow()
     }
 
-    /* --- Account Methods --- */
-
-    /// Create the instance of the shared store
+    /// Get the staking ticker name.
     ///
-    access(account)
-    fun createSharedStore(): @SharedStore {
-        return <- create SharedStore()
+    access(all)
+    view fun getPlatformStakingTickerName(): String {
+        let globalSharedStore = self.borrowGlobalStoreRef()
+        let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
+        return stakingToken ?? "flows"
+    }
+
+    /// Get the platform utility ticker name.
+    ///
+    access(all)
+    view fun getPlatformUtilityTickerName(): String {
+        let globalSharedStore = self.borrowGlobalStoreRef()
+        let tick = globalSharedStore.get("platform:UtilityToken") as! String?
+        return tick ?? "fixes"
     }
 
     /** Transaction hooks */
@@ -872,14 +940,13 @@ access(all) contract FRC20FTShared {
         ///
         access(account)
         fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            totalAmountInListing: UFix64,
+            storefront: Address,
+            listingId: UInt64?,
         ) {
             log("Default Empty Transaction Hook")
         }
@@ -895,7 +962,7 @@ access(all) contract FRC20FTShared {
 
     access(account)
     fun registerHookType(_ type: Type) {
-        if type.isSubtype(of: Type<@AnyResource{TransactionHook}>()) {
+        if type.isSubtype(of: Type<@{TransactionHook}>()) {
             self.validatedHookTypes[type] = true
             emit VaildatedHookTypeAdded(type: type)
         }
@@ -915,7 +982,7 @@ access(all) contract FRC20FTShared {
     ///
     access(all) resource Hooks: TransactionHook, FixesHeartbeat.IHeartbeatHook {
         access(self)
-        let hooks: {Type: Capability<&AnyResource{TransactionHook}>}
+        let hooks: {Type: Capability<&{TransactionHook}>}
 
         init() {
             self.hooks = {}
@@ -933,7 +1000,7 @@ access(all) contract FRC20FTShared {
         // --- Account Methods ---
 
         access(all)
-        fun addHook(_ hook: Capability<&AnyResource{TransactionHook}>) {
+        fun addHook(_ hook: Capability<&{TransactionHook}>) {
             pre {
                 hook.check(): "The hook must be valid"
             }
@@ -955,23 +1022,30 @@ access(all) contract FRC20FTShared {
         ///
         access(account)
         fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            totalAmountInListing: UFix64,
+            storefront: Address,
+            listingId: UInt64?,
         ) {
             let hooksOwnerAddr = self.owner?.address
             if hooksOwnerAddr == nil {
                 return
             }
             // iterate all hooks
-            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+            self._iterateHooks(fun (type: Type, ref: &{FRC20FTShared.TransactionHook}) {
                 // call hook
-                ref.onDeal(storefront: storefront, listingId: listingId, seller: seller, buyer: buyer, tick: tick, dealAmount: dealAmount, dealPrice: dealPrice, totalAmountInListing: totalAmountInListing)
+                ref.onDeal(
+                    seller: seller,
+                    buyer: buyer,
+                    tick: tick,
+                    dealAmount: dealAmount,
+                    dealPrice: dealPrice,
+                    storefront: storefront,
+                    listingId: listingId
+                )
 
                 // emit event
                 emit TransactionHooksOnDeal(
@@ -992,7 +1066,7 @@ access(all) contract FRC20FTShared {
                 return
             }
             // iterate all hooks
-            self._iterateHooks(fun (type: Type, ref: &AnyResource{FRC20FTShared.TransactionHook}) {
+            self._iterateHooks(fun (type: Type, ref: &{FRC20FTShared.TransactionHook}) {
                 // call hook
                 ref.onHeartbeat(deltaTime)
 
@@ -1008,7 +1082,7 @@ access(all) contract FRC20FTShared {
         /// Iterate all hooks
         ///
         access(self)
-        fun _iterateHooks(_ func: ((Type, &AnyResource{FRC20FTShared.TransactionHook}): Void)) {
+        fun _iterateHooks(_ func: ((Type, &{FRC20FTShared.TransactionHook}): Void)) {
             // call all hooks
             for type in self.hooks.keys {
                 // check if the hook type is validated
@@ -1021,7 +1095,7 @@ access(all) contract FRC20FTShared {
                     if !valid {
                         continue
                     }
-                    if let ref: &AnyResource{FRC20FTShared.TransactionHook} = hookCap.borrow() {
+                    if let ref: &{FRC20FTShared.TransactionHook} = hookCap.borrow() {
                         func(type, ref)
                     }
                 }
@@ -1040,9 +1114,9 @@ access(all) contract FRC20FTShared {
     /// Only the owner of the account can call this method
     ///
     access(account)
-    fun borrowTransactionHook(_ address: Address): &AnyResource{TransactionHook}? {
+    fun borrowTransactionHook(_ address: Address): &{TransactionHook}? {
         return getAccount(address)
-            .getCapability<&AnyResource{TransactionHook}>(self.TransactionHookPublicPath)
+            .getCapability<&{TransactionHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 
@@ -1050,9 +1124,9 @@ access(all) contract FRC20FTShared {
     /// Only the owner of the account can call this method
     ///
     access(account)
-    fun borrowTransactionHookWithHeartbeat(_ address: Address): &AnyResource{TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
+    fun borrowTransactionHookWithHeartbeat(_ address: Address): &{TransactionHook, FixesHeartbeat.IHeartbeatHook}? {
         return getAccount(address)
-            .getCapability<&AnyResource{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
+            .getCapability<&{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.TransactionHookPublicPath)
             .borrow()
     }
 

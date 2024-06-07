@@ -347,10 +347,10 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// @return The resource reference conforming to the Resolver interface
         ///
         access(all)
-        fun borrowViewResolver(id: UInt64): &AnyResource{MetadataViews.Resolver} {
+        fun borrowViewResolver(id: UInt64): &{MetadataViews.Resolver} {
             let nft = (&self.ownedNFTs[id] as auth &NonFungibleToken.NFT?)!
             let FixesWrappedNFT = nft as! &FixesWrappedNFT.NFT
-            return FixesWrappedNFT as &AnyResource{MetadataViews.Resolver}
+            return FixesWrappedNFT as &{MetadataViews.Resolver}
         }
 
         /// @deprecated after Cadence 1.0

@@ -1,5 +1,6 @@
 // Fixes imports
 import "FixesHeartbeat"
+import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20StakingManager"
 
@@ -21,7 +22,7 @@ transaction() {
     execute {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         // Tick for staking
-        let platformTickerName = FRC20StakingManager.getPlatformStakingTickerName()
+        let platformTickerName = FRC20FTShared.getPlatformStakingTickerName()
         if acctsPool.getFRC20StakingAddress(tick: platformTickerName) != nil {
             self.heartbeat.tick(scope: "Staking:".concat(platformTickerName))
         }
@@ -29,5 +30,9 @@ transaction() {
         self.heartbeat.tick(scope: "FGameLottery")
         // Tick for Votes
         self.heartbeat.tick(scope: "FRC20Votes")
+        // Tick for TradablePool
+        self.heartbeat.tick(scope: "TradablePool")
+        // Tick for rugroyale
+        self.heartbeat.tick(scope: "FGameRugRoyale")
     }
 }

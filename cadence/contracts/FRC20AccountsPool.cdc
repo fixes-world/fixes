@@ -3,18 +3,21 @@
 
 # FRC20 Accounts Pool
 
-TODO: Add description
+The Hybrid Custody Account Pool
 
 */
 
 // Third-party imports
 import "MetadataViews"
+import "ViewResolver"
 import "FungibleToken"
 import "FlowToken"
 import "HybridCustody"
 // Fixes imports
-// import "Fixes"
-// import "FRC20FTShared"
+import "Fixes"
+import "FixesInscriptionFactory"
+import "FixesFungibleTokenInterface"
+import "FRC20FTShared"
 import "FRC20Indexer"
 
 access(all) contract FRC20AccountsPool {
@@ -40,62 +43,84 @@ access(all) contract FRC20AccountsPool {
         access(all) case EVMAgency
         access(all) case EVMEntrustedAccount
         access(all) case GameWorld
+        access(all) case FungibleToken
     }
 
     /// The public interface can be accessed by anyone
     ///
     access(all) resource interface PoolPublic {
         /// ---- Getters ----
+
         /// Returns the addresses of the FRC20 with the given type
-        access(all) view
-        fun getFRC20Addresses(type: ChildAccountType): {String: Address}
+        access(all)
+        view fun getAddresses(type: ChildAccountType): {String: Address}
+        /// Get Address
+        access(all)
+        view fun getAddress(type: ChildAccountType, _ key: String): Address?
 
         /// Returns the address of the FRC20 staking for the given tick
-        access(all) view
-        fun getFRC20StakingAddress(tick: String): Address?
+        access(all)
+        view fun getFRC20StakingAddress(tick: String): Address?
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
+        view fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
 
         /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getFRC20MarketAddress(tick: String): Address?
+        access(all)
+        view fun getFRC20MarketAddress(tick: String): Address?
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
+        view fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}?
 
         /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getMarketSharedAddress(): Address?
+        access(all)
+        view fun getMarketSharedAddress(): Address?
         /// Returns the address of the FRC20 market for the given tick
         access(all)
-        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}?
+        view fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}?
 
         /// Returns the address of the EVM agent for the given owner address
-        access(all) view
-        fun getEVMAgencyAddress(_ owner: String): Address?
+        access(all)
+        view fun getEVMAgencyAddress(_ owner: String): Address?
         /// Returns the flow token receiver for the given owner address
         access(all)
-        fun borrowEVMAgencyFlowTokenReceiver(_ owner: String): &{FungibleToken.Receiver}?
+        view fun borrowEVMAgencyFlowTokenReceiver(_ owner: String): &{FungibleToken.Receiver}?
 
         /// Returns the address of the EVM entrusted account for the given evm address
-        access(all) view
-        fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address?
+        access(all)
+        view fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address?
         /// Returns the flow token receiver for the given evm address
         access(all)
-        fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}?
+        view fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}?
 
         /// Returns the address of the GameWorld for the given key
-        access(all) view
-        fun getGameWorldAddress(_ key: String): Address?
+        access(all)
+        view fun getGameWorldAddress(_ key: String): Address?
         /// Returns the flow token receiver for the given key
         access(all)
-        fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}?
+        view fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}?
+
+        /// Returns the address of the FRC20 Fungible token with the given type
+        access(all)
+        view fun getFTContractAddress(_ tick: String): Address?
+        /// Returns the flow token receiver for the given tick
+        access(all)
+        view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}?
+        /// Borrow the Fixes Fungible Token contract interface
+        access(all)
+        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface?
+
+        /// Execute inscription and extract FlowToken in the inscription
+        access(all)
+        fun executeInscription(type: ChildAccountType, _ ins: &Fixes.Inscription)
 
         /// ----- Access account methods -----
         /// Borrow child's AuthAccount
         access(account)
         fun borrowChildAccount(type: ChildAccountType, _ key: String?): &AuthAccount?
+        /// Borrow the writable config store
+        access(account)
+        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): &FRC20FTShared.SharedStore?
         /// Sets up a new child account for market
         access(account)
         fun setupNewChildForMarket(tick: String, _ acctCap: Capability<&AuthAccount>)
@@ -111,6 +136,9 @@ access(all) contract FRC20AccountsPool {
         /// Sets up a new child account for some Game World
         access(account)
         fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>)
+        /// Sets up a new child account for FungibleToken
+        access(account)
+        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<&AuthAccount>)
     }
 
     /// The admin interface can only be accessed by the the account manager's owner
@@ -152,118 +180,193 @@ access(all) contract FRC20AccountsPool {
         /** ---- Public Methods ---- */
 
         /// Returns the addresses of the FRC20 with the given type
-        access(all) view
-        fun getFRC20Addresses(type: ChildAccountType): {String: Address} {
+        access(all)
+        view fun getAddresses(type: ChildAccountType): {String: Address} {
             if let tickDict = self.addressMapping[type] {
                 return tickDict
             }
             return {}
         }
 
-        /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getFRC20MarketAddress(tick: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.Market) {
-                return tickDict[tick]
+        /// Get Address
+        ///
+        access(all)
+        view fun getAddress(type: ChildAccountType, _ key: String): Address? {
+            if let dict = self.borrowDict(type: type) {
+                return dict[key]
             }
             return nil
+        }
+
+        /// Returns the address of the FRC20 market for the given tick
+        access(all)
+        view fun getFRC20MarketAddress(tick: String): Address? {
+            return self.getAddress(type: ChildAccountType.Market, tick)
         }
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
+        view fun borrowFRC20MarketFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20MarketAddress(tick: tick) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
 
         /// Returns the address of the FRC20 market for the given tick
-        access(all) view
-        fun getMarketSharedAddress(): Address? {
+        access(all)
+        view fun getMarketSharedAddress(): Address? {
             return self.sharedAddressMappping[ChildAccountType.Market]
         }
 
         /// Returns the address of the FRC20 market for the given tick
         access(all)
-        fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}? {
+        view fun borrowMarketSharedFlowTokenReceiver(): &{FungibleToken.Receiver}? {
             if let addr = self.getMarketSharedAddress() {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
 
         /// Returns the address of the FRC20 staking for the given tick
-        access(all) view
-        fun getFRC20StakingAddress(tick: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.Staking) {
-                return tickDict[tick]
-            }
-            return nil
+        access(all)
+        view fun getFRC20StakingAddress(tick: String): Address? {
+            return self.getAddress(type: ChildAccountType.Staking, tick)
         }
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
+        view fun borrowFRC20StakingFlowTokenReceiver(tick: String): &{FungibleToken.Receiver}? {
             if let addr = self.getFRC20StakingAddress(tick: tick) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
 
         /// Returns the address of the EVM agent for the given eth address
-        access(all) view
-        fun getEVMAgencyAddress(_ owner: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.EVMAgency) {
-                return tickDict[owner]
-            }
-            return nil
+        access(all)
+        view fun getEVMAgencyAddress(_ owner: String): Address? {
+            return self.getAddress(type: ChildAccountType.EVMAgency, owner)
         }
 
         /// Returns the flow token receiver for the given tick
         access(all)
-        fun borrowEVMAgencyFlowTokenReceiver(_ evmAddress: String): &{FungibleToken.Receiver}? {
+        view fun borrowEVMAgencyFlowTokenReceiver(_ evmAddress: String): &{FungibleToken.Receiver}? {
             if let addr = self.getEVMAgencyAddress(evmAddress) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
 
 
         /// Returns the address of the EVM entrusted account for the given evm address
-        access(all) view
-        fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.EVMEntrustedAccount) {
-                return tickDict[evmAddr]
-            }
-            return nil
+        access(all)
+        view fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address? {
+            return self.getAddress(type: ChildAccountType.EVMEntrustedAccount, evmAddr)
         }
 
         /// Returns the flow token receiver for the given evm address
         access(all)
-        fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}? {
+        view fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}? {
             if let addr = self.getEVMEntrustedAccountAddress(evmAddr) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
         }
 
         /// Returns the address of the GameWorld for the given key
-        access(all) view
-        fun getGameWorldAddress(_ key: String): Address? {
-            if let tickDict = self.borrowDict(type: ChildAccountType.GameWorld) {
-                return tickDict[key]
-            }
-            return nil
+        access(all)
+        view fun getGameWorldAddress(_ key: String): Address? {
+            return self.getAddress(type: ChildAccountType.GameWorld, key)
         }
 
         /// Returns the flow token receiver for the given key
         access(all)
-        fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}? {
+        view fun borrowGameWorldFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}? {
             if let addr = self.getGameWorldAddress(key) {
-                return FRC20Indexer.borrowFlowTokenReceiver(addr)
+                return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
+        }
+
+        /// Returns the address of the FRC20 Fungible token with the given type
+        access(all)
+        view fun getFTContractAddress(_ tick: String): Address? {
+            return self.getAddress(type: ChildAccountType.FungibleToken, tick)
+        }
+
+        /// Returns the flow token receiver for the given tick
+        access(all)
+        view fun borrowFTContractFlowTokenReceiver(_ tick: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getFTContractAddress(tick) {
+                return Fixes.borrowFlowTokenReceiver(addr)
+            }
+            return nil
+        }
+
+        /// Borrow the Fixes Fungible Token contract interface
+        /// If the tick starts with "$", it will borrow FixesFungibleToken, otherwise FRC20FungibleToken
+        /// If no contract is found, it will panic
+        ///
+        access(all)
+        view fun borrowFTContract(_ tick: String): &FixesFungibleTokenInterface? {
+            // try to borrow the account to check if it was created
+            if let childAcctRef = self.borrowChildAccount(type: ChildAccountType.FungibleToken, tick) {
+                let name = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+                // try to borrow the contract
+                return childAcctRef.contracts.borrow<&FixesFungibleTokenInterface>(name: name)
+            }
+            return nil
+        }
+
+        /// Execute inscription and extract FlowToken in the inscription
+        ///
+        access(all)
+        fun executeInscription(type: ChildAccountType, _ ins: &Fixes.Inscription) {
+            pre {
+                ins.isExtractable(): "The inscription must be extractable"
+            }
+            post {
+                ins.isExtracted(): "The inscription must be extracted"
+            }
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            assert(
+                meta["op"] == "exec",
+                message: "The inscription operation must be 'exec'"
+            )
+            assert(
+                meta["usage"] != nil,
+                message: "The usage is not found"
+            )
+            let tick = meta["tick"] ?? panic("The ticker name is not found")
+
+            // extract the tokens
+            let extractedToken <- ins.extract()
+            let totalAmount = extractedToken.balance
+
+            // 1/4 -> Platform Staking Account
+            let globalStore = FRC20FTShared.borrowGlobalStoreRef()
+            let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
+            if let addr = self.getAddress(type: ChildAccountType.Staking, stakingFRC20Tick) {
+                if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
+                    // withdraw the tokens to the treasury
+                    stakingFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.4))
+                }
+            }
+
+            // 1/3 -> Token Child Account
+            if let addr = self.getAddress(type: type, tick) {
+                if let tickRelatedFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
+                    // the target account
+                    tickRelatedFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.3))
+                }
+            }
+
+            // 1/3 -> Protocol(System Account)
+            let systemFlowReciever = Fixes.borrowFlowTokenReceiver(self.owner?.address!)
+                ?? panic("Failed to borrow system flow token receiver")
+            // remaining the extracted tokens will be sent to the system account
+            systemFlowReciever.deposit(from: <- extractedToken)
         }
 
         /// ----- Access account methods -----
@@ -289,6 +392,16 @@ access(all) contract FRC20AccountsPool {
                         return ownedChild.borrowAccount()
                     }
                 }
+            }
+            return nil
+        }
+
+        /// Borrow the writable config store
+        ///
+        access(account)
+        fun borrowWritableConfigStore(type: ChildAccountType, _ key: String): &FRC20FTShared.SharedStore? {
+            if let child = self.borrowChildAccount(type: type, key) {
+                return child.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
             }
             return nil
         }
@@ -323,6 +436,12 @@ access(all) contract FRC20AccountsPool {
         access(account)
         fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<&AuthAccount>) {
             self.setupNewChildByKey(type: ChildAccountType.GameWorld, key: key, acctCap)
+        }
+
+        /// Sets up a new child account for FungibleToken
+        access(account)
+        fun setupNewChildForFungibleToken(tick: String, _ acctCap: Capability<&AuthAccount>) {
+            self.setupNewChildByKey(type: ChildAccountType.FungibleToken, key: tick, acctCap)
         }
 
         /** ---- Admin Methods ---- */
