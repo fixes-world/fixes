@@ -1,6 +1,3 @@
-import "FTViewUtils"
-import "ViewResolver"
-import "FungibleTokenMetadataViews"
 // Fixes Imports
 import "FixesFungibleTokenInterface"
 import "FungibleTokenManager"
@@ -8,7 +5,7 @@ import "FungibleTokenManager"
 access(all)
 fun main(
     ftAddress: Address,
-): FTViewUtils.StandardTokenView? {
+): FungibleTokenManager.FixesTokenView? {
     let ftAcct = getAccount(ftAddress)
     var ftName = "FixesFungibleToken"
     var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
@@ -19,5 +16,5 @@ fun main(
     if ftContract == nil {
         return nil
     }
-    return FungibleTokenManager.buildStandardTokenView(ftAddress, ftName)
+    return FungibleTokenManager.buildFixesTokenView(ftAddress, ftName)
 }

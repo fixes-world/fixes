@@ -1,6 +1,3 @@
-import "FTViewUtils"
-import "ViewResolver"
-import "FungibleTokenMetadataViews"
 // Fixes Imports
 import "FixesFungibleTokenInterface"
 import "FungibleTokenManager"
@@ -8,8 +5,8 @@ import "FungibleTokenManager"
 access(all)
 fun main(
     _ addr: Address
-): [FTViewUtils.StandardTokenView] {
-    let views: [FTViewUtils.StandardTokenView] = []
+): [FungibleTokenManager.FixesTokenView] {
+    let views: [FungibleTokenManager.FixesTokenView] = []
     if let ftManager = FungibleTokenManager.borrowFTManager(addr) {
         let ftAddresses = ftManager.getCreatedFungibleTokenAddresses()
         for ftAddress in ftAddresses {
@@ -24,7 +21,7 @@ fun main(
                 continue
             }
             // setup the view
-            if let tokenView = FungibleTokenManager.buildStandardTokenView(ftAddress, ftName) {
+            if let tokenView = FungibleTokenManager.buildFixesTokenView(ftAddress, ftName) {
                 views.append(tokenView)
             }
         }
