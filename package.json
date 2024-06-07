@@ -1,18 +1,18 @@
 {
-  "name": "@fixes/contracts",
+	"name": "@fixes/contracts",
 	"version": "0.8.0-alpha.4",
-  "exports": {
-    "./contracts/*": "./cadence/contracts/*",
-    "./transactions/*": "./cadence/transactions/*",
-    "./transactions-for-evm/*": "./cadence/transactions-for-evm/*",
-    "./scripts/*": "./cadence/scripts/*",
-    "./flow.json": "./flow.json"
-  },
-  "scripts": {
-    "deploy:emulator": "flow project deploy --update",
-    "deploy:testnet": "flow project deploy --update --network testnet",
-    "deploy:mainnet": "flow project deploy --update --network mainnet",
-    "fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
-    "dev": "pnpm deploy:emulator && pnpm fund:emulator"
-  }
+	"exports": {
+		"./contracts/*": "./cadence/contracts/*",
+		"./transactions/*": "./cadence/transactions/*",
+		"./transactions-for-evm/*": "./cadence/transactions-for-evm/*",
+		"./scripts/*": "./cadence/scripts/*",
+		"./flow.json": "./flow.json"
+	},
+	"scripts": {
+		"deploy:emulator": "flow project deploy --update",
+		"deploy:testnet": "flow project deploy --update --network testnet",
+		"deploy:mainnet": "flow project deploy --update --network mainnet",
+		"fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
+		"dev": "pnpm deploy:emulator && pnpm fund:emulator"
+	}
 }
