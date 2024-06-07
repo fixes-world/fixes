@@ -358,6 +358,46 @@ access(all) contract FungibleTokenManager {
         return nil
     }
 
+    /// The struct of Fixes Token View
+    ///
+    access(all) struct FixesTokenView {
+        access(all) let standardView: FTViewUtils.StandardTokenView
+        access(all) let deployer: Address
+        access(all) let accountKey: String
+        access(all) let maxSupply: UFix64
+        access(all) let extra: {String: String}
+
+        init(
+            _ standardView: FTViewUtils.StandardTokenView,
+            _ deployer: Address,
+            _ accountKey: String,
+            _ maxSupply: UFix64,
+            _ extra: {String: String}
+        ) {
+            self.standardView = standardView
+            self.deployer = deployer
+            self.accountKey = accountKey
+            self.maxSupply = maxSupply
+            self.extra = extra
+        }
+    }
+
+    /// Build the Fixes Token View
+    ///
+    access(all)
+    fun buildFixesTokenView(_ ftAddress: Address, _ ftName: String): FixesTokenView? {
+        if let ftInterface = getAccount(ftAddress).contracts.borrow<&FixesFungibleTokenInterface>(name: ftName) {
+            let deployer = ftInterface.getDeployerAddress()
+            let symbol = ftInterface.getSymbol()
+            let accountKey = ftName == "FixesFungibleToken" ? "$".concat(symbol) : symbol
+            let maxSupply = ftInterface.getMaxSupply() ?? UFix64.max
+            if let tokenView = self.buildStandardTokenView(ftAddress, ftName) {
+                return FixesTokenView(tokenView, deployer, accountKey, maxSupply, {})
+            }
+        }
+        return nil
+    }
+
     /// Enable the Fixes Fungible Token
     ///
     access(all)
