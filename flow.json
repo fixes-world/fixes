@@ -370,7 +370,7 @@
 			"source": "imports-c1/15a918087ab12d86/FTViewUtils.cdc",
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
-				"testnet": "0b86f928a1fa7798"
+				"testnet": "b86f928a1fa7798e"
 			}
 		},
 		"FUSD": {
@@ -666,7 +666,7 @@
 			"source": "imports-c1/15a918087ab12d86/ViewResolvers.cdc",
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
-				"testnet": "0b86f928a1fa7798"
+				"testnet": "b86f928a1fa7798e"
 			}
 		},
 		"stFlowToken": {
