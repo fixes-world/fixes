@@ -389,7 +389,7 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun buildFixesTokenView(_ ftAddress: Address, _ ftName: String): FixesTokenView? {
-        if let ftInterface = getAccount(ftAddress).contracts.borrow<&FixesFungibleTokenInterface>(name: ftName) {
+        if let ftInterface = getAccount(ftAddress).contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName) {
             let deployer = ftInterface.getDeployerAddress()
             let symbol = ftInterface.getSymbol()
             let accountKey = ftName == "FixesFungibleToken" ? "$".concat(symbol) : symbol
