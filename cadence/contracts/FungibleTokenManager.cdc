@@ -345,7 +345,7 @@ access(all) contract FungibleTokenManager {
             return FTViewUtils.StandardTokenView(
                 identity: FTViewUtils.FTIdentity(ftAddress, ftName),
                 decimals: 8,
-                tags: [],
+                tags: [] as [String],
                 dataSource: ftAddress,
                 paths: FTViewUtils.StandardTokenPaths(
                     vaultPath: vaultData!.storagePath,
