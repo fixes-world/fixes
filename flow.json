@@ -797,7 +797,7 @@
 			"hash": "9ed7d0e8cf849d6603228a52cb91cc9de5d997abb4f2bb65b3f4ff49ec48e50a",
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
-				"testnet": "0b86f928a1fa7798"
+				"testnet": "b86f928a1fa7798e"
 			}
 		},
 		"FUSD": {
@@ -1134,7 +1134,7 @@
 			"hash": "e5ec455d8d71a03e7bd50d72031594cf3a452b138c4f8b4348ea45bc066d6fca",
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
-				"testnet": "0b86f928a1fa7798"
+				"testnet": "b86f928a1fa7798e"
 			}
 		},
 		"stFlowToken": {
