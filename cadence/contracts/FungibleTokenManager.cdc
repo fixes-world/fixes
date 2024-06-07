@@ -11,6 +11,9 @@ import "FungibleToken"
 import "FlowToken"
 import "StringUtils"
 import "MigrationContractStaging"
+import "FTViewUtils"
+import "ViewResolver"
+import "FungibleTokenMetadataViews"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -327,6 +330,32 @@ access(all) contract FungibleTokenManager {
     view fun isFTContractAuthorizedUser(_ tick: String, _ callerAddr: Address): Bool {
         let globalPublicRef = self.borrowFTGlobalPublic(tick)
         return globalPublicRef?.isAuthorizedUser(callerAddr) ?? false
+    }
+
+    /// Build the Standard Token View
+    ///
+    access(all)
+    fun buildStandardTokenView(_ ftAddress: Address, _ ftName: String): FTViewUtils.StandardTokenView? {
+        if let viewResolver = getAccount(ftAddress).contracts.borrow<&ViewResolver>(name: ftName) {
+            let vaultData = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+            let display = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?
+            if vaultData == nil || display == nil {
+                return nil
+            }
+            return FTViewUtils.StandardTokenView(
+                identity: FTViewUtils.FTIdentity(ftAddress, ftName),
+                decimals: 8,
+                tags: [],
+                dataSource: ftAddress,
+                paths: FTViewUtils.StandardTokenPaths(
+                    vaultPath: vaultData!.storagePath,
+                    balancePath: vaultData!.metadataPath,
+                    receiverPath: vaultData!.receiverPath,
+                ),
+                display: FTViewUtils.FTDisplayWithSource(ftAddress, display!),
+            )
+        }
+        return nil
     }
 
     /// Enable the Fixes Fungible Token
