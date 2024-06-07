@@ -66,15 +66,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FIND": {
-			"source": "./imports/097bafa4e0b48eef/FIND.cdc",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
-		},
 		"FGameLottery": {
 			"source": "cadence/contracts/FGameLottery.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "74ad08095d92192a"
+			}
+		},
+		"FGameLotteryFactory": {
+			"source": "cadence/contracts/FGameLotteryFactory.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -89,12 +90,11 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FGameLotteryFactory": {
-			"source": "cadence/contracts/FGameLotteryFactory.cdc",
+		"FIND": {
+			"source": "./imports/097bafa4e0b48eef/FIND.cdc",
 			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
 			}
 		},
 		"FRC20AccountsPool": {
@@ -209,16 +209,16 @@
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20Votes": {
-			"source": "cadence/contracts/FRC20Votes.cdc",
+		"FRC20VoteCommands": {
+			"source": "cadence/contracts/FRC20VoteCommands.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "74ad08095d92192a"
 			}
 		},
-		"FRC20VoteCommands": {
-			"source": "cadence/contracts/FRC20VoteCommands.cdc",
+		"FRC20Votes": {
+			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "d2abb5dbf5e08666",
@@ -394,50 +394,27 @@
 		"AddressUtils": {
 			"source": "mainnet://a340dc0a4ec828ab.AddressUtils",
 			"hash": "fbef5765f68a64359f2ca799df0fbd594a6e1c92a6f6a0fbba980751e593803f",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
+			"aliases": {}
 		},
 		"ArrayUtils": {
 			"source": "mainnet://a340dc0a4ec828ab.ArrayUtils",
 			"hash": "6b17ff77591d04ac7dbb07adbd8df3ee5a67ea5bf361099a7b78676b9a58eacc",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
+			"aliases": {}
 		},
 		"CapabilityDelegator": {
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityDelegator",
 			"hash": "026019cb04d32e65fca7f40f700f2d46d16a41521f38db27bbf5963816b5d971",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
+			"aliases": {}
 		},
 		"CapabilityFactory": {
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityFactory",
 			"hash": "742bd314afa81bdff5eae4293e7df25923120c70d1f200dff253740deb741cb8",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
+			"aliases": {}
 		},
 		"CapabilityFilter": {
 			"source": "mainnet://d8a7e05a7ac670c0.CapabilityFilter",
 			"hash": "ebf6b62fbc3b31ec825839e62a39baf481c0244106c0e55a7bdb9c15e374cd6a",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
+			"aliases": {}
 		},
 		"Clock": {
 			"source": "mainnet://097bafa4e0b48eef.Clock",
@@ -465,18 +442,12 @@
 		"Domains": {
 			"source": "mainnet://233eb012d34b0070.Domains",
 			"hash": "29164d9aa71f8a63de0025edee3ed3af5a10d609e8786ed430c59f2db4013432",
-			"aliases": {
-				"mainnet": "233eb012d34b0070",
-				"testnet": "b05b2abb42335e88"
-			}
+			"aliases": {}
 		},
 		"FIND": {
 			"source": "mainnet://097bafa4e0b48eef.FIND",
 			"hash": "6144210577276e0c231caacc7418262741c8c6acca11be0a77e4de0e19c2e58f",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
+			"aliases": {}
 		},
 		"FNSConfig": {
 			"source": "mainnet://233eb012d34b0070.FNSConfig",
@@ -511,82 +482,47 @@
 		"FindViews": {
 			"source": "mainnet://097bafa4e0b48eef.FindViews",
 			"hash": "32a5e6232fe0998bf07fa11f968cd57320a741db3365920a5485ddff7fce742d",
-			"aliases": {
-				"mainnet": "097bafa4e0b48eef",
-				"testnet": "35717efbbce11c74"
-			}
+			"aliases": {}
 		},
 		"FlowToken": {
 			"source": "mainnet://1654653399040a61.FlowToken",
 			"hash": "7e2bb5acf84ddcd8ad4a9ddb1e3595c8148ac0a711551e27aa7231db51b2d7ce",
-			"aliases": {
-				"emulator": "0ae53cb6e3f42a79",
-				"mainnet": "1654653399040a61",
-				"testnet": "7e60df042a9c0868"
-			}
+			"aliases": {}
 		},
 		"FungibleToken": {
 			"source": "mainnet://f233dcee88fe0abe.FungibleToken",
 			"hash": "6839378c7c94fa051db4f63fcc5c572ee7a7f49b962f2d161c8f2d7381805299",
-			"aliases": {
-				"emulator": "ee82856bf20e2aa6",
-				"mainnet": "f233dcee88fe0abe",
-				"testnet": "9a0766d93b6608b7"
-			}
+			"aliases": {}
 		},
 		"FungibleTokenMetadataViews": {
 			"source": "mainnet://f233dcee88fe0abe.FungibleTokenMetadataViews",
 			"hash": "46174b8f88bfe289c17e00348643536ab70a27f9b69e7bb1cddc70949fc8cb4b",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "f233dcee88fe0abe",
-				"testnet": "9a0766d93b6608b7"
-			}
+			"aliases": {}
 		},
 		"HybridCustody": {
 			"source": "mainnet://d8a7e05a7ac670c0.HybridCustody",
 			"hash": "455e527f1ad0f6b842979350bad9f158a09cd94632884a46075939dfef2dce3c",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "d8a7e05a7ac670c0",
-				"testing": "0000000000000007",
-				"testnet": "294e44e1ec6993c6"
-			}
+			"aliases": {}
 		},
 		"InscriptionMetadata": {
 			"source": "mainnet://88dd257fcf26d3cc.InscriptionMetadata",
 			"hash": "4f40b2deeb052d4136b4203027e8c8020fa520e4044a4872abc9c612879afb57",
-			"aliases": {
-				"mainnet": "88dd257fcf26d3cc",
-				"testnet": "564b229bd8380848"
-			}
+			"aliases": {}
 		},
 		"MetadataViews": {
 			"source": "mainnet://1d7e57aa55817448.MetadataViews",
 			"hash": "8d605dbd8135085aa9e8bb0604ff67ddb24f70c9368c0be7673efaaa17fcfc8f",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
+			"aliases": {}
 		},
 		"NFTCatalog": {
 			"source": "mainnet://49a7cda3a1eecc29.NFTCatalog",
 			"hash": "1764304baead3b4c248073011c931e0f803c8961e0b8a19be48e8562461e6e3c",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "49a7cda3a1eecc29",
-				"testnet": "324c34e1c517e4db"
-			}
+			"aliases": {}
 		},
 		"NFTRetrieval": {
 			"source": "mainnet://49a7cda3a1eecc29.NFTRetrieval",
 			"hash": "3daa75ef44751d4c45f99bb8f8a86008cfa81ca9d6cd449a91ca6209a4414074",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "49a7cda3a1eecc29",
-				"testnet": "324c34e1c517e4db"
-			}
+			"aliases": {}
 		},
 		"NFTStorefrontV2": {
 			"source": "mainnet://4eb8a10cb9f87357.NFTStorefrontV2",
@@ -598,11 +534,7 @@
 		"NonFungibleToken": {
 			"source": "mainnet://1d7e57aa55817448.NonFungibleToken",
 			"hash": "cdd73be33e303af8e2658bca8a6c1a24494e492e4dc577dbeef14113f04b1ce1",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
+			"aliases": {}
 		},
 		"OnChainMultiSig": {
 			"source": "mainnet://220c1b4155f86f2f.OnChainMultiSig",
@@ -614,18 +546,12 @@
 		"OracleConfig": {
 			"source": "mainnet://cec15c814971c1dc.OracleConfig",
 			"hash": "f8ad5b77d61a8b5fb16ae08429da686649097247592678efd7b2a498f8635898",
-			"aliases": {
-				"mainnet": "cec15c814971c1dc",
-				"testnet": "2a9b59c3e2b72ee0"
-			}
+			"aliases": {}
 		},
 		"OracleInterface": {
 			"source": "mainnet://cec15c814971c1dc.OracleInterface",
 			"hash": "e7c1f419eab82e4e4b6fef15c07052859e1de6751899574dbda8acdfeaf292c0",
-			"aliases": {
-				"mainnet": "cec15c814971c1dc",
-				"testnet": "2a9b59c3e2b72ee0"
-			}
+			"aliases": {}
 		},
 		"Profile": {
 			"source": "mainnet://097bafa4e0b48eef.Profile",
@@ -646,10 +572,7 @@
 		"PublicPriceOracle": {
 			"source": "mainnet://ec67451f8a58216a.PublicPriceOracle",
 			"hash": "c3bbab7908f90655be297cb2bf127254f3072e61e0525c1832f4346ffaaf67f1",
-			"aliases": {
-				"mainnet": "ec67451f8a58216a",
-				"testnet": "866a9f1e81898147"
-			}
+			"aliases": {}
 		},
 		"Sender": {
 			"source": "mainnet://097bafa4e0b48eef.Sender",
@@ -662,20 +585,12 @@
 		"StringUtils": {
 			"source": "mainnet://a340dc0a4ec828ab.StringUtils",
 			"hash": "5cb6f0c52bac8014c4b40cae267e505b52c37cddf10b761b84cbe02aed9b80f3",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "a340dc0a4ec828ab",
-				"testnet": "31ad40c07a2a9788"
-			}
+			"aliases": {}
 		},
 		"ViewResolver": {
 			"source": "mainnet://1d7e57aa55817448.ViewResolver",
 			"hash": "9fa41186f38899625a6b4774f1a9addf8d16b76022d52a99174b4493499dc3de",
-			"aliases": {
-				"emulator": "f8d6e0586b0a20c7",
-				"mainnet": "1d7e57aa55817448",
-				"testnet": "631e88ae7f1d7c20"
-			}
+			"aliases": {}
 		}
 	},
 	"networks": {
@@ -717,17 +632,14 @@
 			"address": "d2abb5dbf5e08666",
 			"key": {
 				"type": "file",
-				"index": 2,
-				"signatureAlgorithm": "ECDSA_P256",
-				"hashAlgorithm": "SHA3_256",
 				"location": "mainnet-admin.pkey"
 			}
 		},
 		"mainnet-user": {
-			"address": "d59667dc1a7cfecf",
+			"address": "d566590bf98ecab2",
 			"key": {
 				"type": "file",
-				"location": "mainnet-user.pkey"
+				"location": "mainnet-tick-user.pkey"
 			}
 		},
 		"testnet-admin": {
