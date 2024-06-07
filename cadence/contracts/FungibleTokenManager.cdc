@@ -339,9 +339,9 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun buildStandardTokenView(_ ftAddress: Address, _ ftName: String): FTViewUtils.StandardTokenView? {
-        if let viewResolver = getAccount(ftAddress).contracts.borrow<&ViewResolver>(name: ftName) {
-            let vaultData = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
-            let display = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?
+        if let viewResolver = getAccount(ftAddress).contracts.borrow<&{ViewResolver}>(name: ftName) {
+            let vaultData = viewResolver.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+            let display = viewResolver.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?
             if vaultData == nil || display == nil {
                 return nil
             }

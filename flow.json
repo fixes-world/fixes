@@ -514,6 +514,14 @@
 				"testnet": "631e88ae7f1d7c20"
 			}
 		},
+		"MigrationContractStaging": {
+			"source": "imports-c1/56100d46aa9b0212/MigrationContractStaging.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "56100d46aa9b0212",
+				"testnet": "2ceae959ed1a7e7a"
+			}
+		},
 		"NFTCatalog": {
 			"source": "imports-c1/49a7cda3a1eecc29/NFTCatalog.cdc",
 			"aliases": {
