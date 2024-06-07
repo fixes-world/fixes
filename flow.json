@@ -717,7 +717,7 @@
 			"address": "d2abb5dbf5e08666",
 			"key": {
 				"type": "file",
-				"index": 1,
+				"index": 2,
 				"signatureAlgorithm": "ECDSA_P256",
 				"hashAlgorithm": "SHA3_256",
 				"location": "mainnet-admin.pkey"
