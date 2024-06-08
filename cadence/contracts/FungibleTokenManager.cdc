@@ -267,7 +267,7 @@ access(all) contract FungibleTokenManager {
 
     /// Create the Manager Resource
     ///
-    access(contract)
+    access(all)
     fun createManager(): @Manager {
         return <- create Manager()
     }
