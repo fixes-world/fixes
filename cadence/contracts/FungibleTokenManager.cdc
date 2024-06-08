@@ -398,6 +398,98 @@ access(all) contract FungibleTokenManager {
         return nil
     }
 
+    /// The struct of Fixes Token Modules
+    ///
+    access(all) struct FixesTokenModules {
+        access(all) let address: Address
+        access(all) let supportedMinters: [Type]
+
+        init(
+            _ address: Address,
+        ) {
+            self.address = address
+            self.supportedMinters = []
+
+            self.sync()
+        }
+
+        access(all)
+        fun sync() {
+            // Try to add tradable pool
+            let tradablePool = FixesTradablePool.borrowTradablePool(self.address)
+            if tradablePool != nil {
+                self.supportedMinters.append(tradablePool.getType())
+            }
+            // Try to add lockdrops pool
+            let lockdropsPool = FixesTokenLockDrops.borrowDropsPool(self.address)
+            if lockdropsPool != nil {
+                self.supportedMinters.append(lockdropsPool.getType())
+            }
+            // Try to add airdrops pool
+            let airdropsPool = FixesTokenAirDrops.borrowAirdropPool(self.address)
+            if airdropsPool != nil {
+                self.supportedMinters.append(airdropsPool.getType())
+            }
+        }
+
+        access(all)
+        view fun isTradablePoolSupported(): Bool {
+            return self.supportedMinters.contains(Type<@FixesTradablePool.TradableLiquidityPool>())
+        }
+
+        access(all)
+        view fun isLockdropsPoolSupported(): Bool {
+            return self.supportedMinters.contains(Type<@FixesTokenLockDrops.DropsPool>())
+        }
+
+        access(all)
+        view fun isAirdropsPoolSupported(): Bool {
+            return self.supportedMinters.contains(Type<@FixesTokenAirDrops.AirdropPool>())
+        }
+    }
+
+    /// The Fixes Token Info
+    ///
+    access(all) struct FixesTokenInfo {
+        access(all) let view: FixesTokenView
+        access(all) let modules: FixesTokenModules
+        access(all) let extra: {String: AnyStruct}
+
+        init(
+            _ view: FixesTokenView,
+            _ modules: FixesTokenModules
+        ) {
+            self.view = view
+            self.modules = modules
+            self.extra = {}
+        }
+    }
+
+    /// Build the Fixes Token Info
+    ///
+    access(all)
+    fun buildFixesTokenInfo(_ ftAddress: Address, _ acctKey: String?): FixesTokenInfo? {
+        var ftName = "FixesFungibleToken"
+        if acctKey != nil {
+            ftName = acctKey![0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+        } else {
+            let ftAcct = getAccount(ftAddress)
+            var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+            if ftContract == nil {
+                ftName = "FRC20FungibleToken"
+                ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+            }
+            if ftContract == nil {
+                return nil
+            }
+        }
+        if let tokenView = self.buildFixesTokenView(ftAddress, ftName) {
+            let modules = FixesTokenModules(ftAddress)
+            return FixesTokenInfo(tokenView, modules)
+        }
+        return nil
+    }
+
     /// Enable the Fixes Fungible Token
     ///
     access(all)

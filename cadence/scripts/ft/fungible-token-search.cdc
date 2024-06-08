@@ -7,17 +7,16 @@ import "FungibleTokenManager"
 access(all)
 fun main(
     _ name: String
-): [FungibleTokenManager.FixesTokenView] {
+): [FungibleTokenManager.FixesTokenInfo] {
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
     let addresses = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
-    let views: [FungibleTokenManager.FixesTokenView] = []
+    let arr: [FungibleTokenManager.FixesTokenInfo] = []
 
     for key in addresses.keys {
         let ftAddress = addresses[key]!
-        let ftName = key[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
-        if let view = FungibleTokenManager.buildFixesTokenView(ftAddress, ftName) {
-            views.append(view)
+        if let info = FungibleTokenManager.buildFixesTokenInfo(ftAddress, nil) {
+            arr.append(info)
         }
     }
-    return views
+    return arr
 }
