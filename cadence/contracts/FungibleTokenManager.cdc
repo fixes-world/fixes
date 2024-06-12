@@ -230,6 +230,24 @@ access(all) contract FungibleTokenManager {
             return self.createdSymbols.length
         }
 
+        // ---- Admin Methods ----
+
+        /// Borrow the shared store of the managed fungible token
+        ///
+        access(all)
+        fun borrowManagedFTStore(_ symbol: String): &FRC20FTShared.SharedStore {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let accountKey = symbol[0] != "$" ? "$".concat(symbol) : symbol
+            assert(
+                self.managedSymbols.contains(accountKey) || self.createdSymbols.contains(accountKey),
+                message: "The fungible token is not managed by the owner"
+            )
+            let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, accountKey)
+                ?? panic("The child account was not created")
+            return acct.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
+                ?? panic("The shared store is not found")
+        }
+
         // ---- Internal Methods ----
 
         /// set the managed fungible token
