@@ -237,8 +237,8 @@ access(all) contract FungibleTokenManager {
 
         /// Borrow the shared store of the managed fungible token
         ///
-        access(all)
-        fun borrowManagedFTStore(_ symbol: String): &FRC20FTShared.SharedStore {
+        access(Sudo)
+        fun borrowManagedFTStore(_ symbol: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let accountKey = symbol[0] != "$" ? "$".concat(symbol) : symbol
             assert(
@@ -247,7 +247,7 @@ access(all) contract FungibleTokenManager {
             )
             let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, accountKey)
                 ?? panic("The child account was not created")
-            return acct.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
+            return acct.storage.borrow<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
                 ?? panic("The shared store is not found")
         }
 
@@ -495,10 +495,10 @@ access(all) contract FungibleTokenManager {
             ftName = acctKey![0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
         } else {
             let ftAcct = getAccount(ftAddress)
-            var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+            var ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
             if ftContract == nil {
                 ftName = "FRC20FungibleToken"
-                ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+                ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
             }
             if ftContract == nil {
                 return nil
