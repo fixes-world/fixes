@@ -19,6 +19,9 @@ import "FixesInscriptionFactory"
 import "FRC20FTShared"
 
 access(all) contract FRC20Indexer {
+
+    access(all) entitlement Admin
+
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -390,7 +393,7 @@ access(all) contract FRC20Indexer {
 
         /// Extract some $FLOW from global pool to sponsor the tick deployer
         ///
-        access(all)
+        access(Admin)
         fun sponsorship(
             amount: UFix64,
             to: Capability<&{FungibleToken.Receiver}>,

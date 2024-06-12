@@ -122,7 +122,7 @@ access(all) contract FungibleTokenManager {
         }
 
         // migrate all children contracts
-        access(all)
+        access(Sudo)
         fun stageAllChildrenContracts() {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
