@@ -517,7 +517,7 @@ access(all) contract FungibleTokenManager {
             if modules.isTradablePoolSupported() {
                 let tradablePool = FixesTradablePool.borrowTradablePool(ftAddress)!
                 info.setExtra("tradable:allocatedSupply", tradablePool.getTotalAllowedMintableAmount())
-                info.setExtra("tradable:supplied", tradablePool.getTotalMintedAmount())
+                info.setExtra("tradable:supplied", tradablePool.getTradablePoolCirculatingSupply())
                 totalAllocatedSupply = totalAllocatedSupply + tradablePool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + tradablePool.getTotalMintedAmount()
                 // update the total token market cap
