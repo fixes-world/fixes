@@ -436,17 +436,17 @@ access(all) contract FungibleTokenManager {
             // Try to add tradable pool
             let tradablePool = FixesTradablePool.borrowTradablePool(self.address)
             if tradablePool != nil {
-                self.supportedMinters.append(tradablePool.getType())
+                self.supportedMinters.append(tradablePool!.getType())
             }
             // Try to add lockdrops pool
             let lockdropsPool = FixesTokenLockDrops.borrowDropsPool(self.address)
             if lockdropsPool != nil {
-                self.supportedMinters.append(lockdropsPool.getType())
+                self.supportedMinters.append(lockdropsPool!.getType())
             }
             // Try to add airdrops pool
             let airdropsPool = FixesTokenAirDrops.borrowAirdropPool(self.address)
             if airdropsPool != nil {
-                self.supportedMinters.append(airdropsPool.getType())
+                self.supportedMinters.append(airdropsPool!.getType())
             }
         }
 
