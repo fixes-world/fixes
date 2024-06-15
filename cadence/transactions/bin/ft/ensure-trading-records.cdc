@@ -2,9 +2,7 @@ import "FRC20FTShared"
 import "FRC20TradingRecord"
 import "FixesHeartbeat"
 
-transaction(
-    tick: String?
-) {
+transaction() {
     prepare(acct: AuthAccount) {
         // create the hooks and save it in the account
         if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
@@ -26,7 +24,7 @@ transaction(
 
         // ensure trading records are available
         if acct.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
-            let tradingRecords <- FRC20TradingRecord.createTradingRecords(tick)
+            let tradingRecords <- FRC20TradingRecord.createTradingRecords(nil)
             acct.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
         }
 
