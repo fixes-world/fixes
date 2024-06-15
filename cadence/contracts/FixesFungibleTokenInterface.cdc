@@ -671,9 +671,9 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// Get the deposit tax recepient
     ///
     access(all)
-    view fun getDepositTaxRecepient(): Address? {
+    view fun getDepositTaxRecipient(): Address? {
         let store = self.borrowSharedStore()
-        if let addr = store.get("fungibleToken:Settings:DepositTaxRecepient") {
+        if let addr = store.get("fungibleToken:Settings:DepositTaxRecipient") {
             return addr as? Address
         }
         return self.account.address

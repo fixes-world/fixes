@@ -274,7 +274,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             if tax > 0.0 {
                 if let depositTax = self.borrowMergeableDataRef(Type<FixesAssetMeta.DepositTax>())  {
                     let isEnabled = (depositTax.getValue("enabled") as? Bool) == true
-                    let taxReceiver = FixesFungibleToken.getDepositTaxRecepient()
+                    let taxReceiver = FixesFungibleToken.getDepositTaxRecipient()
                     if isEnabled && self.owner?.address != taxReceiver {
                         let taxAmount = vault.balance * tax
                         let taxVault <- vault.withdraw(amount: taxAmount)

@@ -495,19 +495,21 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun buildFixesTokenInfo(_ ftAddress: Address, _ acctKey: String?): FixesTokenInfo? {
+        let ftAcct = getAccount(ftAddress)
         var ftName = "FixesFungibleToken"
+        var ftContract: &{FixesFungibleTokenInterface}? = nil
         if acctKey != nil {
             ftName = acctKey![0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
         } else {
-            let ftAcct = getAccount(ftAddress)
-            var ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
             if ftContract == nil {
                 ftName = "FRC20FungibleToken"
                 ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
             }
-            if ftContract == nil {
-                return nil
-            }
+        }
+        if ftContract == nil {
+            return nil
         }
         if let tokenView = self.buildFixesTokenView(ftAddress, ftName) {
             let modules = FixesTokenModules(ftAddress)
@@ -543,6 +545,9 @@ access(all) contract FungibleTokenManager {
             }
             info.setExtra("total:allocatedSupply", totalAllocatedSupply)
             info.setExtra("total:supplied", totalCirculatedSupply)
+            // Deposit Tax Metadata
+            info.setExtra("depositTax:ratio", ftContract!.getDepositTaxRatio())
+            info.setExtra("depositTax:recipient", ftContract!.getDepositTaxRecipient())
             return info
         }
         return nil
