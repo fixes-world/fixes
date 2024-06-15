@@ -519,6 +519,9 @@ access(all) contract FungibleTokenManager {
                 info.setExtra("tradable:allocatedSupply", tradablePool.getTotalAllowedMintableAmount())
                 info.setExtra("tradable:supplied", tradablePool.getTradablePoolCirculatingSupply())
                 info.setExtra("tradable:subjectFeePerc", tradablePool.getSubjectFeePercentage())
+                info.setExtra("tradable:isLocalActive", tradablePool.isLocalActive())
+                info.setExtra("tradable:isHandovered", tradablePool.isLiquidityHandovered())
+                info.setExtra("tradable:swapPairAddr", tradablePool.getSwapPairAddress())
                 totalAllocatedSupply = totalAllocatedSupply + tradablePool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + tradablePool.getTotalMintedAmount()
                 // update the total token market cap
