@@ -11,7 +11,7 @@ transaction(
     symbol: String,
     tradablePoolSupply: UFix64,
     creatorFeePercentage: UFix64,
-    feeMintAmount: UFix64,
+    freeMintAmount: UFix64,
 ) {
     let tickerName: String
     let setupTradablePoolIns: &Fixes.Inscription?
@@ -41,8 +41,8 @@ transaction(
         if creatorFeePercentage > 0.0 {
             fields["feePerc"] = creatorFeePercentage.toString()
         }
-        if feeMintAmount > 0.0 {
-            fields["freeAmount"] = feeMintAmount.toString()
+        if freeMintAmount > 0.0 {
+            fields["freeAmount"] = freeMintAmount.toString()
         }
         let tradablePoolInsDataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: self.tickerName,
