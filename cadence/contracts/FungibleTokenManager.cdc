@@ -481,6 +481,11 @@ access(all) contract FungibleTokenManager {
             self.modules = modules
             self.extra = {}
         }
+
+        access(contract)
+        fun setExtra(_ key: String, _ value: AnyStruct) {
+            self.extra[key] = value
+        }
     }
 
     /// Build the Fixes Token Info
@@ -503,7 +508,39 @@ access(all) contract FungibleTokenManager {
         }
         if let tokenView = self.buildFixesTokenView(ftAddress, ftName) {
             let modules = FixesTokenModules(ftAddress)
-            return FixesTokenInfo(tokenView, modules)
+            let info = FixesTokenInfo(tokenView, modules)
+            var totalAllocatedSupply = 0.0
+            var totalCirculatedSupply = 0.0
+            // update modules info with extra fields
+            if modules.isTradablePoolSupported() {
+                let tradablePool = FixesTradablePool.borrowTradablePool(ftAddress)!
+                info.setExtra("tradable:allocatedSupply", tradablePool.getTotalAllowedMintableAmount())
+                info.setExtra("tradable:supplied", tradablePool.getTotalMintedAmount())
+                totalAllocatedSupply = totalAllocatedSupply + tradablePool.getTotalAllowedMintableAmount()
+                totalCirculatedSupply = totalCirculatedSupply + tradablePool.getTotalMintedAmount()
+                // update the total token market cap
+                info.setExtra("token:totalValue", tradablePool.getTotalTokenValue())
+                info.setExtra("token:totalMcap", tradablePool.getTotalTokenMarketCap())
+                info.setExtra("token:price", tradablePool.getTokenPriceInFlow())
+                info.setExtra("token:priceByLiquidity", tradablePool.getTokenPriceByInPoolLiquidity())
+            }
+            if modules.isLockdropsPoolSupported() {
+                let lockdropsPool = FixesTokenLockDrops.borrowDropsPool(ftAddress)!
+                info.setExtra("lockdrops:allocatedSupply", lockdropsPool.getTotalAllowedMintableAmount())
+                info.setExtra("lockdrops:supplied", lockdropsPool.getTotalMintedAmount())
+                totalAllocatedSupply = totalAllocatedSupply + lockdropsPool.getTotalAllowedMintableAmount()
+                totalCirculatedSupply = totalCirculatedSupply + lockdropsPool.getTotalMintedAmount()
+            }
+            if modules.isAirdropsPoolSupported() {
+                let airdropsPool = FixesTokenAirDrops.borrowAirdropPool(ftAddress)!
+                info.setExtra("airdrops:allocatedSupply", airdropsPool.getTotalAllowedMintableAmount())
+                info.setExtra("airdrops:supplied", airdropsPool.getTotalMintedAmount())
+                totalAllocatedSupply = totalAllocatedSupply + airdropsPool.getTotalAllowedMintableAmount()
+                totalCirculatedSupply = totalCirculatedSupply + airdropsPool.getTotalMintedAmount()
+            }
+            info.setExtra("total:allocatedSupply", totalAllocatedSupply)
+            info.setExtra("total:supplied", totalCirculatedSupply)
+            return info
         }
         return nil
     }
