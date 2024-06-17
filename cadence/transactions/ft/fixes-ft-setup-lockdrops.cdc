@@ -57,7 +57,7 @@ transaction(
         }
         let dataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: self.tickerName,
-            usage: "setup-lockdrop",
+            usage: "setup-lockdrops",
             fields
         )
         // estimate the required storage

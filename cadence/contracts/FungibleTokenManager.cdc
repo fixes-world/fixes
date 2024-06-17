@@ -520,7 +520,11 @@ access(all) contract FungibleTokenManager {
             if modules.isTradablePoolSupported() {
                 let tradablePool = FixesTradablePool.borrowTradablePool(ftAddress)!
                 info.setExtra("tradable:allocatedSupply", tradablePool.getTotalAllowedMintableAmount())
-                info.setExtra("tradable:supplied", tradablePool.getTotalMintedAmount())
+                info.setExtra("tradable:supplied", tradablePool.getTradablePoolCirculatingSupply())
+                info.setExtra("tradable:subjectFeePerc", tradablePool.getSubjectFeePercentage())
+                info.setExtra("tradable:isLocalActive", tradablePool.isLocalActive())
+                info.setExtra("tradable:isHandovered", tradablePool.isLiquidityHandovered())
+                info.setExtra("tradable:swapPairAddr", tradablePool.getSwapPairAddress())
                 totalAllocatedSupply = totalAllocatedSupply + tradablePool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + tradablePool.getTotalMintedAmount()
                 // update the total token market cap
@@ -733,7 +737,7 @@ access(all) contract FungibleTokenManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = self.verifyExecutingInscription(ins, usage: "setup-lockdrop")
+        let meta = self.verifyExecutingInscription(ins, usage: "setup-lockdrops")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
         let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
@@ -896,14 +900,13 @@ access(all) contract FungibleTokenManager {
 
         // calculate the new minter supply
         let maxSupply = superMinter.getMaxSupply()
-        let currentSupply = superMinter.getTotalSupply()
         let grantedSupply = tokenAdminRef.getGrantedMintableAmount()
 
         // check if the caller is advanced
         let isAdvancedCaller = FixesTradablePool.isAdvancedTokenPlayer(callerAddr)
 
         // new minter supply
-        let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
+        let maxSupplyForNewMinter = maxSupply.saturatingSubtract(grantedSupply)
         var newGrantedAmount = maxSupplyForNewMinter
         if let supplyStr = meta["supply"] {
             assert(
