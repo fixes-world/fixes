@@ -893,14 +893,13 @@ access(all) contract FungibleTokenManager {
 
         // calculate the new minter supply
         let maxSupply = superMinter.getMaxSupply()
-        let currentSupply = superMinter.getTotalSupply()
         let grantedSupply = tokenAdminRef.getGrantedMintableAmount()
 
         // check if the caller is advanced
         let isAdvancedCaller = FixesTradablePool.isAdvancedTokenPlayer(callerAddr)
 
         // new minter supply
-        let maxSupplyForNewMinter = maxSupply.saturatingSubtract(currentSupply).saturatingSubtract(grantedSupply)
+        let maxSupplyForNewMinter = maxSupply.saturatingSubtract(grantedSupply)
         var newGrantedAmount = maxSupplyForNewMinter
         if let supplyStr = meta["supply"] {
             assert(
