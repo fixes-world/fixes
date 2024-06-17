@@ -728,7 +728,7 @@ access(all) contract FungibleTokenManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = self.verifyExecutingInscription(ins, usage: "setup-lockdrop")
+        let meta = self.verifyExecutingInscription(ins, usage: "setup-lockdrops")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
         let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
