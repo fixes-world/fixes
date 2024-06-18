@@ -504,17 +504,25 @@ access(all) contract FixesTokenLockDrops {
             return FixesTradablePool.borrowTradablePool(self.getPoolAddress())
         }
 
-        /// Check if the pool is active
-        access(all)
-        view fun isActivated(): Bool
-
         /// Check if the pool is claimable
         access(all)
         view fun isClaimable(): Bool
 
+        /// Check if the pool is active
+        access(all)
+        view fun isActivated(): Bool
+
         /// Check if the pool is deactivated
         access(all)
         view fun isDeprecated(): Bool
+
+        /// Get the activating time
+        access(all)
+        view fun getActivatingTime(): UFix64?
+
+        /// Get the deprecating time
+        access(all)
+        view fun getDeprecatingTime(): UFix64?
 
         // ----- Token in the drops pool -----
 
@@ -703,6 +711,18 @@ access(all) contract FixesTokenLockDrops {
                 isDeprecated = isDeprecated && tradablePool.isInitialized() && tradablePool.isLocalActive()
             }
             return isDeprecated
+        }
+
+        /// Get the activating time
+        access(all)
+        view fun getActivatingTime(): UFix64? {
+            return self.activateTime
+        }
+
+        /// Get the deprecating time
+        access(all)
+        view fun getDeprecatingTime(): UFix64? {
+            return self.failureDeprecatedTime
         }
 
         // ----- Token in the drops pool -----

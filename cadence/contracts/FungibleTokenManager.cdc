@@ -537,6 +537,20 @@ access(all) contract FungibleTokenManager {
                 let lockdropsPool = FixesTokenLockDrops.borrowDropsPool(ftAddress)!
                 info.setExtra("lockdrops:allocatedSupply", lockdropsPool.getTotalAllowedMintableAmount())
                 info.setExtra("lockdrops:supplied", lockdropsPool.getTotalMintedAmount())
+                info.setExtra("lockdrops:lockingTicker", lockdropsPool.getLockingTokenTicker())
+                info.setExtra("lockdrops:isClaimable", lockdropsPool.isClaimable())
+                info.setExtra("lockdrops:isActivated", lockdropsPool.isActivated())
+                info.setExtra("lockdrops:activatingTime", lockdropsPool.getActivatingTime())
+                info.setExtra("lockdrops:isDeprecated", lockdropsPool.isDeprecated())
+                info.setExtra("lockdrops:deprecatingTime", lockdropsPool.getDeprecatingTime())
+                info.setExtra("lockdrops:unclaimedSupply", lockdropsPool.getUnclaimedBalanceInPool())
+                info.setExtra("lockdrops:totalLockedAmount",lockdropsPool.getTotalLockedTokenBalance())
+                let lockingPeriods = lockdropsPool.getLockingPeriods()
+                for i, period in lockingPeriods {
+                    let periodKey = "lockdrops:lockingChoice.".concat(i.toString()).concat(".")
+                    info.setExtra(periodKey.concat("period"), period)
+                    info.setExtra(periodKey.concat("rate"), lockdropsPool.getExchangeRate(period))
+                }
                 totalAllocatedSupply = totalAllocatedSupply + lockdropsPool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + lockdropsPool.getTotalMintedAmount()
             }
