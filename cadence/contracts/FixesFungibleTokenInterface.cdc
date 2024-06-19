@@ -515,7 +515,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         if let addr = store.get("fungibleToken:Settings:DepositTaxRecipient") {
             return addr as? Address
         }
-        return self.account.address
+        return nil
     }
 
     /// Get the fungible token balance of the address
