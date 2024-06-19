@@ -558,6 +558,8 @@ access(all) contract FungibleTokenManager {
                 let airdropsPool = FixesTokenAirDrops.borrowAirdropPool(ftAddress)!
                 info.setExtra("airdrops:allocatedSupply", airdropsPool.getTotalAllowedMintableAmount())
                 info.setExtra("airdrops:supplied", airdropsPool.getTotalMintedAmount())
+                info.setExtra("airdrops:isClaimable", airdropsPool.isClaimable())
+                info.setExtra("airdrops:totalClaimableAmount", airdropsPool.getTotalClaimableAmount())
                 totalAllocatedSupply = totalAllocatedSupply + airdropsPool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + airdropsPool.getTotalMintedAmount()
             }
