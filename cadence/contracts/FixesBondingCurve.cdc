@@ -70,7 +70,17 @@ access(all) contract FixesBondingCurve {
                 ? 0
                 : x1 * (x1 + 1) / SwapConfig.scaleFactor * (2 * x1 + 1) / 6 / SwapConfig.scaleFactor
             let summation = sum1 - sum0
-            return SwapConfig.ScaledUInt256ToUFix64(summation / self.priceCoefficient)
+            // free tokens
+            if summation == 0 {
+                return 0.0
+            }
+            let price = summation / self.priceCoefficient
+            let ret = SwapConfig.ScaledUInt256ToUFix64(price)
+            // set the minimum price for none-free tokens
+            if ret == 0.0 {
+                return 0.00000001
+            }
+            return ret
         }
 
         /// Calculate the amount of tokens that can be bought with the given cost
