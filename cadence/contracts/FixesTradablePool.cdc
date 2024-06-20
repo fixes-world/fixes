@@ -836,7 +836,7 @@ access(all) contract FixesTradablePool {
             var protocolFee: UFix64 = 0.0
             var subjectFee: UFix64 = 0.0
             var buyAmount: UFix64 = 0.0
-            if amount != nil {
+            if amount != nil && amount! > 0.0 {
                 buyAmount = amount!
                 price = self.getBuyPrice(buyAmount)
                 protocolFee = price * FixesTradablePool.getProtocolTradingFee()
@@ -847,6 +847,7 @@ access(all) contract FixesTradablePool {
                 price = flowPaymentVault.balance - protocolFee - subjectFee
                 buyAmount = self.getBuyAmount(price)
             }
+            log("Trader: ".concat(ins.owner!.address.toString()).concat(" Price: ").concat(price.toString()).concat(" Buy Amount: ").concat(buyAmount.toString()))
 
             // check the total cost
             let totalCost = price + protocolFee + subjectFee
@@ -891,12 +892,16 @@ access(all) contract FixesTradablePool {
                 message: "Insufficient token balance: The vault does not have enough tokens"
             )
             // initialize the vault by the inscription (the extracted inscription is also valid)
-            let returnVault <- minter.initializeVaultByInscription(
-                vault: <- self.vault.withdraw(amount: buyAmount),
+            let vaultData = minter.getVaultData()
+            let initializedVault <- minter.initializeVaultByInscription(
+                vault: <- vaultData.createEmptyVault(),
                 ins: ins
             )
+            // deposit the tokens to the initialized return vault
+            initializedVault.deposit(from: <- self.vault.withdraw(amount: buyAmount))
+
             // deposit the tokens to the recipient
-            recipient.deposit(from: <- returnVault)
+            recipient.deposit(from: <- initializedVault)
 
             // the variables for the trade event
             let poolAddr = self.getPoolAddress()
