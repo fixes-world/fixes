@@ -334,7 +334,7 @@ access(all) contract interface FixesFungibleTokenInterface {
             }
             post {
                 ins.isExtracted(): "The inscription must be extracted"
-                vault.getType() == result.getType(): "The vault type must be the same"
+                before(vault.getType()) == result.getType(): "The vault type must be the same"
             }
         }
 
