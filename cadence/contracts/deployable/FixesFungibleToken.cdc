@@ -194,7 +194,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 // borrow the DNA metadata
                 let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
                     ?? panic("The DNA metadata is not found")
-                let oldValue = dnaRef.getValue("mutatableAmount") as! UInt64
+                let oldValue = (dnaRef.getValue("mutatableAmount") as! UInt64?) ?? 0
                 // update the DNA mutatable amount
                 let addAmt = self.getMaxGenerateGeneAttempts()
                 dnaRef.setValue("mutatableAmount", oldValue + addAmt)

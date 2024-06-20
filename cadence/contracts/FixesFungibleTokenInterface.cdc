@@ -184,8 +184,9 @@ access(all) contract interface FixesFungibleTokenInterface {
                 dnaRef.merge(newDNA)
 
                 // update the DNA mutatable amount
-                let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64
-                dnaRef.setValue("mutatableAmount", newMutatableAmt)
+                if let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64? {
+                    dnaRef.setValue("mutatableAmount", newMutatableAmt)
+                }
             }
             return newDNA
         }
