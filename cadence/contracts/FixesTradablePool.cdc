@@ -187,6 +187,11 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getTotalTokenValue(): UFix64
 
+        /// Get the burned token amount
+        ///
+        access(all)
+        view fun getBurnedTokenAmount(): UFix64
+
         /// Get the locked liquidity market cap
         ///
         access(all)
@@ -508,25 +513,25 @@ access(all) contract FixesTradablePool {
         view fun getTokenPriceInFlow(): UFix64 {
             if self.isLocalActive() {
                 return self.getBuyPrice(1.0)
-            } else {
-                let pairRef = self.borrowSwapPairRef()
-                if pairRef == nil {
-                    return 0.0
-                }
-                let pairInfo = pairRef!.getPairInfo()
-                let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
-
-                var reserve0 = 0.0
-                var reserve1 = 0.0
-                if tokenKey == (pairInfo[0] as! String) {
-                    reserve0 = (pairInfo[2] as! UFix64)
-                    reserve1 = (pairInfo[3] as! UFix64)
-                } else {
-                    reserve0 = (pairInfo[3] as! UFix64)
-                    reserve1 = (pairInfo[2] as! UFix64)
-                }
-                return SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
             }
+
+            let pairRef = self.borrowSwapPairRef()
+            if pairRef == nil {
+                return 0.0
+            }
+            let pairInfo = pairRef!.getPairInfo()
+            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+
+            var reserve0 = 0.0
+            var reserve1 = 0.0
+            if tokenKey == (pairInfo[0] as! String) {
+                reserve0 = (pairInfo[2] as! UFix64)
+                reserve1 = (pairInfo[3] as! UFix64)
+            } else {
+                reserve0 = (pairInfo[3] as! UFix64)
+                reserve1 = (pairInfo[2] as! UFix64)
+            }
+            return SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
         }
 
         /// Get the LP token price
@@ -535,28 +540,65 @@ access(all) contract FixesTradablePool {
         view fun getLPPriceInFlow(): UFix64 {
             if self.isLocalActive() {
                 return 0.0
-            } else {
-                let pairRef = self.borrowSwapPairRef()
-                if pairRef == nil {
-                    return 0.0
-                }
-                let pairInfo = pairRef!.getPairInfo()
-                let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
-
-                var reserve0 = 0.0
-                var reserve1 = 0.0
-                if tokenKey == (pairInfo[0] as! String) {
-                    reserve0 = (pairInfo[2] as! UFix64)
-                    reserve1 = (pairInfo[3] as! UFix64)
-                } else {
-                    reserve0 = (pairInfo[3] as! UFix64)
-                    reserve1 = (pairInfo[2] as! UFix64)
-                }
-                let lpTokenSupply = pairInfo[5] as! UFix64
-                let price0 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
-                let totalValueInFlow = price0 * reserve0 + reserve1 * 1.0
-                return lpTokenSupply == 0.0 ? 0.0 : totalValueInFlow / lpTokenSupply
             }
+            let pairRef = self.borrowSwapPairRef()
+            if pairRef == nil {
+                return 0.0
+            }
+            let pairInfo = pairRef!.getPairInfo()
+            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+
+            var reserve0 = 0.0
+            var reserve1 = 0.0
+            if tokenKey == (pairInfo[0] as! String) {
+                reserve0 = (pairInfo[2] as! UFix64)
+                reserve1 = (pairInfo[3] as! UFix64)
+            } else {
+                reserve0 = (pairInfo[3] as! UFix64)
+                reserve1 = (pairInfo[2] as! UFix64)
+            }
+            let lpTokenSupply = pairInfo[5] as! UFix64
+            let price0 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
+            let totalValueInFlow = price0 * reserve0 + reserve1 * 1.0
+            return lpTokenSupply == 0.0 ? 0.0 : totalValueInFlow / lpTokenSupply
+        }
+
+        /// Get the burned token amount
+        ///
+        access(all)
+        view fun getBurnedTokenAmount(): UFix64 {
+            if self.isLocalActive() {
+                return 0.0
+            }
+
+            let pairRef = self.borrowSwapPairRef()
+            if pairRef == nil {
+                return 0.0
+            }
+            let burnedLP = self.getBurnedLP()
+            if burnedLP == 0.0 {
+                return 0.0
+            }
+
+            let pairInfo = pairRef!.getPairInfo()
+            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+
+            var reserve0 = 0.0
+            var reserve1 = 0.0
+            if tokenKey == (pairInfo[0] as! String) {
+                reserve0 = (pairInfo[2] as! UFix64)
+                reserve1 = (pairInfo[3] as! UFix64)
+            } else {
+                reserve0 = (pairInfo[3] as! UFix64)
+                reserve1 = (pairInfo[2] as! UFix64)
+            }
+            let lpTokenSupply = pairInfo[5] as! UFix64
+
+            let scaledBurnedLP = SwapConfig.UFix64ToScaledUInt256(burnedLP)
+            let scaledlpTokenSupply = SwapConfig.UFix64ToScaledUInt256(lpTokenSupply)
+            let scaledReserve0 = SwapConfig.UFix64ToScaledUInt256(reserve0)
+            let scaledBurnedToken0 = scaledReserve0 * scaledBurnedLP / scaledlpTokenSupply
+            return SwapConfig.ScaledUInt256ToUFix64(scaledBurnedToken0)
         }
 
         /// Get the swap pair address
@@ -1186,18 +1228,24 @@ access(all) contract FixesTradablePool {
 
             // add all the token to the pair
             if self.isLocalActive() {
-                let token0In = self.getTokenBalanceInPool()
-                var token1In = self.getFlowBalanceInPool()
-                // add all the token to the pair
+                let token0Max = self.getTokenBalanceInPool()
+                // init the liquidity pool with current price
+                let tokenInPoolPrice = self.getBuyPrice(1.0)
+                let token1In = self.getFlowBalanceInPool()
+                var token0In = token1In / tokenInPoolPrice
+                if token0In > token0Max {
+                    token0In = token0Max
+                }
+                // setup swap pair based on current price
                 if token0Reserve != 0.0 || token1Reserve != 0.0 {
-                    let estimatedToken1In = SwapConfig.quote(amountA: token0In, reserveA: token0Reserve, reserveB: token1Reserve)
-                    if estimatedToken1In > token1In {
+                    let estimatedToken0In = SwapConfig.quote(amountA: token1In, reserveA: token1Reserve, reserveB: token0Reserve)
+                    if estimatedToken0In > token0In {
                         destroy token0Vault
                         destroy token1Vault
                         // DO NOT PANIC
                         return
                     }
-                    token1In = estimatedToken1In
+                    token0In = estimatedToken0In
                 }
                 if token0In > 0.0 {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: token0In))
@@ -1213,22 +1261,34 @@ access(all) contract FixesTradablePool {
                     tokenType: self.getTokenType(),
                 )
             } else {
-                // All Token0 is added to the pair, so we need to calculate the optimized zapped amount through dex
-                let allFlowAmount = self.flowVault.balance
-                let zappedAmt = self._calcZappedAmmount(
-                    tokenInput: allFlowAmount,
-                    tokenReserve: token1Reserve,
-                    swapFeeRateBps: pairInfo[6] as! UInt64
-                )
+                let token0Max = self.getTokenBalanceInPool()
+                let allFlowAmount = self.getFlowBalanceInPool()
+                let estimatedToken0In = SwapConfig.quote(amountA: allFlowAmount, reserveA: token1Reserve, reserveB: token0Reserve)
+                if token0Max > estimatedToken0In {
+                    token0Vault.deposit(from: <- self.vault.withdraw(amount: estimatedToken0In))
+                    token1Vault.deposit(from: <- self.flowVault.withdraw(amount: allFlowAmount))
+                } else if token0Max > 0.0 {
+                    let part1EstimatedToken1In = SwapConfig.quote(amountA: token0Max, reserveA: token0Reserve, reserveB: token1Reserve)
+                    let part2EstimatedToken1In = allFlowAmount - part1EstimatedToken1In
+                    token0Vault.deposit(from: <- self.vault.withdraw(amount: token0Max))
+                    token1Vault.deposit(from: <- self.flowVault.withdraw(amount: part1EstimatedToken1In))
+                } else {
+                    // All Token0 is added to the pair, so we need to calculate the optimized zapped amount through dex
+                    let zappedAmt = self._calcZappedAmmount(
+                        tokenInput: allFlowAmount,
+                        tokenReserve: token1Reserve,
+                        swapFeeRateBps: pairInfo[6] as! UInt64
+                    )
 
-                let swapVaultIn <- self.flowVault.withdraw(amount: zappedAmt)
-                // withdraw all the token0 and add liquidity to the pair
-                token1Vault.deposit(from: <- self.flowVault.withdraw(amount: allFlowAmount - zappedAmt))
-                // swap the token1 to token0 first, and then add liquidity vault
-                token0Vault.deposit(from: <- pairPublicRef!.swap(
-                    vaultIn: <- swapVaultIn,
-                    exactAmountOut: nil
-                ))
+                    let swapVaultIn <- self.flowVault.withdraw(amount: zappedAmt)
+                    // withdraw all the token0 and add liquidity to the pair
+                    token1Vault.deposit(from: <- self.flowVault.withdraw(amount: allFlowAmount - zappedAmt))
+                    // swap the token1 to token0 first, and then add liquidity vault
+                    token0Vault.deposit(from: <- pairPublicRef!.swap(
+                        vaultIn: <- swapVaultIn,
+                        exactAmountOut: nil
+                    ))
+                }
             }
 
             // cache value
