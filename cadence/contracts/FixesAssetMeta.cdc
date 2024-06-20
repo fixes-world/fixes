@@ -301,7 +301,7 @@ access(all) contract FixesAssetMeta {
             )
             for key in fromDna.genes.keys {
                 if let fromGene = fromDna.genes[key] {
-                    self.addGene(fromGene)
+                    self.mergeGene(fromGene)
                 }
             } // end for
         }
@@ -322,6 +322,15 @@ access(all) contract FixesAssetMeta {
             pre {
                 self.isMutatable(): "The DNA is not mutatable"
             }
+            self.mergeGene(gene)
+            // Decrease the mutatable amount
+            self.mutatableAmount = self.mutatableAmount - 1
+        }
+
+        /// Merge a gene to the DNA
+        ///
+        access(self)
+        fun mergeGene(_ gene: Gene): Void {
             let geneId = gene.getId()
             // Merge the gene, use reference to ensure data consistency
             if let geneRef = &self.genes[geneId] as &Gene? {
@@ -330,8 +339,6 @@ access(all) contract FixesAssetMeta {
                 // If the gene is not exist, just copy it
                 self.genes[geneId] = gene
             }
-            // Decrease the mutatable amount
-            self.mutatableAmount = self.mutatableAmount - 1
         }
     }
 
