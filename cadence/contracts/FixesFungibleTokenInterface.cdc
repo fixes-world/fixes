@@ -330,7 +330,6 @@ access(all) contract interface FixesFungibleTokenInterface {
             ins: &Fixes.Inscription
         ): @FungibleToken.Vault {
             pre {
-                ins.isExtractable(): "The inscription must be extractable"
                 vault.getType() == self.getTokenType(): "The vault type must be the same"
             }
             post {
@@ -347,7 +346,6 @@ access(all) contract interface FixesFungibleTokenInterface {
             ins: &Fixes.Inscription
         ) {
             pre {
-                ins.isExtractable(): "The inscription must be extractable"
                 vault.getType() == self.getTokenType(): "The vault type must be the same"
             }
             post {
