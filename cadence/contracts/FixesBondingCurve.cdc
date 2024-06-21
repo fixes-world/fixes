@@ -75,7 +75,8 @@ access(all) contract FixesBondingCurve {
             if summation == 0 {
                 return 0.0
             }
-            let price = summation / self.priceCoefficient
+            let fixedPriceCoefficient = self.priceCoefficient / 250000 * self.priceCoefficient
+            let price = summation / fixedPriceCoefficient
             if price > ufix64Max {
                 return UFix64.max
             }

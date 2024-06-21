@@ -691,9 +691,10 @@ access(all) contract FixesTradablePool {
         ///
         access(all)
         view fun getTotalTokenValue(): UFix64 {
-            let tokenSupply = self.getTotalSupply()
+            let reservedSupply = self.getTokenBalanceInPool()
+            let circulatingSupply = self.getTotalSupply() - reservedSupply
             let tokenPrice = self.getTokenPriceInFlow()
-            return tokenSupply * tokenPrice
+            return circulatingSupply * tokenPrice
         }
 
         /// Get the token holders
@@ -1153,11 +1154,11 @@ access(all) contract FixesTradablePool {
             // if active, then move the liquidity pool to the next stage
             if self.isLocalActive() {
                 // Check the market cap
-                let localMarketCap = self.getLiquidityMarketCap()
+                let totalMarketCap = self.getTotalTokenMarketCap()
                 let targetMarketCap = FixesTradablePool.getTargetMarketCap()
 
                 // if the market cap is less than the target market cap, then do nothing
-                if localMarketCap < targetMarketCap {
+                if totalMarketCap < targetMarketCap {
                     // DO NOT PANIC
                     return
                 }
