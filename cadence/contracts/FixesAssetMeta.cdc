@@ -412,7 +412,7 @@ access(all) contract FixesAssetMeta {
         }
         let threshold = FixesAssetMeta.getQualityLevelUpThreshold(quality)
         let exp = revertibleRandom() % (threshold / 5) // random exp from 20% of the threshold
-        return Gene(id: nil, quality: GeneQuality.Empowered, exp: exp)
+        return Gene(id: nil, quality: quality, exp: exp)
     }
 
     // ----------------- End of DNA and Gene -----------------
