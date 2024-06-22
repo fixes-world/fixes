@@ -419,7 +419,7 @@ access(all) contract FixesAssetMeta {
 
     // ----------------- Deposit Tax -----------------
 
-    /// The DNA data structure
+    /// The DepositTax data structure
     ///
     access(all) struct DepositTax: FixesTraits.MergeableData {
         access(all) var flags: {String: Bool}
@@ -502,4 +502,58 @@ access(all) contract FixesAssetMeta {
     }
 
     // ----------------- End of Deposit Tax -----------------
+
+    // ----------------- ExclusiveMeta -----------------
+
+    /// The DepositTax data structure
+    ///
+    access(all) struct ExclusiveMeta: FixesTraits.MergeableData {
+
+        /// Get the id of the data
+        ///
+        access(all)
+        view fun getId(): String {
+            return "ExclusiveMeta"
+        }
+
+        /// Get the string value of the data
+        ///
+        access(all)
+        view fun toString(): String {
+            return self.getId()
+        }
+
+        /// Get the data keys
+        ///
+        access(all)
+        view fun getKeys(): [String] {
+            return []
+        }
+
+        /// Get the value of the data
+        /// It means genes keys of the DNA
+        ///
+        access(all)
+        view fun getValue(_ key: String): AnyStruct? {
+            return nil
+        }
+
+        /// Split the data into another instance
+        ///
+        access(all)
+        fun split(_ perc: UFix64): {FixesTraits.MergeableData} {
+            return ExclusiveMeta()
+        }
+
+        /// Merge the data from another instance
+        /// The type of the data must be the same(Ensured by interface)
+        ///
+        access(all)
+        fun merge(_ from: {FixesTraits.MergeableData}): Void {
+            // Nothing to merge
+        }
+    }
+
+    // ----------------- End of ExclusiveMeta -----------------
+
 }

@@ -96,6 +96,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         init(balance: UFix64) {
             self.balance = balance
             self.metadata = {}
+
+            // init with ExclusiveMeta, this meta will be removed if the initialize method is called
+            let initmeta = FixesAssetMeta.ExclusiveMeta()
+            self.metadata[initmeta.getType()] = initmeta
         }
 
         destroy() {
@@ -136,6 +140,12 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
             let fromAddr = (ins != nil ? ins!.owner?.address : owner)
                 ?? panic("Failed to get the owner address")
+
+            // remove the ExclusiveMeta
+            let exclusiveMetaType = Type<FixesAssetMeta.ExclusiveMeta>()
+            if self.metadata[exclusiveMetaType] != nil {
+                self.metadata.remove(key: exclusiveMetaType)
+            }
 
             /// init DNA to the metadata
             self.initializeMetadata(FixesAssetMeta.DNA(
@@ -246,26 +256,31 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 newVault.initialize(nil, self.getDNAOwner())
             }
 
-            // setup mergeable data, split from withdraw percentage
-            let percentage = amount / oldBalance
-            let mergeableKeys = self.getMergeableKeys()
-            for key in mergeableKeys {
-                if let dataRef = self.borrowMergeableDataRef(key) {
-                    let splitData = dataRef.split(percentage)
-                    newVault.metadata[key] = splitData
+            // check if the vault has PureVault
+            let isPureVault = self.borrowMergeableDataRef(Type<FixesAssetMeta.ExclusiveMeta>()) != nil
+            // update metadata if the vault is not PureVault
+            if !isPureVault {
+                // setup mergeable data, split from withdraw percentage
+                let percentage = amount / oldBalance
+                let mergeableKeys = self.getMergeableKeys()
+                for key in mergeableKeys {
+                    if let dataRef = self.borrowMergeableDataRef(key) {
+                        let splitData = dataRef.split(percentage)
+                        newVault.metadata[key] = splitData
 
-                    // emit the event
-                    emit TokensMetadataUpdated(
-                        typeIdentifier: key.identifier,
-                        id: dataRef.getId(),
-                        value: dataRef.toString(),
-                        owner: self.owner?.address
-                    )
+                        // emit the event
+                        emit TokensMetadataUpdated(
+                            typeIdentifier: key.identifier,
+                            id: dataRef.getId(),
+                            value: dataRef.toString(),
+                            owner: self.owner?.address
+                        )
+                    }
                 }
-            }
 
-            // Is the vault has DNA, then attempt to generate a new gene
-            self._attemptGenerateGene(amount, oldBalance)
+                // Is the vault has DNA, then attempt to generate a new gene
+                self._attemptGenerateGene(amount, oldBalance)
+            }
 
             // update the balance ranking
             let ownerAddr = self.owner?.address
@@ -344,24 +359,29 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 } // end of deposit tax
             } // end of tax > 0.0
 
-            // merge the metadata
-            let keys = vault.getMergeableKeys()
-            for key in keys {
-                let data = vault.getMergeableData(key)!
-                if let selfData = self.borrowMergeableDataRef(key) {
-                    selfData.merge(data)
-                } else {
-                    self.metadata[key] = data
-                }
+            // check if the vault has PureVault
+            let isPureVault = self.borrowMergeableDataRef(Type<FixesAssetMeta.ExclusiveMeta>()) != nil
+            // update metadata if the vault is not PureVault
+            if !isPureVault {
+                // merge the metadata
+                let keys = vault.getMergeableKeys()
+                for key in keys {
+                    let data = vault.getMergeableData(key)!
+                    if let selfData = self.borrowMergeableDataRef(key) {
+                        selfData.merge(data)
+                    } else {
+                        self.metadata[key] = data
+                    }
 
-                let dataRef = self.borrowMergeableDataRef(key)!
-                // emit the event
-                emit TokensMetadataUpdated(
-                    typeIdentifier: key.identifier,
-                    id: dataRef.getId(),
-                    value: dataRef.toString(),
-                    owner: self.owner?.address
-                )
+                    let dataRef = self.borrowMergeableDataRef(key)!
+                    // emit the event
+                    emit TokensMetadataUpdated(
+                        typeIdentifier: key.identifier,
+                        id: dataRef.getId(),
+                        value: dataRef.toString(),
+                        owner: self.owner?.address
+                    )
+                }
             }
 
             // record the deposited balance
@@ -374,8 +394,11 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             // vault is useless now
             destroy vault
 
-            // Is the vault has DNA, then attempt to generate a new gene
-            self._attemptGenerateGene(depositedBalance, self.balance)
+            // update metadata if the vault is not PureVault
+            if !isPureVault {
+                // Is the vault has DNA, then attempt to generate a new gene
+                self._attemptGenerateGene(depositedBalance, self.balance)
+            }
 
             // update the balance ranking
             let ownerAddr = self.owner?.address

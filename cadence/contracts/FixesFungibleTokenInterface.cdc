@@ -158,7 +158,10 @@ access(all) contract interface FixesFungibleTokenInterface {
             }
 
             let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
-                ?? panic("The DNA metadata is not found")
+            if dnaRef == nil {
+                return nil
+            }
+
             // create a new DNA
             let newDNA = FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
@@ -183,11 +186,11 @@ access(all) contract interface FixesFungibleTokenInterface {
 
             if anyAdded {
                 // merge the DNA
-                dnaRef.merge(newDNA)
+                dnaRef!.merge(newDNA)
 
                 // update the DNA mutatable amount
                 if let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64? {
-                    dnaRef.setValue("mutatableAmount", newMutatableAmt)
+                    dnaRef!.setValue("mutatableAmount", newMutatableAmt)
                 }
             }
             return newDNA
