@@ -107,9 +107,9 @@ access(all) contract FixesAssetMeta {
             self.quality = quality ?? GeneQuality.Nascent
             self.exp = exp ?? 0
             // Log the gene creation
-            log("Gene created:["
+            log("Created Gene["
                 .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
-                .concat("] quality=").concat(self.quality.rawValue.toString()).concat(", exp=").concat(self.exp.toString())
+                .concat("]: quality=").concat(self.quality.rawValue.toString()).concat(", exp=").concat(self.exp.toString())
             )
         }
 
@@ -156,12 +156,12 @@ access(all) contract FixesAssetMeta {
             post {
                 self.getId() == result.getId(): "The gene id is not the same so cannot split"
             }
-            let withdrawexp = UInt64(UInt256(self.exp) * UInt256(perc * 10000.0) / 10000)
+            let withdrawexp = UInt64(UInt256(self.exp) * UInt256(perc * 100000.0) / 100000)
             if withdrawexp > 0 {
                 self.exp = self.exp - withdrawexp
             }
 
-            log("Split Gene ["
+            log("Split Gene["
                 .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
                 .concat("]: A=").concat(self.exp.toString()).concat(", B=").concat(withdrawexp.toString())
                 .concat(", quality=").concat(self.quality.rawValue.toString()))
@@ -189,7 +189,7 @@ access(all) contract FixesAssetMeta {
             let convertexp = UInt64(UInt128(fromGenes.exp) * UInt128(convertRate * 10000.0) / 10000)
             self.exp = self.exp + convertexp
 
-            log("Merge Gene ["
+            log("Merge Gene["
                 .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
                 .concat("]: ExpOld=").concat(oldExp.toString()).concat(", ExpNew=").concat(self.exp.toString()
                 .concat(", quality=").concat(self.quality.rawValue.toString())))
@@ -204,7 +204,7 @@ access(all) contract FixesAssetMeta {
                 upgradeThreshold = FixesAssetMeta.getQualityLevelUpThreshold(self.quality)
                 isUpgradable = upgradeThreshold <= self.exp && self.quality.rawValue < GeneQuality.Eternal.rawValue
 
-                log("Upgrade Gene ["
+                log("Upgrade Gene["
                     .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
                     .concat("]: Exp=").concat(self.exp.toString()).concat(", quality=").concat(self.quality.rawValue.toString()))
             }
