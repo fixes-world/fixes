@@ -175,6 +175,8 @@ access(all) contract interface FixesFungibleTokenInterface {
                 if let gene = FixesAssetMeta.attemptToGenerateGene() {
                     newDNA.addGene(gene)
                     anyAdded = true
+                    // break if newDNA generated
+                    break
                 }
                 i = i + 1
             }

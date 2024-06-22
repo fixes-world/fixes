@@ -106,6 +106,11 @@ access(all) contract FixesAssetMeta {
             }
             self.quality = quality ?? GeneQuality.Nascent
             self.exp = exp ?? 0
+            // Log the gene creation
+            log("Gene created:["
+                .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                .concat("] quality=").concat(self.quality.rawValue.toString()).concat(", exp=").concat(self.exp.toString())
+            )
         }
 
         /// Get the id of the data
@@ -151,12 +156,16 @@ access(all) contract FixesAssetMeta {
             post {
                 self.getId() == result.getId(): "The gene id is not the same so cannot split"
             }
-            let withdrawexp = UInt64(UInt128(self.exp) * UInt128(perc * 10000.0) / 10000)
-            assert(
-                withdrawexp > 0,
-                message: "The exp to split is zero"
-            )
-            self.exp = self.exp - withdrawexp
+            let withdrawexp = UInt64(UInt256(self.exp) * UInt256(perc * 10000.0) / 10000)
+            if withdrawexp > 0 {
+                self.exp = self.exp - withdrawexp
+            }
+
+            log("Split Gene ["
+                .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                .concat("]: A=").concat(self.exp.toString()).concat(", B=").concat(withdrawexp.toString())
+                .concat(", quality=").concat(self.quality.rawValue.toString()))
+
             // Create a new struct
             let newGenes: FixesAssetMeta.Gene = Gene(
                 id: self.id,
@@ -174,10 +183,16 @@ access(all) contract FixesAssetMeta {
             pre {
                 self.getId() == from.getId(): "The gene id is not the same so cannot merge"
             }
+            let oldExp = self.exp
             let fromGenes = from as! Gene
             let convertRate = FixesAssetMeta.getGeneMergeLossOrGain(fromGenes.quality, self.quality)
             let convertexp = UInt64(UInt128(fromGenes.exp) * UInt128(convertRate * 10000.0) / 10000)
             self.exp = self.exp + convertexp
+
+            log("Merge Gene ["
+                .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                .concat("]: ExpOld=").concat(oldExp.toString()).concat(", ExpNew=").concat(self.exp.toString()
+                .concat(", quality=").concat(self.quality.rawValue.toString())))
 
             // check if the quality can be upgraded
             var upgradeThreshold = FixesAssetMeta.getQualityLevelUpThreshold(self.quality)
@@ -188,6 +203,10 @@ access(all) contract FixesAssetMeta {
                 // check upgrade again
                 upgradeThreshold = FixesAssetMeta.getQualityLevelUpThreshold(self.quality)
                 isUpgradable = upgradeThreshold <= self.exp && self.quality.rawValue < GeneQuality.Eternal.rawValue
+
+                log("Upgrade Gene ["
+                    .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                    .concat("]: Exp=").concat(self.exp.toString()).concat(", quality=").concat(self.quality.rawValue.toString()))
             }
         }
     }
