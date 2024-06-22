@@ -233,7 +233,10 @@ access(all) contract interface FixesFungibleTokenInterface {
             }
 
             let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
-                ?? panic("The DNA metadata is not found")
+            if dnaRef == nil {
+                return nil
+            }
+
             // create a new DNA
             let newDNA = FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
@@ -250,17 +253,20 @@ access(all) contract interface FixesFungibleTokenInterface {
                 if let gene = FixesAssetMeta.attemptToGenerateGene() {
                     newDNA.addGene(gene)
                     anyAdded = true
+                    // break if newDNA generated
+                    break
                 }
                 i = i + 1
             }
 
             if anyAdded {
                 // merge the DNA
-                dnaRef.merge(newDNA)
+                dnaRef!.merge(newDNA)
 
                 // update the DNA mutatable amount
-                let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64
-                dnaRef.setValue("mutatableAmount", newMutatableAmt)
+                if let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64? {
+                    dnaRef!.setValue("mutatableAmount", newMutatableAmt)
+                }
             }
 
             // emit the event
@@ -455,12 +461,11 @@ access(all) contract interface FixesFungibleTokenInterface {
             ins: auth(Fixes.Extractable) &Fixes.Inscription
         ): @{FungibleToken.Vault} {
             pre {
-                ins.isExtractable(): "The inscription must be extractable"
                 vault.getType() == self.getTokenType(): "The vault type must be the same"
             }
             post {
                 ins.isExtracted(): "The inscription must be extracted"
-                vault.getType() == result.getType(): "The vault type must be the same"
+                before(vault.getType()) == result.getType(): "The vault type must be the same"
             }
         }
 
@@ -472,7 +477,6 @@ access(all) contract interface FixesFungibleTokenInterface {
             ins: auth(Fixes.Extractable) &Fixes.Inscription
         ) {
             pre {
-                ins.isExtractable(): "The inscription must be extractable"
                 vault.getType() == self.getTokenType(): "The vault type must be the same"
             }
             post {

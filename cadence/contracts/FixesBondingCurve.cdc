@@ -59,6 +59,7 @@ access(all) contract FixesBondingCurve {
         view fun calculatePrice(supply: UFix64, amount: UFix64): UFix64 {
             let scaledX = SwapConfig.UFix64ToScaledUInt256(supply)
             let scaledDeltaX = SwapConfig.UFix64ToScaledUInt256(amount)
+            let ufix64Max = SwapConfig.UFix64ToScaledUInt256(UFix64.max)
             // calculate the sum of squares
             let x0 = scaledX - self.freeScaledAmount
             let sum0: UInt256 = scaledX < self.freeScaledAmount
@@ -70,7 +71,21 @@ access(all) contract FixesBondingCurve {
                 ? 0
                 : x1 * (x1 + 1) / SwapConfig.scaleFactor * (2 * x1 + 1) / 6 / SwapConfig.scaleFactor
             let summation = sum1 - sum0
-            return SwapConfig.ScaledUInt256ToUFix64(summation / self.priceCoefficient)
+            // free tokens
+            if summation == 0 {
+                return 0.0
+            }
+            let fixedPriceCoefficient = self.priceCoefficient / 250000 * self.priceCoefficient
+            let price = summation / fixedPriceCoefficient
+            if price > ufix64Max {
+                return UFix64.max
+            }
+            let ret = SwapConfig.ScaledUInt256ToUFix64(price)
+            // set the minimum price for none-free tokens
+            if ret == 0.0 {
+                return 0.00000001
+            }
+            return ret
         }
 
         /// Calculate the amount of tokens that can be bought with the given cost
@@ -80,7 +95,7 @@ access(all) contract FixesBondingCurve {
             let supplyOnePrice = self.calculatePrice(supply: supply, amount: 1.0)
             let maxAmount = cost / supplyOnePrice
 
-            let minH = 0.000001
+            let minH = 0.01
             var low = 0.0
             var high = maxAmount
             var finalAmount = (low + high) * 0.5

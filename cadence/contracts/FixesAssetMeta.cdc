@@ -106,6 +106,11 @@ access(all) contract FixesAssetMeta {
             }
             self.quality = quality ?? GeneQuality.Nascent
             self.exp = exp ?? 0
+            // Log the gene creation
+            log("Created Gene["
+                .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                .concat("]: quality=").concat(self.quality.rawValue.toString()).concat(", exp=").concat(self.exp.toString())
+            )
         }
 
         /// Get the id of the data
@@ -151,12 +156,16 @@ access(all) contract FixesAssetMeta {
             post {
                 self.getId() == result.getId(): "The gene id is not the same so cannot split"
             }
-            let withdrawexp = UInt64(UInt128(self.exp) * UInt128(perc * 10000.0) / 10000)
-            assert(
-                withdrawexp > 0,
-                message: "The exp to split is zero"
-            )
-            self.exp = self.exp - withdrawexp
+            let withdrawexp = UInt64(UInt256(self.exp) * UInt256(perc * 100000.0) / 100000)
+            if withdrawexp > 0 {
+                self.exp = self.exp - withdrawexp
+            }
+
+            log("Split Gene["
+                .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                .concat("]: A=").concat(self.exp.toString()).concat(", B=").concat(withdrawexp.toString())
+                .concat(", quality=").concat(self.quality.rawValue.toString()))
+
             // Create a new struct
             let newGenes: FixesAssetMeta.Gene = Gene(
                 id: self.id,
@@ -174,10 +183,16 @@ access(all) contract FixesAssetMeta {
             pre {
                 self.getId() == from.getId(): "The gene id is not the same so cannot merge"
             }
+            let oldExp = self.exp
             let fromGenes = from as! Gene
             let convertRate = FixesAssetMeta.getGeneMergeLossOrGain(fromGenes.quality, self.quality)
             let convertexp = UInt64(UInt128(fromGenes.exp) * UInt128(convertRate * 10000.0) / 10000)
             self.exp = self.exp + convertexp
+
+            log("Merge Gene["
+                .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                .concat("]: ExpOld=").concat(oldExp.toString()).concat(", ExpNew=").concat(self.exp.toString()
+                .concat(", quality=").concat(self.quality.rawValue.toString())))
 
             // check if the quality can be upgraded
             var upgradeThreshold = FixesAssetMeta.getQualityLevelUpThreshold(self.quality)
@@ -188,6 +203,10 @@ access(all) contract FixesAssetMeta {
                 // check upgrade again
                 upgradeThreshold = FixesAssetMeta.getQualityLevelUpThreshold(self.quality)
                 isUpgradable = upgradeThreshold <= self.exp && self.quality.rawValue < GeneQuality.Eternal.rawValue
+
+                log("Upgrade Gene["
+                    .concat(self.id[0].toString()).concat(self.id[1].toString()).concat(self.id[2].toString()).concat(self.id[3].toString())
+                    .concat("]: Exp=").concat(self.exp.toString()).concat(", quality=").concat(self.quality.rawValue.toString()))
             }
         }
     }
@@ -305,7 +324,7 @@ access(all) contract FixesAssetMeta {
             )
             for key in fromDna.genes.keys {
                 if let fromGene = fromDna.genes[key] {
-                    self.addGene(fromGene)
+                    self.mergeGene(fromGene)
                 }
             } // end for
         }
@@ -326,6 +345,15 @@ access(all) contract FixesAssetMeta {
             pre {
                 self.isMutatable(): "The DNA is not mutatable"
             }
+            self.mergeGene(gene)
+            // Decrease the mutatable amount
+            self.mutatableAmount = self.mutatableAmount - 1
+        }
+
+        /// Merge a gene to the DNA
+        ///
+        access(self)
+        fun mergeGene(_ gene: Gene): Void {
             let geneId = gene.getId()
             // Merge the gene, use reference to ensure data consistency
             if let geneRef = &self.genes[geneId] as auth(FixesTraits.Write) &Gene? {
@@ -334,8 +362,6 @@ access(all) contract FixesAssetMeta {
                 // If the gene is not exist, just copy it
                 self.genes[geneId] = gene
             }
-            // Decrease the mutatable amount
-            self.mutatableAmount = self.mutatableAmount - 1
         }
     }
 
@@ -390,14 +416,14 @@ access(all) contract FixesAssetMeta {
         }
         let threshold = FixesAssetMeta.getQualityLevelUpThreshold(quality)
         let exp = revertibleRandom<UInt64>(modulo: threshold / 5) // random exp from 20% of the threshold
-        return Gene(id: nil, quality: GeneQuality.Empowered, exp: exp)
+        return Gene(id: nil, quality: quality, exp: exp)
     }
 
     // ----------------- End of DNA and Gene -----------------
 
     // ----------------- Deposit Tax -----------------
 
-    /// The DNA data structure
+    /// The DepositTax data structure
     ///
     access(all) struct DepositTax: FixesTraits.MergeableData {
         access(all) var flags: {String: Bool}
@@ -484,4 +510,58 @@ access(all) contract FixesAssetMeta {
     }
 
     // ----------------- End of Deposit Tax -----------------
+
+    // ----------------- ExclusiveMeta -----------------
+
+    /// The DepositTax data structure
+    ///
+    access(all) struct ExclusiveMeta: FixesTraits.MergeableData {
+
+        /// Get the id of the data
+        ///
+        access(all)
+        view fun getId(): String {
+            return "ExclusiveMeta"
+        }
+
+        /// Get the string value of the data
+        ///
+        access(all)
+        view fun toString(): String {
+            return self.getId()
+        }
+
+        /// Get the data keys
+        ///
+        access(all)
+        view fun getKeys(): [String] {
+            return []
+        }
+
+        /// Get the value of the data
+        /// It means genes keys of the DNA
+        ///
+        access(all)
+        view fun getValue(_ key: String): AnyStruct? {
+            return nil
+        }
+
+        /// Split the data into another instance
+        ///
+        access(FixesTraits.Write)
+        fun split(_ perc: UFix64): {FixesTraits.MergeableData} {
+            return ExclusiveMeta()
+        }
+
+        /// Merge the data from another instance
+        /// The type of the data must be the same(Ensured by interface)
+        ///
+        access(FixesTraits.Write)
+        fun merge(_ from: {FixesTraits.MergeableData}): Void {
+            // Nothing to merge
+        }
+    }
+
+    // ----------------- End of ExclusiveMeta -----------------
+
 }

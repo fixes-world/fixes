@@ -60,7 +60,7 @@ transaction(
         /** ------------- Prepare the token recipient - Start -------------- */
         let tokenVaultData = self.pool.getTokenVaultData()
         // ensure storage path
-        if acct.check<&AnyResource>(from: tokenVaultData.storagePath) == false {
+        if acct.borrow<&AnyResource>(from: tokenVaultData.storagePath) == nil {
             // save the empty vault
             acct.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
             // save the public capability
