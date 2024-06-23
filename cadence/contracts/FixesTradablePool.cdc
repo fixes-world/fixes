@@ -410,6 +410,10 @@ access(all) contract FixesTradablePool {
             let minter = self.borrowMinter()
             let totalMintAmount = minter.getCurrentMintableAmount()
             let newVault <- minter.mintTokens(amount: totalMintAmount)
+            // This is a un-initialized newVault, so it contains a FixesAssetMeta.ExclusiveMeta meta data
+            // After depositing the newVault to the vault, the vault will be initialized first.
+            // But the un-removed FixesAssetMeta.ExclusiveMeta in the newVault will keep existing.
+            // So, the vault is valid but still contains the FixesAssetMeta.ExclusiveMeta.
             self.vault.deposit(from: <- newVault)
             self.acitve = true
 
