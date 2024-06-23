@@ -348,13 +348,13 @@ access(all) contract FungibleTokenManager {
     /// Borrow the ft interface
     ///
     access(all)
-    view fun borrowFixesFTInterface(_ addr: Address): &FixesFungibleTokenInterface? {
+    view fun borrowFixesFTInterface(_ addr: Address): &{FixesFungibleTokenInterface}? {
         let ftAcct = getAccount(addr)
         var ftName = "FixesFungibleToken"
-        var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+        var ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
         if ftContract == nil {
             ftName = "FRC20FungibleToken"
-            ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
         }
         return ftContract
     }
