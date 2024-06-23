@@ -342,6 +342,20 @@ access(all) contract FungibleTokenManager {
         return nil
     }
 
+    /// Borrow the ft interface
+    ///
+    access(all)
+    view fun borrowFixesFTInterface(_ addr: Address): &FixesFungibleTokenInterface? {
+        let ftAcct = getAccount(addr)
+        var ftName = "FixesFungibleToken"
+        var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+        if ftContract == nil {
+            ftName = "FRC20FungibleToken"
+            ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+        }
+        return ftContract
+    }
+
     /// Check if the user is authorized to access the Fixes Fungible Token manager
     ///
     access(all)
