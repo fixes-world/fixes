@@ -243,12 +243,11 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             let ownerAddr = self.owner?.address
             if ownerAddr != nil {
                 let adminRef = FixesFungibleToken.borrowAdminPublic()
-                if let lastTopHolder = adminRef.getLastTopHolder() {
-                    if lastTopHolder != ownerAddr {
-                        let lastTopBalance = FixesFungibleToken.getTokenBalance(lastTopHolder)
-                        if lastTopBalance > self.balance && adminRef.isInTop100(ownerAddr!) {
-                            adminRef.onBalanceChanged(ownerAddr!)
-                        }
+                let lastTopHolder = adminRef.getLastTopHolder()
+                if lastTopHolder != ownerAddr || lastTopHolder == nil {
+                    let lastTopBalance = lastTopHolder != nil ? FixesFungibleToken.getTokenBalance(lastTopHolder!) : 0.0
+                    if lastTopBalance == 0.0 || (lastTopBalance > self.balance && adminRef.isInTop100(ownerAddr!)) {
+                        adminRef.onBalanceChanged(ownerAddr!)
                     }
                 }
                 // if balance is greater than 0, then update the token holder
@@ -353,12 +352,11 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             let ownerAddr = self.owner?.address
             if ownerAddr != nil {
                 let adminRef = FixesFungibleToken.borrowAdminPublic()
-                if let lastTopHolder = adminRef.getLastTopHolder() {
-                    if lastTopHolder != ownerAddr {
-                        let lastTopBalance = FixesFungibleToken.getTokenBalance(lastTopHolder)
-                        if lastTopBalance < self.balance {
-                            adminRef.onBalanceChanged(ownerAddr!)
-                        }
+                let lastTopHolder = adminRef.getLastTopHolder()
+                if lastTopHolder != ownerAddr || lastTopHolder == nil {
+                    let lastTopBalance = lastTopHolder != nil ? FixesFungibleToken.getTokenBalance(lastTopHolder!) : 0.0
+                    if lastTopBalance < self.balance {
+                        adminRef.onBalanceChanged(ownerAddr!)
                     }
                 }
             }
@@ -546,6 +544,10 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
             // insert the address
             self.top100Accounts.insert(at: highBalanceIdx, address)
+            log("onBalanceChanged - ".concat(address.toString())
+                .concat(" balance: ").concat(balance.toString())
+                .concat(" rank: ").concat(highBalanceIdx.toString()))
+            // remove the last one if the length is greater than 100
             if self.top100Accounts.length > 100 {
                 self.top100Accounts.removeLast()
             }

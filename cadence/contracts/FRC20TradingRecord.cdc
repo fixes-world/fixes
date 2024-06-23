@@ -185,7 +185,7 @@ access(all) contract FRC20TradingRecord {
         view fun getRecordLength(): UInt64
         /// Get the records of the page
         access(all)
-        view fun getRecords(page: Int, pageSize: Int): [TransactionRecord]
+        view fun getRecords(page: Int, pageSize: Int, offset: Int?): [TransactionRecord]
         /// Available minutes
         access(all)
         view fun getMintesWithStatus(): [UInt64]
@@ -245,8 +245,8 @@ access(all) contract FRC20TradingRecord {
         }
 
         access(all)
-        view fun getRecords(page: Int, pageSize: Int): [TransactionRecord] {
-            var start = page * pageSize
+        view fun getRecords(page: Int, pageSize: Int, offset: Int?): [TransactionRecord] {
+            var start = page * pageSize + (offset ?? 0)
             if start < 0 {
                 start = 0
             } else if start > self.records.length {
