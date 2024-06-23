@@ -30,7 +30,7 @@ fun main(
     var todayLen: UInt64 = 0
     if let allData = marketRecords.borrowDailyRecords(dateToQuery) {
         todayLen = allData.getRecordLength()
-        ret = allData.getRecords(page: page, pageSize: size)
+        ret = allData.getRecords(page: page, pageSize: size, offset: nil)
     }
     // to load yesterday's data if not enough
     if ret.length < size {
@@ -42,7 +42,7 @@ fun main(
                 let loadedCount = page * size
                 let needCount = size - ret.length
                 let prevPage = (page - (Int(todayLen) + needCount) / size)
-                let prevData: [FRC20TradingRecord.TransactionRecord] = prevDateData.getRecords(page: prevPage, pageSize: size)
+                let prevData = prevDateData.getRecords(page: prevPage, pageSize: size, offset: nil)
                 if prevData.length > 0 {
                     let upTo = prevData.length < needCount ? prevData.length : needCount
                     ret = ret.concat(prevData.slice(from: 0, upTo: upTo))
