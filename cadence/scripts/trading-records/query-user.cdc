@@ -53,7 +53,7 @@ fun main(
                         // load records in this date
                         offset = loadedDiff % size
                         let loadedPageThisDate = loadedDiff / size
-                        totalLoaded = totalLoaded + UInt64(loadedPageThisDate * size)
+                        totalLoaded = totalLoaded + UInt64(loadedPageThisDate * size) + UInt64(offset)
                     }
                 }
 

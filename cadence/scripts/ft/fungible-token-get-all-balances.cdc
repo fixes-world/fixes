@@ -16,7 +16,7 @@ fun main(
 
     let identifiers: [FTViewUtils.FTIdentity] = []
     acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
-        log("Checking at storage: ".concat(path.toString()))
+        // log("Checking at storage: ".concat(path.toString()))
         if type.isSubtype(of: Type<@FixesFungibleTokenInterface.Vault>()) {
             log("Found fungible token: ".concat(type.identifier))
             if let id = parseIdentity(type.identifier) {
@@ -26,7 +26,7 @@ fun main(
         return true
     })
 
-    log("Found ".concat(identifiers.length.toString()).concat(" fungible tokens"))
+    // log("Found ".concat(identifiers.length.toString()).concat(" fungible tokens"))
 
     let results: [BalanceResult] = []
     for id in identifiers {
