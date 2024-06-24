@@ -1,6 +1,7 @@
 import "StringUtils"
 import "FTViewUtils"
 // Fixes Imports
+import "FixesTraits"
 import "FixesFungibleTokenInterface"
 import "FungibleTokenManager"
 
@@ -39,12 +40,22 @@ fun main(
         if ftContract == nil {
             continue
         }
-        let balance = ftContract!.getTokenBalance(userAddr)
-        results.append(BalanceResult(
-            identity: id,
-            balance: balance,
-            info: info
-        ))
+        if let metadata = ftContract!.borrowTokenMetadata(userAddr) {
+            let mappedMergeableData: {String: {FixesTraits.MergeableData}} = {}
+            let keys = metadata.getMergeableKeys()
+            for key in keys {
+                if let mergeableData = metadata.getMergeableData(key) {
+                    let ids = StringUtils.split(key.identifier, ".")
+                    mappedMergeableData[ids[3]] = mergeableData
+                }
+            }
+            results.append(BalanceResult(
+                identity: id,
+                balance: metadata.balance,
+                info: info,
+                metadata: mappedMergeableData
+            ))
+        }
     }
     return results
 }
@@ -66,13 +77,17 @@ access(all) struct BalanceResult {
     let balance: UFix64
     access(all)
     let info: FungibleTokenManager.FixesTokenInfo?
+    access(all)
+    let metadata: {String: {FixesTraits.MergeableData}}
     init(
         identity: FTViewUtils.FTIdentity,
         balance: UFix64,
-        info: FungibleTokenManager.FixesTokenInfo?
+        info: FungibleTokenManager.FixesTokenInfo?,
+        metadata: {String: {FixesTraits.MergeableData}}?
     ) {
         self.identity = identity
         self.balance = balance
         self.info = info
+        self.metadata = metadata ?? {}
     }
 }

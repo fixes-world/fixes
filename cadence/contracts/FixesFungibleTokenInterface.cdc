@@ -526,12 +526,19 @@ access(all) contract interface FixesFungibleTokenInterface {
     ///
     access(all)
     view fun getTokenBalance(_ addr: Address): UFix64 {
-        if let ref = getAccount(addr)
-            .getCapability<&{FungibleToken.Balance}>(self.getVaultPublicPath())
-            .borrow() {
+        if let ref = self.borrowTokenMetadata(addr) {
             return ref.balance
         }
         return 0.0
+    }
+
+    /// Get the token metadata of the address
+    ///
+    access(all)
+    view fun borrowTokenMetadata(_ addr: Address): &{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}? {
+        return getAccount(addr)
+            .getCapability<&{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}>(self.getVaultPublicPath())
+            .borrow()
     }
 
     /// Borrow the vault receiver of the address
