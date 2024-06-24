@@ -296,6 +296,16 @@ access(all) contract FixesAssetMeta {
                 self.getId() == result.getId(): "The result id is not the same so cannot split"
             }
             let newDna = DNA(self.identifier, self.owner, nil)
+            // No need to split
+            if perc == 0.0 {
+                return newDna
+            }
+            // Mutate the mutatable amount
+            if perc >= 1.0 {
+                newDna.mutatableAmount = self.mutatableAmount
+                self.mutatableAmount = 0
+            }
+            // Split the genes
             for key in self.genes.keys {
                 // Split the gene, use reference to ensure data consistency
                 if let geneRef = &self.genes[key] as &Gene? {
@@ -323,6 +333,8 @@ access(all) contract FixesAssetMeta {
                     self.mergeGene(fromGene)
                 }
             } // end for
+            // merge mutatable amount
+            self.mutatableAmount = self.mutatableAmount + fromDna.mutatableAmount
         }
 
         // ---- Customized Methods ----

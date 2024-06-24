@@ -191,6 +191,8 @@ access(all) contract interface FixesFungibleTokenInterface {
                 // update the DNA mutatable amount
                 if let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64? {
                     dnaRef!.setValue("mutatableAmount", newMutatableAmt)
+                    log("".concat(" Account: ").concat(self.getDNAOwner()?.toString() ?? "Unknown")
+                        .concat("NewMutatable: ").concat(newMutatableAmt.toString()))
                 }
             }
             return newDNA

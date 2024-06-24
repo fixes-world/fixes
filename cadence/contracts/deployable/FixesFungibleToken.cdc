@@ -454,13 +454,21 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(self)
         fun _attemptGenerateGene(_ transactedAmt: UFix64, _ totalAmt: UFix64) {
-            if !self.isValidVault() || self.getDNAMutatableAmount() == 0 || totalAmt == 0.0 {
+            log("-> Attempt to generate gene:"
+                .concat(" Owner: ").concat(self.owner?.address?.toString() ?? "Unknown")
+                .concat(" Valid: ").concat(self.isValidVault() ? "true" : "false")
+                .concat(" DNA: ").concat(self.getDNAIdentifier())
+                .concat(" Mutatable: ").concat(self.getDNAMutatableAmount().toString())
+                .concat(" Transacted: ").concat(transactedAmt.toString())
+                .concat(" Total: ").concat(totalAmt.toString()))
+
+            let remainingAmt = self.getDNAMutatableAmount()
+            if !self.isValidVault() || remainingAmt == 0 || transactedAmt == 0.0 || totalAmt == 0.0 {
                 return
             }
             // every 10% of balance change will get a new attempt to mutate the DNA
-            let attempt = UInt64(transactedAmt / totalAmt / 0.1)
             // attempt to generate a new gene
-            if let newMergedDNA = self.attemptGenerateGene(attempt) {
+            if let newMergedDNA = self.attemptGenerateGene(remainingAmt) {
                 // emit the event
                 emit TokenDNAGenerated(
                     identifier: self.getDNAIdentifier(),
