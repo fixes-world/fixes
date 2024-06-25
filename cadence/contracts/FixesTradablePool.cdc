@@ -55,6 +55,9 @@ access(all) contract FixesTradablePool {
     /// Event that is emitted when the liquidity is added.
     access(all) event LiquidityAdded(subject: Address, tokenType: Type, flowAmount: UFix64)
 
+    /// Event that is emitted when the liquidity is removed.
+    access(all) event LiquidityRemoved(subject: Address, tokenType: Type, flowAmount: UFix64)
+
     // Event that is emitted when the liquidity is transferred.
     access(all) event LiquidityTransferred(subject: Address, pairAddr: Address, tokenType: Type, tokenAmount: UFix64, flowAmount: UFix64)
 
@@ -62,6 +65,211 @@ access(all) contract FixesTradablePool {
     access(all) event Trade(trader: Address, isBuy: Bool, subject: Address, ticker: String, tokenAmount: UFix64, flowAmount: UFix64, protocolFee: UFix64, subjectFee: UFix64, supply: UFix64)
 
     /// -------- Resources and Interfaces --------
+
+    // Utility struct for storing an address with a UFix64 score value.
+    access(all) struct AddressWithScore {
+        access(all) let address: Address
+        access(all) let score: UFix64
+        init(_ address: Address, _ score: UFix64) {
+            self.address = address
+            self.score = score
+        }
+    }
+
+    /// Public resource interface for the Trading Center
+    ///
+    access(all) resource interface CeneterPublic {
+        /// Get the total pool amount
+        access(all)
+        view fun totalPoolAmmount(): Int
+        /// (Readonly)Query the latest pools
+        access(all)
+        view fun queryLatestPools(page: Int, size: Int): [AddressWithScore]
+        /// Get the total handovered pool amount
+        access(all)
+        view fun totalHandoveredAmmount(): Int
+        /// (Readonly)Query the latest handovered pools
+        access(all)
+        view fun queryLatestHandoveredPools(page: Int, size: Int): [AddressWithScore]
+        /// Get the total trending pools
+        access(all)
+        view fun getTopTrendingPools(): [AddressWithScore]
+        // --------- Contract Level Write Access ---------
+        /// Invoked when a new pool is initialized
+        access(contract)
+        fun onPoolInitialized(_ poolAddr: Address)
+        /// Invoked when a pool's liquidity is handovered
+        access(contract)
+        fun onPoolLPHandovered(_ poolAddr: Address)
+        /// Invoked when a pool's Flow token is updated
+        access(contract)
+        fun onPoolFlowTokenUpdated(_ poolAddr: Address)
+    }
+
+    /// Trading Center Resource
+    ///
+    access(all) resource TradingCenter: CeneterPublic {
+        // for new list, unlimited
+        access(self) let pools: [Address]
+        access(self) let poolsAddedAt: {Address: UFix64}
+        // for finalized list, unlimited
+        access(self) let handovered: [Address]
+        access(self) let poolsHandoveredAt: {Address: UFix64}
+        // for trending list, top 100 limited
+        access(self) let trendingPools: [Address]
+        access(self) let trendingScore: {Address: UFix64}
+
+        init() {
+            self.pools = []
+            self.poolsAddedAt = {}
+            self.handovered = []
+            self.poolsHandoveredAt = {}
+            self.trendingPools = []
+            self.trendingScore = {}
+        }
+
+        // ----- Implement CeneterPublic -----
+        /// Get the total pool amount
+        access(all)
+        view fun totalPoolAmmount(): Int {
+            return self.pools.length
+        }
+
+        /// Query the latest pools
+        access(all)
+        view fun queryLatestPools(page: Int, size: Int): [AddressWithScore] {
+            let start = page * size
+            let len = self.pools.length
+            var end = start + size
+            if end > len {
+                end = len
+            }
+            let addrs = self.pools.slice(from: start, upTo: end)
+            let ret: [AddressWithScore] = []
+            for addr in addrs {
+                if let time = self.poolsAddedAt[addr] {
+                    ret.append(AddressWithScore(addr, time))
+                }
+            }
+            return ret
+        }
+
+        /// Get the total handovered pool amount
+        access(all)
+        view fun totalHandoveredAmmount(): Int {
+            return self.handovered.length
+        }
+
+        /// Query the latest handovered pools
+        access(all)
+        view fun queryLatestHandoveredPools(page: Int, size: Int): [AddressWithScore] {
+            let start = page * size
+            let len = self.handovered.length
+            var end = start + size
+            if end > len {
+                end = len
+            }
+            let addrs = self.handovered.slice(from: start, upTo: end)
+            let ret: [AddressWithScore] = []
+            for addr in addrs {
+                if let time = self.poolsHandoveredAt[addr] {
+                    ret.append(AddressWithScore(addr, time))
+                }
+            }
+            return ret
+        }
+
+        /// Get the total trending pools
+        access(all)
+        view fun getTopTrendingPools(): [AddressWithScore] {
+            let addrs = self.trendingPools
+            let ret: [AddressWithScore] = []
+            for addr in addrs {
+                if let score = self.trendingScore[addr] {
+                    ret.append(AddressWithScore(addr, score))
+                }
+            }
+            return ret
+        }
+
+        // --------- Contract Level Write Access ---------
+
+        /// Invoked when a new pool is initialized
+        access(contract)
+        fun onPoolInitialized(_ poolAddr: Address) {
+            pre {
+                FixesTradablePool.borrowTradablePool(poolAddr) != nil: "The pool is missing"
+            }
+            // check if the pool is already added
+            if self.poolsAddedAt[poolAddr] != nil {
+                return
+            }
+            // score is now
+            let now = getCurrentBlock().timestamp
+            self.pools.insert(at: 0, poolAddr)
+            self.poolsAddedAt[poolAddr] = now
+        }
+
+        /// Invoked when a pool's liquidity is handovered
+        access(contract)
+        fun onPoolLPHandovered(_ poolAddr: Address) {
+            pre {
+                FixesTradablePool.borrowTradablePool(poolAddr) != nil: "The pool is missing"
+            }
+            // check if the pool is already added
+            if self.poolsHandoveredAt[poolAddr] != nil {
+                return
+            }
+            // score is now
+            let now = getCurrentBlock().timestamp
+            self.handovered.insert(at: 0, poolAddr)
+            self.poolsHandoveredAt[poolAddr] = now
+        }
+
+        /// Invoked when a pool's Flow token is updated
+        access(contract)
+        fun onPoolFlowTokenUpdated(_ address: Address) {
+            if let poolRef = FixesTradablePool.borrowTradablePool(address) {
+                // remove the address from the top 100
+                if let idx = self.trendingPools.firstIndex(of: address) {
+                    self.trendingPools.remove(at: idx)
+                }
+
+                // now address is not in the top 100, we need to check balance and insert it
+                let balance = poolRef.getFlowBalanceInPool()
+                if balance > 0.0 {
+                    self.trendingScore[address] = balance
+                } else {
+                    self.trendingScore.remove(key: address)
+                }
+
+                var highBalanceIdx = 0
+                var lowBalanceIdx = self.trendingPools.length - 1
+                // use binary search to find the position
+                while lowBalanceIdx >= highBalanceIdx {
+                    let mid = (lowBalanceIdx + highBalanceIdx) / 2
+                    let midBalance = self.trendingScore[address] ?? 0.0
+                    // find the position
+                    if balance > midBalance {
+                        lowBalanceIdx = mid - 1
+                    } else if balance < midBalance {
+                        highBalanceIdx = mid + 1
+                    } else {
+                        break
+                    }
+                }
+                // insert the address
+                self.trendingPools.insert(at: highBalanceIdx, address)
+                log("onPoolFlowTokenUpdated - ".concat(address.toString())
+                    .concat(" balance: ").concat(balance.toString())
+                    .concat(" rank: ").concat(highBalanceIdx.toString()))
+                // remove the last one if the length is greater than 100
+                if self.trendingPools.length > 100 {
+                    self.trendingPools.removeLast()
+                }
+            }
+        }
+    }
 
     /// The refund agent resource.
     ///
@@ -427,6 +635,10 @@ access(all) contract FixesTradablePool {
             self.vault.deposit(from: <- newVault)
             self.acitve = true
 
+            // Update in the trading center
+            let tradingCenter = FixesTradablePool.borrowTradingCenter()
+            tradingCenter.onPoolInitialized(self.getPoolAddress())
+
             // Emit the event
             emit LiquidityPoolInitialized(
                 subject: self.getPoolAddress(),
@@ -733,7 +945,7 @@ access(all) contract FixesTradablePool {
 
             // only leave 1.0 $FLOW to setup the liquidity pair
             let liquidityAmount = self.flowVault.balance - 1.0
-            let liquidityVault <- self.flowVault.withdraw(amount: liquidityAmount)
+            let liquidityVault <- self._withdrawFlowToken(liquidityAmount)
 
             // All Liquidity is pulled, so the pool should be set to be inactive
             self.transferLiquidity()
@@ -745,21 +957,13 @@ access(all) contract FixesTradablePool {
         ///
         access(account)
         fun addLiquidity(_ vault: @FungibleToken.Vault) {
-            let amount = vault.balance
-            self.flowVault.deposit(from: <- vault)
+            self._depositFlowToken(<- vault)
 
             // if not active, then try to add liquidity
             let swapThreshold = 10.0
             if self.isLiquidityHandovered() && self.flowVault.balance >= swapThreshold {
                 self._transferLiquidity()
             }
-
-            // Emit the event
-            emit LiquidityAdded(
-                subject: self.getPoolAddress(),
-                tokenType: self.getTokenType(),
-                flowAmount: amount
-            )
         }
 
         /// Transfer liquidity to swap pair
@@ -884,7 +1088,7 @@ access(all) contract FixesTradablePool {
                 subjectFeeReceiverRef.deposit(from: <- subjectFeeVault)
             }
             // deposit the payment to the flow vault in the liquidity pool
-            self.flowVault.deposit(from: <- payment)
+            self._depositFlowToken(<- payment)
 
             let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
             // return remaining Flow tokens to the inscription owner
@@ -962,25 +1166,28 @@ access(all) contract FixesTradablePool {
                 self.flowVault.balance >= totalPrice,
                 message: "Insufficient payment: The flow vault does not have enough tokens"
             )
+
+            // withdraw the tokens from the vault
+            let payment <- self._withdrawFlowToken(totalPrice)
+
             let protocolFee = totalPrice * FixesTradablePool.getProtocolTradingFee()
             let subjectFee = totalPrice * self.getSubjectFeePercentage()
-            let userFund = totalPrice - protocolFee - subjectFee
             // withdraw the protocol fee from the flow vault
             if protocolFee > 0.0 {
-                let protocolFeeVault <- self.flowVault.withdraw(amount: protocolFee)
+                let protocolFeeVault <- payment.withdraw(amount: protocolFee)
                 let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformAddress())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
             // withdraw the subject fee from the flow vault
             if subjectFee > 0.0 {
-                let subjectFeeVault <- self.flowVault.withdraw(amount: subjectFee)
+                let subjectFeeVault <- payment.withdraw(amount: subjectFee)
                 let subjectFeeReceiverRef = Fixes.borrowFlowTokenReceiver(self.getPoolAddress())
                     ?? panic("The subject does not have a FlowTokenReceiver capability")
                 subjectFeeReceiverRef.deposit(from: <- subjectFeeVault)
             }
             // withdraw the user fund from the flow vault
-            recipient.deposit(from: <- self.flowVault.withdraw(amount: userFund))
+            recipient.deposit(from: <- payment)
 
             // deposit the tokens to the token vault
             let tokenAmount = tokenVault.balance
@@ -1190,6 +1397,58 @@ access(all) contract FixesTradablePool {
 
         // ----- Internal Methods -----
 
+        /// Withdraw the flow token from the pool
+        ///
+        access(self)
+        fun _withdrawFlowToken(_ amount: UFix64): @FungibleToken.Vault {
+            pre {
+                amount > 0.0: "The amount must be greater than 0"
+            }
+            post {
+                result.balance == amount: "The returned vault balance must be equal to the amount"
+                self.flowVault.balance == before(self.flowVault.balance) - amount: "The flow vault balance must be decreased"
+            }
+            let vault <- self.flowVault.withdraw(amount: amount)
+
+            // Update in the trading center
+            let tradingCenter = FixesTradablePool.borrowTradingCenter()
+            tradingCenter.onPoolFlowTokenUpdated(self.getPoolAddress())
+
+            // Emit the event
+            emit LiquidityRemoved(
+                subject: self.getPoolAddress(),
+                tokenType: self.getTokenType(),
+                flowAmount: amount
+            )
+
+            return <- vault
+        }
+
+        /// Deposit the flow token to the pool
+        ///
+        access(self)
+        fun _depositFlowToken(_ vault: @FungibleToken.Vault) {
+            pre {
+                vault.balance > 0.0: "The vault balance must be greater than 0"
+            }
+            post {
+                self.flowVault.balance == before(self.flowVault.balance) + before(vault.balance): "The flow vault balance must be increased"
+            }
+            let amount = vault.balance
+            self.flowVault.deposit(from: <- vault)
+
+            // Update in the trading center
+            let tradingCenter = FixesTradablePool.borrowTradingCenter()
+            tradingCenter.onPoolFlowTokenUpdated(self.getPoolAddress())
+
+            // Emit the event
+            emit LiquidityAdded(
+                subject: self.getPoolAddress(),
+                tokenType: self.getTokenType(),
+                flowAmount: amount
+            )
+        }
+
         /// Ensure the swap pair is created
         ///
         access(self)
@@ -1202,7 +1461,7 @@ access(all) contract FixesTradablePool {
                 let vaultData = minterRef.getVaultData()
 
                 // create the account creation fee vault
-                let acctCreateFeeVault <- self.flowVault.withdraw(amount: 0.01)
+                let acctCreateFeeVault <- self._withdrawFlowToken(0.01)
                 // create the pair
                 SwapFactory.createPair(
                     token0Vault: <- vaultData.createEmptyVault(),
@@ -1270,10 +1529,14 @@ access(all) contract FixesTradablePool {
                 if token0In > 0.0 {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: token0In))
                 }
-                token1Vault.deposit(from: <- self.flowVault.withdraw(amount: token1In))
+                token1Vault.deposit(from: <- self._withdrawFlowToken(token1In))
 
                 // set the local liquidity pool to inactive
                 self.acitve = false
+
+                // Update in the trading center
+                let tradingCenter = FixesTradablePool.borrowTradingCenter()
+                tradingCenter.onPoolLPHandovered(self.getPoolAddress())
 
                 // set the flag in shared store
                 let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -1297,12 +1560,12 @@ access(all) contract FixesTradablePool {
                 let estimatedToken0In = SwapConfig.quote(amountA: allFlowAmount, reserveA: token1Reserve, reserveB: token0Reserve)
                 if token0Max > estimatedToken0In {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: estimatedToken0In))
-                    token1Vault.deposit(from: <- self.flowVault.withdraw(amount: allFlowAmount))
+                    token1Vault.deposit(from: <- self._withdrawFlowToken(allFlowAmount))
                 } else if token0Max > 0.0 {
                     let part1EstimatedToken1In = SwapConfig.quote(amountA: token0Max, reserveA: token0Reserve, reserveB: token1Reserve)
                     let part2EstimatedToken1In = allFlowAmount - part1EstimatedToken1In
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: token0Max))
-                    token1Vault.deposit(from: <- self.flowVault.withdraw(amount: part1EstimatedToken1In))
+                    token1Vault.deposit(from: <- self._withdrawFlowToken(part1EstimatedToken1In))
                 } else {
                     // All Token0 is added to the pair, so we need to calculate the optimized zapped amount through dex
                     let zappedAmt = self._calcZappedAmmount(
@@ -1310,10 +1573,12 @@ access(all) contract FixesTradablePool {
                         tokenReserve: token1Reserve,
                         swapFeeRateBps: pairInfo[6] as! UInt64
                     )
+                    // withdraw all the flow token and add liquidity to the pair
+                    let payment <- self._withdrawFlowToken(allFlowAmount)
 
-                    let swapVaultIn <- self.flowVault.withdraw(amount: zappedAmt)
+                    let swapVaultIn <- payment.withdraw(amount: zappedAmt)
                     // withdraw all the token0 and add liquidity to the pair
-                    token1Vault.deposit(from: <- self.flowVault.withdraw(amount: allFlowAmount - zappedAmt))
+                    token1Vault.deposit(from: <- payment)
                     // swap the token1 to token0 first, and then add liquidity vault
                     token0Vault.deposit(from: <- pairPublicRef!.swap(
                         vaultIn: <- swapVaultIn,
@@ -1561,5 +1826,44 @@ access(all) contract FixesTradablePool {
     view fun getLiquidityPoolPublicPath(): PublicPath {
         let prefix = self.getPathPrefix()
         return PublicPath(identifier: prefix.concat("LiquidityPool"))!
+    }
+
+    /// Get the storage path for the Trading Center
+    ///
+    access(all)
+    view fun getTradingCenterStoragePath(): StoragePath {
+        let prefix = self.getPathPrefix()
+        return StoragePath(identifier: prefix.concat("TradingCenter"))!
+    }
+
+    /// Get the public path for the Trading Center
+    ///
+    access(all)
+    view fun getTradingCenterPublicPath(): PublicPath {
+        let prefix = self.getPathPrefix()
+        return PublicPath(identifier: prefix.concat("TradingCenter"))!
+    }
+
+    /// Create the trading information center
+    ///
+    access(all)
+    fun createCenter(): @TradingCenter {
+        return <- create TradingCenter()
+    }
+
+    /// Borrow the trading information center
+    ///
+    access(all)
+    view fun borrowTradingCenter(): &TradingCenter{CeneterPublic} {
+        return self.account
+            .getCapability<&TradingCenter{CeneterPublic}>(self.getTradingCenterPublicPath())
+            .borrow()
+            ?? panic("The Trading Center is missing")
+    }
+
+    init() {
+        let storagePath = self.getTradingCenterStoragePath()
+        self.account.save(<- self.createCenter(), to: storagePath)
+        self.account.link<&TradingCenter{CeneterPublic}>(self.getTradingCenterPublicPath(), target: storagePath)
     }
 }

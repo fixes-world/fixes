@@ -13,6 +13,9 @@ fun main(
     let arr: [FungibleTokenManager.FixesTokenInfo] = []
 
     for key in addresses.keys {
+        if key.slice(from: 0, upTo: name.length) != name {
+            continue
+        }
         let ftAddress = addresses[key]!
         if let info = FungibleTokenManager.buildFixesTokenInfo(ftAddress, nil) {
             arr.append(info)
