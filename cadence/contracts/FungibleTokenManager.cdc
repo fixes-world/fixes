@@ -578,8 +578,18 @@ access(all) contract FungibleTokenManager {
                 totalAllocatedSupply = totalAllocatedSupply + airdropsPool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + airdropsPool.getTotalMintedAmount()
             }
+            // Total Supply Metadata
             info.setExtra("total:allocatedSupply", totalAllocatedSupply)
             info.setExtra("total:supplied", totalCirculatedSupply)
+            // Token Metadata
+            info.setExtra("token:deployedAt", ftContract!.getDeployedAt())
+            // borrow trading records
+            if let records = FRC20TradingRecord.borrowTradingRecords(ftAddress) {
+                let status = records.getStatus()
+                info.setExtra("token:transactions", status.sales)
+                info.setExtra("token:totalTradedVolume", status.volume)
+                info.setExtra("token:totalTradedAmount", status.dealAmount)
+            }
             // Deposit Tax Metadata
             info.setExtra("depositTax:ratio", ftContract!.getDepositTaxRatio())
             info.setExtra("depositTax:recipient", ftContract!.getDepositTaxRecipient())
@@ -1177,6 +1187,7 @@ access(all) contract FungibleTokenManager {
         // - FRC20FTShared.SharedStore: configuration
         //   - Store the Symbol, Name for the token
         //   - Store the Deployer of the token
+        //   - Store the Deploying Time of the token
 
         // create the shared store and save it in the account
         if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
@@ -1200,6 +1211,7 @@ access(all) contract FungibleTokenManager {
             // set the configuration
             store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDeployer, value: caller)
             store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol, value: symbol)
+            store.setByEnum(FRC20FTShared.ConfigType.FungibleTokenDeployedAt, value: getCurrentBlock().timestamp)
 
             isUpdated = true || isUpdated
         }

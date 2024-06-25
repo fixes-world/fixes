@@ -443,6 +443,15 @@ access(all) contract interface FixesFungibleTokenInterface {
         return deployer ?? panic("Deployer address not found")
     }
 
+    /// Get the deployed at time
+    ///
+    access(all)
+    view fun getDeployedAt(): UFix64 {
+        let store = self.borrowSharedStore()
+        let deployedAt = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDeployedAt) as! UFix64?
+        return deployedAt ?? 0.0 // Default time is 0
+    }
+
     /// Get the ticker name of the token
     ///
     access(all)
