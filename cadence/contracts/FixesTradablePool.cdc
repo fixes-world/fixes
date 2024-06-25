@@ -117,6 +117,16 @@ access(all) contract FixesTradablePool {
             return self.isInitialized() && !self.isLocalActive() && self.getSwapPairAddress() != nil
         }
 
+        access(all)
+        view fun getHandoveredAt(): UFix64? {
+            if self.isLiquidityHandovered() {
+                if let store = FRC20FTShared.borrowStoreRef(self.getPoolAddress()) {
+                    return store.getByEnum(FRC20FTShared.ConfigType.TradablePoolHandoveredAt) as! UFix64?
+                }
+            }
+            return nil
+        }
+
         /// Check if the liquidity pool is initialized
         access(all)
         view fun isInitialized(): Bool
@@ -1264,6 +1274,17 @@ access(all) contract FixesTradablePool {
 
                 // set the local liquidity pool to inactive
                 self.acitve = false
+
+                // set the flag in shared store
+                let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+                if let acctKey = self.getAccountsPoolKey() {
+                    if let store = acctsPool.borrowWritableConfigStore(type: FRC20AccountsPool.ChildAccountType.FungibleToken, acctKey) {
+                        store.setByEnum(
+                            FRC20FTShared.ConfigType.TradablePoolHandoveredAt,
+                            value: getCurrentBlock().timestamp
+                        )
+                    }
+                }
 
                 // emit the liquidity pool inactivated event
                 emit LiquidityPoolInactivated(
