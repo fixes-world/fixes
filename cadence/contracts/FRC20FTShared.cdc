@@ -745,6 +745,9 @@ access(all) contract FRC20FTShared {
         // TradablePool config type
         access(all) case TradablePoolCreateLPTargetMarketCap
         access(all) case TradablePoolTradingFee
+        access(all) case TradablePoolHandoveredAt
+        // FungibleToken config type - extra.1
+        access(all) case FungibleTokenDeployedAt
     }
 
     /* --- Public Methods --- */
@@ -829,11 +832,17 @@ access(all) contract FRC20FTShared {
             case ConfigType.FungibleTokenMaxSupply:
                 key = "fungibleToken:MaxSupply"
                 break
+            case ConfigType.FungibleTokenDeployedAt:
+                key = "fungibleToken:DeployedAt"
+                break
             case ConfigType.TradablePoolCreateLPTargetMarketCap:
                 key = "tradablePool:CreateLPTargetMarketCap"
                 break
             case ConfigType.TradablePoolTradingFee:
                 key = "tradablePool:TradingFee"
+                break
+            case ConfigType.TradablePoolHandoveredAt:
+                key = "tradablePool:HandoveredAt"
                 break
             }
             return key

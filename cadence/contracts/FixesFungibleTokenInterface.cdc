@@ -174,7 +174,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         ///
         access(all)
         view fun getMaxGenerateGeneAttempts(): UInt64 {
-            return 5
+            return 2
         }
 
         // ---- Internal methods - implement required ----
@@ -266,6 +266,8 @@ access(all) contract interface FixesFungibleTokenInterface {
                 // update the DNA mutatable amount
                 if let newMutatableAmt = newDNA.getValue("mutatableAmount") as! UInt64? {
                     dnaRef!.setValue("mutatableAmount", newMutatableAmt)
+                    log("".concat(" Account: ").concat(self.getDNAOwner()?.toString() ?? "Unknown")
+                        .concat("NewMutatable: ").concat(newMutatableAmt.toString()))
                 }
             }
 
@@ -602,6 +604,15 @@ access(all) contract interface FixesFungibleTokenInterface {
         return deployer ?? panic("Deployer address not found")
     }
 
+    /// Get the deployed at time
+    ///
+    access(all)
+    view fun getDeployedAt(): UFix64 {
+        let store = self.borrowSharedStore()
+        let deployedAt = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenDeployedAt) as! UFix64?
+        return deployedAt ?? 0.0 // Default time is 0
+    }
+
     /// Get the ticker name of the token
     ///
     access(all)
@@ -687,12 +698,19 @@ access(all) contract interface FixesFungibleTokenInterface {
     ///
     access(all)
     view fun getTokenBalance(_ addr: Address): UFix64 {
-        if let ref = getAccount(addr)
-            .capabilities.get<&{FungibleToken.Balance}>(self.getVaultPublicPath())
-            .borrow() {
+        if let ref = self.borrowTokenMetadata(addr) {
             return ref.balance
         }
         return 0.0
+    }
+
+    /// Get the token metadata of the address
+    ///
+    access(all)
+    view fun borrowTokenMetadata(_ addr: Address): &{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}? {
+        return getAccount(addr)
+            .capabilities.get<&{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}>(self.getVaultPublicPath())
+            .borrow()
     }
 
     /// Borrow the vault receiver of the address

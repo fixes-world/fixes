@@ -1,9 +1,19 @@
 import "FRC20FTShared"
 import "FRC20TradingRecord"
+import "FixesTradablePool"
 import "FixesHeartbeat"
 
 transaction() {
     prepare(acct: AuthAccount) {
+        let centerStoragePath = FixesTradablePool.getTradingCenterStoragePath()
+        if acct.borrow<&AnyResource>(from: centerStoragePath) == nil {
+            acct.save(<- FixesTradablePool.createCenter(), to: centerStoragePath)
+            acct.link<&FixesTradablePool.TradingCenter{FixesTradablePool.CeneterPublic}>(
+                FixesTradablePool.getTradingCenterPublicPath(),
+                target: centerStoragePath
+            )
+        }
+
         // create the hooks and save it in the account
         if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
