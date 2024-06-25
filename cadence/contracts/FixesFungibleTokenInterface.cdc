@@ -109,7 +109,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         ///
         access(all)
         view fun getMaxGenerateGeneAttempts(): UInt64 {
-            return 5
+            return 2
         }
 
         // ---- Internal methods - implement required ----
