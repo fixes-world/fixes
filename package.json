@@ -13,6 +13,8 @@
 		"deploy:testnet": "flow project deploy --update --network testnet",
 		"deploy:mainnet": "flow project deploy --update --network mainnet",
 		"fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
+		"hb:emulator": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=emulator-account",
+		"hb:testnet": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=testnet-user --network=testnet",
 		"dev": "pnpm deploy:emulator && pnpm fund:emulator"
 	}
 }
