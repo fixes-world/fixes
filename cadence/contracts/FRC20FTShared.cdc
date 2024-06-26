@@ -743,6 +743,19 @@ access(all) contract FRC20FTShared {
         access(all) case FungibleTokenDeployedAt
     }
 
+    /// Get the readonly config types
+    ///
+    access(all)
+    view fun getReadonlyConfigTypes(): [FRC20FTShared.ConfigType] {
+        return [
+            ConfigType.FungibleTokenDeployer,
+            ConfigType.FungibleTokenSymbol,
+            ConfigType.FungibleTokenMaxSupply,
+            ConfigType.FungibleTokenDeployedAt,
+            ConfigType.TradablePoolHandoveredAt
+        ]
+    }
+
     /* --- Public Methods --- */
 
     access(all) resource interface SharedStorePublic {
@@ -876,6 +889,15 @@ access(all) contract FRC20FTShared {
         ///
         access(all)
         fun set(_ key: String, value: AnyStruct) {
+            let readonlyTypes = FRC20FTShared.getReadonlyConfigTypes()
+            for readonlyType in readonlyTypes {
+                if let readonlyKey = self.getKeyByEnum(readonlyType) {
+                    assert(
+                        key != readonlyKey || self.data[readonlyKey] == nil,
+                        message: "The key ".concat(readonlyKey).concat(" is readonly")
+                    )
+                }
+            }
             self.data[key] = value
 
             emit SharedStoreKeyUpdated(key: key, valueType: value.getType())
