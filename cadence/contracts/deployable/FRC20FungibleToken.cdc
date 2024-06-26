@@ -146,8 +146,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.initializeMetadata(FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
                 from,
-                // Only FungibleTokens initialized from the Indexer can have 5 mutation attempts.
-                isInitedFromIndexer ? 5 : 0
+                // Only FungibleTokens initialized from the Indexer can have mutation attempts.
+                isInitedFromIndexer ? self.getMaxGenerateGeneAttempts() : 0
             ))
         }
 
@@ -210,7 +210,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
 
         /// DNA charging
-        /// One inscription can activate 5 DNA mutatable attempts.
+        /// One inscription can activate DNA mutatable attempts.
         ///
         access(all)
         fun chargeDNAMutatableAttempts(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
@@ -425,7 +425,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             return &self.metadata[type]
         }
 
-        /// Attempt to generate a new gene, max 5 attempts for each action
+        /// Attempt to generate a new gene, max attempts for each action
         ///
         access(self)
         fun _attemptGenerateGene(_ transactedAmt: UFix64, _ totalAmt: UFix64) {

@@ -243,9 +243,9 @@ access(all) contract interface FixesFungibleTokenInterface {
                 self.getDNAOwner() ?? panic("The DNA owner is not found"),
                 mutatableAmt,
             )
-            let maxLimit = self.getMaxGenerateGeneAttempts()
-            if max > maxLimit {
-                max = maxLimit
+            // limit the max attempt
+            if max > 10 {
+                max = 10
             }
             var anyAdded = false
             var i: UInt64 = 0
