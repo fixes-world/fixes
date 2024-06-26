@@ -61,12 +61,14 @@ access(all) contract FixesBondingCurve {
             let scaledDeltaX = SwapConfig.UFix64ToScaledUInt256(amount)
             let ufix64Max = SwapConfig.UFix64ToScaledUInt256(UFix64.max)
             // calculate the sum of squares
-            let x0 = scaledX - self.freeScaledAmount
+            let x0 = scaledX < self.freeScaledAmount ? UInt256(0) : scaledX - self.freeScaledAmount
             let sum0: UInt256 = scaledX < self.freeScaledAmount
                 ? 0
                 : x0 * (x0 + 1) / SwapConfig.scaleFactor * (2 * x0 + 1) / 6 / SwapConfig.scaleFactor
             // calculate the sum of squares after adding the amount
-            let x1 = scaledX - self.freeScaledAmount + scaledDeltaX
+            let x1 = scaledX + scaledDeltaX <= self.freeScaledAmount
+                ? UInt256(0)
+                : scaledX - self.freeScaledAmount + scaledDeltaX
             let sum1: UInt256 = scaledX + scaledDeltaX <= self.freeScaledAmount
                 ? 0
                 : x1 * (x1 + 1) / SwapConfig.scaleFactor * (2 * x1 + 1) / 6 / SwapConfig.scaleFactor
