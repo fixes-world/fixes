@@ -248,7 +248,8 @@ access(all) contract FixesTradablePool {
                 // use binary search to find the position
                 while lowBalanceIdx >= highBalanceIdx {
                     let mid = (lowBalanceIdx + highBalanceIdx) / 2
-                    let midBalance = self.trendingScore[address] ?? 0.0
+                    let midAddr = self.trendingPools[mid]
+                    let midBalance = self.trendingScore[midAddr] ?? 0.0
                     // find the position
                     if balance > midBalance {
                         lowBalanceIdx = mid - 1
