@@ -87,16 +87,16 @@ access(all) contract FixesTradablePool {
         view fun totalPoolAmmount(): Int
         /// (Readonly)Query the latest pools
         access(all)
-        view fun queryLatestPools(page: Int, size: Int): [AddressWithScore]
+        fun queryLatestPools(page: Int, size: Int): [AddressWithScore]
         /// Get the total handovered pool amount
         access(all)
         view fun totalHandoveredAmmount(): Int
         /// (Readonly)Query the latest handovered pools
         access(all)
-        view fun queryLatestHandoveredPools(page: Int, size: Int): [AddressWithScore]
+        fun queryLatestHandoveredPools(page: Int, size: Int): [AddressWithScore]
         /// Get the total trending pools
         access(all)
-        view fun getTopTrendingPools(): [AddressWithScore]
+        fun getTopTrendingPools(): [AddressWithScore]
         // --------- Contract Level Write Access ---------
         /// Invoked when a new pool is initialized
         access(contract)
@@ -140,7 +140,7 @@ access(all) contract FixesTradablePool {
 
         /// Query the latest pools
         access(all)
-        view fun queryLatestPools(page: Int, size: Int): [AddressWithScore] {
+        fun queryLatestPools(page: Int, size: Int): [AddressWithScore] {
             let start = page * size
             let len = self.pools.length
             var end = start + size
@@ -165,7 +165,7 @@ access(all) contract FixesTradablePool {
 
         /// Query the latest handovered pools
         access(all)
-        view fun queryLatestHandoveredPools(page: Int, size: Int): [AddressWithScore] {
+        fun queryLatestHandoveredPools(page: Int, size: Int): [AddressWithScore] {
             let start = page * size
             let len = self.handovered.length
             var end = start + size
@@ -184,7 +184,7 @@ access(all) contract FixesTradablePool {
 
         /// Get the total trending pools
         access(all)
-        view fun getTopTrendingPools(): [AddressWithScore] {
+        fun getTopTrendingPools(): [AddressWithScore] {
             let addrs = self.trendingPools
             let ret: [AddressWithScore] = []
             for addr in addrs {
@@ -1328,7 +1328,7 @@ access(all) contract FixesTradablePool {
         /// Withdraw the flow token from the pool
         ///
         access(self)
-        fun _withdrawFlowToken(_ amount: UFix64): @FungibleToken.Vault {
+        fun _withdrawFlowToken(_ amount: UFix64): @{FungibleToken.Vault} {
             pre {
                 amount > 0.0: "The amount must be greater than 0"
             }
@@ -1792,7 +1792,9 @@ access(all) contract FixesTradablePool {
 
     init() {
         let storagePath = self.getTradingCenterStoragePath()
-        self.account.save(<- self.createCenter(), to: storagePath)
-        self.account.link<&TradingCenter>(self.getTradingCenterPublicPath(), target: storagePath)
+        self.account.storage.save(<- self.createCenter(), to: storagePath)
+        let cap = self.account
+            .capabilities.storage.issue<&TradingCenter>(storagePath)
+        self.account.capabilities.publish(cap, at: self.getTradingCenterPublicPath())
     }
 }
