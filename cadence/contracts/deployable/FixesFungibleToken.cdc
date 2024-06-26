@@ -151,8 +151,8 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.initializeMetadata(FixesAssetMeta.DNA(
                 self.getDNAIdentifier(),
                 fromAddr,
-                // if inscription exists, init the DNA with 5 mutatable attempts
-                ins != nil ? 5 : 0
+                // if inscription exists, init the DNA with the mutatable attempts
+                ins != nil ? self.getMaxGenerateGeneAttempts() : 0
             ))
 
             // Add deposit tax metadata
@@ -187,7 +187,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
 
         /// DNA charging
-        /// One inscription can activate 5 DNA mutatable attempts.
+        /// One inscription can activate DNA mutatable attempts.
         ///
         access(all)
         fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription) {
