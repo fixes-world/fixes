@@ -175,9 +175,9 @@ access(all) contract FGameRugRoyale {
         }
         /// Transfer liquidity to swap pair
         access(account)
-        fun transferLiquidity() {
+        fun transferLiquidity(): Bool {
             post {
-                self.getLiquidityValue() == 0.0: "Liquidity not transferred"
+                result == false || self.getLiquidityValue() == 0.0: "Liquidity not transferred"
             }
         }
     }

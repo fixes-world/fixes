@@ -986,17 +986,17 @@ access(all) contract FixesTradablePool {
         /// Transfer liquidity to swap pair
         ///
         access(account)
-        fun transferLiquidity() {
+        fun transferLiquidity(): Bool {
             // check if flow vault has enough liquidity, if not then do nothing
             if self.flowVault.balance < 0.02 {
                 // DO NOT PANIC
-                return
+                return false
             }
 
             // Ensure the swap pair is created
             self._ensureSwapPair()
             // Transfer the liquidity to the swap pair
-            self._transferLiquidity()
+            return self._transferLiquidity()
         }
 
         // ----- Implement FungibleToken.Receiver -----
@@ -1492,7 +1492,7 @@ access(all) contract FixesTradablePool {
         /// Create a new pair and add liquidity
         ///
         access(self)
-        fun _transferLiquidity() {
+        fun _transferLiquidity(): Bool {
             // Now we can add liquidity to the swap pair
             let minterRef = self.borrowMinter()
             let vaultData = minterRef.getVaultData()
@@ -1501,7 +1501,7 @@ access(all) contract FixesTradablePool {
             let pairPublicRef = self.borrowSwapPairRef()
             if pairPublicRef == nil {
                 // DO NOT PANIC
-                return
+                return false
             }
 
             // Token0 => self.vault, Token1 => self.flowVault
@@ -1539,7 +1539,7 @@ access(all) contract FixesTradablePool {
                         destroy token0Vault
                         destroy token1Vault
                         // DO NOT PANIC
-                        return
+                        return false
                     }
                     token0In = estimatedToken0In
                 }
@@ -1627,6 +1627,8 @@ access(all) contract FixesTradablePool {
                 tokenAmount: token0Amount,
                 flowAmount: token1Amount
             )
+
+            return true
         }
 
         /// Calculate the optimized zapped amount through dex
