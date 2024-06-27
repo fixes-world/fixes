@@ -848,7 +848,17 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun borrowSwapPairRef(): &{SwapInterfaces.PairPublic}? {
             if let pairAddr = self.getSwapPairAddress() {
-                return getAccount(pairAddr)
+                // ensure the pair's contract exists
+                // Note: because the pair is created by the factory, in the first transactions. the contract can not be borrowed.
+                // So, We need to ensure the pair contract exists.
+                // But that will be improved in the future.
+                let acct = getAccount(pairAddr)
+                let allNames = acct.contracts.names
+                if !allNames.contains("SwapPair") {
+                    return nil
+                }
+                // Now we can borrow the reference
+                return acct
                     .getCapability<&{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
                     .borrow()
             }
