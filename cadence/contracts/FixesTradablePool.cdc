@@ -497,6 +497,12 @@ access(all) contract FixesTradablePool {
             return self.curve.getType()
         }
 
+        /// Get the free amount
+        access(all)
+        view fun getFreeAmount(): UFix64 {
+            return self.curve.getFreeAmount()
+        }
+
         /// Get the price of the token based on the supply and amount
         access(all)
         view fun getPrice(supply: UFix64, amount: UFix64): UFix64 {
@@ -1776,7 +1782,7 @@ access(all) contract FixesTradablePool {
         let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
         let valueInStore = sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolCreateLPTargetMarketCap) as! UFix64?
         // Default is 32800 USD
-        let defaultTargetMarketCap = 32_800.0
+        let defaultTargetMarketCap = 328.0
         return valueInStore ?? defaultTargetMarketCap
     }
 

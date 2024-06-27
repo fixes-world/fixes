@@ -20,6 +20,8 @@ access(all) contract FixesBondingCurve {
     ///
     access(all) struct interface CurveInterface {
         access(all)
+        view fun getFreeAmount(): UFix64 { return 0.0 }
+        access(all)
         view fun calculatePrice(supply: UFix64, amount: UFix64): UFix64
         access(all)
         view fun calculateAmount(supply: UFix64, cost: UFix64): UFix64
@@ -52,6 +54,11 @@ access(all) contract FixesBondingCurve {
             let max = SwapConfig.UFix64ToScaledUInt256(maxSupply ?? UFix64.max)
             self.priceCoefficient = max / 2 / SwapConfig.scaleFactor * SwapConfig.sqrt(max) / SwapConfig.sqrt(SwapConfig.scaleFactor)
         }
+
+        /// Get the free amount
+        ///
+        access(all)
+        view fun getFreeAmount(): UFix64 { return SwapConfig.ScaledUInt256ToUFix64(self.freeScaledAmount) }
 
         /// Get the price of the token based on the supply and amount
         ///
