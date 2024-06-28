@@ -431,6 +431,22 @@ access(all) contract FixesTradablePool {
             }
         }
 
+        /// Get the swap pair reserved info for the liquidity pool
+        /// 0 - Token0 reserve
+        /// 1 - Token1 reserve
+        /// 2 - LP token supply
+        ///
+        access(all)
+        view fun getSwapPairReservedInfo(): [UFix64; 3]?
+
+        /// Get the estimated swap amount
+        ///
+        access(all)
+        view fun getSwapEstimatedAmount(
+            _ directionTokenToFlow: Bool,
+            amount: UFix64,
+        ): UFix64
+
         // ----- Trade (Writable) -----
 
         /// Buy the token with the given inscription
@@ -747,24 +763,27 @@ access(all) contract FixesTradablePool {
             if self.isLocalActive() {
                 return self.getBuyPrice(1.0)
             }
+            return self.getSwapEstimatedAmount(true, amount: 1.0)
+        }
 
-            let pairRef = self.borrowSwapPairRef()
-            if pairRef == nil {
+        /// Get the estimated swap amount
+        ///
+        access(all)
+        view fun getSwapEstimatedAmount(
+            _ directionTokenToFlow: Bool,
+            amount: UFix64,
+        ): UFix64 {
+            let pairInfo = self.getSwapPairReservedInfo()
+            if pairInfo == nil {
                 return 0.0
             }
-            let pairInfo = pairRef!.getPairInfo()
-            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
-
-            var reserve0 = 0.0
-            var reserve1 = 0.0
-            if tokenKey == (pairInfo[0] as! String) {
-                reserve0 = (pairInfo[2] as! UFix64)
-                reserve1 = (pairInfo[3] as! UFix64)
+            let reserveToken = pairInfo![0]
+            let reserveFlow = pairInfo![1]
+            if directionTokenToFlow {
+                return SwapConfig.quote(amountA: amount, reserveA: reserveToken, reserveB: reserveFlow)
             } else {
-                reserve0 = (pairInfo[3] as! UFix64)
-                reserve1 = (pairInfo[2] as! UFix64)
+                return SwapConfig.quote(amountA: amount, reserveA: reserveFlow, reserveB: reserveToken)
             }
-            return SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
         }
 
         /// Get the LP token price
@@ -774,25 +793,18 @@ access(all) contract FixesTradablePool {
             if self.isLocalActive() {
                 return 0.0
             }
-            let pairRef = self.borrowSwapPairRef()
-            if pairRef == nil {
+
+            let pairInfo = self.getSwapPairReservedInfo()
+            if pairInfo == nil {
                 return 0.0
             }
-            let pairInfo = pairRef!.getPairInfo()
-            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+            let reserve0 = pairInfo![0]
+            let reserve1 = pairInfo![1]
+            let lpTokenSupply = pairInfo![2]
 
-            var reserve0 = 0.0
-            var reserve1 = 0.0
-            if tokenKey == (pairInfo[0] as! String) {
-                reserve0 = (pairInfo[2] as! UFix64)
-                reserve1 = (pairInfo[3] as! UFix64)
-            } else {
-                reserve0 = (pairInfo[3] as! UFix64)
-                reserve1 = (pairInfo[2] as! UFix64)
-            }
-            let lpTokenSupply = pairInfo[5] as! UFix64
-            let price0 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
-            let totalValueInFlow = price0 * reserve0 + reserve1 * 1.0
+            // amount1 is the price
+            let amount1 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
+            let totalValueInFlow = amount1 * reserve0 + 1.0 * reserve1
             return lpTokenSupply == 0.0 ? 0.0 : totalValueInFlow / lpTokenSupply
         }
 
@@ -804,15 +816,37 @@ access(all) contract FixesTradablePool {
                 return 0.0
             }
 
-            let pairRef = self.borrowSwapPairRef()
-            if pairRef == nil {
-                return 0.0
-            }
             let burnedLP = self.getBurnedLP()
             if burnedLP == 0.0 {
                 return 0.0
             }
+            let pairInfo = self.getSwapPairReservedInfo()
+            if pairInfo == nil {
+                return 0.0
+            }
 
+            let reserve0 = pairInfo![0]
+            let reserve1 = pairInfo![1]
+            let lpTokenSupply = pairInfo![2]
+
+            let scaledBurnedLP = SwapConfig.UFix64ToScaledUInt256(burnedLP)
+            let scaledlpTokenSupply = SwapConfig.UFix64ToScaledUInt256(lpTokenSupply)
+            let scaledReserve0 = SwapConfig.UFix64ToScaledUInt256(reserve0)
+            let scaledBurnedToken0 = scaledReserve0 * scaledBurnedLP / scaledlpTokenSupply
+            return SwapConfig.ScaledUInt256ToUFix64(scaledBurnedToken0)
+        }
+
+        /// Get the swap pair reserved info for the liquidity pool
+        /// 0 - Token0 reserve
+        /// 1 - Token1 reserve
+        /// 2 - LP token supply
+        ///
+        access(all)
+        view fun getSwapPairReservedInfo(): [UFix64; 3]? {
+            let pairRef = self.borrowSwapPairRef()
+            if pairRef == nil {
+                return nil
+            }
             let pairInfo = pairRef!.getPairInfo()
             let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
 
@@ -826,12 +860,7 @@ access(all) contract FixesTradablePool {
                 reserve1 = (pairInfo[2] as! UFix64)
             }
             let lpTokenSupply = pairInfo[5] as! UFix64
-
-            let scaledBurnedLP = SwapConfig.UFix64ToScaledUInt256(burnedLP)
-            let scaledlpTokenSupply = SwapConfig.UFix64ToScaledUInt256(lpTokenSupply)
-            let scaledReserve0 = SwapConfig.UFix64ToScaledUInt256(reserve0)
-            let scaledBurnedToken0 = scaledReserve0 * scaledBurnedLP / scaledlpTokenSupply
-            return SwapConfig.ScaledUInt256ToUFix64(scaledBurnedToken0)
+            return [reserve0, reserve1, lpTokenSupply]
         }
 
         /// Get the swap pair address
