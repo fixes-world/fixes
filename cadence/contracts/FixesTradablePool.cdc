@@ -1356,7 +1356,7 @@ access(all) contract FixesTradablePool {
             let isInPoolTrading = buyer == poolAddr || seller == poolAddr
             let storefront = isInPoolTrading ? poolAddr : (self.getSwapPairAddress() ?? poolAddr)
 
-            // invoke the pool transaction hook
+            // invoke the buyer transaction hook
             if let buyerTransactionHook = FRC20FTShared.borrowTransactionHook(buyer) {
                 buyerTransactionHook.onDeal(
                     seller: seller,
@@ -1368,7 +1368,8 @@ access(all) contract FixesTradablePool {
                     listingId: nil,
                 )
             }
-            // invoke the user transaction hook
+
+            // invoke the seller transaction hook
             if let sellerTransactionHook = FRC20FTShared.borrowTransactionHook(seller) {
                 sellerTransactionHook.onDeal(
                     seller: seller,
@@ -1379,6 +1380,21 @@ access(all) contract FixesTradablePool {
                     storefront: storefront,
                     listingId: nil,
                 )
+            }
+
+            // invoke the pool transaction hook for non-pool trading
+            if !isInPoolTrading {
+                if let poolTransactionHook = FRC20FTShared.borrowTransactionHook(poolAddr) {
+                    poolTransactionHook.onDeal(
+                        seller: seller,
+                        buyer: buyer,
+                        tick: tickerName,
+                        dealAmount: dealAmount,
+                        dealPrice: dealPrice,
+                        storefront: storefront,
+                        listingId: nil,
+                    )
+                }
             }
 
             // invoke the system transaction hook
