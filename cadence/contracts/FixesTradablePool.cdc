@@ -1353,36 +1353,34 @@ access(all) contract FixesTradablePool {
             // for TradablePool hook
             let poolAddr = self.getPoolAddress()
             // Buyer or Seller should be the pool address
-            assert(
-                buyer == poolAddr || seller == poolAddr,
-                message: "The buyer or seller must be the pool address"
-            )
+            let isInPoolTrading = buyer == poolAddr || seller == poolAddr
+            let storefront = isInPoolTrading ? poolAddr : (self.getSwapPairAddress() ?? poolAddr)
 
             // invoke the pool transaction hook
-            if let poolTransactionHook = FRC20FTShared.borrowTransactionHook(poolAddr) {
-                poolTransactionHook.onDeal(
+            if let buyerTransactionHook = FRC20FTShared.borrowTransactionHook(buyer) {
+                buyerTransactionHook.onDeal(
                     seller: seller,
                     buyer: buyer,
                     tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
-                    storefront: poolAddr,
+                    storefront: storefront,
                     listingId: nil,
                 )
             }
             // invoke the user transaction hook
-            let userAddr = buyer == poolAddr ? seller : buyer
-            if let userTransactionHook = FRC20FTShared.borrowTransactionHook(userAddr) {
-                userTransactionHook.onDeal(
+            if let sellerTransactionHook = FRC20FTShared.borrowTransactionHook(seller) {
+                sellerTransactionHook.onDeal(
                     seller: seller,
                     buyer: buyer,
                     tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
-                    storefront: poolAddr,
+                    storefront: storefront,
                     listingId: nil,
                 )
             }
+
             // invoke the system transaction hook
             if let systemTransactionHook = FRC20FTShared.borrowTransactionHook(Fixes.getPlatformAddress()) {
                 systemTransactionHook.onDeal(
@@ -1391,7 +1389,7 @@ access(all) contract FixesTradablePool {
                     tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
-                    storefront: poolAddr,
+                    storefront: storefront,
                     listingId: nil,
                 )
             }
