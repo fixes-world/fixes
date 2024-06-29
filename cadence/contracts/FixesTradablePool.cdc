@@ -780,9 +780,9 @@ access(all) contract FixesTradablePool {
             let reserveToken = pairInfo![0]
             let reserveFlow = pairInfo![1]
             if directionTokenToFlow {
-                return SwapConfig.quote(amountA: amount, reserveA: reserveToken, reserveB: reserveFlow)
+                return SwapConfig.getAmountOut(amountIn: amount, reserveIn: reserveToken, reserveOut: reserveFlow)
             } else {
-                return SwapConfig.quote(amountA: amount, reserveA: reserveFlow, reserveB: reserveToken)
+                return SwapConfig.getAmountOut(amountIn: amount, reserveIn: reserveFlow, reserveOut: reserveToken)
             }
         }
 

@@ -19,9 +19,9 @@ fun main(
                     let reserveFlow = pairInfo[1]
                     var amountOut = 0.0
                     if directionCoinToFlow {
-                        amountOut = SwapConfig.quote(amountA: amountIn, reserveA: reserveCoin, reserveB: reserveFlow)
+                        amountOut = SwapConfig.getAmountOut(amountIn: amountIn, reserveIn: reserveCoin, reserveOut: reserveFlow)
                     } else {
-                        amountOut = SwapConfig.quote(amountA: amountIn, reserveA: reserveFlow, reserveB: reserveCoin)
+                        amountOut = SwapConfig.getAmountOut(amountIn: amountIn, reserveIn: reserveFlow, reserveOut: reserveCoin)
                     }
                     return SwapEstimatedPreview(
                         isCoinToFlow: directionCoinToFlow,
