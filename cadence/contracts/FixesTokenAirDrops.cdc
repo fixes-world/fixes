@@ -72,10 +72,6 @@ access(all) contract FixesTokenAirDrops {
         access(all)
         view fun isClaimable(): Bool
 
-        /// Get the current mintable amount
-        access(all)
-        view fun getCurrentMintableAmount(): UFix64
-
         // ----- Token in the drops pool -----
 
         /// Get the total claimable amount
@@ -96,7 +92,6 @@ access(all) contract FixesTokenAirDrops {
         ) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
-                self.getCurrentMintableAmount() > self.getTotalClaimableAmount(): "The mint amount must be greater than 0"
             }
             post {
                 ins.isExtracted(): "The inscription is not extracted"
@@ -160,12 +155,6 @@ access(all) contract FixesTokenAirDrops {
             return true
         }
 
-        /// Get the current mintable amount
-        access(all)
-        view fun getCurrentMintableAmount(): UFix64 {
-            return self.minter.getCurrentMintableAmount()
-        }
-
         // ----- Token in the drops pool -----
 
         /// Get the total claimable amount
@@ -188,6 +177,9 @@ access(all) contract FixesTokenAirDrops {
             _ ins: &Fixes.Inscription,
             claimables: {Address: UFix64}
         ) {
+            pre {
+                self.getTotalClaimableAmount() < self.getTotalAllowedMintableAmount(): "The total claimable amount exceeds the mintable amount"
+            }
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
             assert(
                 self.isAuthorizedUser(callerAddr),

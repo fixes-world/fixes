@@ -371,11 +371,22 @@ access(all) contract interface FixesFungibleTokenInterface {
             return minterRef.getTotalAllowedMintableAmount() - minterRef.getCurrentMintableAmount()
         }
 
+        access(all)
+        view fun getCurrentMintableAmount(): UFix64 {
+            let minterRef = self.borrowMinter()
+            return minterRef.getCurrentMintableAmount()
+        }
+
         /// Get the total allowed mintable amount
         access(all)
         view fun getTotalAllowedMintableAmount(): UFix64 {
             let minterRef = self.borrowMinter()
             return minterRef.getTotalAllowedMintableAmount()
+        }
+
+        access(all)
+        view fun isMintable(): Bool {
+            return self.getCurrentMintableAmount() > 0.0
         }
 
         /// Get the token type

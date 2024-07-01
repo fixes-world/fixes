@@ -517,10 +517,6 @@ access(all) contract FixesTokenLockDrops {
         access(all)
         view fun getDeprecatingTime(): UFix64?
 
-        /// Get the current mintable amount
-        access(all)
-        view fun getCurrentMintableAmount(): UFix64
-
         // ----- Token in the drops pool -----
 
         /// Get the balance of the token in pool
@@ -575,7 +571,6 @@ access(all) contract FixesTokenLockDrops {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isActivated(): "You can not lock the token when the pool is not activated"
                 !self.isClaimable(): "You can not lock the token when the pool is claimable"
-                self.getCurrentMintableAmount() > 0.0: "The mint amount must be greater than 0"
             }
             post {
                 ins.isExtracted(): "The inscription is not extracted"
@@ -729,12 +724,6 @@ access(all) contract FixesTokenLockDrops {
             return self.failureDeprecatedTime
         }
 
-        /// Get the current mintable amount
-        access(all)
-        view fun getCurrentMintableAmount(): UFix64 {
-            return self.minter.getCurrentMintableAmount()
-        }
-
         // ----- Token in the drops pool -----
 
         /// Get the balance of the token in pool
@@ -825,6 +814,7 @@ access(all) contract FixesTokenLockDrops {
         ) {
             pre {
                 self.lockingExchangeRates[lockingPeriod] != nil: "The locking period is not supported"
+                self.getCurrentMintableAmount() > 0.0: "The mint amount must be greater than 0"
             }
             let minter = self.borrowMinter()
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
