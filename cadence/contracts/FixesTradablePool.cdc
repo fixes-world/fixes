@@ -401,6 +401,22 @@ access(all) contract FixesTradablePool {
             }
         }
 
+        /// Get the swap pair reserved info for the liquidity pool
+        /// 0 - Token0 reserve
+        /// 1 - Token1 reserve
+        /// 2 - LP token supply
+        ///
+        access(all)
+        view fun getSwapPairReservedInfo(): [UFix64; 3]?
+
+        /// Get the estimated swap amount
+        ///
+        access(all)
+        view fun getSwapEstimatedAmount(
+            _ directionTokenToFlow: Bool,
+            amount: UFix64,
+        ): UFix64
+
         // ----- Trade (Writable) -----
 
         /// Buy the token with the given inscription
@@ -465,6 +481,12 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getCurveType(): Type {
             return self.curve.getType()
+        }
+
+        /// Get the free amount
+        access(all)
+        view fun getFreeAmount(): UFix64 {
+            return self.curve.getFreeAmount()
         }
 
         /// Get the price of the token based on the supply and amount
@@ -680,24 +702,27 @@ access(all) contract FixesTradablePool {
             if self.isLocalActive() {
                 return self.getBuyPrice(1.0)
             }
+            return self.getSwapEstimatedAmount(true, amount: 1.0)
+        }
 
-            let pairRef = self.borrowSwapPairRef()
-            if pairRef == nil {
+        /// Get the estimated swap amount
+        ///
+        access(all)
+        view fun getSwapEstimatedAmount(
+            _ directionTokenToFlow: Bool,
+            amount: UFix64,
+        ): UFix64 {
+            let pairInfo = self.getSwapPairReservedInfo()
+            if pairInfo == nil {
                 return 0.0
             }
-            let pairInfo = pairRef!.getPairInfo()
-            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
-
-            var reserve0 = 0.0
-            var reserve1 = 0.0
-            if tokenKey == (pairInfo[0] as! String) {
-                reserve0 = (pairInfo[2] as! UFix64)
-                reserve1 = (pairInfo[3] as! UFix64)
+            let reserveToken = pairInfo![0]
+            let reserveFlow = pairInfo![1]
+            if directionTokenToFlow {
+                return SwapConfig.getAmountOut(amountIn: amount, reserveIn: reserveToken, reserveOut: reserveFlow)
             } else {
-                reserve0 = (pairInfo[3] as! UFix64)
-                reserve1 = (pairInfo[2] as! UFix64)
+                return SwapConfig.getAmountOut(amountIn: amount, reserveIn: reserveFlow, reserveOut: reserveToken)
             }
-            return SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
         }
 
         /// Get the LP token price
@@ -707,25 +732,18 @@ access(all) contract FixesTradablePool {
             if self.isLocalActive() {
                 return 0.0
             }
-            let pairRef = self.borrowSwapPairRef()
-            if pairRef == nil {
+
+            let pairInfo = self.getSwapPairReservedInfo()
+            if pairInfo == nil {
                 return 0.0
             }
-            let pairInfo = pairRef!.getPairInfo()
-            let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
+            let reserve0 = pairInfo![0]
+            let reserve1 = pairInfo![1]
+            let lpTokenSupply = pairInfo![2]
 
-            var reserve0 = 0.0
-            var reserve1 = 0.0
-            if tokenKey == (pairInfo[0] as! String) {
-                reserve0 = (pairInfo[2] as! UFix64)
-                reserve1 = (pairInfo[3] as! UFix64)
-            } else {
-                reserve0 = (pairInfo[3] as! UFix64)
-                reserve1 = (pairInfo[2] as! UFix64)
-            }
-            let lpTokenSupply = pairInfo[5] as! UFix64
-            let price0 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
-            let totalValueInFlow = price0 * reserve0 + reserve1 * 1.0
+            // amount1 is the price
+            let amount1 = SwapConfig.quote(amountA: 1.0, reserveA: reserve0, reserveB: reserve1)
+            let totalValueInFlow = amount1 * reserve0 + 1.0 * reserve1
             return lpTokenSupply == 0.0 ? 0.0 : totalValueInFlow / lpTokenSupply
         }
 
@@ -737,15 +755,37 @@ access(all) contract FixesTradablePool {
                 return 0.0
             }
 
-            let pairRef = self.borrowSwapPairRef()
-            if pairRef == nil {
-                return 0.0
-            }
             let burnedLP = self.getBurnedLP()
             if burnedLP == 0.0 {
                 return 0.0
             }
+            let pairInfo = self.getSwapPairReservedInfo()
+            if pairInfo == nil {
+                return 0.0
+            }
 
+            let reserve0 = pairInfo![0]
+            let reserve1 = pairInfo![1]
+            let lpTokenSupply = pairInfo![2]
+
+            let scaledBurnedLP = SwapConfig.UFix64ToScaledUInt256(burnedLP)
+            let scaledlpTokenSupply = SwapConfig.UFix64ToScaledUInt256(lpTokenSupply)
+            let scaledReserve0 = SwapConfig.UFix64ToScaledUInt256(reserve0)
+            let scaledBurnedToken0 = scaledReserve0 * scaledBurnedLP / scaledlpTokenSupply
+            return SwapConfig.ScaledUInt256ToUFix64(scaledBurnedToken0)
+        }
+
+        /// Get the swap pair reserved info for the liquidity pool
+        /// 0 - Token0 reserve
+        /// 1 - Token1 reserve
+        /// 2 - LP token supply
+        ///
+        access(all)
+        view fun getSwapPairReservedInfo(): [UFix64; 3]? {
+            let pairRef = self.borrowSwapPairRef()
+            if pairRef == nil {
+                return nil
+            }
             let pairInfo = pairRef!.getPairInfo()
             let tokenKey = SwapConfig.SliceTokenTypeIdentifierFromVaultType(vaultTypeIdentifier: self.vault.getType().identifier)
 
@@ -759,12 +799,7 @@ access(all) contract FixesTradablePool {
                 reserve1 = (pairInfo[2] as! UFix64)
             }
             let lpTokenSupply = pairInfo[5] as! UFix64
-
-            let scaledBurnedLP = SwapConfig.UFix64ToScaledUInt256(burnedLP)
-            let scaledlpTokenSupply = SwapConfig.UFix64ToScaledUInt256(lpTokenSupply)
-            let scaledReserve0 = SwapConfig.UFix64ToScaledUInt256(reserve0)
-            let scaledBurnedToken0 = scaledReserve0 * scaledBurnedLP / scaledlpTokenSupply
-            return SwapConfig.ScaledUInt256ToUFix64(scaledBurnedToken0)
+            return [reserve0, reserve1, lpTokenSupply]
         }
 
         /// Get the swap pair address
@@ -781,7 +816,17 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun borrowSwapPairRef(): &{SwapInterfaces.PairPublic}? {
             if let pairAddr = self.getSwapPairAddress() {
-                return getAccount(pairAddr)
+                // ensure the pair's contract exists
+                // Note: because the pair is created by the factory, in the first transactions. the contract can not be borrowed.
+                // So, We need to ensure the pair contract exists.
+                // But that will be improved in the future.
+                let acct = getAccount(pairAddr)
+                let allNames = acct.contracts.names
+                if !allNames.contains("SwapPair") {
+                    return nil
+                }
+                // Now we can borrow the reference
+                return acct
                     .capabilities.get<&{SwapInterfaces.PairPublic}>(SwapConfig.PairPublicPath)
                     .borrow()
             }
@@ -897,17 +942,17 @@ access(all) contract FixesTradablePool {
         /// Transfer liquidity to swap pair
         ///
         access(account)
-        fun transferLiquidity() {
+        fun transferLiquidity(): Bool {
             // check if flow vault has enough liquidity, if not then do nothing
             if self.flowVault.balance < 0.02 {
                 // DO NOT PANIC
-                return
+                return false
             }
 
             // Ensure the swap pair is created
             self._ensureSwapPair()
             // Transfer the liquidity to the swap pair
-            self._transferLiquidity()
+            return self._transferLiquidity()
         }
 
         // ----- Implement FungibleToken.Receiver -----
@@ -1235,36 +1280,50 @@ access(all) contract FixesTradablePool {
             // for TradablePool hook
             let poolAddr = self.getPoolAddress()
             // Buyer or Seller should be the pool address
-            assert(
-                buyer == poolAddr || seller == poolAddr,
-                message: "The buyer or seller must be the pool address"
-            )
+            let isInPoolTrading = buyer == poolAddr || seller == poolAddr
+            let storefront = isInPoolTrading ? poolAddr : (self.getSwapPairAddress() ?? poolAddr)
 
-            // invoke the pool transaction hook
-            if let poolTransactionHook = FRC20FTShared.borrowTransactionHook(poolAddr) {
-                poolTransactionHook.onDeal(
+            // invoke the buyer transaction hook
+            if let buyerTransactionHook = FRC20FTShared.borrowTransactionHook(buyer) {
+                buyerTransactionHook.onDeal(
                     seller: seller,
                     buyer: buyer,
                     tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
-                    storefront: poolAddr,
+                    storefront: storefront,
                     listingId: nil,
                 )
             }
-            // invoke the user transaction hook
-            let userAddr = buyer == poolAddr ? seller : buyer
-            if let userTransactionHook = FRC20FTShared.borrowTransactionHook(userAddr) {
-                userTransactionHook.onDeal(
+
+            // invoke the seller transaction hook
+            if let sellerTransactionHook = FRC20FTShared.borrowTransactionHook(seller) {
+                sellerTransactionHook.onDeal(
                     seller: seller,
                     buyer: buyer,
                     tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
-                    storefront: poolAddr,
+                    storefront: storefront,
                     listingId: nil,
                 )
             }
+
+            // invoke the pool transaction hook for non-pool trading
+            if !isInPoolTrading {
+                if let poolTransactionHook = FRC20FTShared.borrowTransactionHook(poolAddr) {
+                    poolTransactionHook.onDeal(
+                        seller: seller,
+                        buyer: buyer,
+                        tick: tickerName,
+                        dealAmount: dealAmount,
+                        dealPrice: dealPrice,
+                        storefront: storefront,
+                        listingId: nil,
+                    )
+                }
+            }
+
             // invoke the system transaction hook
             if let systemTransactionHook = FRC20FTShared.borrowTransactionHook(Fixes.getPlatformAddress()) {
                 systemTransactionHook.onDeal(
@@ -1273,7 +1332,7 @@ access(all) contract FixesTradablePool {
                     tick: tickerName,
                     dealAmount: dealAmount,
                     dealPrice: dealPrice,
-                    storefront: poolAddr,
+                    storefront: storefront,
                     listingId: nil,
                 )
             }
@@ -1403,7 +1462,7 @@ access(all) contract FixesTradablePool {
         /// Create a new pair and add liquidity
         ///
         access(self)
-        fun _transferLiquidity() {
+        fun _transferLiquidity(): Bool {
             // Now we can add liquidity to the swap pair
             let minterRef = self.borrowMinter()
             let vaultData = minterRef.getVaultData()
@@ -1412,7 +1471,7 @@ access(all) contract FixesTradablePool {
             let pairPublicRef = self.borrowSwapPairRef()
             if pairPublicRef == nil {
                 // DO NOT PANIC
-                return
+                return false
             }
 
             // Token0 => self.vault, Token1 => self.flowVault
@@ -1450,7 +1509,7 @@ access(all) contract FixesTradablePool {
                         Burner.burn(<- token0Vault)
                         Burner.burn(<- token1Vault)
                         // DO NOT PANIC
-                        return
+                        return false
                     }
                     token0In = estimatedToken0In
                 }
@@ -1538,6 +1597,8 @@ access(all) contract FixesTradablePool {
                 tokenAmount: token0Amount,
                 flowAmount: token1Amount
             )
+
+            return true
         }
 
         /// Calculate the optimized zapped amount through dex
@@ -1704,7 +1765,7 @@ access(all) contract FixesTradablePool {
         let sharedStore = FRC20FTShared.borrowGlobalStoreRef()
         let valueInStore: UFix64? = sharedStore.getByEnum(FRC20FTShared.ConfigType.TradablePoolCreateLPTargetMarketCap) as! UFix64?
         // Default is 32800 USD
-        let defaultTargetMarketCap = 32_800.0
+        let defaultTargetMarketCap = 32800.0
         return valueInStore ?? defaultTargetMarketCap
     }
 

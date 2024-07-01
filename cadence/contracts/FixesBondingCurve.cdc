@@ -20,6 +20,8 @@ access(all) contract FixesBondingCurve {
     ///
     access(all) struct interface CurveInterface {
         access(all)
+        view fun getFreeAmount(): UFix64 { return 0.0 }
+        access(all)
         view fun calculatePrice(supply: UFix64, amount: UFix64): UFix64
         access(all)
         view fun calculateAmount(supply: UFix64, cost: UFix64): UFix64
@@ -50,8 +52,17 @@ access(all) contract FixesBondingCurve {
         ) {
             self.freeScaledAmount = SwapConfig.UFix64ToScaledUInt256(freeAmount ?? 0.0)
             let max = SwapConfig.UFix64ToScaledUInt256(maxSupply ?? UFix64.max)
+            assert(
+                max > 0,
+                message: "Max supply must be greater than 0"
+            )
             self.priceCoefficient = max / 2 / SwapConfig.scaleFactor * SwapConfig.sqrt(max) / SwapConfig.sqrt(SwapConfig.scaleFactor)
         }
+
+        /// Get the free amount
+        ///
+        access(all)
+        view fun getFreeAmount(): UFix64 { return SwapConfig.ScaledUInt256ToUFix64(self.freeScaledAmount) }
 
         /// Get the price of the token based on the supply and amount
         ///
@@ -61,12 +72,12 @@ access(all) contract FixesBondingCurve {
             let scaledDeltaX = SwapConfig.UFix64ToScaledUInt256(amount)
             let ufix64Max = SwapConfig.UFix64ToScaledUInt256(UFix64.max)
             // calculate the sum of squares
-            let x0 = scaledX - self.freeScaledAmount
+            let x0 = scaledX.saturatingSubtract(self.freeScaledAmount)
             let sum0: UInt256 = scaledX < self.freeScaledAmount
                 ? 0
                 : x0 * (x0 + 1) / SwapConfig.scaleFactor * (2 * x0 + 1) / 6 / SwapConfig.scaleFactor
             // calculate the sum of squares after adding the amount
-            let x1 = scaledX - self.freeScaledAmount + scaledDeltaX
+            let x1 = scaledX.saturatingSubtract(self.freeScaledAmount).saturatingAdd(scaledDeltaX)
             let sum1: UInt256 = scaledX + scaledDeltaX <= self.freeScaledAmount
                 ? 0
                 : x1 * (x1 + 1) / SwapConfig.scaleFactor * (2 * x1 + 1) / 6 / SwapConfig.scaleFactor
@@ -92,7 +103,10 @@ access(all) contract FixesBondingCurve {
         ///
         access(all)
         view fun calculateAmount(supply: UFix64, cost: UFix64): UFix64 {
-            let supplyOnePrice = self.calculatePrice(supply: supply, amount: 1.0)
+            var supplyOnePrice = self.calculatePrice(supply: supply, amount: 1.0)
+            if supplyOnePrice == 0.0 {
+                supplyOnePrice = 0.00000001
+            }
             let maxAmount = cost / supplyOnePrice
 
             let minH = 0.01
@@ -101,13 +115,13 @@ access(all) contract FixesBondingCurve {
             var finalAmount = (low + high) * 0.5
             var calcCost = self.calculatePrice(supply: supply, amount: finalAmount)
             // binary search
-            while calcCost > cost + minH || calcCost < cost - minH {
+            while calcCost > cost.saturatingAdd(minH) || calcCost < cost.saturatingSubtract(minH) {
                 if calcCost > cost {
                     high = finalAmount
                 } else {
                     low = finalAmount
                 }
-                finalAmount = (low + high) * 0.5
+                finalAmount = low.saturatingAdd(high) * 0.5
                 calcCost = self.calculatePrice(supply: supply, amount: finalAmount)
             }
             return finalAmount

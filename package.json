@@ -1,6 +1,6 @@
 {
 	"name": "@fixes/contracts",
-	"version": "0.8.0-alpha.12",
+	"version": "0.8.0-alpha.15",
 	"exports": {
 		"./contracts/*": "./cadence/contracts/*",
 		"./transactions/*": "./cadence/transactions/*",
@@ -15,6 +15,10 @@
 		"lines": "find . \\( -name '*.cdc' -o -name '*.ts' -o -name '*.prisma' -o -name '*.vue' \\) -not -path '*/node_modules/*' -not -path '*/tests/*' -not -path '*/deps/*' -not -path '*/dist/*' -not -path '*/imports*' | xargs wc -l",
 		"lines:contracts": "find ./cadence/contracts \\( -name '*.cdc' \\) -not -path '*/node_modules/*' -not -path '*/tests/*' -not -path '*/deps/*' -not -path '*/dist/*' | xargs wc -l",
 		"fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
+		"hb:emulator": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=emulator-account",
+		"hb:testnet": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=testnet-user --network=testnet --gas-limit=9999",
+		"stage-ft:testnet": "flow transactions send ./cadence/transactions/bin/ft/stage-fts.cdc --signer=testnet-admin --network=testnet --gas-limit=9999",
+		"upgrade-ft:testnet": "flow transactions send ./cadence/transactions/bin/ft/upgrade-fts.cdc --signer=testnet-admin --network=testnet --gas-limit=9999",
 		"dev": "pnpm deploy:emulator && pnpm fund:emulator"
 	}
 }

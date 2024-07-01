@@ -63,8 +63,8 @@ transaction(
         manager.addAccount(cap: cap)
 
         manager.setChildAccountDisplay(address: childAcctAddr, MetadataViews.Display(
-                name: "FIXeS Entrusted",
-                description: "FIXeS EVM Entrusted Account",
+                name: "Fixes Entrusted",
+                description: "Fixes World EVM Entrusted Account",
                 thumbnail: MetadataViews.HTTPFile(url: "https://i.imgur.com/hs3U5CY.png")
             )
         )

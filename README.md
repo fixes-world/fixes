@@ -1,4 +1,4 @@
-# The contracts of FIXeS World
+# The contracts of Fixes World
 
 The Autonomous Programable Token Universe #onFlow
 
