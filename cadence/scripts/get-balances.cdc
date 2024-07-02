@@ -14,17 +14,16 @@ fun main(
         if ret[tick] != nil {
             continue
         }
+        var bal = 0.0
         if tick == "" {
-            var flowBal = 0.0
             if let flowRef = getAccount(addr)
                 .getCapability(/public/flowTokenBalance)
                 .borrow<&{FungibleToken.Balance}>()
             {
-                flowBal = flowRef.balance
+                bal = flowRef.balance
             }
-            ret[""] = flowBal
+            ret[""] = bal
         } else if tick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
-            var bal = 0.0
             if let stFlowRef = getAccount(addr)
                 .getCapability(stFlowToken.tokenBalancePath)
                 .borrow<&{FungibleToken.Balance}>()
@@ -33,7 +32,10 @@ fun main(
             }
             ret["@"] = bal
         } else {
-            ret[tick] = indexer.getBalance(tick: tick, addr: addr)
+            if let tokenMeta = indexer.getTokenMeta(tick: tick) {
+                bal = indexer.getBalance(tick: tokenMeta.tick, addr: addr)
+            }
+            ret[tick] = bal
         }
     }
     return ret
