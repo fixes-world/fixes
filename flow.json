@@ -774,11 +774,11 @@
 		"mainnet-admin": {
 			"address": "d2abb5dbf5e08666",
 			"key": {
-				"type": "file",
-				"index": 2,
+				"type": "google-kms",
+				"index": 3,
 				"signatureAlgorithm": "ECDSA_P256",
-				"hashAlgorithm": "SHA3_256",
-				"location": "mainnet-admin.pkey"
+				"hashAlgorithm": "SHA2_256",
+				"resourceID": "projects/blockchains-360016/locations/global/keyRings/Prod_FixesWorld/cryptoKeys/mainnet-admin/cryptoKeyVersions/1"
 			}
 		},
 		"mainnet-user": {
