@@ -624,6 +624,22 @@ access(all) contract FungibleTokenManager {
         let meta = self.verifyExecutingInscription(ins, usage: "init-ft")
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
+        // The reserved symbol for Fixes Fungible Token
+        let reservedLowerSymbols = ["flow", "flows", "fixes"]
+        let lowerTicker = tick.toLower()
+
+        // Avoid using the reserved symbol
+        assert(
+            !reservedLowerSymbols.contains(lowerTicker),
+            message: "The token symbol is reserved"
+        )
+
+        // ticker should be 2~7 characters
+        assert(
+            tick.length >= 2 && tick.length <= 7,
+            message: "The token symbol should be 2~7 characters"
+        )
+
         /// Check if the account is already enabled
         assert(
             acctsPool.getFTContractAddress(tick) == nil,
