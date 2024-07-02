@@ -7,7 +7,7 @@
 This is the fungible token contract interface for a Fungible tokens with FixesAssetMeta.DNA metadata.
 
 */
-
+import "FlowToken"
 import "FungibleToken"
 import "FungibleTokenMetadataViews"
 // Fixes imports
@@ -420,6 +420,114 @@ access(all) contract interface FixesFungibleTokenInterface {
         /// Borrow the minter reference
         access(contract)
         view fun borrowMinter(): &{IMinter}
+    }
+
+    /// The public interface for the liquidity holder
+    ///
+    access(all) resource interface LiquidityHolder {
+        // --- read methods ---
+
+        /// Check if the address is authorized user for the liquidity holder
+        access(all)
+        view fun isAuthorizedUser(_ addr: Address): Bool
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type
+
+        /// Get the token symbol
+        access(all)
+        view fun getTokenSymbol(): String
+
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String?
+
+        /// Get the liquidity market cap
+        access(all)
+        view fun getLiquidityMarketCap(): UFix64
+
+        /// Get the liquidity pool value
+        access(all)
+        view fun getLiquidityValue(): UFix64
+
+        /// Get the flow balance in pool
+        access(all)
+        view fun getFlowBalanceInPool(): UFix64
+
+        /// Get the token balance in pool
+        access(all)
+        view fun getTokenBalanceInPool(): UFix64
+
+        /// Get the token price in flow
+        access(all)
+        view fun getTokenPriceInFlow(): UFix64
+
+        /// Get the token price by current liquidity
+        access(all)
+        view fun getTokenPriceByInPoolLiquidity(): UFix64 {
+            let tokenBalance = self.getTokenBalanceInPool()
+            if tokenBalance == 0.0 {
+                return 0.0
+            }
+            let currentFlowBalance = self.getFlowBalanceInPool()
+            return currentFlowBalance / tokenBalance
+        }
+
+        /// Get the token price with extra liquidity
+        access(all)
+        view fun getTokenPriceWithExtraLiquidity(_ extraLiquidity: UFix64): UFix64 {
+            let tokenBalance = self.getTokenBalanceInPool()
+            if tokenBalance == 0.0 {
+                return 0.0
+            }
+            let currentFlowBalance = self.getFlowBalanceInPool() + extraLiquidity
+            return currentFlowBalance / tokenBalance
+        }
+
+        /// Get the total token market cap
+        access(all)
+        view fun getTotalTokenMarketCap(): UFix64
+
+        /// Get the total token supply value
+        access(all)
+        view fun getTotalTokenValue(): UFix64
+
+        /// Get the token holders
+        access(all)
+        view fun getHolders(): UInt64
+        /// Get the trade count
+        access(all)
+        view fun getTrades(): UInt64
+
+        // --- write methods ---
+
+        /// Pull liquidity from the pool
+        access(account)
+        fun pullLiquidity(): @FungibleToken.Vault {
+            pre {
+                self.getLiquidityValue() > 0.0: "No liquidity to pull"
+            }
+            post {
+                result.balance == before(self.getLiquidityValue()): "Invalid result balance"
+                result.isInstance(Type<@FlowToken.Vault>()): "Invalid result type"
+            }
+        }
+        /// Push liquidity to the pool
+        access(account)
+        fun addLiquidity(_ vault: @FungibleToken.Vault) {
+            pre {
+                vault.balance > 0.0: "No liquidity to push"
+                vault.isInstance(Type<@FlowToken.Vault>()): "Invalid result type"
+            }
+        }
+        /// Transfer liquidity to swap pair
+        access(account)
+        fun transferLiquidity(): Bool {
+            post {
+                result == false || self.getLiquidityValue() == 0.0: "Liquidity not transferred"
+            }
+        }
     }
 
     /// ------------ Public Functions - no default implementation ------------

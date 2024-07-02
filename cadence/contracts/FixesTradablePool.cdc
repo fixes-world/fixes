@@ -31,7 +31,6 @@ import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20StakingManager"
 import "FRC20Converter"
-import "FGameRugRoyale"
 
 /// The bonding curve contract.
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
@@ -573,7 +572,7 @@ access(all) contract FixesTradablePool {
 
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, FixesFungibleTokenInterface.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver {
         /// The bonding curve of the liquidity pool
         access(contract)
         let curve: {FixesBondingCurve.CurveInterface}
@@ -904,7 +903,7 @@ access(all) contract FixesTradablePool {
             return contractRef.borrowGlobalPublic()
         }
 
-        // ----- Implement FGameRugRoyale.LiquidityHolder -----
+        // ----- Implement LiquidityHolder -----
 
         /// Get the token symbol
         access(all)
@@ -1860,10 +1859,10 @@ access(all) contract FixesTradablePool {
     /// Get the public capability of Tradable Pool
     ///
     access(all)
-    view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool{LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}? {
+    view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool{LiquidityPoolInterface, FixesFungibleTokenInterface.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}? {
         // @deprecated in Cadence 1.0
         return getAccount(addr)
-            .getCapability<&TradableLiquidityPool{LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}>(self.getLiquidityPoolPublicPath())
+            .getCapability<&TradableLiquidityPool{LiquidityPoolInterface, FixesFungibleTokenInterface.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}>(self.getLiquidityPoolPublicPath())
             .borrow()
     }
 
