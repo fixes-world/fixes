@@ -402,7 +402,7 @@ access(all) contract FixesTokenLockDrops {
 
             // add the pool to the user's joined pools
             if self.joinedPools[userAddr] == nil {
-                self.joinedPools[userAddr] == []
+                self.joinedPools[userAddr] = []
             }
             let userJoinedPools = self.borrowUserJoinedPools(userAddr) ?? panic("The user joined pools is missing")
             if !userJoinedPools.contains(poolAddr) {
