@@ -32,7 +32,6 @@ import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20StakingManager"
 import "FRC20Converter"
-import "FGameRugRoyale"
 
 /// The bonding curve contract.
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
@@ -543,7 +542,7 @@ access(all) contract FixesTradablePool {
 
     /// The liquidity pool resource.
     ///
-    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, FGameRugRoyale.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver {
+    access(all) resource TradableLiquidityPool: LiquidityPoolInterface, FixesFungibleTokenInterface.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver {
         /// The bonding curve of the liquidity pool
         access(contract)
         let curve: {FixesBondingCurve.CurveInterface}
@@ -843,7 +842,7 @@ access(all) contract FixesTradablePool {
             return contractRef.borrowGlobalPublic()
         }
 
-        // ----- Implement FGameRugRoyale.LiquidityHolder -----
+        // ----- Implement LiquidityHolder -----
 
         /// Check if the address is authorized user for the liquidity holder
         ///

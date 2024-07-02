@@ -815,6 +815,7 @@ access(all) contract FixesTokenLockDrops {
         ) {
             pre {
                 self.lockingExchangeRates[lockingPeriod] != nil: "The locking period is not supported"
+                self.getCurrentMintableAmount() > 0.0: "The mint amount must be greater than 0"
             }
             let minter = self.borrowMinter()
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
@@ -866,6 +867,11 @@ access(all) contract FixesTokenLockDrops {
             if mintAmount > maxMintAmount {
                 mintAmount = maxMintAmount
             }
+
+            assert(
+                mintAmount > 0.0,
+                message: "The mint amount is zero"
+            )
 
             // mint the tokens and deposit to the vault
             self.vault.deposit(from: <- self.minter.mintTokens(amount: mintAmount))

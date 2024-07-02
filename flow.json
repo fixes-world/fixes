@@ -4,266 +4,266 @@
 			"source": "cadence/contracts/ETHUtils.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"EVMAgent": {
 			"source": "cadence/contracts/EVMAgent.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FGameLottery": {
 			"source": "cadence/contracts/FGameLottery.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FGameLotteryFactory": {
 			"source": "cadence/contracts/FGameLotteryFactory.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FGameLotteryRegistry": {
 			"source": "cadence/contracts/FGameLotteryRegistry.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FGameRugRoyale": {
 			"source": "cadence/contracts/FGameRugRoyale.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20Agents": {
 			"source": "cadence/contracts/FRC20Agents.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20Converter": {
 			"source": "cadence/contracts/FRC20Converter.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20FTShared": {
 			"source": "cadence/contracts/FRC20FTShared.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20FungibleToken": {
 			"source": "cadence/contracts/deployable/FRC20FungibleToken.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20MarketManager": {
 			"source": "cadence/contracts/FRC20MarketManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20Marketplace": {
 			"source": "cadence/contracts/FRC20Marketplace.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20NFTWrapper": {
 			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20SemiNFT": {
 			"source": "cadence/contracts/FRC20SemiNFT.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20Staking": {
 			"source": "cadence/contracts/FRC20Staking.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20StakingForwarder": {
 			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20StakingManager": {
 			"source": "cadence/contracts/FRC20StakingManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20StakingVesting": {
 			"source": "cadence/contracts/FRC20StakingVesting.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20Storefront": {
 			"source": "cadence/contracts/FRC20Storefront.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20TradingRecord": {
 			"source": "cadence/contracts/FRC20TradingRecord.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20VoteCommands": {
 			"source": "cadence/contracts/FRC20VoteCommands.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesAssetMeta": {
 			"source": "cadence/contracts/FixesAssetMeta.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesAvatar": {
 			"source": "cadence/contracts/FixesAvatar.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesBondingCurve": {
 			"source": "cadence/contracts/FixesBondingCurve.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesFungibleToken": {
 			"source": "cadence/contracts/deployable/FixesFungibleToken.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesFungibleTokenInterface": {
 			"source": "cadence/contracts/FixesFungibleTokenInterface.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesHeartbeat": {
 			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesInscriptionFactory": {
 			"source": "cadence/contracts/FixesInscriptionFactory.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesTokenAirDrops": {
 			"source": "cadence/contracts/FixesTokenAirDrops.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesTokenLockDrops": {
 			"source": "cadence/contracts/FixesTokenLockDrops.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesTradablePool": {
 			"source": "cadence/contracts/FixesTradablePool.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesTraits": {
 			"source": "cadence/contracts/FixesTraits.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"FungibleTokenManager": {
 			"source": "cadence/contracts/FungibleTokenManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "74ad08095d92192a"
+				"testnet": "0e11cd1707e0843b"
 			}
 		},
 		"AddressUtils": {
@@ -1184,11 +1184,11 @@
 		"mainnet-admin": {
 			"address": "d2abb5dbf5e08666",
 			"key": {
-				"type": "file",
-				"index": 2,
+				"type": "google-kms",
+				"index": 3,
 				"signatureAlgorithm": "ECDSA_P256",
-				"hashAlgorithm": "SHA3_256",
-				"location": "mainnet-admin.pkey"
+				"hashAlgorithm": "SHA2_256",
+				"resourceID": "projects/blockchains-360016/locations/global/keyRings/Prod_FixesWorld/cryptoKeys/mainnet-admin/cryptoKeyVersions/1"
 			}
 		},
 		"mainnet-user": {
@@ -1199,12 +1199,9 @@
 			}
 		},
 		"testnet-admin": {
-			"address": "74ad08095d92192a",
+			"address": "0e11cd1707e0843b",
 			"key": {
 				"type": "file",
-				"index": 1,
-				"signatureAlgorithm": "ECDSA_P256",
-				"hashAlgorithm": "SHA3_256",
 				"location": "testnet-admin.pkey"
 			}
 		},
@@ -1286,14 +1283,14 @@
 				"FRC20Converter",
 				"FixesFungibleTokenInterface",
 				"FixesBondingCurve",
-				"FGameRugRoyale",
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
 				"FixesTokenAirDrops",
 				"FRC20Agents",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FungibleTokenManager"
+				"FungibleTokenManager",
+				"FGameRugRoyale"
 			]
 		},
 		"mainnet": {
@@ -1358,7 +1355,6 @@
 				"FRC20Converter",
 				"FixesFungibleTokenInterface",
 				"FixesBondingCurve",
-				"FGameRugRoyale",
 				"FixesTradablePool",
 				"FixesTokenLockDrops",
 				"FixesTokenAirDrops",

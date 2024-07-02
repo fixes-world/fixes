@@ -173,6 +173,9 @@ access(all) contract FixesTokenAirDrops {
             _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             claimables: {Address: UFix64}
         ) {
+            pre {
+                self.getTotalClaimableAmount() < self.getTotalAllowedMintableAmount(): "The total claimable amount exceeds the mintable amount"
+            }
             let callerAddr = ins.owner?.address ?? panic("The owner is missing")
             assert(
                 self.isAuthorizedUser(callerAddr),

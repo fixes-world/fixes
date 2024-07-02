@@ -29,7 +29,6 @@ import "FRC20TradingRecord"
 import "FRC20StakingManager"
 import "FRC20Agents"
 import "FRC20Converter"
-import "FGameRugRoyale"
 
 /// The Manager contract for Fungible Token
 ///
@@ -563,6 +562,7 @@ access(all) contract FungibleTokenManager {
                 info.setExtra("lockdrops:activatingTime", lockdropsPool.getActivatingTime())
                 info.setExtra("lockdrops:isDeprecated", lockdropsPool.isDeprecated())
                 info.setExtra("lockdrops:deprecatingTime", lockdropsPool.getDeprecatingTime())
+                info.setExtra("lockdrops:currentMintableAmount", lockdropsPool.getCurrentMintableAmount())
                 info.setExtra("lockdrops:unclaimedSupply", lockdropsPool.getUnclaimedBalanceInPool())
                 info.setExtra("lockdrops:totalLockedAmount",lockdropsPool.getTotalLockedTokenBalance())
                 let lockingPeriods = lockdropsPool.getLockingPeriods()
@@ -579,6 +579,7 @@ access(all) contract FungibleTokenManager {
                 info.setExtra("airdrops:allocatedSupply", airdropsPool.getTotalAllowedMintableAmount())
                 info.setExtra("airdrops:supplied", airdropsPool.getTotalMintedAmount())
                 info.setExtra("airdrops:isClaimable", airdropsPool.isClaimable())
+                info.setExtra("airdrops:currentMintableAmount", airdropsPool.getCurrentMintableAmount())
                 info.setExtra("airdrops:totalClaimableAmount", airdropsPool.getTotalClaimableAmount())
                 totalAllocatedSupply = totalAllocatedSupply + airdropsPool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + airdropsPool.getTotalMintedAmount()

@@ -4,6 +4,7 @@ import "stFlowToken"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FixesTradablePool"
@@ -61,7 +62,7 @@ transaction(
             ?? panic("Could not get the FRC20 contract address!")
         // Get the liquidity cap capability
         let liquidityCap = getAccount(addr)
-            .getCapability<&{FGameRugRoyale.LiquidityHolder}>(FixesTradablePool.getLiquidityPoolPublicPath())
+            .getCapability<&{FixesFungibleTokenInterface.LiquidityHolder}>(FixesTradablePool.getLiquidityPoolPublicPath())
 
         assert(liquidityCap.check(), message: "Failed to get the liquidity capability!")
 

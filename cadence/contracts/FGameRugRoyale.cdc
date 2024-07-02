@@ -75,86 +75,6 @@ access(all) contract FGameRugRoyale {
         access(all) case Ended
     }
 
-    /// The public interface for the liquidity holder
-    ///
-    access(all) resource interface LiquidityHolder: FixesFungibleTokenInterface.ITokenBasics, FixesFungibleTokenInterface.ITokenLiquidity {
-        // --- read methods ---
-
-        /// Check if the address is authorized user for the liquidity holder
-        access(all)
-        view fun isAuthorizedUser(_ addr: Address): Bool
-
-        /// Get the flow balance in pool
-        access(all)
-        view fun getFlowBalanceInPool(): UFix64
-
-        /// Get the token balance in pool
-        access(all)
-        view fun getTokenBalanceInPool(): UFix64
-
-        /// Get the token price in flow
-        access(all)
-        view fun getTokenPriceInFlow(): UFix64
-
-        /// Get the token price by current liquidity
-        access(all)
-        view fun getTokenPriceByInPoolLiquidity(): UFix64 {
-            let tokenBalance = self.getTokenBalanceInPool()
-            if tokenBalance == 0.0 {
-                return 0.0
-            }
-            let currentFlowBalance = self.getFlowBalanceInPool()
-            return currentFlowBalance / tokenBalance
-        }
-
-        /// Get the token price with extra liquidity
-        access(all)
-        view fun getTokenPriceWithExtraLiquidity(_ extraLiquidity: UFix64): UFix64 {
-            let tokenBalance = self.getTokenBalanceInPool()
-            if tokenBalance == 0.0 {
-                return 0.0
-            }
-            let currentFlowBalance = self.getFlowBalanceInPool() + extraLiquidity
-            return currentFlowBalance / tokenBalance
-        }
-
-        /// Get the token holders
-        access(all)
-        view fun getHolders(): UInt64
-        /// Get the trade count
-        access(all)
-        view fun getTrades(): UInt64
-
-        // --- write methods ---
-
-        /// Pull liquidity from the pool
-        access(account)
-        fun pullLiquidity(): @{FungibleToken.Vault} {
-            pre {
-                self.getLiquidityValue() > 0.0: "No liquidity to pull"
-            }
-            post {
-                result.balance == before(self.getLiquidityValue()): "Invalid result balance"
-                result.isInstance(Type<@FlowToken.Vault>()): "Invalid result type"
-            }
-        }
-        /// Push liquidity to the pool
-        access(account)
-        fun addLiquidity(_ vault: @{FungibleToken.Vault}) {
-            pre {
-                vault.balance > 0.0: "No liquidity to push"
-                vault.isInstance(Type<@FlowToken.Vault>()): "Invalid result type"
-            }
-        }
-        /// Transfer liquidity to swap pair
-        access(account)
-        fun transferLiquidity(): Bool {
-            post {
-                result == false || self.getLiquidityValue() == 0.0: "Liquidity not transferred"
-            }
-        }
-    }
-
     /// Struct for the winner status
     ///
     access(all) struct WinnerStatus {
@@ -333,7 +253,7 @@ access(all) contract FGameRugRoyale {
 
         /// Join the game
         access(contract)
-        fun joinGame(_ cap: Capability<&{LiquidityHolder}>)
+        fun joinGame(_ cap: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>)
     }
 
     /// The resource of rug royale game
@@ -350,7 +270,7 @@ access(all) contract FGameRugRoyale {
         let inGameLiquidity: @{FungibleToken.Vault}
         /// All memecoin participants: FT Address => Capability
         access(self)
-        let participants: {Address: Capability<&{LiquidityHolder}>}
+        let participants: {Address: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>}
         /// Current alive participants: FT Address => Is Alive
         access(self)
         let participantsAlive: {Address: Bool}
@@ -807,7 +727,7 @@ access(all) contract FGameRugRoyale {
 
         /// Join the game
         access(contract)
-        fun joinGame(_ cap: Capability<&{LiquidityHolder}>) {
+        fun joinGame(_ cap: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>) {
             pre {
                 self.isJoinable(): "The game is not joinable"
                 cap.check() == true: "Invalid capability"
@@ -850,7 +770,7 @@ access(all) contract FGameRugRoyale {
         /// Get the liquidity holder reference
         ///
         access(self)
-        view fun borrowLiquidHolderRef(_ address: Address): &{LiquidityHolder}? {
+        view fun borrowLiquidHolderRef(_ address: Address): &{FixesFungibleTokenInterface.LiquidityHolder}? {
             if let cap = self.participants[address] {
                 return cap.borrow()
             }
@@ -899,7 +819,7 @@ access(all) contract FGameRugRoyale {
         access(all)
         fun joinGame(
             ins: auth(Fixes.Extractable) &Fixes.Inscription,
-            _ cap: Capability<&{LiquidityHolder}>
+            _ cap: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>
         ) {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
@@ -950,7 +870,7 @@ access(all) contract FGameRugRoyale {
         access(all)
         fun joinGame(
             ins: auth(Fixes.Extractable) &Fixes.Inscription,
-            _ cap: Capability<&{LiquidityHolder}>
+            _ cap: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>
         ) {
             let currentGame = self.borrowCurrentGame()
             assert(
