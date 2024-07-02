@@ -246,16 +246,17 @@ access(all) contract FixesTokenAirDrops {
                 message: "The recipient does not support the token"
             )
 
+            // initialize the vault by inscription, op=exec
+            let vaultData = self.minter.getVaultData()
+            let initializedVault <- self.minter.initializeVaultByInscription(
+                vault: <- vaultData.createEmptyVault(),
+                ins: ins
+            )
             // mint the token
-            let newVault <- self.minter.mintTokens(amount: claimableAmount)
+            initializedVault.deposit(from: <- self.minter.mintTokens(amount: claimableAmount))
             // update the claimable amount
             self.claimableRecords[callerAddr] = 0.0
 
-            // initialize the vault by inscription, op=exec
-            let initializedVault <- self.minter.initializeVaultByInscription(
-                vault: <- newVault,
-                ins: ins
-            )
             // transfer the token
             recipient.deposit(from: <- initializedVault)
 
