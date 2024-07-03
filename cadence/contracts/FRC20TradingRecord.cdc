@@ -373,15 +373,8 @@ access(all) contract FRC20TradingRecord {
     }
 
     access(all) resource interface TradingRecordsPublic {
-        // ---- Public Methods ----
         access(all)
-        view fun isSharedRecrds(): Bool
-
-        access(all)
-        view fun getTickerName(): String?
-
-        access(all)
-        fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
+        view fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}?
         // ---- 2x Traders Points ----
         access(all)
         view fun getTraders(): [Address]
@@ -441,22 +434,10 @@ access(all) contract FRC20TradingRecord {
             return self.status
         }
 
-        access(all)
-        view fun isSharedRecrds(): Bool {
-            return self.tick == nil
-        }
-
-        /// Get the ticker name
-        ///
-        access(all)
-        view fun getTickerName(): String? {
-            return self.tick
-        }
-
         /// Get the public daily records
         ///
         access(all)
-        fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}? {
+        view fun borrowDailyRecords(_ date: UInt64): &DailyRecords{DailyRecordsPublic, TradingStatusViewer}? {
             return self.borrowDailyRecordsPriv(date)
         }
 
@@ -548,11 +529,6 @@ access(all) contract FRC20TradingRecord {
 
         access(contract)
         fun addRecord(record: TransactionRecord) {
-            // if tick is not nil, check the ticker name
-            if self.tick != nil && self.tick != record.tick {
-                return // DO NOT PANIC
-            }
-
             // timestamp is in seconds, not milliseconds
             let timestamp = record.timestamp
             let date = self.convertToDate(timestamp)
