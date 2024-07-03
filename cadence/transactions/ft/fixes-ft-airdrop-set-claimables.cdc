@@ -59,6 +59,10 @@ transaction(
             ?? panic("Could not get the FRC20 contract address!")
      }
 
+     pre {
+        claimables.length > 0: "Claimables must have at least one entry!"
+     }
+
     execute {
         // Set the claimables
         let pool = FixesTokenAirDrops.borrowAirdropPool(self.poolAddress)
