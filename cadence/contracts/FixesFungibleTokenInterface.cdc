@@ -626,32 +626,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         return iconPng ?? iconSvg ?? iconJpg ?? iconGif ?? iconDefault
     }
 
-    /// Get the deposit tax of the Fungible Token
-    ///
-    access(all)
-    view fun getDepositTaxRatio(): UFix64 {
-        post {
-            result >= 0.0: "The deposit tax ratio must be greater than or equal to 0"
-            result < 1.0: "The deposit tax ratio must be less than 1"
-        }
-        let store = self.borrowSharedStore()
-        if let tax = store.get("fungibleToken:Settings:DepositTax") {
-            return tax as? UFix64 ?? 0.0
-        }
-        return 0.0
-    }
-
-    /// Get the deposit tax recepient
-    ///
-    access(all)
-    view fun getDepositTaxRecipient(): Address? {
-        let store = self.borrowSharedStore()
-        if let addr = store.get("fungibleToken:Settings:DepositTaxRecipient") {
-            return addr as? Address
-        }
-        return nil
-    }
-
     /// Get the fungible token balance of the address
     ///
     access(all)

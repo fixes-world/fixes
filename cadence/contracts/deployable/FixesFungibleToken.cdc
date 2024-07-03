@@ -154,11 +154,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 // if inscription exists, init the DNA with the mutatable attempts
                 ins != nil ? self.getMaxGenerateGeneAttempts() : 0
             ))
-
-            // Add deposit tax metadata
-            if fromAddr != FixesFungibleToken.getAccountAddress() {
-                self.initializeMetadata(FixesAssetMeta.DepositTax(nil))
-            }
         }
 
         /// Set the metadata by key
@@ -332,36 +327,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             if !self.isValidVault() && currentOwner != nil {
                 self.initialize(nil, currentOwner!)
             }
-
-            // check the deposit tax, if exists then charge the tax
-            let tax = FixesFungibleToken.getDepositTaxRatio()
-            if tax > 0.0 && selfOwner != dnaOwner {
-                if let depositTax = self.borrowMergeableDataRef(Type<FixesAssetMeta.DepositTax>())  {
-                    let isEnabled = (depositTax.getValue("enabled") as! Bool?) == true
-                    let taxReceiver = FixesFungibleToken.getDepositTaxRecipient()
-                    if isEnabled && self.owner?.address != taxReceiver {
-                        let taxAmount = vault.balance * tax
-                        let taxVault <- vault.withdraw(amount: taxAmount)
-                        log("-> Deposit tax: ".concat(taxAmount.toString()))
-                        if taxReceiver != nil && FixesFungibleToken.borrowVaultReceiver(taxReceiver!) != nil {
-                            let receiverRef = FixesFungibleToken.borrowVaultReceiver(taxReceiver!)!
-                            receiverRef.deposit(from: <- taxVault)
-                            log("-> Deposit tax received by: ".concat(taxReceiver!.toString()))
-                        } else {
-                            // Send to the black hole instead of destroying.
-                            // This can keep the totalSupply unchanged (In theory).
-                            if BlackHole.isAnyBlackHoleAvailable() {
-                                BlackHole.vanish(<- taxVault)
-                            } else {
-                                // Otherwise, destroy the taxVault
-                                // TODO: Using Burner to burn the taxVault in Cadence 1.0
-                                destroy taxVault
-                            }
-                            log("-> Deposit tax vanished")
-                        }
-                    }
-                } // end of deposit tax
-            } // end of tax > 0.0
 
             // check if the vault has PureVault
             let isPureVault = self.borrowMergeableDataRef(Type<FixesAssetMeta.ExclusiveMeta>()) != nil
