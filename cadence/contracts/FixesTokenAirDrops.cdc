@@ -210,6 +210,8 @@ access(all) contract FixesTokenAirDrops {
                 message: "The total claimable amount exceeds the mintable amount"
             )
             self.grantedClaimableAmount = newGrantedClaimableAmount
+            log("The granted claimable amount is updated from ".concat(oldGrantedClaimableAmount.toString())
+                .concat(" to ").concat(newGrantedClaimableAmount.toString()))
 
             // emit the event
             emit AirdropPoolSetClaimable(
