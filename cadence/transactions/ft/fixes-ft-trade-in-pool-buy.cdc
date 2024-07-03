@@ -95,7 +95,7 @@ transaction(
 
         /// calculate the cost or amount
         var costAmount = cost
-        if costAmount == nil{
+        if costAmount == nil || costAmount! == 0.0 {
             assert(
                 amount != nil,
                 message: "Either cost or amount should be provided!"
