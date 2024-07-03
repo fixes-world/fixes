@@ -16,11 +16,11 @@ fun main(
 }
 
 access(all) struct UserAirdropStatus {
-    access(all) let claimableAmount: UFix64
+    access(all) let claimableTokenAmount: UFix64
 
     init(
         _ claimableAmount: UFix64
     ) {
-        self.claimableAmount = claimableAmount
+        self.claimableTokenAmount = claimableAmount
     }
 }
