@@ -87,10 +87,6 @@ transaction(
         /** ------------- End --------------------------------------- */
     }
 
-    pre {
-        self.pool.isClaimable(): "The pool is not claimable!"
-    }
-
     execute {
         self.pool.claimUnlockedTokens(self.ins, recipient: self.recipient)
     }

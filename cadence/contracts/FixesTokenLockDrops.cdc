@@ -409,7 +409,7 @@ access(all) contract FixesTokenLockDrops {
 
             // add the pool to the user's joined pools
             if self.joinedPools[userAddr] == nil {
-                self.joinedPools[userAddr] == []
+                self.joinedPools[userAddr] = []
             }
             let userJoinedPools = self.borrowUserJoinedPools(userAddr) ?? panic("The user joined pools is missing")
             if !userJoinedPools.contains(poolAddr) {
@@ -577,7 +577,6 @@ access(all) contract FixesTokenLockDrops {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isActivated(): "You can not lock the token when the pool is not activated"
-                !self.isClaimable(): "You can not lock the token when the pool is claimable"
             }
             post {
                 ins.isExtracted(): "The inscription is not extracted"
@@ -925,16 +924,19 @@ access(all) contract FixesTokenLockDrops {
                 message: "The recipient does not support the token type"
             )
 
+            // initialize the vault by inscription, op=exec
+            let vaultData = self.minter.getVaultData()
+            let initializedVault <- self.minter.initializeVaultByInscription(
+                vault: <- vaultData.createEmptyVault(),
+                ins: ins
+            )
             // withdraw the claimable amount from the vault
-            let newVault <- self.vault.withdraw(amount: claimableAmount)
+            // deposit the tokens to the initialized return vault
+            initializedVault.deposit(from: <- self.vault.withdraw(amount: claimableAmount))
             // update the claimable record
             self.claimableRecords[callerAddr] = 0.0
 
-            // initialize the vault by inscription, op=exec
-            let initializedVault <- self.minter.initializeVaultByInscription(
-                vault: <- newVault,
-                ins: ins
-            )
+            // deposit the tokens to the recipient
             recipient.deposit(from: <- initializedVault)
 
             // emit the drops claimed event
