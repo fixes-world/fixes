@@ -324,7 +324,9 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             let vault <- from as! @FixesFungibleToken.Vault
 
             // try to get the current owner of the DNA
-            let currentOwner = self.owner?.address ?? vault.getDNAOwner()
+            let selfOwner = self.owner?.address
+            let dnaOwner = vault.getDNAOwner()
+            let currentOwner = selfOwner ?? dnaOwner
 
             // initialize current vault if it is not initialized
             if !self.isValidVault() && currentOwner != nil {
@@ -333,16 +335,18 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
 
             // check the deposit tax, if exists then charge the tax
             let tax = FixesFungibleToken.getDepositTaxRatio()
-            if tax > 0.0 {
+            if tax > 0.0 && selfOwner != dnaOwner {
                 if let depositTax = self.borrowMergeableDataRef(Type<FixesAssetMeta.DepositTax>())  {
-                    let isEnabled = (depositTax.getValue("enabled") as? Bool) == true
+                    let isEnabled = (depositTax.getValue("enabled") as! Bool?) == true
                     let taxReceiver = FixesFungibleToken.getDepositTaxRecipient()
                     if isEnabled && self.owner?.address != taxReceiver {
                         let taxAmount = vault.balance * tax
                         let taxVault <- vault.withdraw(amount: taxAmount)
+                        log("-> Deposit tax: ".concat(taxAmount.toString()))
                         if taxReceiver != nil && FixesFungibleToken.borrowVaultReceiver(taxReceiver!) != nil {
                             let receiverRef = FixesFungibleToken.borrowVaultReceiver(taxReceiver!)!
                             receiverRef.deposit(from: <- taxVault)
+                            log("-> Deposit tax received by: ".concat(taxReceiver!.toString()))
                         } else {
                             // Send to the black hole instead of destroying.
                             // This can keep the totalSupply unchanged (In theory).
@@ -353,6 +357,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                                 // TODO: Using Burner to burn the taxVault in Cadence 1.0
                                 destroy taxVault
                             }
+                            log("-> Deposit tax vanished")
                         }
                     }
                 } // end of deposit tax
@@ -598,6 +603,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(contract)
         fun onBalanceChanged(_ address: Address): Bool {
+            log("onBalanceChanged - Start - ".concat(address.toString()))
             // remove the address from the top 100
             if let idx = self.top100Accounts.firstIndex(of: address) {
                 self.top100Accounts.remove(at: idx)
@@ -621,7 +627,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
             // insert the address
             self.top100Accounts.insert(at: highBalanceIdx, address)
-            log("onBalanceChanged - ".concat(address.toString())
+            log("onBalanceChanged - End - ".concat(address.toString())
                 .concat(" balance: ").concat(balance.toString())
                 .concat(" rank: ").concat(highBalanceIdx.toString()))
             // remove the last one if the length is greater than 100
@@ -826,7 +832,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         )
         let tick = meta["tick"] ?? panic("The ticker name is not found")
         assert(
-            tick[0] == "$" && tick == "$".concat(self.getSymbol()),
+            tick.length > 0 && tick[0] == "$" && tick == "$".concat(self.getSymbol()),
             message: "The ticker name is not matched"
         )
 

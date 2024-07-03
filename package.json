@@ -9,14 +9,15 @@
 		"./flow.json": "./flow.json"
 	},
 	"scripts": {
+		"dev": "pnpm deploy:emulator && pnpm fund:emulator",
+		"fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
 		"deploy:emulator": "flow project deploy --update",
 		"deploy:testnet": "flow project deploy --update --network testnet",
 		"deploy:mainnet": "flow project deploy --update --network mainnet",
-		"fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
 		"hb:emulator": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=emulator-account",
 		"hb:testnet": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=testnet-user --network=testnet --gas-limit=9999",
-		"stage-ft:testnet": "flow transactions send ./cadence/transactions/bin/ft/stage-fts.cdc --signer=testnet-admin --network=testnet --gas-limit=9999",
+		"upgrade-ft:emulator": "flow transactions send ./cadence/transactions/bin/ft/upgrade-fts.cdc --signer=emulator-account",
 		"upgrade-ft:testnet": "flow transactions send ./cadence/transactions/bin/ft/upgrade-fts.cdc --signer=testnet-admin --network=testnet --gas-limit=9999",
-		"dev": "pnpm deploy:emulator && pnpm fund:emulator"
+		"stage-ft:testnet": "flow transactions send ./cadence/transactions/bin/ft/stage-fts.cdc --signer=testnet-admin --network=testnet --gas-limit=9999"
 	}
 }
