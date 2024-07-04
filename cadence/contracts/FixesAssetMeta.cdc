@@ -433,7 +433,7 @@ access(all) contract FixesAssetMeta {
 
     // ----------------- End of DNA and Gene -----------------
 
-    // ----------------- Deposit Tax -----------------
+    // ----------------- Deposit Tax (Deprecated) -----------------
 
     /// The DepositTax data structure
     ///

@@ -1038,10 +1038,21 @@ access(all) contract FixesTradablePool {
                 price = flowPaymentVault.balance - protocolFee - subjectFee
                 buyAmount = self.getBuyAmount(price)
             }
-            log("Trader: ".concat(ins.owner!.address.toString()).concat(" Price: ").concat(price.toString()).concat(" Buy Amount: ").concat(buyAmount.toString()))
 
             // check the total cost
             let totalCost = price + protocolFee + subjectFee
+
+            log("Trader: ".concat(ins.owner!.address.toString())
+                .concat(" Inscription Value: ").concat(ins.getInscriptionValue().toString())
+                .concat(" Partial Extract: ").concat(flowAvailableAmount.toString())
+                .concat(" Flow Payment Vault: ").concat(flowPaymentVault.balance.toString())
+                .concat(" Price: ").concat(price.toString())
+                .concat(" Buy Amount: ").concat(buyAmount.toString())
+                .concat(" Protocol Fee: ").concat(protocolFee.toString())
+                .concat(" Subject Fee: ").concat(subjectFee.toString())
+                .concat(" Total Cost: ").concat(totalCost.toString())
+            )
+
             assert(
                 totalCost <= flowPaymentVault.balance,
                 message: "Insufficient payment: The total cost is greater than the available Flow tokens"

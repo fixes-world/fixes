@@ -596,9 +596,6 @@ access(all) contract FungibleTokenManager {
                 info.setExtra("token:totalTradedVolume", status.volume)
                 info.setExtra("token:totalTradedAmount", status.dealAmount)
             }
-            // Deposit Tax Metadata
-            info.setExtra("depositTax:ratio", ftContract!.getDepositTaxRatio())
-            info.setExtra("depositTax:recipient", ftContract!.getDepositTaxRecipient())
             return info
         }
         return nil

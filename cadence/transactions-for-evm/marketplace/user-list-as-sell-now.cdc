@@ -43,7 +43,7 @@ transaction(
         )
         /** ------------- EVMAgency: End --------------------------------------- */
 
-        /** ------------- Start -- FRC20 Marketing Account General Initialization -------------  */
+        /** ------------- Start -- TradingRecords General Initialization -------------  */
         // Ensure hooks are initialized
         if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
@@ -68,7 +68,7 @@ transaction(
 
         // Ensure Trading Records is initialized
         if acct.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
-            let tradingRecords <- FRC20TradingRecord.createTradingRecords(tick)
+            let tradingRecords <- FRC20TradingRecord.createTradingRecords(nil)
             acct.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
             // link the trading records to the public path
             acct.unlink(FRC20TradingRecord.TradingRecordsPublicPath)

@@ -128,11 +128,6 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
                 // if inscription exists, init the DNA with the mutatable attempts
                 ins != nil ? self.getMaxGenerateGeneAttempts() : 0
             ))
-
-            // Add deposit tax metadata
-            if fromAddr != FixesFungibleToken.getAccountAddress() {
-                self.initializeMetadata(FixesAssetMeta.DepositTax(nil))
-            }
         }
 
         /// Set the metadata by key
@@ -276,38 +271,14 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             let vault <- from as! @FixesFungibleToken.Vault
 
             // try to get the current owner of the DNA
-            let currentOwner = self.owner?.address ?? vault.getDNAOwner()
+            let selfOwner = self.owner?.address
+            let dnaOwner = vault.getDNAOwner()
+            let currentOwner = selfOwner ?? dnaOwner
 
             // initialize current vault if it is not initialized
             if !self.isValidVault() && currentOwner != nil {
                 self.initialize(nil, currentOwner!)
             }
-
-            // check the deposit tax, if exists then charge the tax
-            let tax = FixesFungibleToken.getDepositTaxRatio()
-            if tax > 0.0 {
-                if let depositTax = self.borrowMergeableDataRef(Type<FixesAssetMeta.DepositTax>())  {
-                    let isEnabled = (depositTax.getValue("enabled") as? Bool) == true
-                    let taxReceiver = FixesFungibleToken.getDepositTaxRecipient()
-                    if isEnabled && self.owner?.address != taxReceiver {
-                        let taxAmount = vault.balance * tax
-                        let taxVault <- vault.withdraw(amount: taxAmount)
-                        if taxReceiver != nil && FixesFungibleToken.borrowVaultReceiver(taxReceiver!) != nil {
-                            let receiverRef = FixesFungibleToken.borrowVaultReceiver(taxReceiver!)!
-                            receiverRef.deposit(from: <- taxVault)
-                        } else {
-                            // Send to the black hole instead of destroying.
-                            // This can keep the totalSupply unchanged (In theory).
-                            if BlackHole.isAnyBlackHoleAvailable() {
-                                BlackHole.vanish(<- taxVault)
-                            } else {
-                                // Otherwise, destory the taxVault
-                                Burner.burn(<- taxVault)
-                            }
-                        }
-                    }
-                } // end of deposit tax
-            } // end of tax > 0.0
 
             // check if the vault has PureVault
             let isPureVault = self.borrowMergeableDataRef(Type<FixesAssetMeta.ExclusiveMeta>()) != nil
@@ -529,6 +500,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(contract)
         fun onBalanceChanged(_ address: Address): Bool {
+            log("onBalanceChanged - Start - ".concat(address.toString()))
             // remove the address from the top 100
             if let idx = self.top100Accounts.firstIndex(of: address) {
                 self.top100Accounts.remove(at: idx)
@@ -552,7 +524,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
             // insert the address
             self.top100Accounts.insert(at: highBalanceIdx, address)
-            log("onBalanceChanged - ".concat(address.toString())
+            log("onBalanceChanged - End - ".concat(address.toString())
                 .concat(" balance: ").concat(balance.toString())
                 .concat(" rank: ").concat(highBalanceIdx.toString()))
             // remove the last one if the length is greater than 100
@@ -754,7 +726,7 @@ access(all) contract FixesFungibleToken: FixesFungibleTokenInterface, FungibleTo
         )
         let tick = meta["tick"] ?? panic("The ticker name is not found")
         assert(
-            tick[0] == "$" && tick == "$".concat(self.getSymbol()),
+            tick.length > 0 && tick[0] == "$" && tick == "$".concat(self.getSymbol()),
             message: "The ticker name is not matched"
         )
 

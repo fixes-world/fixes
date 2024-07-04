@@ -94,14 +94,22 @@ access(all) contract FixesAvatar {
             storefront: Address,
             listingId: UInt64?,
         ) {
-            // For season 0, we only support the following tick
+            // For frc20, we only support the following tick
             // "flows", the default tick
             // "fixes", the tick for the FIXeS platform
             let availableTicks = [
                 FRC20FTShared.getPlatformStakingTickerName(),
                 FRC20FTShared.getPlatformUtilityTickerName()
             ]
-            if availableTicks.contains(tick) {
+            var isValidTrx = availableTicks.contains(tick)
+
+            // For Coins, all transactions from tradable pool are valid
+            if tick.length > 0 && tick[0] == "$" {
+                isValidTrx = seller == storefront || buyer == storefront
+            }
+
+            // Try to generate a random entry
+            if isValidTrx {
                 if let entry <- FixesTraits.attemptToGenerateRandomEntryForSeason0() {
                     log("Generated a random entry for season 0".concat(entry.uuid.toString()))
                     self.addTraitEntry(<- entry)
