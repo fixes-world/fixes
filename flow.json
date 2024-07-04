@@ -910,7 +910,18 @@
 				"EVMAgent",
 				"FGameLottery",
 				"FGameLotteryRegistry",
-				"FGameLotteryFactory"
+				"FGameLotteryFactory",
+				"FixesAssetMeta",
+				"FRC20Converter",
+				"FixesFungibleTokenInterface",
+				"FixesBondingCurve",
+				"FixesTradablePool",
+				"FixesTokenLockDrops",
+				"FixesTokenAirDrops",
+				"FRC20Agents",
+				"FixesFungibleToken",
+				"FRC20FungibleToken",
+				"FungibleTokenManager"
 			]
 		},
 		"testnet": {
