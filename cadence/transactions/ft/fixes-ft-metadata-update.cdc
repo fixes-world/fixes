@@ -61,6 +61,7 @@ transaction(
 
     execute {
         let store = self.managerRef.borrowManagedFTStore(self.tickerName)
+            ?? panic("Could not borrow a reference to the Fungible Token Store")
 
         let tokenSymbol = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
             ?? panic("Symbol is not set")

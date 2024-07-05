@@ -167,18 +167,27 @@ access(all) contract FungibleTokenManager {
         view fun getCreatedFungibleTokenAmount(): Int
         // ----- Internal Methods -----
         access(contract)
-        fun setFungibleTokenManaged(_ symbol: String, flag: Bool)
+        fun setFungibleTokenManaged(
+            _ symbol: String,
+            _ storeCap: Capability<&FRC20FTShared.SharedStore>?
+        )
         access(contract)
-        fun addCreatedFungibleToken(_ symbol: String)
+        fun addCreatedFungibleToken(
+            _ symbol: String,
+            _ storeCap: Capability<&FRC20FTShared.SharedStore>
+        )
     }
 
     access(all) resource Manager: ManagerPublic {
         access(self)
+        let createdSymbols: [String]
+        access(self)
         let managedSymbols: [String]
         access(self)
-        let createdSymbols: [String]
+        let managedStores: {String: Capability<&FRC20FTShared.SharedStore>}
 
         init() {
+            self.managedStores = {}
             self.managedSymbols = []
             self.createdSymbols = []
         }
@@ -234,17 +243,11 @@ access(all) contract FungibleTokenManager {
         /// Borrow the shared store of the managed fungible token
         ///
         access(all)
-        fun borrowManagedFTStore(_ symbol: String): &FRC20FTShared.SharedStore {
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            let accountKey = symbol[0] != "$" ? "$".concat(symbol) : symbol
-            assert(
-                self.managedSymbols.contains(accountKey) || self.createdSymbols.contains(accountKey),
-                message: "The fungible token is not managed by the owner"
-            )
-            let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, accountKey)
-                ?? panic("The child account was not created")
-            return acct.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
-                ?? panic("The shared store is not found")
+        view fun borrowManagedFTStore(_ symbol: String): &FRC20FTShared.SharedStore? {
+            if let cap = self.managedStores[symbol] {
+                return cap.borrow()
+            }
+            return nil
         }
 
         // ---- Internal Methods ----
@@ -252,29 +255,42 @@ access(all) contract FungibleTokenManager {
         /// set the managed fungible token
         ///
         access(contract)
-        fun setFungibleTokenManaged(_ symbol: String, flag: Bool) {
+        fun setFungibleTokenManaged(
+            _ symbol: String,
+            _ storeCap: Capability<&FRC20FTShared.SharedStore>?
+        ) {
+            pre {
+                storeCap == nil || storeCap!.check() == true: "The store capability is invalid"
+            }
             let isManaged = self.managedSymbols.contains(symbol)
             var isUpdated = false
-            if flag && !isManaged {
+            if storeCap != nil && !isManaged {
                 self.managedSymbols.append(symbol)
+                self.managedStores[symbol] = storeCap!
                 isUpdated = true
-            } else if !flag && isManaged {
+            } else if storeCap == nil && isManaged {
                 self.managedSymbols.remove(at: self.managedSymbols.firstIndex(of: symbol)!)
                 isUpdated = true
             }
 
             if isUpdated {
-                emit FungibleTokenManagerUpdated(symbol: symbol, manager: self.owner?.address!, flag: flag)
+                emit FungibleTokenManagerUpdated(symbol: symbol, manager: self.owner?.address!, flag: storeCap != nil)
             }
         }
 
         /// set the created fungible token
         ///
         access(contract)
-        fun addCreatedFungibleToken(_ symbol: String) {
+        fun addCreatedFungibleToken(
+            _ symbol: String,
+            _ storeCap: Capability<&FRC20FTShared.SharedStore>
+        ) {
+            pre {
+                storeCap.check() == true: "The store capability is invalid"
+            }
             if !self.createdSymbols.contains(symbol) {
                 self.createdSymbols.append(symbol)
-                self.setFungibleTokenManaged(symbol, flag: true)
+                self.setFungibleTokenManaged(symbol, storeCap)
             }
         }
     }
@@ -654,10 +670,6 @@ access(all) contract FungibleTokenManager {
         self._ensureFungibleTokenAccountResourcesAvailable(tick, caller: callerAddr)
         // deploy the contract of Fixes Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
-
-        // Add token symbol to the managed list
-        let managerRef = self.borrowFTManager(callerAddr) ?? panic("The manager resource is not found")
-        managerRef.addCreatedFungibleToken(tick)
 
         // emit the event
         emit FungibleTokenAccountCreated(
@@ -1056,10 +1068,6 @@ access(all) contract FungibleTokenManager {
         // deploy the contract of FRC20 Fungible Token to the account
         self._updateFungibleTokenContractInAccount(tickerName, contractName: "FRC20FungibleToken")
 
-        // Add token symbol to the managed list
-        let managerRef = self.borrowFTManager(callerAddr) ?? panic("The manager resource is not found")
-        managerRef.addCreatedFungibleToken(tickerName)
-
         // emit the event
         emit FungibleTokenAccountCreated(
             symbol: tickerName,
@@ -1213,6 +1221,14 @@ access(all) contract FungibleTokenManager {
             // link the shared store to the public path
             childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
             childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+
+            // Add token symbol to the managed list
+            let managerRef = self.borrowFTManager(caller) ?? panic("The manager resource is not found")
+            // create a private cap for shared store for the fungible token
+            let privId = "FRC20SharedStoreTempPriv_".concat(childAddr.toString())
+            let cap = childAcctRef.link<&FRC20FTShared.SharedStore>(PrivatePath(identifier: privId)!, target: FRC20FTShared.SharedStoreStoragePath)
+            assert(cap!.check(), message: "The shared store is not valid")
+            managerRef.addCreatedFungibleToken(tick, cap!)
 
             isUpdated = true || isUpdated
         }
