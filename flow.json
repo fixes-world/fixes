@@ -788,11 +788,18 @@
 				"location": "mainnet-tick-user.pkey"
 			}
 		},
-		"testnet-admin": {
+		"testnet-admin-old": {
 			"address": "0e11cd1707e0843b",
 			"key": {
 				"type": "file",
 				"location": "testnet-admin.pkey"
+			}
+		},
+		"testnet-admin": {
+			"address": "bc0eb933e82c2216",
+			"key": {
+				"type": "file",
+				"location": "testnet-admin-new.pkey"
 			}
 		},
 		"testnet-user": {
