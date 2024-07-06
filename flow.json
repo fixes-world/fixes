@@ -4,266 +4,266 @@
 			"source": "cadence/contracts/ETHUtils.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"EVMAgent": {
 			"source": "cadence/contracts/EVMAgent.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FGameLottery": {
 			"source": "cadence/contracts/FGameLottery.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FGameLotteryFactory": {
 			"source": "cadence/contracts/FGameLotteryFactory.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FGameLotteryRegistry": {
 			"source": "cadence/contracts/FGameLotteryRegistry.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FGameRugRoyale": {
 			"source": "cadence/contracts/FGameRugRoyale.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20Agents": {
 			"source": "cadence/contracts/FRC20Agents.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20Converter": {
 			"source": "cadence/contracts/FRC20Converter.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20FTShared": {
 			"source": "cadence/contracts/FRC20FTShared.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20FungibleToken": {
 			"source": "cadence/contracts/deployable/FRC20FungibleToken.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20MarketManager": {
 			"source": "cadence/contracts/FRC20MarketManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20Marketplace": {
 			"source": "cadence/contracts/FRC20Marketplace.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20NFTWrapper": {
 			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20SemiNFT": {
 			"source": "cadence/contracts/FRC20SemiNFT.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20Staking": {
 			"source": "cadence/contracts/FRC20Staking.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20StakingForwarder": {
 			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20StakingManager": {
 			"source": "cadence/contracts/FRC20StakingManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20StakingVesting": {
 			"source": "cadence/contracts/FRC20StakingVesting.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20Storefront": {
 			"source": "cadence/contracts/FRC20Storefront.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20TradingRecord": {
 			"source": "cadence/contracts/FRC20TradingRecord.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20VoteCommands": {
 			"source": "cadence/contracts/FRC20VoteCommands.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesAssetMeta": {
 			"source": "cadence/contracts/FixesAssetMeta.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesAvatar": {
 			"source": "cadence/contracts/FixesAvatar.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesBondingCurve": {
 			"source": "cadence/contracts/FixesBondingCurve.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesFungibleToken": {
 			"source": "cadence/contracts/deployable/FixesFungibleToken.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesFungibleTokenInterface": {
 			"source": "cadence/contracts/FixesFungibleTokenInterface.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesHeartbeat": {
 			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesInscriptionFactory": {
 			"source": "cadence/contracts/FixesInscriptionFactory.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesTokenAirDrops": {
 			"source": "cadence/contracts/FixesTokenAirDrops.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesTokenLockDrops": {
 			"source": "cadence/contracts/FixesTokenLockDrops.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesTradablePool": {
 			"source": "cadence/contracts/FixesTradablePool.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesTraits": {
 			"source": "cadence/contracts/FixesTraits.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		},
 		"FungibleTokenManager": {
 			"source": "cadence/contracts/FungibleTokenManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "0e11cd1707e0843b"
+				"testnet": "bc0eb933e82c2216"
 			}
 		}
 	},
