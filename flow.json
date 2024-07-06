@@ -4,266 +4,266 @@
 			"source": "cadence/contracts/ETHUtils.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"EVMAgent": {
 			"source": "cadence/contracts/EVMAgent.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FGameLottery": {
 			"source": "cadence/contracts/FGameLottery.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FGameLotteryFactory": {
 			"source": "cadence/contracts/FGameLotteryFactory.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FGameLotteryRegistry": {
 			"source": "cadence/contracts/FGameLotteryRegistry.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FGameRugRoyale": {
 			"source": "cadence/contracts/FGameRugRoyale.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20Agents": {
 			"source": "cadence/contracts/FRC20Agents.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20Converter": {
 			"source": "cadence/contracts/FRC20Converter.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20FTShared": {
 			"source": "cadence/contracts/FRC20FTShared.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20FungibleToken": {
 			"source": "cadence/contracts/deployable/FRC20FungibleToken.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20Indexer": {
 			"source": "cadence/contracts/FRC20Indexer.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20MarketManager": {
 			"source": "cadence/contracts/FRC20MarketManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20Marketplace": {
 			"source": "cadence/contracts/FRC20Marketplace.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20NFTWrapper": {
 			"source": "cadence/contracts/FRC20NFTWrapper.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20SemiNFT": {
 			"source": "cadence/contracts/FRC20SemiNFT.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20Staking": {
 			"source": "cadence/contracts/FRC20Staking.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20StakingForwarder": {
 			"source": "cadence/contracts/FRC20StakingForwarder.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20StakingManager": {
 			"source": "cadence/contracts/FRC20StakingManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20StakingVesting": {
 			"source": "cadence/contracts/FRC20StakingVesting.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20Storefront": {
 			"source": "cadence/contracts/FRC20Storefront.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20TradingRecord": {
 			"source": "cadence/contracts/FRC20TradingRecord.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20VoteCommands": {
 			"source": "cadence/contracts/FRC20VoteCommands.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FRC20Votes": {
 			"source": "cadence/contracts/FRC20Votes.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"Fixes": {
 			"source": "cadence/contracts/Fixes.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesAssetMeta": {
 			"source": "cadence/contracts/FixesAssetMeta.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesAvatar": {
 			"source": "cadence/contracts/FixesAvatar.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesBondingCurve": {
 			"source": "cadence/contracts/FixesBondingCurve.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesFungibleToken": {
 			"source": "cadence/contracts/deployable/FixesFungibleToken.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesFungibleTokenInterface": {
 			"source": "cadence/contracts/FixesFungibleTokenInterface.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesHeartbeat": {
 			"source": "cadence/contracts/FixesHeartbeat.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesInscriptionFactory": {
 			"source": "cadence/contracts/FixesInscriptionFactory.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesTokenAirDrops": {
 			"source": "cadence/contracts/FixesTokenAirDrops.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesTokenLockDrops": {
 			"source": "cadence/contracts/FixesTokenLockDrops.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesTradablePool": {
 			"source": "cadence/contracts/FixesTradablePool.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesTraits": {
 			"source": "cadence/contracts/FixesTraits.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		},
 		"FungibleTokenManager": {
 			"source": "cadence/contracts/FungibleTokenManager.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "bc0eb933e82c2216"
+				"testnet": "b7248baa24a95c3f"
 			}
 		}
 	},
@@ -792,11 +792,11 @@
 			"address": "0e11cd1707e0843b",
 			"key": {
 				"type": "file",
-				"location": "testnet-admin.pkey"
+				"location": "testnet-admin-old.pkey"
 			}
 		},
 		"testnet-admin": {
-			"address": "bc0eb933e82c2216",
+			"address": "b7248baa24a95c3f",
 			"key": {
 				"type": "file",
 				"location": "testnet-admin-new.pkey"
