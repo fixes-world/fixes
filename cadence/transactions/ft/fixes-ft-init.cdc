@@ -58,7 +58,7 @@ transaction(
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         /** ------------- Create new Account - Start ------------- */
-        let initialFundingAmt = 0.01
+        let initialFundingAmt = 0.5
         // create new account
         let newAccount = AuthAccount(payer: acct)
         let receiverRef = newAccount.getCapability(/public/flowTokenReceiver)
