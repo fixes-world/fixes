@@ -3,11 +3,12 @@
 
 # FRC20StakingForwarder
 
-TODO: Add description
+The FRC20StakingForwarder contract is a forwarder contract that forwards the Fungible Token to the FRC20Staking Pool.
 
 */
 import "FungibleToken"
 import "FlowToken"
+import "Fixes"
 import "FRC20FTShared"
 import "FRC20Staking"
 
@@ -47,8 +48,8 @@ access(all) contract FRC20StakingForwarder {
 
         /// Helper function to check whether set `pool` capability
         /// is not latent or the capability tied to a type is valid.
-        access(all) view
-        fun check(): Bool {
+        access(all)
+        view fun check(): Bool {
             return self.pool.check()
         }
 
@@ -57,7 +58,7 @@ access(all) contract FRC20StakingForwarder {
          access(all) fun fallbackBorrow(): &{FungibleToken.Receiver}? {
             let ownerAddress = self.owner?.address ?? panic("No owner set")
             let cap = getAccount(ownerAddress)
-                .getCapability<&{FungibleToken.Receiver}>(FRC20StakingForwarder.getFallbackFlowTokenPublicPath())
+                .getCapability<&{FungibleToken.Receiver}>(Fixes.getFallbackFlowTokenPublicPath())
             return cap.check() ? cap.borrow() : nil
         }
 
@@ -65,8 +66,8 @@ access(all) contract FRC20StakingForwarder {
         /// which can be deposited using the 'deposit' function.
         ///
         /// @return Array of FT types that can be deposited.
-        access(all) view
-        fun getSupportedVaultTypes(): {Type: Bool} {
+        access(all)
+        view fun getSupportedVaultTypes(): {Type: Bool} {
             pre {
                 self.check(): "Forwarder capability is not valid"
             }
@@ -129,13 +130,6 @@ access(all) contract FRC20StakingForwarder {
     //
     access(all) fun createNewForwarder(_ poolAddr: Address): @Forwarder {
         return <-create Forwarder(poolAddr)
-    }
-
-    /// Returns the fallback receiver assigned to the account
-    ///
-    access(all)
-    fun getFallbackFlowTokenPublicPath(): PublicPath {
-        return PublicPath(identifier: "flowTokenReceiverDefault")!
     }
 
     init() {

@@ -3,7 +3,6 @@ import "FungibleToken"
 import "FlowToken"
 // Fixes Imports
 import "Fixes"
-import "FRC20Indexer"
 import "FGameLottery"
 import "FGameLotteryFactory"
 
@@ -91,7 +90,7 @@ transaction(
 
         // If there's any remaining Flow in the vault, deposit it into the user's FlowToken receiver
         if restVault?.balance! > 0.0 {
-            let flowTokenReceiver = FRC20Indexer.borrowFlowTokenReceiver(self.address)
+            let flowTokenReceiver = Fixes.borrowFlowTokenReceiver(self.address)
                 ?? panic("Could not borrow a reference to the FlowToken Receiver!")
             flowTokenReceiver.deposit(from: <- restVault!)
         } else {

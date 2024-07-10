@@ -35,20 +35,20 @@ access(all) contract FixesAvatar {
     /* --- Interfaces & Resources --- */
 
     access(all) resource interface ProfilePublic {
-        access(all) view
-        fun getProperty(_ name: String): String?
+        access(all)
+        view fun getProperty(_ name: String): String?
 
-        access(all) view
-        fun getEnabledTraits(): [MetadataViews.Trait]
+        access(all)
+        view fun getEnabledTraits(): [MetadataViews.Trait]
 
-        access(all) view
-        fun getOwnedTraitIDs(): [UInt64]
+        access(all)
+        view fun getOwnedTraitIDs(): [UInt64]
 
-        access(all) view
-        fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset?
+        access(all)
+        view fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset?
 
-        access(all) view
-        fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait?
+        access(all)
+        view fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait?
     }
 
     /// The resource that stores the metadata for this contract
@@ -86,19 +86,30 @@ access(all) contract FixesAvatar {
         ///
         access(account)
         fun onDeal(
-            storefront: Address,
-            listingId: UInt64,
             seller: Address,
             buyer: Address,
             tick: String,
             dealAmount: UFix64,
             dealPrice: UFix64,
-            totalAmountInListing: UFix64,
+            storefront: Address,
+            listingId: UInt64?,
         ) {
-            // For season 0, we only support the following tick
+            // For frc20, we only support the following tick
             // "flows", the default tick
             // "fixes", the tick for the FIXeS platform
-            if tick == "flows" || tick == "fixes" {
+            let availableTicks = [
+                FRC20FTShared.getPlatformStakingTickerName(),
+                FRC20FTShared.getPlatformUtilityTickerName()
+            ]
+            var isValidTrx = availableTicks.contains(tick)
+
+            // For Coins, all transactions from tradable pool are valid
+            if tick.length > 0 && tick[0] == "$" {
+                isValidTrx = seller == storefront || buyer == storefront
+            }
+
+            // Try to generate a random entry
+            if isValidTrx {
                 if let entry <- FixesTraits.attemptToGenerateRandomEntryForSeason0() {
                     log("Generated a random entry for season 0".concat(entry.uuid.toString()))
                     self.addTraitEntry(<- entry)
@@ -132,13 +143,13 @@ access(all) contract FixesAvatar {
 
         /// Get the property with the given name
         ///
-        access(all) view
-        fun getProperty(_ name: String): String? {
+        access(all)
+        view fun getProperty(_ name: String): String? {
             return self.properties[name]
         }
 
-        access(all) view
-        fun getEnabledTraits(): [MetadataViews.Trait] {
+        access(all)
+        view fun getEnabledTraits(): [MetadataViews.Trait] {
             let traits: [MetadataViews.Trait] = []
             for traitId in self.enabledEntities {
                 if let entry = self.borrowEntry(traitId) {
@@ -150,21 +161,21 @@ access(all) contract FixesAvatar {
             return traits
         }
 
-        access(all) view
-        fun getOwnedTraitIDs(): [UInt64] {
+        access(all)
+        view fun getOwnedTraitIDs(): [UInt64] {
             return self.ownedEntities.keys
         }
 
-        access(all) view
-        fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset? {
+        access(all)
+        view fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset? {
             if let entry = self.borrowEntry(id) {
                 return entry.getTrait()
             }
             return nil
         }
 
-        access(all) view
-        fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait? {
+        access(all)
+        view fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait? {
             if let entry = self.borrowEntry(id) {
                 return entry.resolveView(Type<MetadataViews.Trait>()) as! MetadataViews.Trait?
             }

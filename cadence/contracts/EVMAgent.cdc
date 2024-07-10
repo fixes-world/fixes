@@ -13,6 +13,7 @@ import "StringUtils"
 // Fixes Imports
 import "ETHUtils"
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20Indexer"
 import "FRC20Staking"
 import "FRC20AccountsPool"
@@ -63,13 +64,18 @@ access(all) contract EVMAgent {
     /* --- Interfaces & Resources --- */
 
     access(all) resource interface  IEntrustedStatus {
-        access(all) let key: String
+        access(all)
+        let key: String
+
         /// Borrow the agency capability
-        access(all) fun borrowAgency(): &Agency{AgencyPublic}
+        access(all)
+        fun borrowAgency(): &Agency{AgencyPublic}
         /// Get the flow spent by the entrusted account
-        access(all) view fun getFeeSpent(): UFix64
+        access(all)
+        view fun getFeeSpent(): UFix64
         /// Add the spent flow fee
-        access(contract) fun addSpentFlowFee(_ amount: UFix64)
+        access(contract)
+        fun addSpentFlowFee(_ amount: UFix64)
     }
 
     /// Entrusted status resource stored in the entrusted child account
@@ -97,7 +103,8 @@ access(all) contract EVMAgent {
         }
 
         /// Get the flow spent by the entrusted account
-        access(all) view fun getFeeSpent(): UFix64 {
+        access(all)
+        view fun getFeeSpent(): UFix64 {
             return self.feeSpent
         }
 
@@ -111,7 +118,8 @@ access(all) contract EVMAgent {
     ///
     access(all) resource AgencyManager {
         // Capability to the agency
-        access(self) let agency: Capability<&Agency{AgencyPublic, AgencyPrivate}>
+        access(self)
+        let agency: Capability<&Agency{AgencyPublic, AgencyPrivate}>
 
         init(
             _ agency: Capability<&Agency{AgencyPublic, AgencyPrivate}>
@@ -178,22 +186,22 @@ access(all) contract EVMAgent {
     ///
     access(all) resource interface AgencyPublic {
         /// Get the owner address
-        access(all) view
-        fun getOwnerAddress(): Address {
+        access(all)
+        view fun getOwnerAddress(): Address {
             return self.owner?.address ?? panic("Agency should have an owner")
         }
 
         // Check if the EVM address is managed by the agency
-        access(all) view
-        fun isEVMAccountManaged(_ evmAddress: String): Bool
+        access(all)
+        view fun isEVMAccountManaged(_ evmAddress: String): Bool
 
         /// Get the agency account
-        access(all) view
-        fun getDetails(): AgencyStatus
+        access(all)
+        view fun getDetails(): AgencyStatus
 
         /// Get the balance of the flow for the agency
-        access(all) view
-        fun getFlowBalance(): UFix64
+        access(all)
+        view fun getFlowBalance(): UFix64
 
         /// Create a new entrusted account by the agency
         access(all)
@@ -319,20 +327,20 @@ access(all) contract EVMAgent {
         /* --- Public methods  --- */
 
         // Check if the EVM address is managed by the agency
-        access(all) view
-        fun isEVMAccountManaged(_ evmAddress: String): Bool {
+        access(all)
+        view fun isEVMAccountManaged(_ evmAddress: String): Bool {
             return self.managedEntrustedAccounts[evmAddress] != nil
         }
 
         /// Get the agency account
-        access(all) view
-        fun getDetails(): AgencyStatus {
+        access(all)
+        view fun getDetails(): AgencyStatus {
             return self.status
         }
 
         /// Get the balance of the flow for the agency
-        access(all) view
-        fun getFlowBalance(): UFix64 {
+        access(all)
+        view fun getFlowBalance(): UFix64 {
             if let ref = getAccount(self.getOwnerAddress())
                 .getCapability(/public/flowTokenBalance)
                 .borrow<&FlowToken.Vault{FungibleToken.Balance}>() {
@@ -441,7 +449,7 @@ access(all) contract EVMAgent {
             timestamp: UInt64
         ): &AuthAccount {
             let message = "op=".concat(methodFingerprint)
-                .concat(",params=").concat(StringUtils.join(params, "|"))
+                .concat(",params=").concat(params.length > 0 ? StringUtils.join(params, "|") : "")
             return self._verifyAndBorrowEntrustedAccount(
                 message: message,
                 hexPublicKey: hexPublicKey,
@@ -586,8 +594,8 @@ access(all) contract EVMAgent {
     ///
     access(all) resource interface AgencyCenterPublic {
         /// Get the agencies
-        access(all) view
-        fun getAgencies(): [Address]
+        access(all)
+        view fun getAgencies(): [Address]
 
         /// Create a new agency
         access(all)
@@ -613,8 +621,8 @@ access(all) contract EVMAgent {
 
         /// Get the agencies
         ///
-        access(all) view
-        fun getAgencies(): [Address] {
+        access(all)
+        view fun getAgencies(): [Address] {
             return self.agencies.keys
         }
 
@@ -630,7 +638,7 @@ access(all) contract EVMAgent {
             let frc20Indexer = FRC20Indexer.getIndexer()
 
             // inscription data
-            let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
             assert(
                 op == "create-evm-agency",
@@ -656,7 +664,7 @@ access(all) contract EVMAgent {
             let addr = acct.address
 
             // extract the flow from the inscriptions and deposit to the agency
-            let flowReceiverRef = FRC20Indexer.borrowFlowTokenReceiver(addr)
+            let flowReceiverRef = Fixes.borrowFlowTokenReceiver(addr)
                 ?? panic("Could not borrow receiver reference to the recipient's Vault")
             flowReceiverRef.deposit(from: <- ins.extract())
 
@@ -719,15 +727,15 @@ access(all) contract EVMAgent {
 
     /* --- Public methods  --- */
 
-    access(all) view
-    fun getIdentifierPrefix(): String {
+    access(all)
+    view fun getIdentifierPrefix(): String {
         return "EVMAgency_".concat(self.account.address.toString())
     }
 
     /// Get the fee for any operation by the agency
     ///
-    access(all) view
-    fun getAgencyFlowFee(): UFix64 {
+    access(all)
+    view fun getAgencyFlowFee(): UFix64 {
         return 0.01
     }
 

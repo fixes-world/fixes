@@ -3,10 +3,11 @@
 
 # FRC20MarketManager
 
-TODO: Add description
+THe resource manager for the FRC20Marketplace contract.
 
 */
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesHeartbeat"
 import "FRC20FTShared"
 import "FRC20Indexer"
@@ -167,7 +168,7 @@ access(all) contract FRC20MarketManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "enable-market",

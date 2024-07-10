@@ -141,15 +141,15 @@ access(all) contract FRC20StakingVesting {
 
         /// Returns the tick name of remaining change
         ///
-        access(all) view
-        fun getVestingTick(): String {
+        access(all)
+        view fun getVestingTick(): String {
             return self.remaining.getOriginalTick()
         }
 
         /// Returns the vesting info
         ///
-        access(all) view
-        fun getVestingDetails(): VestingInfo {
+        access(all)
+        view fun getVestingDetails(): VestingInfo {
             return VestingInfo(
                 stakeTick: self.stakeTick,
                 rewardTick: self.getVestingTick(),
@@ -166,29 +166,29 @@ access(all) contract FRC20StakingVesting {
 
         /// Returns the amount of the change that is vested
         ///
-        access(all) view
-        fun getVestedAmount(): UFix64 {
+        access(all)
+        view fun getVestedAmount(): UFix64 {
             return self.initialAmount / UFix64(self.totalBatches) * UFix64(self.vestedBatchAmount)
         }
 
-        access(all) view
-        fun getNextVestableAmount(): UFix64 {
+        access(all)
+        view fun getNextVestableAmount(): UFix64 {
             return self.initialAmount / UFix64(self.totalBatches)
         }
 
-        access(all) view
-        fun getNextVestableTime(): UFix64 {
+        access(all)
+        view fun getNextVestableTime(): UFix64 {
             return self.lastVestedAt + self.interval
         }
 
-        access(all) view
-        fun isVestable(): Bool {
+        access(all)
+        view fun isVestable(): Bool {
             let now = getCurrentBlock().timestamp
             return self.getNextVestableTime() <= now
         }
 
-        access(all) view
-        fun isCompleted(): Bool {
+        access(all)
+        view fun isCompleted(): Bool {
             return self.vestedBatchAmount >= self.totalBatches || self.remaining.isEmpty()
         }
 
@@ -244,8 +244,8 @@ access(all) contract FRC20StakingVesting {
     ///
     access(all) resource interface VestingVaultPublic {
         /// Returns the vesting entries
-        access(all) view
-        fun getVestingEntries(): [VestingInfo]
+        access(all)
+        view fun getVestingEntries(): [VestingInfo]
 
         /// Add a vesting entry
         access(account)
@@ -275,8 +275,8 @@ access(all) contract FRC20StakingVesting {
         /** ---- Public Methods ---- */
 
         /// Returns the vesting entries
-        access(all) view
-        fun getVestingEntries(): [VestingInfo] {
+        access(all)
+        view fun getVestingEntries(): [VestingInfo] {
             let ret: [VestingInfo] = []
             var i = 0
             let len = self.entries.length

@@ -7,7 +7,7 @@ import "FRC20Indexer"
 access(all)
 fun main(): UFix64 {
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-    let stakingTokens = acctsPool.getFRC20Addresses(type: FRC20AccountsPool.ChildAccountType.Staking)
+    let stakingTokens = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.Staking)
 
     var totalTVL = 0.0
     let ticks = stakingTokens.keys

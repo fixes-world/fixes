@@ -1,5 +1,6 @@
 import "FungibleToken"
 import "FlowToken"
+import "stFlowToken"
 import "FRC20Indexer"
 
 access(all)
@@ -8,16 +9,33 @@ fun main(
     ticks: [String],
 ): {String: UFix64} {
     let indexer = FRC20Indexer.getIndexer()
-    let vaultRef = getAccount(addr)
-        .getCapability(/public/flowTokenBalance)
-        .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
-        ?? panic("Could not borrow Balance reference to the Vault")
     let ret: {String: UFix64} = {}
     for tick in ticks {
-        if tick != "" {
-            ret[tick] = indexer.getBalance(tick: tick, addr: addr)
+        if ret[tick] != nil {
+            continue
+        }
+        var bal = 0.0
+        if tick == "" {
+            if let flowRef = getAccount(addr)
+                .getCapability(/public/flowTokenBalance)
+                .borrow<&{FungibleToken.Balance}>()
+            {
+                bal = flowRef.balance
+            }
+            ret[""] = bal
+        } else if tick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
+            if let stFlowRef = getAccount(addr)
+                .getCapability(stFlowToken.tokenBalancePath)
+                .borrow<&{FungibleToken.Balance}>()
+            {
+                bal = stFlowRef.balance
+            }
+            ret["@"] = bal
         } else {
-            ret[""] = vaultRef.balance
+            if let tokenMeta = indexer.getTokenMeta(tick: tick) {
+                bal = indexer.getBalance(tick: tokenMeta.tick, addr: addr)
+            }
+            ret[tick] = bal
         }
     }
     return ret

@@ -44,15 +44,15 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Readonly Mehtods -----
 
-        access(all) view
-        fun getCommandType(): CommandType
-        access(all) view
-        fun verifyVoteCommands(): Bool
+        access(all)
+        view fun getCommandType(): CommandType
+        access(all)
+        view fun verifyVoteCommands(): Bool
 
         /// Check if all inscriptions are extracted.
         ///
-        access(all) view
-        fun isAllInscriptionsExtracted(): Bool {
+        access(all)
+        view fun isAllInscriptionsExtracted(): Bool {
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
             for insRef in insRefArr {
                 if !insRef.isExtracted() {
@@ -68,7 +68,7 @@ access(all) contract FRC20VoteCommands {
         ///
         access(account)
         fun refundFailedVoteCommands(receiver: Address): Bool {
-            let recieverRef = FRC20Indexer.borrowFlowTokenReceiver(receiver)
+            let recieverRef = Fixes.borrowFlowTokenReceiver(receiver)
             if recieverRef == nil {
                 return false
             }
@@ -120,13 +120,13 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.None
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             return true
         }
 
@@ -151,22 +151,21 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.SetBurnable
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = false
             isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil
             }
@@ -202,21 +201,20 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.BurnUnsupplied
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil
             }
@@ -252,21 +250,20 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.MoveTreasuryToLotteryJackpot
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "lottery" && meta["tick"] != nil && meta["amt"] != nil
             }
@@ -311,21 +308,20 @@ access(all) contract FRC20VoteCommands {
 
         // ----- Methods: Read -----
 
-        access(all) view
-        fun getCommandType(): CommandType {
+        access(all)
+        view fun getCommandType(): CommandType {
             return CommandType.MoveTreasuryToStakingReward
         }
 
-        access(all) view
-        fun verifyVoteCommands(): Bool {
+        access(all)
+        view fun verifyVoteCommands(): Bool {
             // Refs
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "staking"
                     && meta["tick"] != nil && meta["amt"] != nil
@@ -346,11 +342,11 @@ access(all) contract FRC20VoteCommands {
                 return false
             }
             let ins = insRefArr[0]
-            let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
 
             // singleton resources
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            let platformStakeTick = FRC20StakingManager.getPlatformStakingTickerName()
+            let platformStakeTick = FRC20FTShared.getPlatformStakingTickerName()
             let vestingBatch = UInt32.fromString(meta["batch"]!)
             let vestingInterval = UFix64.fromString(meta["interval"]!)
             if vestingBatch == nil || vestingInterval == nil {

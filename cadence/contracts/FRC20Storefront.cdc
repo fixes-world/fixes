@@ -11,6 +11,7 @@ import "FungibleToken"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20AccountsPool"
@@ -199,40 +200,40 @@ access(all) contract FRC20Storefront {
 
         /// Get the price per token
         ///
-        access(all) view
-        fun pricePerToken(): UFix64 {
+        access(all)
+        view fun pricePerToken(): UFix64 {
             return self.totalPrice / self.amount
         }
 
         /// Get the price rank
-        access(all) view
-        fun priceRank(): UInt64 {
+        access(all)
+        view fun priceRank(): UInt64 {
             return UInt64(100000.0 / self.amount * self.totalPrice)
         }
 
         /// Return if the listing is completed.
         ///
-        access(all) view
-        fun isCompleted(): Bool {
+        access(all)
+        view fun isCompleted(): Bool {
             return self.status == ListingStatus.Completed
         }
 
         /// Return if the listing is cancelled.
         ///
-        access(all) view
-        fun isCancelled(): Bool {
+        access(all)
+        view fun isCancelled(): Bool {
             return self.status == ListingStatus.Cancelled
         }
 
         /// Return if the listing is fully transacted.
         ///
-        access(all) view
-        fun isFullyTransacted(): Bool {
+        access(all)
+        view fun isFullyTransacted(): Bool {
             return self.transactedAmount == self.amount
         }
 
-        access(all) view
-        fun getPriceByTransactedAmount(_ transactedAmount: UFix64): UFix64 {
+        access(all)
+        view fun getPriceByTransactedAmount(_ transactedAmount: UFix64): UFix64 {
             pre {
                 transactedAmount <= self.amount: "Transacted amount should not exceed the total amount"
             }
@@ -285,29 +286,29 @@ access(all) contract FRC20Storefront {
         /** ---- Public Methods ---- */
 
         /// Get the address of the owner of the NFT that is being sold.
-        access(all) view
-        fun getOwnerAddress(): Address
+        access(all)
+        view fun getOwnerAddress(): Address
 
         /// The listing frc20 token name
-        access(all) view
-        fun getTickName(): String
+        access(all)
+        view fun getTickName(): String
 
         /// Borrow the listing token Meta for the selling FRC20 token
-        access(all) view
-        fun getTickMeta(): FRC20Indexer.FRC20Meta
+        access(all)
+        view fun getTickMeta(): FRC20Indexer.FRC20Meta
 
         /// Fetches the details of the listing.
-        access(all) view
-        fun getDetails(): ListingDetails
+        access(all)
+        view fun getDetails(): ListingDetails
 
         /// Fetches the status
-        access(all) view
-        fun getStatus(): ListingStatus
+        access(all)
+        view fun getStatus(): ListingStatus
 
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
-        access(all) view
-        fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
+        access(all)
+        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
 
         /// Purchase the listing, buying the token.
         /// This pays the beneficiaries and returns the token to the buyer.
@@ -364,7 +365,7 @@ access(all) contract FRC20Storefront {
             // Analyze the listing inscription and build the details
             let indexer = FRC20Indexer.getIndexer()
             // find the op first
-            let meta = indexer.parseMetadata(&listIns.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&listIns.getData() as &Fixes.InscriptionData)
             let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
 
             var order: @FRC20FTShared.ValidFrozenOrder? <- nil
@@ -418,22 +419,22 @@ access(all) contract FRC20Storefront {
         /// getOwnerAddress
         /// Fetches the address of the owner of the NFT that is being sold.
         ///
-        access(all) view
-        fun getOwnerAddress(): Address {
+        access(all)
+        view fun getOwnerAddress(): Address {
             return self.owner?.address ?? panic("Get owner address failed")
         }
 
         /// The listing frc20 token name
         ///
-        access(all) view
-        fun getTickName(): String {
+        access(all)
+        view fun getTickName(): String {
             return self.details.tick
         }
 
         /// borrow the Token Meta for the selling FRC20 token
         ///
-        access(all) view
-        fun getTickMeta(): FRC20Indexer.FRC20Meta {
+        access(all)
+        view fun getTickMeta(): FRC20Indexer.FRC20Meta {
             let indexer = FRC20Indexer.getIndexer()
             return indexer.getTokenMeta(tick: self.details.tick)
                 ?? panic("Unable to fetch the token meta")
@@ -441,23 +442,23 @@ access(all) contract FRC20Storefront {
 
         /// Fetches the status
         ///
-        access(all) view
-        fun getStatus(): ListingStatus {
+        access(all)
+        view fun getStatus(): ListingStatus {
             return self.details.status
         }
 
         /// Get the details of listing.
         ///
-        access(all) view
-        fun getDetails(): ListingDetails {
+        access(all)
+        view fun getDetails(): ListingDetails {
             return self.details
         }
 
         /// getAllowedCommissionReceivers
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
-        access(all) view
-        fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]? {
+        access(all)
+        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]? {
             return self.commissionRecipientCaps
         }
 
@@ -558,7 +559,7 @@ access(all) contract FRC20Storefront {
                 // If there is residual change, pay to the buyer
                 let residualVault <- extractedFlowChange.extractAsVault()
                 destroy extractedFlowChange
-                let buyerVault = FRC20Indexer.borrowFlowTokenReceiver(buyer)
+                let buyerVault = Fixes.borrowFlowTokenReceiver(buyer)
                     ?? panic("Unable to fetch the buyer vault")
                 buyerVault.deposit(from: <- residualVault)
             } else {
@@ -650,7 +651,7 @@ access(all) contract FRC20Storefront {
 
             let transactedPrice = payment.balance
             // The payment vault for the sale is from the taker's address
-            let paymentRecipient = FRC20Indexer.borrowFlowTokenReceiver(seller)
+            let paymentRecipient = Fixes.borrowFlowTokenReceiver(seller)
                 ?? panic("Unable to fetch the payment recipient")
 
             // Pay the sale cuts to the recipients.
@@ -697,40 +698,37 @@ access(all) contract FRC20Storefront {
             let marketAddress = acctsPool.getFRC20MarketAddress(tick: tickName) ?? panic("Unable to fetch the marketplace address")
             if let marketTransactionHook = FRC20FTShared.borrowTransactionHook(marketAddress) {
                 marketTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
                     seller: seller,
                     buyer: buyer,
                     tick: tickName,
                     dealAmount: transactedAmt,
                     dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
                 )
             }
             // for seller hook
             if let sellerTransactionHook = FRC20FTShared.borrowTransactionHook(seller) {
                 sellerTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
                     seller: seller,
                     buyer: buyer,
                     tick: tickName,
                     dealAmount: transactedAmt,
                     dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
                 )
             }
             // for buyer hook
             if let buyerTransactionHook = FRC20FTShared.borrowTransactionHook(buyer) {
                 buyerTransactionHook.onDeal(
-                    storefront: storefrontAddress,
-                    listingId: self.details.storefrontId,
                     seller: seller,
                     buyer: buyer,
                     tick: tickName,
                     dealAmount: transactedAmt,
                     dealPrice: transactedPrice,
-                    totalAmountInListing: self.details.amount,
+                    storefront: storefrontAddress,
+                    listingId: self.details.storefrontId,
                 )
             }
             // ------- end ---------------------------------
@@ -849,7 +847,7 @@ access(all) contract FRC20Storefront {
             let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
 
             // some constants
-            let stakingFRC20Tick = (globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?) ?? "flows"
+            let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
             let listingTick = self.details.tick
             let listingTokenMeta = frc20Indexer.getTokenMeta(tick: listingTick)
                 ?? panic("Unable to fetch the token meta")
@@ -893,7 +891,7 @@ access(all) contract FRC20Storefront {
             }
 
             let payToDeployer = fun (_ payment: @FungibleToken.Vault) {
-                if let flowVault = FRC20Indexer.borrowFlowTokenReceiver(listingTokenMeta.deployer) {
+                if let flowVault = Fixes.borrowFlowTokenReceiver(listingTokenMeta.deployer) {
                     flowVault.deposit(from: <- payment)
                 } else {
                     // if the deployer pool doesn't exist, pay to token treasury
@@ -1315,7 +1313,7 @@ access(all) contract FRC20Storefront {
         if !indexer.isValidFRC20Inscription(ins: ins) {
             return false
         }
-        let meta = indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower()
         if op == nil || op!.slice(from: 0, upTo: 5) != "list-" {
             return false

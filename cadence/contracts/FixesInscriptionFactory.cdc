@@ -6,19 +6,44 @@
 This contract is a helper factory contract to create Fixes Inscriptions.
 
 */
-
+import "StringUtils"
 import "FlowToken"
 // Fixes Imports
 import "Fixes"
 
 access(all) contract FixesInscriptionFactory {
 
-    /* --- General Private Methods --- */
+    /* --- General Utility Methods --- */
+
+    /// Parse the metadata of a FRC20 inscription
+    ///
+    access(all)
+    view fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
+        let ret: {String: String} = {}
+        if data.encoding != nil && data.encoding != "utf8" {
+            panic("The inscription is not encoded in utf8")
+        }
+        // parse the body
+        if let body = String.fromUTF8(data.metadata) {
+            // split the pairs
+            let pairs = StringUtils.split(body, ",")
+            for pair in pairs {
+                // split the key and value
+                let kv = StringUtils.split(pair, "=")
+                if kv.length == 2 {
+                    ret[kv[0]] = kv[1]
+                }
+            }
+        } else {
+            panic("The inscription is not encoded in utf8")
+        }
+        return ret
+    }
 
     /// Estimate inscribing cost
     ///
-    access(all) view
-    fun estimateFrc20InsribeCost(
+    access(all)
+    view fun estimateFrc20InsribeCost(
         _ dataStr: String
     ): UFix64 {
         // estimate the required storage
@@ -33,8 +58,8 @@ access(all) contract FixesInscriptionFactory {
 
     /// This is the general factory method to create a fixes inscription
     ///
-    access(all) view
-    fun createFrc20Inscription(
+    access(all)
+    view fun createFrc20Inscription(
         _ dataStr: String,
         _ costReserve: @FlowToken.Vault
     ): @Fixes.Inscription {
@@ -80,24 +105,24 @@ access(all) contract FixesInscriptionFactory {
 
     // Basic FRC20 Inscription
 
-    access(all) view
-    fun buildMintFRC20(
+    access(all)
+    view fun buildMintFRC20(
         tick: String,
         amt: UFix64,
     ): String {
         return "op=mint,tick=".concat(tick).concat(",amt=").concat(amt.toString())
     }
 
-    access(all) view
-    fun buildBurnFRC20(
+    access(all)
+    view fun buildBurnFRC20(
         tick: String,
         amt: UFix64,
     ): String {
         return "op=burn,tick=".concat(tick).concat(",amt=").concat(amt.toString())
     }
 
-    access(all) view
-    fun buildDeployFRC20(
+    access(all)
+    view fun buildDeployFRC20(
         tick: String,
         max: UFix64,
         limit: UFix64,
@@ -109,8 +134,8 @@ access(all) contract FixesInscriptionFactory {
             .concat(",burnable=").concat(burnable ? "1" : "0")
     }
 
-    access(all) view
-    fun buildTransferFRC20(
+    access(all)
+    view fun buildTransferFRC20(
         tick: String,
         to: Address,
         amt: UFix64,
@@ -122,15 +147,15 @@ access(all) contract FixesInscriptionFactory {
 
     // Market FRC20 Inscription
 
-    access(all) view
-    fun buildMarketEnable(
+    access(all)
+    view fun buildMarketEnable(
         tick: String,
     ): String {
         return "op=enable-market,tick=".concat(tick)
     }
 
-    access(all) view
-    fun buildMarketListBuyNow(
+    access(all)
+    view fun buildMarketListBuyNow(
         tick: String,
         amount: UFix64,
         price: UFix64,
@@ -140,8 +165,8 @@ access(all) contract FixesInscriptionFactory {
             .concat(",price=").concat(price.toString())
     }
 
-    access(all) view
-    fun buildMarketListSellNow(
+    access(all)
+    view fun buildMarketListSellNow(
         tick: String,
         amount: UFix64,
         price: UFix64,
@@ -151,8 +176,8 @@ access(all) contract FixesInscriptionFactory {
             .concat(",price=").concat(price.toString())
     }
 
-    access(all) view
-    fun buildMarketTakeBuyNow(
+    access(all)
+    view fun buildMarketTakeBuyNow(
         tick: String,
         amount: UFix64,
     ): String {
@@ -160,8 +185,8 @@ access(all) contract FixesInscriptionFactory {
             .concat(",amt=").concat(amount.toString())
     }
 
-    access(all) view
-    fun buildMarketTakeSellNow(
+    access(all)
+    view fun buildMarketTakeSellNow(
         tick: String,
         amount: UFix64,
     ): String {
@@ -171,8 +196,8 @@ access(all) contract FixesInscriptionFactory {
 
     // Staking FRC20 Inscription
 
-    access(all) view
-    fun buildStakeDonate(
+    access(all)
+    view fun buildStakeDonate(
         tick: String?,
         amount: UFix64?,
     ): String {
@@ -185,18 +210,27 @@ access(all) contract FixesInscriptionFactory {
         return dataStr
     }
 
-    access(all) view
-    fun buildStakeWithdraw(
+    access(all)
+    view fun buildStakeWithdraw(
         tick: String,
         amount: UFix64,
     ): String {
-        return "op=withdraw,tick=".concat(tick)
-            .concat(",amt=").concat(amount.toString())
-            .concat(",usage=staking")
+        return self.buildWithdraw(tick: tick, amount: amount, usage: "staking")
     }
 
-    access(all) view
-    fun buildStakeDeposit(
+    access(all)
+    view fun buildWithdraw(
+        tick: String,
+        amount: UFix64,
+        usage: String,
+    ): String {
+        return "op=withdraw,tick=".concat(tick)
+            .concat(",amt=").concat(amount.toString())
+            .concat(",usage=").concat(usage)
+    }
+
+    access(all)
+    view fun buildDeposit(
         tick: String,
     ): String {
         return "op=deposit,tick=".concat(tick)
@@ -204,8 +238,8 @@ access(all) contract FixesInscriptionFactory {
 
     // EVM Agency Inscription
 
-    access(all) view
-    fun buildEvmAgencyCreate(
+    access(all)
+    view fun buildEvmAgencyCreate(
         tick: String,
     ): String {
         return "op=create-evm-agency,tick=".concat(tick)
@@ -215,8 +249,8 @@ access(all) contract FixesInscriptionFactory {
 
     /// The cost of this lottery pool is $FIXES
     ///
-    access(all) view
-    fun estimateLotteryFIXESTicketsCost(
+    access(all)
+    view fun estimateLotteryFIXESTicketsCost(
         _ ticketAmount: UInt64,
         _ powerup: UFix64?
     ): UFix64 {
@@ -230,23 +264,21 @@ access(all) contract FixesInscriptionFactory {
 
     /// Build the inscription for lottery $FIXES tickets buying
     ///
-    access(all) view
-    fun buildLotteryBuyFIXESTickets(
+    access(all)
+    view fun buildLotteryBuyFIXESTickets(
         _ ticketAmount: UInt64,
         _ powerup: UFix64?
     ): String {
         let amount = self.estimateLotteryFIXESTicketsCost(ticketAmount, powerup)
-        return "op=withdraw,tick=fixes"
-            .concat(",amt=").concat(amount.toString())
-            .concat(",usage=lottery")
+        return self.buildWithdraw(tick: "fixes", amount: amount, usage: "lottery")
     }
 
     // FRC20 Voting Commands
 
     /// Build the inscription for voting command to set the burnable status of a FRC20 token
     ///
-    access(all) view
-    fun buildVoteCommandSetBurnable(
+    access(all)
+    view fun buildVoteCommandSetBurnable(
         tick: String,
         burnable: Bool,
     ): String {
@@ -256,8 +288,8 @@ access(all) contract FixesInscriptionFactory {
 
     /// Build the inscription for voting command to burn unsupplied tokens of a FRC20 token
     ///
-    access(all) view
-    fun buildVoteCommandBurnUnsupplied(
+    access(all)
+    view fun buildVoteCommandBurnUnsupplied(
         tick: String,
         percent: UFix64,
     ): String {
@@ -267,8 +299,8 @@ access(all) contract FixesInscriptionFactory {
 
     /// Build the inscription for voting command to move treasury to lottery jackpot
     ///
-    access(all) view
-    fun buildVoteCommandMoveTreasuryToLotteryJackpot(
+    access(all)
+    view fun buildVoteCommandMoveTreasuryToLotteryJackpot(
         tick: String,
         amount: UFix64,
     ): String {
@@ -278,8 +310,8 @@ access(all) contract FixesInscriptionFactory {
 
     /// Build the inscription for voting command to move treasury to staking
     ///
-    access(all) view
-    fun buildVoteCommandMoveTreasuryToStaking(
+    access(all)
+    view fun buildVoteCommandMoveTreasuryToStaking(
         tick: String,
         amount: UFix64,
         vestingBatchAmount: UInt32,
@@ -289,5 +321,33 @@ access(all) contract FixesInscriptionFactory {
             .concat(",amt=").concat(amount.toString())
             .concat(",batch=").concat(vestingBatchAmount.toString())
             .concat(",interval=").concat(vestingInterval.toString())
+    }
+
+    // FRC20 Fungible Token Inscription
+
+    /// Build the inscription for converting fungible token to indexer
+    ///
+    access(all)
+    view fun buildFungibleTokenConvertFromIndexer(
+        tick: String,
+        amount: UFix64,
+    ): String {
+        return self.buildWithdraw(tick: tick, amount: amount, usage: "convert")
+    }
+
+    /// Build the inscription for pure executing methods
+    ///
+    access(all)
+    view fun buildPureExecuting(
+        tick: String,
+        usage: String?,
+        _ extraFields: {String: String},
+    ): String {
+        var str = "op=exec,tick=".concat(tick)
+            .concat(",usage=".concat(usage ?? "*"))
+        for key in extraFields.keys {
+            str = str.concat(",").concat(key).concat("=").concat(extraFields[key]!)
+        }
+        return str
     }
 }

@@ -3,7 +3,10 @@
 
 # FixesHeartbeat
 
-TODO: Add description
+The `FixesHeartbeat` contract is a contract that provides a heartbeat mechanism for the Flow blockchain.
+It allows developers to add hooks to the contract and execute them periodically.
+The contract is designed to be simple and easy to use.
+It is suitable for various use cases, such as updating the contract state, sending notifications, and more.
 
 */
 
@@ -63,9 +66,14 @@ access(all) contract FixesHeartbeat {
         ///
         access(all)
         fun tick(scope: String) {
-            pre {
-                FixesHeartbeat.heartbeatScopes[scope] != nil: "The scope does not exist"
+            // Check if the scope exists
+            if FixesHeartbeat.heartbeatScopes[scope] == nil {
+                log("The scope does not exist: ".concat(scope))
+                return
+            } else {
+                log("Ticking Heartbeart for scope: ".concat(scope))
             }
+
             if let hooks = FixesHeartbeat.borrowHooksDictRef(scope: scope) {
                 let now = getCurrentBlock().timestamp
                 let lastHeartbeatTime = FixesHeartbeat.lastHeartbeatTime[scope] ?? (now - FixesHeartbeat.heartbeatMinInterval)
@@ -78,7 +86,7 @@ access(all) contract FixesHeartbeat {
                 // iterate all the hooks
                 for hookAddr in hooks.keys {
                     if let hookRef = getAccount(hookAddr)
-                        .getCapability<&AnyResource{IHeartbeatHook}>(hooks[hookAddr]!)
+                        .getCapability<&{IHeartbeatHook}>(hooks[hookAddr]!)
                         .borrow()
                     {
                         hookRef.onHeartbeat(deltaTime)

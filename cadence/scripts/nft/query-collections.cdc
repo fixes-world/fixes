@@ -36,11 +36,11 @@ fun main(
     let ret: {String: MetadataViews.NFTCollectionDisplay} = {}
     acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
         if type.isSubtype(of: Type<@NonFungibleToken.Collection>()) && !ignoreCollections.contains(type) {
-            let valid = acct.check<@AnyResource{MetadataViews.ResolverCollection}>(from: path)
+            let valid = acct.check<@{MetadataViews.ResolverCollection}>(from: path)
             if !valid {
                 // hack for FreeFlow Inscription
-                if acct.check<@AnyResource{InscriptionMetadata.ResolverCollection}>(from: path) {
-                    let ref = acct.borrow<&AnyResource{InscriptionMetadata.ResolverCollection}>(from: path)!
+                if acct.check<@{InscriptionMetadata.ResolverCollection}>(from: path) {
+                    let ref = acct.borrow<&{InscriptionMetadata.ResolverCollection}>(from: path)!
                     let nftIds = ref.getIDs()
                     if nftIds.length == 0 {
                         return true
@@ -56,7 +56,7 @@ fun main(
                 }
                 return true
             }
-            let ref = acct.borrow<&AnyResource{MetadataViews.ResolverCollection}>(from: path)!
+            let ref = acct.borrow<&{MetadataViews.ResolverCollection}>(from: path)!
             let nftIds = ref.getIDs()
             if nftIds.length == 0 {
                 return true

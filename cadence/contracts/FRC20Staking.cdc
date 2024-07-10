@@ -93,17 +93,17 @@ access(all) contract FRC20Staking {
         let tick: String
 
         /// Returns the details of the staking pool
-        access(all) view
-        fun getDetails(): StakingInfo
+        access(all)
+        view fun getDetails(): StakingInfo
 
         /** ---- Rewards ---- */
         /// Returns the reward strategy names
-        access(all) view
-        fun getRewardNames(): [String]
+        access(all)
+        view fun getRewardNames(): [String]
 
         /// Returns the reward details of the given name
-        access(all) view
-        fun getRewardDetails(_ rewardTick: String): RewardDetails?
+        access(all)
+        view fun getRewardDetails(_ rewardTick: String): RewardDetails?
 
         /** -- Rewards: Account Level Methods -- */
 
@@ -118,12 +118,12 @@ access(all) contract FRC20Staking {
         /** ---- Delegators ---- */
 
         /// Returns the delegators of this staking pool
-        access(all) view
-        fun getDelegators(): [Address]
+        access(all)
+        view fun getDelegators(): [Address]
 
         /// Returns the delegator unstaking info
-        access(all) view
-        fun getDelegatorUnstakingInfo(_ delegator: Address): DelegatorUnstakingInfo?
+        access(all)
+        view fun getDelegatorUnstakingInfo(_ delegator: Address): DelegatorUnstakingInfo?
 
         /** -- Delegators: Account Level Methods -- */
 
@@ -220,8 +220,8 @@ access(all) contract FRC20Staking {
 
         /// Returns the details of the staking pool
         ///
-        access(all) view
-        fun getDetails(): StakingInfo {
+        access(all)
+        view fun getDetails(): StakingInfo {
             let totalStakedRef = self.borrowTotalStaked()
             return StakingInfo(
                 tick: self.tick,
@@ -234,15 +234,15 @@ access(all) contract FRC20Staking {
 
         /// Returns the reward strategy names
         ///
-        access(all) view
-        fun getRewardNames(): [String] {
+        access(all)
+        view fun getRewardNames(): [String] {
             return self.rewards.keys
         }
 
         /// Returns the reward details of the given tick name
         ///
-        access(all) view
-        fun getRewardDetails(_ rewardTick: String): RewardDetails? {
+        access(all)
+        view fun getRewardDetails(_ rewardTick: String): RewardDetails? {
             if let reward = self.borrowRewardStrategy(rewardTick) {
                 return RewardDetails(
                     stakeTick: reward.stakeTick,
@@ -257,15 +257,15 @@ access(all) contract FRC20Staking {
 
         /// Returns the delegators of this staking pool
         ///
-        access(all) view
-        fun getDelegators(): [Address] {
+        access(all)
+        view fun getDelegators(): [Address] {
             return self.delegators.keys
         }
 
         /// Returns the delegator unstaking info
         ///
-        access(all) view
-        fun getDelegatorUnstakingInfo(_ delegator: Address): DelegatorUnstakingInfo? {
+        access(all)
+        view fun getDelegatorUnstakingInfo(_ delegator: Address): DelegatorUnstakingInfo? {
             if let delegatorRecordRef = self.borrowDelegatorRecord(delegator) {
                 return delegatorRecordRef.getDetails()
             }
@@ -319,10 +319,8 @@ access(all) contract FRC20Staking {
             )
 
             // update staked change
-            FRC20FTShared.depositToChange(
-                receiver: self.borrowTotalStaked(),
-                change: <- change
-            )
+            let totalStakeRef = self.borrowTotalStaked()
+            totalStakeRef.forceMerge(from: <- change)
 
             // update staked change for delegator
             let delegatorRef = delegatorRecordRef.borrowDelegatorRef()
@@ -726,10 +724,7 @@ access(all) contract FRC20Staking {
                         // merge to ret change
                         let amount = unwrappedChange.getBalance()
                         // deposit to change
-                        FRC20FTShared.depositToChange(
-                            receiver: retRef,
-                            change: <- unwrappedChange
-                        )
+                        retRef.forceMerge(from: <- unwrappedChange)
 
                         // emit event
                         emit DelegatorUnStakingUnlocked(
@@ -899,10 +894,7 @@ access(all) contract FRC20Staking {
 
                 if newAddedYieldRate > 0.0 {
                     // add to total reward
-                    FRC20FTShared.depositToChange(
-                        receiver: self.borrowRewardRef(),
-                        change: <- income
-                    )
+                    self.totalReward.forceMerge(from: <- income)
 
                     // emit event
                     emit RewardIncomeAdded(
@@ -921,10 +913,8 @@ access(all) contract FRC20Staking {
                         from: poolAddr
                     )
                     // Deposit pool address for accumulating enough values
-                    FRC20FTShared.depositToChange(
-                        receiver: &newChange as &FRC20FTShared.Change,
-                        change: <- income
-                    )
+                    newChange.forceMerge(from: <- income)
+
                     let indexer = FRC20Indexer.getIndexer()
                     // deposit change to indexer
                     indexer.returnChange(change: <- newChange)
@@ -1009,10 +999,8 @@ access(all) contract FRC20Staking {
             )
 
             // Deposit the reward to delegatorRewardChange's change
-            FRC20FTShared.depositToChange(
-                receiver: &delegatorRewardChange as &FRC20FTShared.Change,
-                change: <- withdrawnChange
-            )
+            delegatorRewardChange.forceMerge(from: <- withdrawnChange)
+
             // return the change
             return <- delegatorRewardChange
         }
@@ -1036,12 +1024,12 @@ access(all) contract FRC20Staking {
         /** ---- Public methods ---- */
 
         /// Get the staked frc20 token balance of the delegator
-        access(all) view
-        fun getStakedBalance(tick: String): UFix64
+        access(all)
+        view fun getStakedBalance(tick: String): UFix64
 
         /// Get the staked frc20 Semi-NFTs of the delegator
-        access(all) view
-        fun getStakedNFTIds(tick: String): [UInt64]
+        access(all)
+        view fun getStakedNFTIds(tick: String): [UInt64]
 
         /** ---- Contract level methods ---- */
 
@@ -1080,16 +1068,16 @@ access(all) contract FRC20Staking {
 
         /// Get the staked frc20 token balance of the delegator
         ///
-        access(all) view
-        fun getStakedBalance(tick: String): UFix64 {
+        access(all)
+        view fun getStakedBalance(tick: String): UFix64 {
             let colRef = self.borrowSemiNFTCollection()
             return colRef.getStakedBalance(tick: tick)
         }
 
         /// Get the staked frc20 Semi-NFTs of the delegator
         ///
-        access(all) view
-        fun getStakedNFTIds(tick: String): [UInt64] {
+        access(all)
+        view fun getStakedNFTIds(tick: String): [UInt64] {
             let colRef = self.borrowSemiNFTCollection()
             return colRef.getIDsByTick(tick: tick)
         }

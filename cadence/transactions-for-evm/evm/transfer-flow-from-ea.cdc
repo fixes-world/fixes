@@ -11,7 +11,7 @@ transaction(
     timestamp: UInt64,
 ) {
     let sender: &FlowToken.Vault{FungibleToken.Provider}
-    let recipient: &AnyResource{FungibleToken.Receiver}
+    let recipient: &{FungibleToken.Receiver}
 
     prepare(acct: AuthAccount) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
@@ -31,7 +31,7 @@ transaction(
             ?? panic("Could not borrow a reference to the sender's vault!")
 
         self.recipient = getAccount(to).getCapability(/public/flowTokenReceiver)
-                .borrow<&AnyResource{FungibleToken.Receiver}>()
+                .borrow<&{FungibleToken.Receiver}>()
                 ?? panic("Could not borrow receiver reference to the recipient's Vault")
     }
 

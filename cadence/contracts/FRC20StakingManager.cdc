@@ -13,6 +13,7 @@ import "NonFungibleToken"
 import "MetadataViews"
 // Fixes Imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FixesHeartbeat"
 import "FRC20Indexer"
 import "FRC20FTShared"
@@ -52,8 +53,8 @@ access(all) contract FRC20StakingManager {
     /// Staking Admin Public Resource interface
     ///
     access(all) resource interface StakingAdminPublic {
-        access(all) view
-        fun isWhitelisted(address: Address): Bool
+        access(all)
+        view fun isWhitelisted(address: Address): Bool
     }
 
     /// Staking Admin Resource, represents a staking admin and store in admin's account
@@ -66,8 +67,8 @@ access(all) contract FRC20StakingManager {
             self.whitelist = {}
         }
 
-        access(all) view
-        fun isWhitelisted(address: Address): Bool {
+        access(all)
+        view fun isWhitelisted(address: Address): Bool {
             return self.whitelist[address] ?? false
         }
 
@@ -450,7 +451,7 @@ access(all) contract FRC20StakingManager {
             // Link the new forwarding receiver capability
             childAcctRef.link<&{FungibleToken.Receiver}>(flowReceiverPath, target: FRC20StakingForwarder.StakingForwarderStoragePath)
             // link the FlowToken to the forwarder fallback path
-            let fallbackPath = FRC20StakingForwarder.getFallbackFlowTokenPublicPath()
+            let fallbackPath = Fixes.getFallbackFlowTokenPublicPath()
             childAcctRef.unlink(fallbackPath)
             childAcctRef.link<&FlowToken.Vault{FungibleToken.Receiver, FungibleToken.Balance}>(fallbackPath, target: /storage/flowTokenVault)
 
@@ -463,8 +464,8 @@ access(all) contract FRC20StakingManager {
 
     /// Check if the given address is whitelisted
     ///
-    access(all) view
-    fun isWhitelisted(_ address: Address): Bool {
+    access(all)
+    view fun isWhitelisted(_ address: Address): Bool {
         if address == self.account.address {
             return true
         }
@@ -477,8 +478,8 @@ access(all) contract FRC20StakingManager {
 
     /// Check if the given address is eligible for registering
     ///
-    access(all) view
-    fun isEligibleForRegistering(stakeTick: String, addr: Address): Bool {
+    access(all)
+    view fun isEligibleForRegistering(stakeTick: String, addr: Address): Bool {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         // Get the staking pool address
@@ -487,15 +488,23 @@ access(all) contract FRC20StakingManager {
         // borrow the staking pool
         let pool = FRC20Staking.borrowPool(poolAddress)
             ?? panic("The staking pool is not found")
+        let totalStakedBalance = pool.getDetails().totalStaked
+                // if the controller staked more than 10% of the total staked tokens, then it is valid
+        return self.isEligibleByStakePower(stakeTick: stakeTick, addr: addr, threshold: totalStakedBalance * 0.1)
+    }
+
+    /// Check if the given address is eligible by stake power
+    ///
+    access(all)
+    view fun isEligibleByStakePower(stakeTick: String, addr: Address, threshold: UFix64): Bool {
         // Check if the controller is whitelisted or staked enough tokens
         var isValid = self.isWhitelisted(addr)
         // Check if the controller is staked enough tokens
         if !isValid {
             if let delegator = FRC20Staking.borrowDelegator(addr) {
-                let totalStakedBalance = pool.getDetails().totalStaked
                 let controllerStakedBalance = delegator.getStakedBalance(tick: stakeTick)
                 // if the controller staked more than 10% of the total staked tokens, then it is valid
-                isValid = controllerStakedBalance >= totalStakedBalance * 0.1
+                isValid = controllerStakedBalance >= threshold
             }
         }
         return isValid
@@ -510,15 +519,6 @@ access(all) contract FRC20StakingManager {
 
     /** ---- Public Methods - User ---- */
 
-    /// Get the staking ticker name.
-    ///
-    access(all) view
-    fun getPlatformStakingTickerName(): String {
-        let globalSharedStore = FRC20FTShared.borrowGlobalStoreRef()
-        let stakingToken = globalSharedStore.getByEnum(FRC20FTShared.ConfigType.PlatofrmMarketplaceStakingToken) as! String?
-        return stakingToken ?? "flows"
-    }
-
     /// Borrow the platform staking pool.
     ///
     access(all)
@@ -526,7 +526,7 @@ access(all) contract FRC20StakingManager {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         // Get the staking pool address
-        let stakeTick = self.getPlatformStakingTickerName()
+        let stakeTick = FRC20FTShared.getPlatformStakingTickerName()
         let poolAddress = acctsPool.getFRC20StakingAddress(tick: stakeTick)
             ?? panic("The staking pool is not enabled")
         // borrow the staking pool
@@ -542,7 +542,7 @@ access(all) contract FRC20StakingManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "withdraw",
@@ -617,7 +617,7 @@ access(all) contract FRC20StakingManager {
         )
 
         // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "deposit",
@@ -762,7 +762,7 @@ access(all) contract FRC20StakingManager {
             ?? panic("The staking pool is not found")
 
         // inscription data
-        let meta = frc20Indexer.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "withdraw",

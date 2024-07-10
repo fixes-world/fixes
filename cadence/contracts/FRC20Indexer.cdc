@@ -7,13 +7,13 @@ This the main contract of FRC20, it is used to deploy and manage the FRC20 token
 
 */
 // Third-party imports
-import "StringUtils"
 import "MetadataViews"
 import "FungibleToken"
 import "FungibleTokenMetadataViews"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
+import "FixesInscriptionFactory"
 import "FRC20FTShared"
 
 access(all) contract FRC20Indexer {
@@ -101,45 +101,45 @@ access(all) contract FRC20Indexer {
     access(all) resource interface IndexerPublic {
         /* --- read-only --- */
         /// Get all the tokens
-        access(all) view
-        fun getTokens(): [String]
+        access(all)
+        view fun getTokens(): [String]
         /// Get the meta-info of a token
-        access(all) view
-        fun getTokenMeta(tick: String): FRC20Meta?
+        access(all)
+        view fun getTokenMeta(tick: String): FRC20Meta?
         /// Get the token display info
-        access(all) view
-        fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay?
+        access(all)
+        view fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay?
         /// Check if an inscription is a valid FRC20 inscription
-        access(all) view
-        fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool
+        access(all)
+        view fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool
         /// Get the balance of a FRC20 token
-        access(all) view
-        fun getBalance(tick: String, addr: Address): UFix64
+        access(all)
+        view fun getBalance(tick: String, addr: Address): UFix64
         /// Get all balances of some address
-        access(all) view
-        fun getBalances(addr: Address): {String: UFix64}
+        access(all)
+        view fun getBalances(addr: Address): {String: UFix64}
         /// Get the holders of a FRC20 token
-        access(all) view
-        fun getHolders(tick: String): [Address]
+        access(all)
+        view fun getHolders(tick: String): [Address]
         /// Get the amount of holders of a FRC20 token
-        access(all) view
-        fun getHoldersAmount(tick: String): UInt64
+        access(all)
+        view fun getHoldersAmount(tick: String): UInt64
         /// Get the pool balance of a FRC20 token
-        access(all) view
-        fun getPoolBalance(tick: String): UFix64
+        access(all)
+        view fun getPoolBalance(tick: String): UFix64
         /// Get the benchmark value of a FRC20 token
-        access(all) view
-        fun getBenchmarkValue(tick: String): UFix64
+        access(all)
+        view fun getBenchmarkValue(tick: String): UFix64
         /// Get the pool balance of platform treasury
-        access(all) view
-        fun getPlatformTreasuryBalance(): UFix64
+        access(all)
+        view fun getPlatformTreasuryBalance(): UFix64
         /** ---- borrow public interface ---- */
         /// Borrow the token's treasury $FLOW receiver
         access(all)
-        fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}
+        view fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver}
         /// Borrow the platform treasury $FLOW receiver
         access(all)
-        fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver}
+        view fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver}
         /* --- write --- */
         /// Deploy a new FRC20 token
         access(all)
@@ -153,11 +153,10 @@ access(all) contract FRC20Indexer {
         /// Burn a FRC20 token
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault
-        /** ---- Account Methods for readonly ---- */
-        /// Parse the metadata of a FRC20 inscription
-        access(account) view
-        fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String}
         /** ---- Account Methods for listing ---- */
+        /// Ensure the balance of an address exists
+        access(account)
+        fun ensureBalanceExists(tick: String, addr: Address)
         /// Building a selling FRC20 Token order with the sale cut from a FRC20 inscription
         /// This method will not extract all value of the inscription
         access(account)
@@ -198,6 +197,9 @@ access(all) contract FRC20Indexer {
         /// Return the change of a FRC20 order back to the owner
         access(account)
         fun returnChange(change: @FRC20FTShared.Change)
+        /// Burn a FRC20 token and withdraw $FLOW by SystemBurner
+        access(account)
+        fun burnFromTreasury(ins: &Fixes.Inscription): @FlowToken.Vault
         /** ---- Account Methods for command inscriptions ---- */
         /// Set a FRC20 token to be burnable
         access(account)
@@ -205,7 +207,7 @@ access(all) contract FRC20Indexer {
         // Burn unsupplied frc20 tokens
         access(account)
         fun burnUnsupplied(ins: &Fixes.Inscription)
-        /// Burn unsupplied frc20 tokens
+        /// Withdraw some $FLOW from the treasury
         access(account)
         fun withdrawFromTreasury(ins: &Fixes.Inscription): @FRC20FTShared.Change
         /// Allocate the tokens to some address
@@ -249,22 +251,22 @@ access(all) contract FRC20Indexer {
 
         /// Get all the tokens
         ///
-        access(all) view
-        fun getTokens(): [String] {
+        access(all)
+        view fun getTokens(): [String] {
             return self.tokens.keys
         }
 
         /// Get the meta-info of a token
         ///
-        access(all) view
-        fun getTokenMeta(tick: String): FRC20Meta? {
+        access(all)
+        view fun getTokenMeta(tick: String): FRC20Meta? {
             return self.tokens[tick.toLower()]
         }
 
         /// Get the token display info
         ///
-        access(all) view
-        fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay? {
+        access(all)
+        view fun getTokenDisplay(tick: String): FungibleTokenMetadataViews.FTDisplay? {
             let ticker = tick.toLower()
             if self.tokens[ticker] == nil {
                 return nil
@@ -295,16 +297,16 @@ access(all) contract FRC20Indexer {
 
         /// Get the balance of a FRC20 token
         ///
-        access(all) view
-        fun getBalance(tick: String, addr: Address): UFix64 {
+        access(all)
+        view fun getBalance(tick: String, addr: Address): UFix64 {
             let balancesRef = self._borrowBalancesRef(tick: tick)
             return balancesRef[addr] ?? 0.0
         }
 
         /// Get all balances of some address
         ///
-        access(all) view
-        fun getBalances(addr: Address): {String: UFix64} {
+        access(all)
+        view fun getBalances(addr: Address): {String: UFix64} {
             let ret: {String: UFix64} = {}
             for tick in self.tokens.keys {
                 let balancesRef = self._borrowBalancesRef(tick: tick)
@@ -317,29 +319,29 @@ access(all) contract FRC20Indexer {
         }
 
         /// Get the holders of a FRC20 token
-        access(all) view
-        fun getHolders(tick: String): [Address] {
+        access(all)
+        view fun getHolders(tick: String): [Address] {
             let balancesRef = self._borrowBalancesRef(tick: tick)
             return balancesRef.keys
         }
 
         /// Get the amount of holders of a FRC20 token
-        access(all) view
-        fun getHoldersAmount(tick: String): UInt64 {
+        access(all)
+        view fun getHoldersAmount(tick: String): UInt64 {
             return UInt64(self.getHolders(tick: tick.toLower()).length)
         }
 
         /// Get the pool balance of a FRC20 token
         ///
-        access(all) view
-        fun getPoolBalance(tick: String): UFix64 {
+        access(all)
+        view fun getPoolBalance(tick: String): UFix64 {
             let pool = self._borrowTokenTreasury(tick: tick)
             return pool.balance
         }
 
         /// Get the benchmark value of a FRC20 token
-        access(all) view
-        fun getBenchmarkValue(tick: String): UFix64 {
+        access(all)
+        view fun getBenchmarkValue(tick: String): UFix64 {
             let pool = self._borrowTokenTreasury(tick: tick)
             let meta = self.borrowTokenMeta(tick: tick)
             let totalExisting = meta.supplied.saturatingSubtract(meta.burned)
@@ -352,15 +354,15 @@ access(all) contract FRC20Indexer {
 
         /// Get the pool balance of global
         ///
-        access(all) view
-        fun getPlatformTreasuryBalance(): UFix64 {
+        access(all)
+        view fun getPlatformTreasuryBalance(): UFix64 {
             return self.treasury.balance
         }
 
         /// Check if an inscription is a valid FRC20 inscription
         ///
-        access(all) view
-        fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
+        access(all)
+        view fun isValidFRC20Inscription(ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
             let p = ins.getMetaProtocol()
             return ins.getMimeType() == "text/plain" &&
                 (p == "FRC20" || p == "frc20" || p == "frc-20" || p == "FRC-20")
@@ -371,7 +373,7 @@ access(all) contract FRC20Indexer {
         /// Borrow the token's treasury $FLOW receiver
         ///
         access(all)
-        fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver} {
+        view fun borrowTokenTreasuryReceiver(tick: String): &FlowToken.Vault{FungibleToken.Receiver} {
             let pool = self._borrowTokenTreasury(tick: tick)
             // Force cast to FungibleToken.Receiver, don't care about the warning, just for avoiding some mistakes
             return pool as &FlowToken.Vault{FungibleToken.Receiver}
@@ -380,7 +382,7 @@ access(all) contract FRC20Indexer {
         /// Borrow the platform treasury $FLOW receiver
         ///
         access(all)
-        fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver} {
+        view fun borowPlatformTreasuryReceiver(): &FlowToken.Vault{FungibleToken.Receiver} {
             let pool = self._borrowPlatformTreasury()
             // Force cast to FungibleToken.Receiver, don't care about the warning, just for avoiding some mistakes
             return pool as &FlowToken.Vault{FungibleToken.Receiver}
@@ -445,7 +447,7 @@ access(all) contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "deploy" && meta["tick"] != nil && meta["max"] != nil && meta["lim"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for deployment"
@@ -455,6 +457,12 @@ access(all) contract FRC20Indexer {
             assert(
                 tick.length >= 3 && tick.length <= 10,
                 message: "The token tick should be between 3 and 10 characters"
+            )
+            // ensure the first letter is lowercase a-z
+            let firstLetterUTF8 = tick[0].utf8
+            assert(
+                 firstLetterUTF8.length == 1 && firstLetterUTF8[0] >= 97 && firstLetterUTF8[0] <= 122,
+                message: "The token tick should start with a lowercase letter"
             )
             assert(
                 self.tokens[tick] == nil && self.balances[tick] == nil && self.pool[tick] == nil,
@@ -497,7 +505,7 @@ access(all) contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "mint" && meta["tick"] != nil && meta["amt"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for minting"
@@ -528,12 +536,12 @@ access(all) contract FRC20Indexer {
                 amtToAdd > 0.0,
                 message: "The amount should be greater than 0.0"
             )
+
             // update the balance
-            if let oldBalance = balancesRef[fromAddr] {
-                balancesRef[fromAddr] = oldBalance.saturatingAdd(amtToAdd)
-            } else {
-                balancesRef[fromAddr] = amtToAdd
-            }
+            self.ensureBalanceExists(tick: tick, addr: fromAddr)
+            let oldBalance = balancesRef[fromAddr] ?? panic("Failed to refer to balance")
+            balancesRef[fromAddr] = oldBalance.saturatingAdd(amtToAdd)
+
             tokenMeta.updateSupplied(tokenMeta.supplied + amtToAdd)
 
             // emit event
@@ -555,7 +563,7 @@ access(all) contract FRC20Indexer {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "transfer" && meta["tick"] != nil && meta["amt"] != nil && meta["to"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for transfer"
@@ -575,14 +583,31 @@ access(all) contract FRC20Indexer {
         }
 
         /// Burn a FRC20 token
+        /// it is public so it can be called by the frc20 holders
         ///
         access(all)
         fun burn(ins: &Fixes.Inscription): @FlowToken.Vault {
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let tick = self._parseTickerName(meta)
+            let tokenMeta = self.borrowTokenMeta(tick: tick)
+            // this method is public, so the token should be burnable
+            assert(
+                tokenMeta.burnable,
+                message: "The token is not burnable"
+            )
+            return <- self.burnFromTreasury(ins: ins)
+        }
+
+        /// Burn a FRC20 token and withdraw $FLOW
+        /// This method is account access, so it can be called by the indexer or other contracts in the account
+        ///
+        access(account)
+        fun burnFromTreasury(ins: &Fixes.Inscription): @FlowToken.Vault {
             pre {
                 ins.isExtractable(): "The inscription is not extractable"
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "burn" && meta["tick"] != nil && meta["amt"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for burning"
@@ -590,10 +615,6 @@ access(all) contract FRC20Indexer {
 
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
-            assert(
-                tokenMeta.burnable,
-                message: "The token is not burnable"
-            )
             assert(
                 tokenMeta.supplied > tokenMeta.burned,
                 message: "The token has been burned out"
@@ -637,33 +658,6 @@ access(all) contract FRC20Indexer {
             }
         }
 
-        // ---- Account Methods ----
-
-        /// Parse the metadata of a FRC20 inscription
-        ///
-        access(account) view
-        fun parseMetadata(_ data: &Fixes.InscriptionData): {String: String} {
-            let ret: {String: String} = {}
-            if data.encoding != nil && data.encoding != "utf8" {
-                panic("The inscription is not encoded in utf8")
-            }
-            // parse the body
-            if let body = String.fromUTF8(data.metadata) {
-                // split the pairs
-                let pairs = StringUtils.split(body, ",")
-                for pair in pairs {
-                    // split the key and value
-                    let kv = StringUtils.split(pair, "=")
-                    if kv.length == 2 {
-                        ret[kv[0]] = kv[1]
-                    }
-                }
-            } else {
-                panic("The inscription is not encoded in utf8")
-            }
-            return ret
-        }
-
         // ---- Account Methods for command inscriptions ----
 
         /// Set a FRC20 token to be burnable
@@ -676,7 +670,7 @@ access(all) contract FRC20Indexer {
                 // The command inscriptions should be only executed by the indexer
                 self._isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for setting burnable"
@@ -707,7 +701,7 @@ access(all) contract FRC20Indexer {
                 // The command inscriptions should be only executed by the indexer
                 self._isOwnedByIndexer(ins): "The inscription is not owned by the indexer"
             }
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for burning unsupplied tokens"
@@ -765,7 +759,7 @@ access(all) contract FRC20Indexer {
                 result.getBalance() > 0.0: "The result should have a positive balance"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "withdrawFromTreasury" && meta["tick"] != nil && meta["amt"] != nil && meta["usage"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for withdrawing from treasury"
@@ -819,7 +813,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "alloc" && meta["tick"] != nil && meta["amt"] != nil && meta["to"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for allocating"
@@ -846,7 +840,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             // only check the tick property
             assert(
                 meta["tick"] != nil,
@@ -879,7 +873,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "list-buynow" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
@@ -934,7 +928,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "list-sellnow" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
@@ -995,8 +989,8 @@ access(all) contract FRC20Indexer {
                 maxAmount <= change.getBalance(): "The max amount should be less than or equal to the change balance"
             }
 
-            let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
-            let takerMeta = self.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
+            let makerMeta = FixesInscriptionFactory.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
+            let takerMeta = FixesInscriptionFactory.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
 
             assert(
                 makerMeta["op"] == "list-buynow" && makerMeta["tick"] != nil && makerMeta["amt"] != nil && makerMeta["price"] != nil,
@@ -1071,8 +1065,8 @@ access(all) contract FRC20Indexer {
                 change.isBackedByFlowTokenVault() == true: "The change should be backed by a flow vault"
             }
 
-            let makerMeta = self.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
-            let takerMeta = self.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
+            let makerMeta = FixesInscriptionFactory.parseMetadata(&makerIns.getData() as &Fixes.InscriptionData)
+            let takerMeta = FixesInscriptionFactory.parseMetadata(&takerIns.getData() as &Fixes.InscriptionData)
 
             assert(
                 makerMeta["op"] == "list-sellnow" && makerMeta["tick"] != nil && makerMeta["amt"] != nil && makerMeta["price"] != nil,
@@ -1138,7 +1132,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: listedIns): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&listedIns.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&listedIns.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"]?.slice(from: 0, upTo: 5) == "list-" && meta["tick"] != nil && meta["amt"] != nil && meta["price"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for listing"
@@ -1150,7 +1144,7 @@ access(all) contract FRC20Indexer {
             )
 
             // deposit the token change return to change's from address
-            let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
+            let flowReceiver = Fixes.borrowFlowTokenReceiver(fromAddr)
                 ?? panic("The flow receiver no found")
             let supportedTypes = flowReceiver.getSupportedVaultTypes()
             assert(
@@ -1173,7 +1167,7 @@ access(all) contract FRC20Indexer {
                 self.isValidFRC20Inscription(ins: ins): "The inscription is not a valid FRC20 inscription"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "withdraw" && meta["tick"] != nil && meta["amt"] != nil && meta["usage"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for transfer"
@@ -1181,24 +1175,38 @@ access(all) contract FRC20Indexer {
 
             let tick = self._parseTickerName(meta)
             let tokenMeta = self.borrowTokenMeta(tick: tick)
-            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
             let usage = meta["usage"]!
             assert(
-                usage == "staking" || usage == "donate" || usage == "lottery",
-                message: "The usage should be 'staking' or 'donate' or 'lottery'"
+                usage == "staking" || usage == "donate" || usage == "lottery" || usage == "convert" || usage == "lock" || usage == "empty",
+                message: "The usage should be 'staking', 'donate', 'lottery', 'convert', 'lock' or 'empty'"
             )
+
+            // The from address: the owner of the inscription
             let fromAddr = ins.owner!.address
 
-            let retChange <- self._withdrawToTokenChange(
-                tick: tick,
-                fromAddr: fromAddr,
-                amt: amt
-            )
+            // amount can be zero, which means withdraw nothing, just execute the inscription
+            var retChange: @FRC20FTShared.Change? <- nil
+            let amt = UFix64.fromString(meta["amt"]!) ?? panic("The amount is not a valid UFix64")
+            if amt == 0.0 {
+                // ensure usage is empty
+                assert(
+                    usage == "empty",
+                    message: "The usage should be 'empty' if the amount is zero"
+                )
+                retChange <-! FRC20FTShared.createEmptyChange(tick: tick, from: fromAddr)
+            } else {
+                // withdraw the token to change
+                retChange <-! self._withdrawToTokenChange(
+                    tick: tick,
+                    fromAddr: fromAddr,
+                    amt: amt
+                )
+            }
 
             // extract inscription
             self._extractInscription(tick: tick, ins: ins)
 
-            return <- retChange
+            return <- retChange!
         }
 
         /// Deposit a FRC20 token change to indexer
@@ -1211,7 +1219,7 @@ access(all) contract FRC20Indexer {
                 change.isBackedByVault() == false: "The change should not be backed by a vault"
             }
 
-            let meta = self.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             assert(
                 meta["op"] == "deposit" && meta["tick"] != nil,
                 message: "The inscription is not a valid FRC20 inscription for transfer"
@@ -1249,7 +1257,7 @@ access(all) contract FRC20Indexer {
                     message: "The change should be a flow token vault"
                 )
                 // deposit the token change return to change's from address
-                let flowReceiver = FRC20Indexer.borrowFlowTokenReceiver(fromAddr)
+                let flowReceiver = Fixes.borrowFlowTokenReceiver(fromAddr)
                     ?? panic("The flow receiver no found")
                 let supportedTypes = flowReceiver.getSupportedVaultTypes()
                 assert(
@@ -1262,6 +1270,16 @@ access(all) contract FRC20Indexer {
                 self._depositFromTokenChange(change: <- change, to: fromAddr)
             } else {
                 panic("The change should not be backed by a vault that not a flow token vault")
+            }
+        }
+
+        /// Ensure the balance of an address exists
+        ///
+        access(account)
+        fun ensureBalanceExists(tick: String, addr: Address) {
+            let balancesRef = self._borrowBalancesRef(tick: tick)
+            if balancesRef[addr] == nil {
+                balancesRef[addr] = 0.0
             }
         }
 
@@ -1461,15 +1479,14 @@ access(all) contract FRC20Indexer {
             }
             let tick = change.tick
             let amt = change.extract()
+
+            // ensure the balance exists
+            self.ensureBalanceExists(tick: tick, addr: to)
             // borrow the balance mapping
             let balancesRef = self._borrowBalancesRef(tick: tick)
-
             // update the balance
-            if let oldBalance = balancesRef[to] {
-                balancesRef[to] = oldBalance.saturatingAdd(amt)
-            } else {
-                balancesRef[to] = amt
-            }
+            let oldBalance = balancesRef[to] ?? panic("Failed to refer to balance")
+            balancesRef[to] = oldBalance.saturatingAdd(amt)
 
             // emit event
             emit FRC20DepositedFromChange(
@@ -1518,15 +1535,15 @@ access(all) contract FRC20Indexer {
 
         /// Check if an inscription is owned by the indexer
         ///
-        access(self) view
-        fun _isOwnedByIndexer(_ ins: &Fixes.Inscription): Bool {
+        access(self)
+        view fun _isOwnedByIndexer(_ ins: &Fixes.Inscription): Bool {
             return ins.owner?.address == FRC20Indexer.getAddress()
         }
 
         /// Parse the ticker name from the meta-info of a FRC20 inscription
         ///
         access(self)
-        fun _parseTickerName(_ meta: {String: String}): String {
+        view fun _parseTickerName(_ meta: {String: String}): String {
             let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
             assert(
                 self.tokens[tick] != nil && self.balances[tick] != nil && self.pool[tick] != nil,
@@ -1585,17 +1602,6 @@ access(all) contract FRC20Indexer {
             .getCapability<&InscriptionIndexer{IndexerPublic}>(self.IndexerPublicPath)
             .borrow()
         return cap ?? panic("Could not borrow InscriptionIndexer")
-    }
-
-    /// Helper method to get FlowToken receiver
-    ///
-    access(all)
-    fun borrowFlowTokenReceiver(
-        _ addr: Address
-    ): &{FungibleToken.Receiver}? {
-        let cap = getAccount(addr)
-            .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
-        return cap.borrow()
     }
 
     init() {

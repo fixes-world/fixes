@@ -3,16 +3,67 @@
 
 # FixesTraits
 
-TODO: Add description
+This contract mainly includes commonly used Structs related to Asset Traits.
 
 */
-
 // Thirdparty Imports
 import "MetadataViews"
 
 /// The `FixesTraits` contract
 ///
 access(all) contract FixesTraits {
+
+    /// =============  Trait: Fungible Token =============
+
+    /// The mergeable data interface
+    ///
+    access(all) struct interface MergeableData {
+        /// Get the id of the data
+        access(all)
+        view fun getId(): String
+        /// Get the string value of the data
+        access(all)
+        view fun toString(): String
+        /// Get the data keys
+        access(all)
+        view fun getKeys(): [String]
+        /// Get the value of the data
+        access(all)
+        view fun getValue(_ key: String): AnyStruct?
+        /// Get the writable keys
+        access(all)
+        view fun getWritableKeys(): [String] {
+            return []
+        }
+        /// Set the value of the data
+        access(all)
+        fun setValue(_ key: String, _ value: AnyStruct) {
+            pre {
+                self.getWritableKeys().contains(key): "The key is not writable"
+            }
+            let writableKeys = self.getWritableKeys()
+            if writableKeys.length == 0 {
+                panic("The gene data cannot be modified by set method")
+            }
+        }
+        /// Split the data into another instance
+        access(all)
+        fun split(_ perc: UFix64): {MergeableData} {
+            pre {
+                perc > 0.0 && perc <= 1.0: "The percentage should be between 0 and 1"
+            }
+            post {
+                self.getType().identifier == result.getType().identifier: "The data type must be the same"
+            }
+        }
+        /// Merge the data from another instance
+        access(all)
+        fun merge(_ from: {MergeableData}): Void {
+            pre {
+                self.getType().identifier == from.getType().identifier: "The data type must be the same"
+            }
+        }
+    }
 
     /// =============  Trait: Season 0 - Secret Garden =============
 
@@ -40,8 +91,8 @@ access(all) contract FixesTraits {
         access(all) case RuggedHill // 乱石山岗
     }
 
-    access(all) view
-    fun getSeason0SecretPlacesDefs(): [Definition] {
+    access(all)
+    view fun getSeason0SecretPlacesDefs(): [Definition] {
         return [
             Definition(5, 100), // 1% chance, rarity 2
             Definition(12, 1900), // 19% chance, rarity 1
@@ -105,8 +156,8 @@ access(all) contract FixesTraits {
         access(all) case PhysicalTraining // 锻炼体魄
     }
 
-    access(all) view
-    fun getSeason0AbilityDefs(): [Definition] {
+    access(all)
+    view fun getSeason0AbilityDefs(): [Definition] {
         return [
             Definition(5, 20), // 0.2% chance, rarity 3
             Definition(12, 100), // 1% chance, rarity 2
@@ -150,8 +201,8 @@ access(all) contract FixesTraits {
         access(all) case TrollsHammer // 巨魔之锤
     }
 
-    access(all) view
-    fun getSeason0WeaponsDefs(): [Definition] {
+    access(all)
+    view fun getSeason0WeaponsDefs(): [Definition] {
         return [
             Definition(5, 20), // 0.2% chance, rarity 3
             Definition(12, 100), // 1% chance, rarity 2
