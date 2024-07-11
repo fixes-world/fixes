@@ -20,6 +20,7 @@ fun main(): UFix64 {
     let tickerTotal: {String: UFix64} = {}
     // This is the soft burned LP value which is fully locked in the BlackHole Vault
     var burnedLPValue = 0.0
+    var flowLockedInPoolValue = 0.0
     addrsDict.forEachKey(fun (key: String): Bool {
         if let addr = addrsDict[key] {
             // sum up all locked token balances in LockDrops Pool
@@ -30,26 +31,27 @@ fun main(): UFix64 {
             // sum up all burned LP value in Tradable Pool
             if let tradablePool = FixesTradablePool.borrowTradablePool(addr) {
                 burnedLPValue = burnedLPValue + tradablePool.getBurnedLiquidityValue()
+                flowLockedInPoolValue = flowLockedInPoolValue + tradablePool.getFlowBalanceInPool()
             }
         }
         return true
     })
     // sum up all locked token balances in LockDrops Pool
-    var totalTVL = 0.0
+    var totalLockingTokenTVL = 0.0
     tickerTotal.forEachKey(fun (key: String): Bool {
         let lockedAmount = tickerTotal[key]!
         if key == "" {
             // this is locked FLOW
-            totalTVL = totalTVL + lockedAmount
+            totalLockingTokenTVL = totalLockingTokenTVL + lockedAmount
         } else if key == "fixes" {
             // this is locked FIXES
             let price = frc20Indexer.getBenchmarkValue(tick: "fixes")
-            totalTVL = totalTVL + lockedAmount * price
+            totalLockingTokenTVL = totalLockingTokenTVL + lockedAmount * price
         } else if key == stFlowTokenKey {
             // this is locked stFlow
-            totalTVL = totalTVL + LiquidStaking.calcFlowFromStFlow(stFlowAmount: lockedAmount)
+            totalLockingTokenTVL = totalLockingTokenTVL + LiquidStaking.calcFlowFromStFlow(stFlowAmount: lockedAmount)
         }
         return true
     })
-    return totalTVL + burnedLPValue
+    return totalLockingTokenTVL + burnedLPValue + flowLockedInPoolValue
 }
