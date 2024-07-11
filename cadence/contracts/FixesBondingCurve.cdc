@@ -25,6 +25,13 @@ access(all) contract FixesBondingCurve {
         view fun calculatePrice(supply: UFix64, amount: UFix64): UFix64
         access(all)
         view fun calculateAmount(supply: UFix64, cost: UFix64): UFix64
+        /// Calculate the unit price of the token
+        access(all)
+        view fun calculateUnitPrice(supply: UFix64): UFix64 {
+            let freeAmount = self.getFreeAmount()
+            let restFreeAmount = freeAmount.saturatingSubtract(supply)
+            return self.calculatePrice(supply: supply, amount: restFreeAmount + 1.0)
+        }
     }
 
     /// The Quadratic curve implementation.

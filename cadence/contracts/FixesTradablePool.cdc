@@ -518,10 +518,10 @@ access(all) contract FixesTradablePool {
             return self.curve.getFreeAmount()
         }
 
-        /// Get the price of the token based on the supply and amount
+        /// Get the price of the token
         access(all)
-        view fun getPrice(supply: UFix64, amount: UFix64): UFix64 {
-            return self.curve.calculatePrice(supply: supply, amount: amount)
+        view fun getUnitPrice(): UFix64 {
+            return self.curve.calculateUnitPrice(supply: self.getTradablePoolCirculatingSupply())
         }
 
         /// Calculate the price of buying the token based on the amount
@@ -760,7 +760,7 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getTokenPriceInFlow(): UFix64 {
             if self.isLocalActive() {
-                return self.getBuyPrice(1.0)
+                return self.getUnitPrice()
             }
             return self.getSwapEstimatedAmount(true, amount: 1.0)
         }
@@ -1581,7 +1581,7 @@ access(all) contract FixesTradablePool {
             if self.isLocalActive() {
                 let token0Max = self.getTokenBalanceInPool()
                 // init the liquidity pool with current price
-                let tokenInPoolPrice = self.getBuyPrice(1.0)
+                let tokenInPoolPrice = self.getUnitPrice()
                 let token1In = self.getFlowBalanceInPool()
                 var token0In = token1In / tokenInPoolPrice
                 if token0In > token0Max {
