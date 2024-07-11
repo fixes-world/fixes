@@ -1498,14 +1498,16 @@ access(all) contract FixesTradablePool {
         ///
         access(self)
         fun _depositFlowToken(_ vault: @FungibleToken.Vault) {
-            pre {
-                vault.balance > 0.0: "The vault balance must be greater than 0"
-            }
             post {
                 self.flowVault.balance == before(self.flowVault.balance) + before(vault.balance): "The flow vault balance must be increased"
             }
             let amount = vault.balance
-            self.flowVault.deposit(from: <- vault)
+            if amount > 0.0 {
+                self.flowVault.deposit(from: <- vault)
+            } else {
+                destroy vault
+                return
+            }
 
             // Update in the trading center
             let tradingCenter = FixesTradablePool.borrowTradingCenter()
