@@ -1516,14 +1516,30 @@ access(all) contract FixesTradablePool {
                 }
                 // setup swap pair based on current price
                 if token0Reserve != 0.0 || token1Reserve != 0.0 {
-                    let estimatedToken0In = SwapConfig.quote(amountA: token1In, reserveA: token1Reserve, reserveB: token0Reserve)
-                    if estimatedToken0In > token0In {
+                    // let the price close to the tokenInPoolPrice
+                    let swapPrice = SwapConfig.getAmountOut(amountIn: 1.0, reserveIn: token0Reserve, reserveOut: token1Reserve)
+                    // we need ensure the final swap price is quite close to the tokenInPoolPrice
+                    // if tokenInPoolPrice is greater than swapPrice
+                    // then we need to swap a portion of token1 to token0 in the pair
+                    // Here is the formula to calculate the optimized token0In
+                    if swapPrice >= tokenInPoolPrice {
+                        // only swap a portion of token1 to token0 for the case that the swap price is greater than the tokenInPoolPrice
+                        let estimatedToken0In = SwapConfig.quote(amountA: token1In, reserveA: token1Reserve, reserveB: token0Reserve)
+                        if estimatedToken0In > token0In {
+                            Burner.burn(<- token0Vault)
+                            Burner.burn(<- token1Vault)
+                            // DO NOT PANIC
+                            return false
+                        }
+                        token0In = estimatedToken0In
+                    } else {
+                        // For the case that the swap price is less than the tokenInPoolPrice
+                        // DON'T DO ANYTHING
                         Burner.burn(<- token0Vault)
                         Burner.burn(<- token1Vault)
                         // DO NOT PANIC
                         return false
                     }
-                    token0In = estimatedToken0In
                 }
                 if token0In > 0.0 {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: token0In))
@@ -1557,14 +1573,21 @@ access(all) contract FixesTradablePool {
                 let token0Max = self.getTokenBalanceInPool()
                 let allFlowAmount = self.getFlowBalanceInPool()
                 let estimatedToken0In = SwapConfig.quote(amountA: allFlowAmount, reserveA: token1Reserve, reserveB: token0Reserve)
-                if token0Max > estimatedToken0In {
+                if token0Max >= estimatedToken0In {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: estimatedToken0In))
                     token1Vault.deposit(from: <- self._withdrawFlowToken(allFlowAmount))
                 } else if token0Max > 0.0 {
                     let part1EstimatedToken1In = SwapConfig.quote(amountA: token0Max, reserveA: token0Reserve, reserveB: token1Reserve)
-                    let part2EstimatedToken1In = allFlowAmount - part1EstimatedToken1In
-                    token0Vault.deposit(from: <- self.vault.withdraw(amount: token0Max))
-                    token1Vault.deposit(from: <- self._withdrawFlowToken(part1EstimatedToken1In))
+                    let part2EstimatedToken1In = allFlowAmount.saturatingSubtract(part1EstimatedToken1In)
+                    if part2EstimatedToken1In > 0.0 {
+                        token0Vault.deposit(from: <- self.vault.withdraw(amount: token0Max))
+                        token1Vault.deposit(from: <- self._withdrawFlowToken(part1EstimatedToken1In))
+                    } else {
+                        destroy token0Vault
+                        destroy token1Vault
+                        // DO NOT PANIC
+                        return false
+                    }
                 } else {
                     // All Token0 is added to the pair, so we need to calculate the optimized zapped amount through dex
                     let zappedAmt = self._calcZappedAmmount(
