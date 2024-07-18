@@ -1621,22 +1621,22 @@ access(all) contract FixesTradablePool {
                             => scaledX  = sqrt(token0Reserve * token1Reserve / tokenInPoolPrice) * sf - ScaledToken0Reserve
                                         = resXSqrt / sqrt(sf) * sf - ScaledToken0Reserve
                         */
-                        let resXSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve * scaledTokenInPoolPrice)
+                        let resXSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve / scaledTokenInPoolPrice)
                         let scaledX = (resXSqrt / SwapConfig.sqrt(sf) * sf).saturatingSubtract(scaledToken0Reserve)
                         let swapToken0In = SwapConfig.ScaledUInt256ToUFix64(scaledX)
                         if swapToken0In > token0Max {
-                            // panic("The swap token0In is greater than the token0Max. "
-                            //     .concat(swapToken0In.toString())
-                            //     .concat(" > ")
-                            //     .concat(token0Max.toString())
-                            //     .concat(" swapPrice: ")
-                            //     .concat(scaledSwapPrice.toString())
-                            //     .concat(" bcPrice: ")
-                            //     .concat(scaledTokenInPoolPrice.toString())
-                            // )
-                            destroy token0Vault
-                            destroy token1Vault
-                            return false
+                            panic("The swap token0In is greater than the token0Max. "
+                                .concat(swapToken0In.toString())
+                                .concat(" > ")
+                                .concat(token0Max.toString())
+                                .concat(" swapPrice: ")
+                                .concat(scaledSwapPrice.toString())
+                                .concat(" bcPrice: ")
+                                .concat(scaledTokenInPoolPrice.toString())
+                            )
+                            // destroy token0Vault
+                            // destroy token1Vault
+                            // return false
                         }
                         // swap the token0 to token1 first, and then add liquidity to token1 vault
                         if swapToken0In > 0.0 && swapToken0In <= token0Max {
@@ -1673,23 +1673,25 @@ access(all) contract FixesTradablePool {
                                         = sqrt(token0Reserve * token1Reserve * tokenInPoolPrice) * sqrt(sf^3)
                             => scaledY  = sqrt(token0Reserve * token1Reserve * tokenInPoolPrice) * sf - SacledToken1Reserve
                                         = resYSqrt / sqrt(sf^3) * sf - ScaledToken1Reserve
+                                        = resYSqrt / sf / sqrt(sf) * sf - ScaledToken1Reserve
+                                        = resYSqrt / sqrt(sf) - ScaledToken1Reserve
                         */
-                        let resYSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve / scaledTokenInPoolPrice)
-                        let scaledY = (resYSqrt / SwapConfig.sqrt(sf * sf * sf) * sf).saturatingSubtract(scaledToken1Reserve)
+                        let resYSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve * scaledTokenInPoolPrice)
+                        let scaledY = (resYSqrt / SwapConfig.sqrt(sf)).saturatingSubtract(scaledToken1Reserve)
                         let swapToken1In = SwapConfig.ScaledUInt256ToUFix64(scaledY)
                         if swapToken1In > token1Max {
-                            // panic("The swap token1In is greater than the token1Max. "
-                            //     .concat(swapToken1In.toString())
-                            //     .concat(" > ")
-                            //     .concat(token1Max.toString())
-                            //     .concat(" swapPrice: ")
-                            //     .concat(scaledSwapPrice.toString())
-                            //     .concat(" bcPrice: ")
-                            //     .concat(scaledTokenInPoolPrice.toString())
-                            // )
-                            destroy token0Vault
-                            destroy token1Vault
-                            return false
+                            panic("The swap token1In is greater than the token1Max. "
+                                .concat(swapToken1In.toString())
+                                .concat(" > ")
+                                .concat(token1Max.toString())
+                                .concat(" swapPrice: ")
+                                .concat(scaledSwapPrice.toString())
+                                .concat(" bcPrice: ")
+                                .concat(scaledTokenInPoolPrice.toString())
+                            )
+                            // destroy token0Vault
+                            // destroy token1Vault
+                            // return false
                         }
                         // swap the token1 to token0 first, and then add liquidity to token0 vault
                         if swapToken1In > 0.0 {
