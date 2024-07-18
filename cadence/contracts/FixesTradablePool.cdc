@@ -1616,10 +1616,10 @@ access(all) contract FixesTradablePool {
                                         = sqrt(token0Reserve * sf * token1Reserve * sf * tokenInPoolPrice * sf)
                                         = sqrt(token0Reserve * token1Reserve * tokenInPoolPrice) * sqrt(sf^3)
                             => scaledX  = sqrt(token0Reserve * token1Reserve * tokenInPoolPrice) * sf - ScaledToken0Reserve
-                                        = resXSqrt / sqrt(sf^3) - ScaledToken0Reserve
+                                        = resXSqrt / sqrt(sf^3) * sf - ScaledToken0Reserve
                         */
                         let resXSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve * scaledTokenInPoolPrice)
-                        let scaledX = (resXSqrt / SwapConfig.sqrt(sf * sf * sf)).saturatingSubtract(scaledToken0Reserve)
+                        let scaledX = (resXSqrt / SwapConfig.sqrt(sf * sf * sf) * sf).saturatingSubtract(scaledToken0Reserve)
                         let swapToken0In = SwapConfig.ScaledUInt256ToUFix64(scaledX)
                         // swap the token0 to token1 first, and then add liquidity to token1 vault
                         if swapToken0In > 0.0 && swapToken0In <= token0Max {
@@ -1655,10 +1655,10 @@ access(all) contract FixesTradablePool {
                                         = sqrt(token0Reserve * sf * token1Reserve * sf / tokenInPoolPrice * sf)
                                         = sqrt(token0Reserve * token1Reserve / tokenInPoolPrice) * sqrt(sf)
                             => scaledY  = sqrt(token0Reserve * token1Reserve / tokenInPoolPrice) * sf - SacledToken1Reserve
-                                        = resYSqrt / sqrt(sf) - ScaledToken1Reserve
+                                        = resYSqrt / sqrt(sf) * sf - ScaledToken1Reserve
                         */
                         let resYSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve / scaledTokenInPoolPrice)
-                        let scaledY = (resYSqrt / SwapConfig.sqrt(sf)).saturatingSubtract(scaledToken1Reserve)
+                        let scaledY = (resYSqrt / SwapConfig.sqrt(sf) * sf).saturatingSubtract(scaledToken1Reserve)
                         let swapToken1In = SwapConfig.ScaledUInt256ToUFix64(scaledY)
                         // swap the token1 to token0 first, and then add liquidity to token0 vault
                         if swapToken1In > 0.0 && swapToken1In <= token1Max  {
