@@ -1671,7 +1671,7 @@ access(all) contract FixesTradablePool {
                             => resYSqrt = sqrt(ScaledToken0Reserve * ScaledToken1Reserve * ScaledTokenInPoolPrice)
                                         = sqrt(token0Reserve * sf * token1Reserve * sf * tokenInPoolPrice * sf)
                                         = sqrt(token0Reserve * token1Reserve * tokenInPoolPrice) * sqrt(sf^3)
-                            => scaledY  = sqrt(token0Reserve * token1Reserve / tokenInPoolPrice) * sf - SacledToken1Reserve
+                            => scaledY  = sqrt(token0Reserve * token1Reserve * tokenInPoolPrice) * sf - SacledToken1Reserve
                                         = resYSqrt / sqrt(sf^3) * sf - ScaledToken1Reserve
                         */
                         let resYSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve / scaledTokenInPoolPrice)
