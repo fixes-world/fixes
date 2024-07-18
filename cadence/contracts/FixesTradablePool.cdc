@@ -1582,37 +1582,78 @@ access(all) contract FixesTradablePool {
                 let token0Max = self.getTokenBalanceInPool()
                 // init the liquidity pool with current price
                 let tokenInPoolPrice = self.getUnitPrice()
-                let token1In = self.getFlowBalanceInPool()
+                var token1In = self.getFlowBalanceInPool()
                 var token0In = token1In / tokenInPoolPrice
-                if token0In > token0Max {
-                    token0In = token0Max
-                }
+
                 // setup swap pair based on current price
                 if token0Reserve != 0.0 || token1Reserve != 0.0 {
                     // let the price close to the tokenInPoolPrice
                     let swapPrice = SwapConfig.getAmountOut(amountIn: 1.0, reserveIn: token0Reserve, reserveOut: token1Reserve)
                     // we need ensure the final swap price is quite close to the tokenInPoolPrice
-                    // if tokenInPoolPrice is greater than swapPrice
-                    // then we need to swap a portion of token1 to token0 in the pair
-                    // Here is the formula to calculate the optimized token0In
-                    if swapPrice >= tokenInPoolPrice {
-                        // only swap a portion of token1 to token0 for the case that the swap price is greater than the tokenInPoolPrice
-                        let estimatedToken0In = SwapConfig.quote(amountA: token1In, reserveA: token1Reserve, reserveB: token0Reserve)
-                        if estimatedToken0In > token0In {
-                            destroy token0Vault
-                            destroy token1Vault
-                            // DO NOT PANIC
-                            return false
+                    let scaledToken0Reserve = SwapConfig.UFix64ToScaledUInt256(token0Reserve)
+                    let scaledToken1Reserve = SwapConfig.UFix64ToScaledUInt256(token1Reserve)
+                    let scaledTokenInPoolPrice = SwapConfig.UFix64ToScaledUInt256(tokenInPoolPrice)
+                    // if the swap price is greater than the tokenInPoolPrice, we need to make the swap price cheaper
+                    if swapPrice > tokenInPoolPrice {
+                        // So we need to add a portion of token0 in pool, increase the token0Reserve and decrease the token1Reserve
+                        // Before: swapPrice = token0Reserve / token1Reserve
+                        // After: swapPriceAfter = (token0Reserve + x) / (token1Reserve - y) = tokenInPoolPrice
+                        // ------------------------------
+                        // y is swapToken1Out, x is swapToken0In, so we just need to calculate the optimized x
+                        // Swap Formula: token0Reserve * token1Reserve = (token0Reserve + x) * (token1Reserve - y)
+                        // => (token1Reserve - y) = (token0Reserve * token1Reserve) / (token0Reserve + x)
+                        // => tokenInPoolPrice = (token0Reserve + x) / ((token0Reserve * token1Reserve) / (token0Reserve + x))
+                        //                     = (token0Reserve + x)^2 / (token0Reserve * token1Reserve)
+                        // => x = sqrt(token0Reserve * token1Reserve * tokenInPoolPrice) - token0Reserve
+                        let valueSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve * scaledTokenInPoolPrice)
+                        let swapToken0In = SwapConfig.ScaledUInt256ToUFix64(valueSqrt.saturatingSubtract(scaledToken0Reserve))
+                        // swap the token0 to token1 first, and then add liquidity to token1 vault
+                        if swapToken0In > 0.0 {
+                            let token0ToSwap <- self.vault.withdraw(amount: swapToken0In)
+                            let token1SwappedVault <- pairPublicRef!.swap(
+                                vaultIn: <- token0ToSwap,
+                                exactAmountOut: nil
+                            )
+                            // now the swapPrice should be close to the tokenInPoolPrice
+                            // so we can re-calculate the token0In & token1In to add liquidity
+                            token0In = (token1SwappedVault.balance + token1In) / tokenInPoolPrice
+                            // deposit the token1Swapped to the token1Vault
+                            token1Vault.deposit(from: <- token1SwappedVault)
                         }
-                        token0In = estimatedToken0In
                     } else {
-                        // For the case that the swap price is less than the tokenInPoolPrice
-                        // DON'T DO ANYTHING
-                        destroy token0Vault
-                        destroy token1Vault
-                        // DO NOT PANIC
-                        return false
+                        // if the swap price is less than the tokenInPoolPrice, we need to make the swap price higher
+                        // So we need to add a portion of token0 in pool, decrease the token0Reserve and increase the token1Reserve
+                        // Before: swapPrice = token0Reserve / token1Reserve
+                        // After: swapPriceAfter = (token0Reserve - x) / (token1Reserve + y) = tokenInPoolPrice
+                        // ------------------------------
+                        // y is swapToken1In, x is swapToken0Out, so we just need to calculate the optimized y
+                        // Swap Formula: token0Reserve * token1Reserve = (token0Reserve - x) * (token1Reserve + y)
+                        // => (token1Reserve - x) = (token0Reserve * token1Reserve) / (token1Reserve + y)
+                        // => tokenInPoolPrice = (token0Reserve * token1Reserve) / (token1Reserve + y) / (token1Reserve + y)
+                        //                     = (token0Reserve * token1Reserve) / (token1Reserve + y)^2
+                        // => y = sqrt(token0Reserve * token1Reserve / tokenInPoolPrice) - token1Reserve
+                        let valueSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve / scaledTokenInPoolPrice)
+                        let swapToken1In = SwapConfig.ScaledUInt256ToUFix64(valueSqrt.saturatingSubtract(scaledToken1Reserve))
+                        // swap the token1 to token0 first, and then add liquidity to token0 vault
+                        if swapToken1In > 0.0 {
+                            let token1ToSwap <- self._withdrawFlowToken(swapToken1In)
+                            let token0SwappedVault <- pairPublicRef!.swap(
+                                vaultIn: <- token1ToSwap,
+                                exactAmountOut: nil
+                            )
+                            // now the swapPrice should be close to the tokenInPoolPrice
+                            // add token0 back to the pool
+                            self.vault.deposit(from: <- token0SwappedVault)
+                            // re-calculate the token0In & token1In to add liquidity
+                            token1In = self.getFlowBalanceInPool()
+                            token0In = token1In / tokenInPoolPrice
+                        }
                     }
+                }
+
+                // deposit the token0In & token1In to the vaults
+                if token0In > token0Max {
+                    token0In = token0Max
                 }
                 if token0In > 0.0 {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: token0In))
