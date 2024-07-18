@@ -1580,9 +1580,10 @@ access(all) contract FixesTradablePool {
             // add all the token to the pair
             if self.isLocalActive() {
                 let token0Max = self.getTokenBalanceInPool()
+                let token1Max = self.getFlowBalanceInPool()
                 // init the liquidity pool with current price
                 let tokenInPoolPrice = self.getUnitPrice()
-                var token1In = self.getFlowBalanceInPool()
+                var token1In = token1Max
                 var token0In = token1In / tokenInPoolPrice
 
                 // setup swap pair based on current price
@@ -1608,7 +1609,7 @@ access(all) contract FixesTradablePool {
                         let valueSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve * scaledTokenInPoolPrice)
                         let swapToken0In = SwapConfig.ScaledUInt256ToUFix64(valueSqrt.saturatingSubtract(scaledToken0Reserve))
                         // swap the token0 to token1 first, and then add liquidity to token1 vault
-                        if swapToken0In > 0.0 {
+                        if swapToken0In > 0.0 && swapToken0In <= token0Max {
                             let token0ToSwap <- self.vault.withdraw(amount: swapToken0In)
                             let token1SwappedVault <- pairPublicRef!.swap(
                                 vaultIn: <- token0ToSwap,
@@ -1635,7 +1636,7 @@ access(all) contract FixesTradablePool {
                         let valueSqrt = SwapConfig.sqrt(scaledToken0Reserve * scaledToken1Reserve / scaledTokenInPoolPrice)
                         let swapToken1In = SwapConfig.ScaledUInt256ToUFix64(valueSqrt.saturatingSubtract(scaledToken1Reserve))
                         // swap the token1 to token0 first, and then add liquidity to token0 vault
-                        if swapToken1In > 0.0 {
+                        if swapToken1In > 0.0 && swapToken1In <= token1Max  {
                             let token1ToSwap <- self._withdrawFlowToken(swapToken1In)
                             let token0SwappedVault <- pairPublicRef!.swap(
                                 vaultIn: <- token1ToSwap,
