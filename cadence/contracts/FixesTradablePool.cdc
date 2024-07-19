@@ -1625,18 +1625,18 @@ access(all) contract FixesTradablePool {
                         let scaledX = (resXSqrt / SwapConfig.sqrt(sf) * sf).saturatingSubtract(scaledToken0Reserve)
                         let swapToken0In = SwapConfig.ScaledUInt256ToUFix64(scaledX)
                         if swapToken0In > token0Max {
-                            panic("The swap token0In is greater than the token0Max. "
-                                .concat(swapToken0In.toString())
-                                .concat(" > ")
-                                .concat(token0Max.toString())
-                                .concat(" swapPrice: ")
-                                .concat(scaledSwapPrice.toString())
-                                .concat(" bcPrice: ")
-                                .concat(scaledTokenInPoolPrice.toString())
-                            )
-                            // destroy token0Vault
-                            // destroy token1Vault
-                            // return false
+                            // panic("The swap token0In is greater than the token0Max. "
+                            //     .concat(swapToken0In.toString())
+                            //     .concat(" > ")
+                            //     .concat(token0Max.toString())
+                            //     .concat(" swapPrice: ")
+                            //     .concat(scaledSwapPrice.toString())
+                            //     .concat(" bcPrice: ")
+                            //     .concat(scaledTokenInPoolPrice.toString())
+                            // )
+                            destroy token0Vault
+                            destroy token1Vault
+                            return false
                         }
                         // swap the token0 to token1 first, and then add liquidity to token1 vault
                         if swapToken0In > 0.0 && swapToken0In <= token0Max {
@@ -1680,18 +1680,18 @@ access(all) contract FixesTradablePool {
                         let scaledY = (resYSqrt / SwapConfig.sqrt(sf)).saturatingSubtract(scaledToken1Reserve)
                         let swapToken1In = SwapConfig.ScaledUInt256ToUFix64(scaledY)
                         if swapToken1In > token1Max {
-                            panic("The swap token1In is greater than the token1Max. "
-                                .concat(swapToken1In.toString())
-                                .concat(" > ")
-                                .concat(token1Max.toString())
-                                .concat(" swapPrice: ")
-                                .concat(scaledSwapPrice.toString())
-                                .concat(" bcPrice: ")
-                                .concat(scaledTokenInPoolPrice.toString())
-                            )
-                            // destroy token0Vault
-                            // destroy token1Vault
-                            // return false
+                            // panic("The swap token1In is greater than the token1Max. "
+                            //     .concat(swapToken1In.toString())
+                            //     .concat(" > ")
+                            //     .concat(token1Max.toString())
+                            //     .concat(" swapPrice: ")
+                            //     .concat(scaledSwapPrice.toString())
+                            //     .concat(" bcPrice: ")
+                            //     .concat(scaledTokenInPoolPrice.toString())
+                            // )
+                            destroy token0Vault
+                            destroy token1Vault
+                            return false
                         }
                         // swap the token1 to token0 first, and then add liquidity to token0 vault
                         if swapToken1In > 0.0 {
@@ -1713,6 +1713,9 @@ access(all) contract FixesTradablePool {
                 // deposit the token0In & token1In to the vaults
                 if token0In > token0Max {
                     token0In = token0Max
+                }
+                if token1In > token1Max {
+                    token1In = token1Max
                 }
                 if token0In > 0.0 {
                     token0Vault.deposit(from: <- self.vault.withdraw(amount: token0In))
