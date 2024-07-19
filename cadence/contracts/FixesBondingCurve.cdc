@@ -25,6 +25,13 @@ access(all) contract FixesBondingCurve {
         view fun calculatePrice(supply: UFix64, amount: UFix64): UFix64
         access(all)
         view fun calculateAmount(supply: UFix64, cost: UFix64): UFix64
+        /// Calculate the unit price of the token
+        access(all)
+        view fun calculateUnitPrice(supply: UFix64): UFix64 {
+            let freeAmount = self.getFreeAmount()
+            let restFreeAmount = freeAmount.saturatingSubtract(supply)
+            return self.calculatePrice(supply: supply, amount: restFreeAmount + 1.0)
+        }
     }
 
     /// The Quadratic curve implementation.
@@ -68,6 +75,11 @@ access(all) contract FixesBondingCurve {
         ///
         access(all)
         view fun calculatePrice(supply: UFix64, amount: UFix64): UFix64 {
+            // avoid useless calculation
+            if amount == 0.0 {
+                return 0.0
+            }
+
             let scaledX = SwapConfig.UFix64ToScaledUInt256(supply)
             let scaledDeltaX = SwapConfig.UFix64ToScaledUInt256(amount)
             let ufix64Max = SwapConfig.UFix64ToScaledUInt256(UFix64.max)
@@ -77,7 +89,7 @@ access(all) contract FixesBondingCurve {
                 ? 0
                 : x0 * (x0 + 1) / SwapConfig.scaleFactor * (2 * x0 + 1) / 6 / SwapConfig.scaleFactor
             // calculate the sum of squares after adding the amount
-            let x1 = scaledX.saturatingSubtract(self.freeScaledAmount).saturatingAdd(scaledDeltaX)
+            let x1 = scaledX.saturatingAdd(scaledDeltaX).saturatingSubtract(self.freeScaledAmount)
             let sum1: UInt256 = scaledX + scaledDeltaX <= self.freeScaledAmount
                 ? 0
                 : x1 * (x1 + 1) / SwapConfig.scaleFactor * (2 * x1 + 1) / 6 / SwapConfig.scaleFactor
@@ -103,16 +115,23 @@ access(all) contract FixesBondingCurve {
         ///
         access(all)
         view fun calculateAmount(supply: UFix64, cost: UFix64): UFix64 {
-            var supplyOnePrice = self.calculatePrice(supply: supply, amount: 1.0)
+            // avoid useless calculation
+            if cost == 0.0 {
+                return 0.0
+            }
+
+            let freeAmount = self.getFreeAmount()
+            let restFreeAmount = freeAmount.saturatingSubtract(supply)
+            var supplyOnePrice = self.calculatePrice(supply: supply, amount: restFreeAmount + 1.0)
             if supplyOnePrice == 0.0 {
                 supplyOnePrice = 0.00000001
             }
-            let maxAmount = cost / supplyOnePrice
 
             let minH = 0.01
-            var low = 0.0
-            var high = maxAmount
-            var finalAmount = (low + high) * 0.5
+            var low = restFreeAmount
+            var high = restFreeAmount + cost / supplyOnePrice
+            var finalAmount = low.saturatingAdd(high).saturatingMultiply(0.5)
+
             var calcCost = self.calculatePrice(supply: supply, amount: finalAmount)
             // binary search
             while calcCost > cost.saturatingAdd(minH) || calcCost < cost.saturatingSubtract(minH) {
