@@ -311,7 +311,11 @@ access(all) contract FixesAssetMeta {
                 if let geneRef = &self.genes[key] as &Gene? {
                     let geneId = geneRef.getId()
                     // add the new gene to the new DNA
-                    newDna.genes[geneId] = geneRef.split(perc) as! Gene
+                    let newGene = geneRef.split(perc) as! Gene
+                    // Don't add the gene if the exp is 0
+                    if newGene.exp > 0 {
+                        newDna.genes[geneId] = newGene
+                    }
                 }
             }
             return newDna
@@ -330,6 +334,9 @@ access(all) contract FixesAssetMeta {
             )
             for key in fromDna.genes.keys {
                 if let fromGene = fromDna.genes[key] {
+                    if fromGene.exp == 0 {
+                        continue
+                    }
                     self.mergeGene(fromGene)
                 }
             } // end for
