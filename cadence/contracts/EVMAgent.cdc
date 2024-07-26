@@ -222,7 +222,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault
 
         /// Create a new entrusted account by the agency
