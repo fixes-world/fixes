@@ -88,12 +88,12 @@ access(all) contract FRC20AccountsPool {
         access(all)
         view fun borrowEVMAgencyFlowTokenReceiver(_ owner: String): &{FungibleToken.Receiver}?
 
-        /// Returns the address of the EVM entrusted account for the given evm address
+        /// Returns the address of the entrusted account for the given evm address
         access(all)
-        view fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address?
+        view fun getEntrustedAccountAddress(_ key: String): Address?
         /// Returns the flow token receiver for the given evm address
         access(all)
-        view fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}?
+        view fun borrowEntrustedAccountFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}?
 
         /// Returns the address of the GameWorld for the given key
         access(all)
@@ -134,7 +134,7 @@ access(all) contract FRC20AccountsPool {
         fun setupNewChildForEVMAgency(owner: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
         /// Sets up a new child account for EVM entrusted account
         access(account)
-        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
+        fun setupNewChildForEntrustedAccount(key: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
         /// Sets up a new child account for some Game World
         access(account)
         fun setupNewChildForGameWorld(key: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>)
@@ -261,16 +261,16 @@ access(all) contract FRC20AccountsPool {
         }
 
 
-        /// Returns the address of the EVM entrusted account for the given evm address
+        /// Returns the address of the entrusted account for the given evm address
         access(all)
-        view fun getEVMEntrustedAccountAddress(_ evmAddr: String): Address? {
-            return self.getAddress(type: ChildAccountType.EVMEntrustedAccount, evmAddr)
+        view fun getEntrustedAccountAddress(_ key: String): Address? {
+            return self.getAddress(type: ChildAccountType.EVMEntrustedAccount, key)
         }
 
         /// Returns the flow token receiver for the given evm address
         access(all)
-        view fun borrowEVMEntrustedAccountFlowTokenReceiver(_ evmAddr: String): &{FungibleToken.Receiver}? {
-            if let addr = self.getEVMEntrustedAccountAddress(evmAddr) {
+        view fun borrowEntrustedAccountFlowTokenReceiver(_ key: String): &{FungibleToken.Receiver}? {
+            if let addr = self.getEntrustedAccountAddress(key) {
                 return Fixes.borrowFlowTokenReceiver(addr)
             }
             return nil
@@ -431,10 +431,10 @@ access(all) contract FRC20AccountsPool {
             self.setupNewChildByKey(type: ChildAccountType.EVMAgency, key: owner, acctCap)
         }
 
-        /// Sets up a new child account for EVM entrusted account
+        /// Sets up a new child account for entrusted account
         access(account)
-        fun setupNewChildForEVMEntrustedAccount(evmAddr: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
-            self.setupNewChildByKey(type: ChildAccountType.EVMEntrustedAccount, key: evmAddr, acctCap)
+        fun setupNewChildForEntrustedAccount(key: String, _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>) {
+            self.setupNewChildByKey(type: ChildAccountType.EVMEntrustedAccount, key: key, acctCap)
         }
 
         /// Sets up a new child account for some Game World
