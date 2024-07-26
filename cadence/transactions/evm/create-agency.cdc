@@ -37,7 +37,7 @@ transaction(
         )
 
         /** ------------- Create the Inscription - Start ------------- */
-        let insDataStr = FixesInscriptionFactory.buildEvmAgencyCreate(tick: "flows")
+        let insDataStr = FixesInscriptionFactory.buildAcctAgencyCreate()
         // estimate the required storage
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(insDataStr)
         // get reserved cost

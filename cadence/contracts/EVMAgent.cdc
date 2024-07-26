@@ -14,6 +14,7 @@ import "StringUtils"
 import "ETHUtils"
 import "Fixes"
 import "FixesInscriptionFactory"
+import "FRC20FTShared"
 import "FRC20Indexer"
 import "FRC20Staking"
 import "FRC20AccountsPool"
@@ -30,6 +31,7 @@ access(all) contract EVMAgent {
     access(all) event NewAgencyManagerCreated(forAgency: Address)
     /// Event emitted when a new entrusted account is created.
     access(all) event NewEntrustedAccountCreated(
+        accountKey: String,
         evmAddress: String,
         entrustedAccount: Address,
         byAgency: Address,
@@ -37,6 +39,7 @@ access(all) contract EVMAgent {
     )
     /// Event emitted when the entrusted account is verified
     access(all) event EntrustedAccountVerified(
+        accountKey: String,
         evmAddress: String,
         entrustedAccount: Address,
         byAgency: Address,
@@ -191,10 +194,6 @@ access(all) contract EVMAgent {
             return self.owner?.address ?? panic("Agency should have an owner")
         }
 
-        // Check if the EVM address is managed by the agency
-        access(all)
-        view fun isEVMAccountManaged(_ evmAddress: String): Bool
-
         /// Get the agency account
         access(all)
         view fun getDetails(): AgencyStatus
@@ -202,6 +201,14 @@ access(all) contract EVMAgent {
         /// Get the balance of the flow for the agency
         access(all)
         view fun getFlowBalance(): UFix64
+
+        // Check if the EVM address is managed by the agency
+        access(all)
+        view fun isEVMAccountManaged(_ evmAddress: String): Bool
+
+        // Check if the social id is managed by the agency
+        access(all)
+        view fun isSocialIDManaged(_ platform: String, _ platformId: String): Bool
 
         /// Create a new entrusted account by the agency
         access(all)
@@ -243,7 +250,10 @@ access(all) contract EVMAgent {
         /// Current status of the agency
         access(self)
         let status: AgencyStatus
-        /// EVMAddress String => Address
+        /// Key => Address
+        /// Keys format:
+        ///     EVMAddress => 0xabc...123
+        ///     SoicalHandleKey => platform:platformId
         access(self)
         let managedEntrustedAccounts: {String: Address}
 
@@ -332,6 +342,13 @@ access(all) contract EVMAgent {
             return self.managedEntrustedAccounts[evmAddress] != nil
         }
 
+        // Check if the social id is managed by the agency
+        access(all)
+        view fun isSocialIDManaged(_ platform: String, _ platformId: String): Bool {
+            let id = platform.concat(":").concat(platformId)
+            return self.managedEntrustedAccounts[id] != nil
+        }
+
         /// Get the agency account
         access(all)
         view fun getDetails(): AgencyStatus {
@@ -352,15 +369,50 @@ access(all) contract EVMAgent {
         /// The agency will fund the new created entrusted account with 0.01 $FLOW
         ///
         access(all)
+        fun createSocialEntrustedAccount(
+            platform: String,
+            platformId: String,
+            hexPublicKey: String,
+            hexSignature: String,
+            timestamp: UInt64,
+            _ acctCap: Capability<&AuthAccount>
+        ): @FlowToken.Vault {
+            let socialId = EVMAgent.getSocialId(platform, platformId)
+
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            // Ensure the key is not already registered
+            let existingAddr = acctsPool.getEntrustedAccountAddress(socialId)
+            assert(
+                existingAddr == nil,
+                message: "EVM address already registered for an agent account"
+            )
+            // Calculate the EVM address from the public key
+            let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
+
+            let message = "op=create-entrusted-account(),params="
+                .concat(",platform=").concat(platform)
+                .concat(",platformId=").concat(platformId)
+                .concat(",evmAddress=").concat(evmAddress)
+                .concat(",timestamp=").concat(timestamp.toString())
+            log("Verifying message: ".concat(message))
+            let isValid = ETHUtils.verifySignature(hexPublicKey: hexPublicKey, hexSignature: hexSignature, message: message)
+            assert(
+                isValid,
+                message: "Invalid signature"
+            )
+
+            return <- self._createEntrustedAccount(accountKey: socialId, evmAddress: evmAddress, acctCap)
+        }
+
+        /// The agency will fund the new created entrusted account with 0.01 $FLOW
+        ///
+        access(all)
         fun createEntrustedAccount(
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
             _ acctCap: Capability<&AuthAccount>
         ): @FlowToken.Vault {
-            pre {
-                acctCap.check(): "Invalid account capability"
-            }
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
             assert(
                 self.managedEntrustedAccounts[evmAddress] == nil,
@@ -368,7 +420,7 @@ access(all) contract EVMAgent {
             )
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // Ensure the evmAddress is not already registered
-            let existingAddr = acctsPool.getEVMEntrustedAccountAddress(evmAddress)
+            let existingAddr = acctsPool.getEntrustedAccountAddress(evmAddress)
             assert(
                 existingAddr == nil,
                 message: "EVM address already registered for an agent account"
@@ -384,6 +436,20 @@ access(all) contract EVMAgent {
                 message: "Invalid signature"
             )
 
+            return <- self._createEntrustedAccount(accountKey: evmAddress, evmAddress: evmAddress, acctCap)
+        }
+
+        /// Create the entrusted account
+        access(self)
+        fun _createEntrustedAccount(
+            accountKey: String,
+            evmAddress: String,
+            _ acctCap: Capability<&AuthAccount>
+        ): @FlowToken.Vault {
+            pre {
+                acctCap.check(): "Invalid account capability"
+            }
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // Get the agency account
             let agencyAcct = self._borrowAgencyAccount()
 
@@ -414,18 +480,24 @@ access(all) contract EVMAgent {
             entrustedAcctFlowRecipientRef.deposit(from: <-initFlow)
 
             // add the cap to accounts pool
-            acctsPool.setupNewChildForEVMEntrustedAccount(evmAddr: evmAddress, acctCap)
+            acctsPool.setupNewChildForEntrustedAccount(key: accountKey, acctCap)
 
             // Ensure all resources in initialized to the entrusted account
-            self._ensureEntrustedAcctResources(evmAddress)
+            self._ensureEntrustedAcctResources(accountKey)
             self.status.addManagingEntrustedAccounts(1)
             self.status.addSpentFlowAmount(spentFlowAmt)
 
             /// Save the entrusted account address
-            self.managedEntrustedAccounts[evmAddress] = entrustedAddress
+            self.managedEntrustedAccounts[accountKey] = entrustedAddress
+            /// update the status
+            if accountKey != evmAddress {
+                let cacheKey = "AccountKey:".concat(evmAddress)
+                self.status.updateExtra(cacheKey, accountKey)
+            }
 
             // emit event
             emit NewEntrustedAccountCreated(
+                accountKey: accountKey,
                 evmAddress: evmAddress,
                 entrustedAccount: entrustedAddress,
                 byAgency: agencyAcct.address,
@@ -434,6 +506,16 @@ access(all) contract EVMAgent {
 
             // return the refund balance
             return <- (refundBalance as! @FlowToken.Vault)
+        }
+
+        /// Get the account key of the entrusted account
+        access(self)
+        view fun getAccountKey(_ evmAddress: String): String {
+            let cacheKey = "AccountKey:".concat(evmAddress)
+            if let accountKey = self.status.extra[cacheKey] as! String? {
+                return accountKey
+            }
+            return evmAddress
         }
 
         /// Verify the evm signature, if valid, borrow the reference of the entrusted account
@@ -468,13 +550,15 @@ access(all) contract EVMAgent {
             timestamp: UInt64
         ): &AuthAccount {
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
+            let accountKey = self.getAccountKey(evmAddress)
             assert(
-                self.managedEntrustedAccounts[evmAddress] != nil,
+                self.managedEntrustedAccounts[accountKey] != nil,
                 message: "EVM address not registered for an agent account"
             )
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            // Ensure the evmAddress is not already registered
-            let entrustedAddr = acctsPool.getEVMEntrustedAccountAddress(evmAddress)
+
+            // Ensure the account is already registered
+            let entrustedAddr = acctsPool.getEntrustedAccountAddress(accountKey)
             assert(
                 entrustedAddr != nil,
                 message: "EVM address not registered for an agent account"
@@ -495,7 +579,7 @@ access(all) contract EVMAgent {
             // and we can borrow the reference to the entrusted account
             let entrustedAcct = acctsPool.borrowChildAccount(
                 type: FRC20AccountsPool.ChildAccountType.EVMEntrustedAccount,
-                evmAddress
+                accountKey
             ) ?? panic("The staking account was not created")
 
             // The entrusted account need to pay a fee to the agency
@@ -521,6 +605,7 @@ access(all) contract EVMAgent {
 
             // emit event
             emit EntrustedAccountVerified(
+                accountKey: accountKey,
                 evmAddress: evmAddress,
                 entrustedAccount: entrustedAcct.address,
                 byAgency: self.getOwnerAddress(),
@@ -603,10 +688,15 @@ access(all) contract EVMAgent {
 
         /// Get the agency by evm address
         access(all)
-        fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}?
+        view fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}?
+
+        /// Get the agency by social id
+        access(all)
+        view fun borrowAgencyBySocialId(_ platform: String, _ platformId: String): &Agency{AgencyPublic}?
+
         /// Get the agency by address
         access(all)
-        fun pickValidAgency(): &Agency{AgencyPublic}?
+        view fun pickValidAgency(): &Agency{AgencyPublic}?
     }
 
     /// Agency center resource
@@ -641,15 +731,15 @@ access(all) contract EVMAgent {
             let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
             let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
             assert(
-                op == "create-evm-agency",
+                op == "create-evm-agency" || op == "create-acct-agency",
                 message: "Invalid operation"
             )
-            let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
             let fromAddr = ins.owner?.address ?? panic("The owner address is not found")
 
             let delegator = FRC20Staking.borrowDelegator(fromAddr)
                 ?? panic("The delegator is not found")
-            let stakedBalance = delegator.getStakedBalance(tick: tick)
+            let platformStakeTick = FRC20FTShared.getPlatformStakingTickerName()
+            let stakedBalance = delegator.getStakedBalance(tick: platformStakeTick)
             // only the delegator with enough staked balance can create the agency
             assert(
                 stakedBalance >= 10000.0,
@@ -684,9 +774,22 @@ access(all) contract EVMAgent {
         /// Get the agency by evm address
         ///
         access(all)
-        fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}? {
+        view fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}? {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            if let addr = acctsPool.getEVMEntrustedAccountAddress(evmAddress) {
+            if let addr = acctsPool.getEntrustedAccountAddress(evmAddress) {
+                if let entrustStatus = EVMAgent.borrowEntrustStatus(addr) {
+                    return entrustStatus.borrowAgency()
+                }
+            }
+            return nil
+        }
+
+        /// Get the agency by social id
+        access(all)
+        view fun borrowAgencyBySocialId(_ platform: String, _ platformId: String): &Agency{AgencyPublic}? {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let id = EVMAgent.getSocialId(platform, platformId)
+            if let addr = acctsPool.getEntrustedAccountAddress(id) {
                 if let entrustStatus = EVMAgent.borrowEntrustStatus(addr) {
                     return entrustStatus.borrowAgency()
                 }
@@ -737,6 +840,13 @@ access(all) contract EVMAgent {
     access(all)
     view fun getAgencyFlowFee(): UFix64 {
         return 0.01
+    }
+
+    /// Get the social id by platform + id
+    ///
+    access(all)
+    viw fun getSocialId(_ platform: String, _ platformId: String): String {
+        return platform.concat(":").concat(platformId)
     }
 
     /// Get the capability to the entrusted status
