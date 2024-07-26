@@ -210,6 +210,17 @@ access(all) contract EVMAgent {
         access(all)
         view fun isSocialIDManaged(_ platform: String, _ platformId: String): Bool
 
+        /// The agency will fund the new created entrusted account with 0.01 $FLOW
+        access(all)
+        fun createSocialEntrustedAccount(
+            platform: String,
+            platformId: String,
+            hexPublicKey: String,
+            hexSignature: String,
+            timestamp: UInt64,
+            _ acctCap: Capability<&AuthAccount>
+        ): @FlowToken.Vault
+
         /// Create a new entrusted account by the agency
         access(all)
         fun createEntrustedAccount(
@@ -849,7 +860,7 @@ access(all) contract EVMAgent {
     /// Get the social id by platform + id
     ///
     access(all)
-    viw fun getSocialId(_ platform: String, _ platformId: String): String {
+    view fun getSocialId(_ platform: String, _ platformId: String): String {
         return platform.concat(":").concat(platformId)
     }
 
