@@ -146,6 +146,12 @@ access(all) contract FungibleTokenManager {
             self._stageChildrenContracts(keys: keys.slice(from: start, upTo: end))
         }
 
+        // migrate child
+        access(all)
+        fun stageChildrenContract(key: String) {
+            self._stageChildrenContracts(keys: [key])
+        }
+
         // migrate the children contracts
         access(self)
         fun _stageChildrenContracts(keys: [String]) {
