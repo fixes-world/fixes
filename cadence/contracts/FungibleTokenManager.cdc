@@ -122,7 +122,34 @@ access(all) contract FungibleTokenManager {
         fun stageAllChildrenContracts() {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
-            let ticks = dict.keys
+            // stage the contracts
+            self._stageChildrenContracts(keys: dict.keys)
+        }
+
+        // migrate all children contracts
+        access(all)
+        fun stageChildrenContracts(page: Int) {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
+            let keys = dict.keys
+            // paginate the keys
+            let pageSize = 5
+            let start = page * pageSize
+            var end = start + pageSize
+            if end > keys.length {
+                end = keys.length
+            }
+            if start >= end {
+                return
+            }
+            // stage the contracts
+            self._stageChildrenContracts(keys: keys.slice(from: start, upTo: end))
+        }
+
+        // migrate the children contracts
+        access(self)
+        fun _stageChildrenContracts(keys: [String]) {
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // get the statged template codes
             let serviceAddr = Fixes.getPlatformAddress()
             let codes: {String: String} = {}
@@ -133,10 +160,10 @@ access(all) contract FungibleTokenManager {
                 message: "The staged contract codes are not found"
             )
             // migrate the contracts
-            for tick in ticks {
-                let ftContractName = tick[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
+            for key in keys {
+                let ftContractName = key[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
                 let ftContractCode = codes[ftContractName]!
-                if let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick) {
+                if let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, key) {
                     if acct.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath) == nil {
                         acct.save(<-MigrationContractStaging.createHost(), to: MigrationContractStaging.HostStoragePath)
                     }
