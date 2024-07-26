@@ -373,7 +373,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault {
             let socialId = EVMAgent.getSocialId(platform, platformId)
             assert(
@@ -446,7 +446,7 @@ access(all) contract EVMAgent {
         fun _createEntrustedAccount(
             accountKey: String,
             evmAddress: String,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault {
             pre {
                 acctCap.check(): "Invalid account capability"
@@ -850,7 +850,7 @@ access(all) contract EVMAgent {
     /// Get the social id by platform + id
     ///
     access(all)
-    viw fun getSocialId(_ platform: String, _ platformId: String): String {
+    view fun getSocialId(_ platform: String, _ platformId: String): String {
         return platform.concat(":").concat(platformId)
     }
 
