@@ -378,6 +378,10 @@ access(all) contract EVMAgent {
             _ acctCap: Capability<&AuthAccount>
         ): @FlowToken.Vault {
             let socialId = EVMAgent.getSocialId(platform, platformId)
+            assert(
+                self.managedEntrustedAccounts[socialId] == nil,
+                message: "The social id already registered for an agent account"
+            )
 
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             // Ensure the key is not already registered
