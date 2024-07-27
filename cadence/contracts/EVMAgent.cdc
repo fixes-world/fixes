@@ -404,10 +404,10 @@ access(all) contract EVMAgent {
             // Calculate the EVM address from the public key
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
 
-            let message = "op=create-entrusted-account-by-social(),params="
+            let message = "op=create-entrusted-account-by-social(String|String),params="
                 .concat(",platform=").concat(platform)
                 .concat(",platformId=").concat(platformId)
-                .concat(",evmAddress=").concat(evmAddress)
+                .concat(",address=").concat(evmAddress)
                 .concat(",timestamp=").concat(timestamp.toString())
             log("Verifying message: ".concat(message))
             let isValid = ETHUtils.verifySignature(hexPublicKey: hexPublicKey, hexSignature: hexSignature, message: message)
