@@ -404,7 +404,7 @@ access(all) contract EVMAgent {
             // Calculate the EVM address from the public key
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
 
-            let message = "op=create-entrusted-account(),params="
+            let message = "op=create-entrusted-account-by-social(),params="
                 .concat(",platform=").concat(platform)
                 .concat(",platformId=").concat(platformId)
                 .concat(",evmAddress=").concat(evmAddress)
