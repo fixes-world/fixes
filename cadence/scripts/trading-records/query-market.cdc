@@ -36,7 +36,7 @@ fun main(
     // to load yesterday's data if not enough
     var i = 0
     var currentDate = dateToQuery
-    let maxRepeat = 30
+    let maxRepeat = 90
     while ret.length < size && i < maxRepeat {
         let prevDatetime = currentDate
         if let prevDateData = records!.borrowDailyRecords(prevDatetime) {
