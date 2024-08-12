@@ -239,6 +239,12 @@ access(all) contract FixesInscriptionFactory {
     // EVM Agency Inscription
 
     access(all)
+    view fun buildAcctAgencyCreate(): String {
+        return "op=create-acct-agency"
+    }
+
+    /// @deprecated
+    access(all)
     view fun buildEvmAgencyCreate(
         tick: String,
     ): String {

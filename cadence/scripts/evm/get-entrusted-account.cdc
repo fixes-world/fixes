@@ -2,8 +2,8 @@ import "FRC20AccountsPool"
 
 access(all)
 fun main(
-    evmAddr: String
+    key: String
 ): Address? {
     let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-    return acctsPool.getEVMEntrustedAccountAddress(evmAddr)
+    return acctsPool.getEntrustedAccountAddress(key)
 }
