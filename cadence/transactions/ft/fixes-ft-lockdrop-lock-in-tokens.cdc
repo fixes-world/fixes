@@ -21,18 +21,20 @@ transaction(
     lockingAmount: UFix64,
 ) {
     let tickerName: String
-    let ins: &Fixes.Inscription
-    let pool: &FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}
-    let lockingVault: @FungibleToken.Vault?
+    let ins: auth(Fixes.Extractable) &Fixes.Inscription
+    let pool: &FixesTokenLockDrops.DropsPool
+    let lockingVault: @{FungibleToken.Vault}?
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
@@ -53,7 +55,8 @@ transaction(
         assert(periodRate > 0.0, message: "Invalid locking period")
 
         // Get a reference to the signer's stored vault
-        let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let flowVaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         /** ------------- Create the Inscription - Start ------------- */
@@ -69,7 +72,8 @@ transaction(
             if lockType == FixesTokenLockDrops.SupportedLockingTick.FlowToken {
                 self.lockingVault <- flowVaultRef.withdraw(amount: lockingAmount)
             } else {
-                let stFlowVaultRef = acct.borrow<&stFlowToken.Vault>(from: stFlowToken.tokenVaultPath)
+                let stFlowVaultRef = acct.storage
+                    .borrow<auth(FungibleToken.Withdraw) &stFlowToken.Vault>(from: stFlowToken.tokenVaultPath)
                     ?? panic("Could not borrow reference to the owner's stFlow Vault!")
                 self.lockingVault <- stFlowVaultRef.withdraw(amount: lockingAmount)
             }

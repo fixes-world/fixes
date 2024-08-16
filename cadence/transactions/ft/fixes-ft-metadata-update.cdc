@@ -22,32 +22,34 @@ transaction(
     let tickerName: String
     let managerRef: &FungibleTokenManager.Manager
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         /** ------------- Prepare the Fungible Token Manager - Start ----------- */
         let managerPath = FungibleTokenManager.getManagerStoragePath()
-        if acct.borrow<&FungibleTokenManager.Manager>(from: managerPath) == nil {
-            acct.save(<- FungibleTokenManager.createManager(), to: managerPath)
+        if acct.storage.borrow<&FungibleTokenManager.Manager>(from: managerPath) == nil {
+            acct.storage.save(<- FungibleTokenManager.createManager(), to: managerPath)
 
             // create the public capability for the manager
             let managerPubPath = FungibleTokenManager.getManagerPublicPath()
-            acct.unlink(managerPubPath)
-            acct.link<&FungibleTokenManager.Manager{FungibleTokenManager.ManagerPublic}>(
-                managerPubPath,
-                target: managerPath
+            acct.capabilities.unpublish(managerPubPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FungibleTokenManager.Manager>(managerPath),
+                at: managerPubPath
             )
         }
 
-        self.managerRef = acct.borrow<&FungibleTokenManager.Manager>(from: managerPath)
+        self.managerRef = acct.storage.borrow<&FungibleTokenManager.Manager>(from: managerPath)
             ?? panic("Could not borrow a reference to the Fungible Token Manager")
         /** ------------- End -------------------------------------------------- */
 

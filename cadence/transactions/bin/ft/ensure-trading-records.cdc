@@ -45,7 +45,8 @@ transaction() {
         }
 
         // borrow the hooks reference
-        let hooksRef = acct.storage.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+        let hooksRef = acct.storage
+            .borrow<auth(FRC20FTShared.Manage) &FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
 
         // add the trading records to the hooks, if it is not added yet

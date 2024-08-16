@@ -13,7 +13,8 @@ transaction(
     discord: String,
 ) {
     prepare(acct: auth(Storage, Capabilities) &Account) {
-        let wrapperIndexer = acct.storage.borrow<&FRC20NFTWrapper.WrapperIndexer>(from: FRC20NFTWrapper.FRC20NFTWrapperIndexerStoragePath)
+        let wrapperIndexer = acct.storage
+            .borrow<auth(FRC20NFTWrapper.Admin) &FRC20NFTWrapper.WrapperIndexer>(from: FRC20NFTWrapper.FRC20NFTWrapperIndexerStoragePath)
             ?? panic("Could not borrow a reference to the NFT Wrapper")
 
         // set default values

@@ -8,7 +8,8 @@ fun main(
 ): [Inscription] {
     let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(addr)
     let storePath = Fixes.getFixesStoreStoragePath()
-    if let storeRef = acct.storage.borrow<&Fixes.InscriptionsStore>(from: storePath) {
+    if let storeRef = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) {
         let ids = storeRef.getIDs()
         var upTo = (page + 1) * limit
         if upTo > ids.length {

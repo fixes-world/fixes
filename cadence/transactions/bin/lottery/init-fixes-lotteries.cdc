@@ -35,7 +35,8 @@ transaction(
         // deposit 1.0 FLOW to the newly created account
         if initialFundingAmt > 0.0 {
             // Get a reference to the signer's stored vault
-            let vaultRef = acct.storage.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+            let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("Could not borrow reference to the owner's Vault!")
 
             let receiverRef1 = newAccount1.capabilities

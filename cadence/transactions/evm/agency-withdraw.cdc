@@ -6,16 +6,17 @@ import "EVMAgent"
 transaction(
     amt: UFix64
 ) {
-    let manager: &EVMAgent.AgencyManager
-    let receiver: &FlowToken.Vault{FungibleToken.Receiver}
+    let manager: auth(EVMAgent.Manage) &EVMAgent.AgencyManager
+    let receiver: &{FungibleToken.Receiver}
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         // Borrow the manager
-        self.manager = acct.borrow<&EVMAgent.AgencyManager>(from: EVMAgent.evmAgencyManagerStoragePath)
+        self.manager = acct.storage
+            .borrow<auth(EVMAgent.Manage) &EVMAgent.AgencyManager>(from: EVMAgent.evmAgencyManagerStoragePath)
             ?? panic("Could not borrow the manager")
 
         self.receiver = acct
-            .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
             .borrow() ?? panic("Could not borrow receiver capability")
     }
 
