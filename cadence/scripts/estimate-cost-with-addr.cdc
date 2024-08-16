@@ -18,8 +18,8 @@ fun main(
     ) + 0.0001
 
     let vaultRef = getAccount(payer)
-        .getCapability(/public/flowTokenBalance)
-        .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+        .capabilities.get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+        .borrow()
         ?? panic("Could not borrow Balance reference to the Vault")
 
     return Estimated(cost: cost, balance: vaultRef.balance)

@@ -4,15 +4,15 @@ access(all)
 fun main(
     addr: Address,
 ): ArchivedInfo {
-    let acct = getAuthAccount(addr)
+    let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(addr)
     let archiveIdxPath = Fixes.getArchivedFixesMaxIndexStoragePath()
-    let archiveIdx = acct.load<UInt64>(from: archiveIdxPath) ?? 0
+    let archiveIdx = acct.storage.load<UInt64>(from: archiveIdxPath) ?? 0
 
     let archivedAmount: [UInt64] = []
     var i: UInt64 = 0
     while i <= archiveIdx {
         let archivePath = Fixes.getArchivedFixesStoragePath(i)
-        if let ref = acct.borrow<&Fixes.ArchivedInscriptions>(from: archivePath) {
+        if let ref = acct.storage.borrow<&Fixes.ArchivedInscriptions>(from: archivePath) {
             archivedAmount.append(UInt64(ref.getLength()))
         }
         i = i + 1

@@ -1,6 +1,6 @@
 import "NonFungibleToken"
 import "MetadataViews"
-import "InscriptionMetadata"
+import "ViewResolver"
 import "StringUtils"
 import "FixesWrappedNFT"
 
@@ -8,7 +8,7 @@ access(all)
 fun main(
     addr: Address
 ): {String: MetadataViews.NFTCollectionDisplay} {
-    let acct = getAuthAccount(addr)
+    let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(addr)
 
     // set default values
     let defaultBannerMedia = MetadataViews.Media(
@@ -34,41 +34,28 @@ fun main(
     ]
 
     let ret: {String: MetadataViews.NFTCollectionDisplay} = {}
-    acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
-        if type.isSubtype(of: Type<@NonFungibleToken.Collection>()) && !ignoreCollections.contains(type) {
-            let valid = acct.check<@{MetadataViews.ResolverCollection}>(from: path)
+    acct.storage.forEachStored(fun (path: StoragePath, type: Type): Bool {
+        if type.isSubtype(of: Type<@{NonFungibleToken.Collection}>()) && !ignoreCollections.contains(type) {
+            let valid = acct.storage.check<@{ViewResolver.ResolverCollection}>(from: path)
             if !valid {
-                // hack for FreeFlow Inscription
-                if acct.check<@{InscriptionMetadata.ResolverCollection}>(from: path) {
-                    let ref = acct.borrow<&{InscriptionMetadata.ResolverCollection}>(from: path)!
-                    let nftIds = ref.getIDs()
-                    if nftIds.length == 0 {
-                        return true
-                    }
-                    ret[type.identifier] = MetadataViews.NFTCollectionDisplay(
-                        name: "FreeFlow",
-                        description: "Free Flow Inscription NFT Collection.",
-                        externalURL: defaultUrl,
-                        squareImage: defaultSquareMedia,
-                        bannerImage: defaultBannerMedia,
-                        socials: defaultSocial
-                    )
-                }
                 return true
             }
-            let ref = acct.borrow<&{MetadataViews.ResolverCollection}>(from: path)!
+            let ref = acct.storage.borrow<&{ViewResolver.ResolverCollection}>(from: path)!
             let nftIds = ref.getIDs()
             if nftIds.length == 0 {
                 return true
             }
             // use the first NFT to get the collection display
             let viewResolver = ref.borrowViewResolver(id: nftIds[0])
+            if viewResolver == nil {
+                return true
+            }
             // if the collection has a display, use it
-            if let display = MetadataViews.getNFTCollectionDisplay(viewResolver) {
+            if let display = MetadataViews.getNFTCollectionDisplay(viewResolver!) {
                 ret[type.identifier] = display
             }
             // if the collection has an NFT display, use it
-            else if let nftDisplay = MetadataViews.getDisplay(viewResolver) {
+            else if let nftDisplay = MetadataViews.getDisplay(viewResolver!) {
                 let media = MetadataViews.Media(
                     file: nftDisplay.thumbnail,
                     mediaType: "image/*"
@@ -81,6 +68,7 @@ fun main(
                     bannerImage: defaultBannerMedia,
                     socials: defaultSocial
                 )
+            // if the collection has no display, use the default
             } else {
                 let ids = StringUtils.split(type.identifier, ".")
                 ret[type.identifier] = MetadataViews.NFTCollectionDisplay(

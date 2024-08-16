@@ -12,9 +12,9 @@ fun main(
     page: Int,
     size: Int,
 ): [StakedNFTInfo] {
-    let acct = getAuthAccount(addr)
+    let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(addr)
     // ensure collection exists
-    if acct.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
+    if acct.storage.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
         return []
     }
 
@@ -25,11 +25,13 @@ fun main(
 
     // Load from staked NFT Collection
     // ensure path correct
-    acct.unlink(FRC20SemiNFT.CollectionPublicPath)
-    acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath, target: FRC20SemiNFT.CollectionStoragePath)
+    acct.capabilities.unpublish(FRC20SemiNFT.CollectionPublicPath)
+    let cap = acct.capabilities.storage.issue<&FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionStoragePath)
+    acct.capabilities.publish(cap, at: FRC20SemiNFT.CollectionPublicPath)
+
     // get the collection reference
     if let collection = acct
-        .getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath)
+        .capabilities.get<&FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionPublicPath)
         .borrow() {
 
         let nftIDs = collection.getIDs()
@@ -83,7 +85,7 @@ access(all)
 fun tryAddStakedNFT(
     ret: &[StakedNFTInfo],
     tick: String?,
-    nft: &FRC20SemiNFT.NFT{FRC20SemiNFT.IFRC20SemiNFT, NonFungibleToken.INFT, MetadataViews.Resolver},
+    nft: &FRC20SemiNFT.NFT,
     locked: Bool,
 ) {
     // skip if not staked

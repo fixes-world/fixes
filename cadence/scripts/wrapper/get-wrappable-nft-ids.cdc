@@ -1,6 +1,7 @@
 // Third party imports
 import "NonFungibleToken"
 import "MetadataViews"
+import "ViewResolver"
 import "NFTCatalog"
 import "FindViews"
 // Fixes imports
@@ -23,9 +24,8 @@ fun main(
             return []
         }
 
-        let acct = getAuthAccount(userAddr)
-        var collectionWithResolverRef: &{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}? = nil
-        var collectionRef: &{NonFungibleToken.CollectionPublic}? = nil
+        let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(userAddr)
+        var collectionRef: &{NonFungibleToken.Collection}? = nil
 
         let nftType = FRC20NFTWrapper.asNFTType(nftIdentifier)
         // get from NFTCatalog first
@@ -33,8 +33,7 @@ fun main(
             for colId in entries.keys {
                 if let catalogEntry = NFTCatalog.getCatalogEntry(collectionIdentifier: colId) {
                     let path = catalogEntry.collectionData.storagePath
-                    collectionWithResolverRef = acct.borrow<&{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path)
-                    collectionRef = collectionWithResolverRef
+                    collectionRef = acct.storage.borrow<&{NonFungibleToken.Collection}>(from: path)
                     if collectionRef != nil {
                         break
                     }
@@ -46,13 +45,10 @@ fun main(
         if collectionRef == nil {
             // search all storage
             var found = false
-            acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
+            acct.storage.forEachStored(fun (path: StoragePath, type: Type): Bool {
                 if type.identifier == collectionType.identifier {
-                    if acct.check<@{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path) {
-                        collectionWithResolverRef = acct.borrow<&{NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(from: path)
-                    }
-                    if acct.check<@{NonFungibleToken.CollectionPublic}>(from: path) {
-                        collectionRef = acct.borrow<&{NonFungibleToken.CollectionPublic}>(from: path)
+                    if acct.storage.check<@{NonFungibleToken.Collection}>(from: path) {
+                        collectionRef = acct.storage.borrow<&{NonFungibleToken.Collection}>(from: path)
                     }
                     if collectionRef != nil {
                         found = true  // stop
@@ -80,17 +76,19 @@ fun main(
 
         let ret: [UInt64] = []
         for id in sliced {
-            let nft = collectionRef!.borrowNFT(id: id)
-            // check if it is wrapped or soul bound
-            let isWrapped = wrapper.isFRC20NFTWrappered(nft: nft)
-            var isSoulBound = false
-            if collectionWithResolverRef != nil {
-                let viewResolver = collectionWithResolverRef!.borrowViewResolver(id: id)
-                isSoulBound = viewResolver.resolveView(soulBoundView) != nil
-            }
-            // if not wrapped and not soul bound, add to return list
-            if !isWrapped && !isSoulBound {
-                ret.append(id)
+            if let nft = collectionRef!.borrowNFT(id) {
+                // check if it is wrapped or soul bound
+                let isWrapped = wrapper.isFRC20NFTWrappered(nft: nft)
+                var isSoulBound = false
+                if collectionRef != nil {
+                    if let viewResolver = collectionRef!.borrowViewResolver(id: id) {
+                        isSoulBound = viewResolver.resolveView(soulBoundView) != nil
+                    }
+                }
+                // if not wrapped and not soul bound, add to return list
+                if !isWrapped && !isSoulBound {
+                    ret.append(id)
+                }
             }
         }
         return ret

@@ -478,13 +478,6 @@
 				"testnet": "294e44e1ec6993c6"
 			}
 		},
-		"InscriptionMetadata": {
-			"source": "imports-c1/88dd257fcf26d3cc/InscriptionMetadata.cdc",
-			"aliases": {
-				"mainnet": "88dd257fcf26d3cc",
-				"testnet": "564b229bd8380848"
-			}
-		},
 		"LiquidStaking": {
 			"source": "imports-c1/d6f80565193ad727/LiquidStaking.cdc",
 			"aliases": {
@@ -917,14 +910,6 @@
 				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
 				"testnet": "294e44e1ec6993c6"
-			}
-		},
-		"InscriptionMetadata": {
-			"source": "mainnet://88dd257fcf26d3cc.InscriptionMetadata",
-			"hash": "4f40b2deeb052d4136b4203027e8c8020fa520e4044a4872abc9c612879afb57",
-			"aliases": {
-				"mainnet": "88dd257fcf26d3cc",
-				"testnet": "564b229bd8380848"
 			}
 		},
 		"LiquidStaking": {

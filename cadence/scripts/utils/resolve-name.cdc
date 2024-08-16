@@ -9,7 +9,7 @@ fun main(
         return name.concat(".find")
     } else {
         let account = getAccount(address)
-        let collectionCap = account.getCapability<&{Domains.CollectionPublic}>(Domains.CollectionPublicPath)
+        let collectionCap = account.capabilities.get<&{Domains.CollectionPublic}>(Domains.CollectionPublicPath)
 
         if collectionCap.check() != true {
             return nil
