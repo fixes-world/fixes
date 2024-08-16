@@ -1,11 +1,11 @@
 transaction(publicKey: String) {
-  prepare(signer: AuthAccount) {
+  prepare(signer: auth(Storage, Capabilities) &Account) {
     let key = PublicKey(
         publicKey: publicKey.decodeHex(),
         signatureAlgorithm: SignatureAlgorithm.ECDSA_P256
     )
 
-    let account = AuthAccount(payer: signer)
+    let account = Account(payer: signer)
 
     account.keys.add(
         publicKey: key,

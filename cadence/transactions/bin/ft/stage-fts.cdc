@@ -1,8 +1,9 @@
 import "FungibleTokenManager"
 
 transaction() {
-    prepare(acct: AuthAccount) {
-        let ftAdmin = acct.borrow<&FungibleTokenManager.Admin>(from: FungibleTokenManager.AdminStoragePath)
+    prepare(acct: auth(Storage, Capabilities) &Account) {
+        let ftAdmin = acct.storage
+            .borrow<auth(FungibleTokenManager.Sudo) &FungibleTokenManager.Admin>(from: FungibleTokenManager.AdminStoragePath)
             ?? panic("Missing FungibleTokenManager.Admin")
         ftAdmin.stageAllChildrenContracts()
     }
