@@ -10,36 +10,38 @@ transaction(
     nftIds: [UInt64],
     keepWrapped: Bool,
 ) {
-    let wrapper: &FRC20NFTWrapper.Wrapper{FRC20NFTWrapper.WrapperPublic}
-    let wrappedNFTCol: &FixesWrappedNFT.Collection
-    let nftProvider: &{NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}
+    let wrapper: &{FRC20NFTWrapper.WrapperPublic}
+    let wrappedNFTCol: auth(NonFungibleToken.Withdraw) &FixesWrappedNFT.Collection
+    let nftProvider: auth(NonFungibleToken.Withdraw) &{NonFungibleToken.Collection}
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         self.wrapper = FRC20NFTWrapper.borrowWrapperPublic(addr: wrapperAddr) ?? panic("Could not borrow public reference")
 
         // Create a new empty collection
-        if acct.borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath) == nil {
+        if acct.storage.borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath) == nil {
             // Create a new empty collection
-            let collection <- FixesWrappedNFT.createEmptyCollection()
+            let collection <- FixesWrappedNFT.createEmptyCollection(nftType: Type<@FixesWrappedNFT.NFT>())
 
             // save it to the account
-            acct.save(<-collection, to: FixesWrappedNFT.CollectionStoragePath)
+            acct.storage.save(<-collection, to: FixesWrappedNFT.CollectionStoragePath)
 
             // create a public capability for the collection
-            acct.link<&FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(
-                FixesWrappedNFT.CollectionPublicPath,
-                target: FixesWrappedNFT.CollectionStoragePath
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FixesWrappedNFT.Collection>(FixesWrappedNFT.CollectionStoragePath),
+                at: FixesWrappedNFT.CollectionPublicPath
             )
         }
 
-        self.wrappedNFTCol = acct.borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath)!
+        self.wrappedNFTCol = acct.storage
+            .borrow<auth(NonFungibleToken.Withdraw) &FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath)!
 
         // Find the nft to wrap
         let nftColType = FRC20NFTWrapper.asCollectionType(nftCollectionIdentifier)
-        var nftProviderRef: &{NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}? = nil
-        acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
+        var nftProviderRef: auth(NonFungibleToken.Withdraw) &{NonFungibleToken.Collection}? = nil
+        acct.storage.forEachStored(fun (path: StoragePath, type: Type): Bool {
             if type == nftColType {
-                if let colRef = acct.borrow<&{NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}>(from: path) {
+                if let colRef = acct.storage
+                    .borrow<auth(NonFungibleToken.Withdraw) &{NonFungibleToken.Collection}>(from: path) {
                     nftProviderRef = colRef
                     return false
                 }
