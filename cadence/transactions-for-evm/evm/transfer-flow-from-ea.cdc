@@ -10,10 +10,10 @@ transaction(
     hexSignature: String,
     timestamp: UInt64,
 ) {
-    let sender: &FlowToken.Vault{FungibleToken.Provider}
+    let sender: auth(FungibleToken.Withdraw) &FlowToken.Vault
     let recipient: &{FungibleToken.Receiver}
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
         let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
             ?? panic("Could not borrow a reference to the EVMAgency!")
@@ -27,12 +27,14 @@ transaction(
         )
         /** ------------- EVMAgency: End --------------------------------------- */
 
-        self.sender = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault) as &FlowToken.Vault{FungibleToken.Provider}?
+        self.sender = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow a reference to the sender's vault!")
 
-        self.recipient = getAccount(to).getCapability(/public/flowTokenReceiver)
-                .borrow<&{FungibleToken.Receiver}>()
-                ?? panic("Could not borrow receiver reference to the recipient's Vault")
+        self.recipient = getAccount(to).capabilities
+            .get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .borrow()
+            ?? panic("Could not borrow receiver reference to the recipient's Vault")
     }
 
     execute {

@@ -1,4 +1,5 @@
 #allowAccountLinking
+import "FungibleToken"
 import "FlowToken"
 import "HybridCustody"
 // Import the Fixes contract
@@ -9,9 +10,10 @@ transaction(
     hexSignature: String,
     timestamp: UInt64,
 ) {
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         // Pick a random agency
@@ -21,9 +23,9 @@ transaction(
 
         /** ------------- Create new Account - Start ------------- */
         // create new account
-        let newAccount = AuthAccount(payer: acct)
-        let cap = newAccount.linkAccount(HybridCustody.LinkedAccountPrivatePath)
-            ?? panic("problem linking account Capability for new account")
+        let newAccount = Account(payer: acct)
+        let cap = newAccount.capabilities
+            .account.issue<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()
         /** ------------- End --------------------------------------- */
 
         let refundCreationFee <- agency.createEntrustedAccount(
