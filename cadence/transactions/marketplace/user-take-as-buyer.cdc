@@ -19,16 +19,18 @@ transaction(
     // RankedId => BuyAmount
     batchBuyItems: {String: UFix64},
 ) {
-    let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
+    let market: &{FRC20Marketplace.MarketPublic}
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
@@ -49,40 +51,44 @@ transaction(
 
         /** ------------- Start -- TradingRecords General Initialization -------------  */
         // Ensure hooks are initialized
-        if acct.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
+        if acct.storage.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
-            acct.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+            acct.storage.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
         }
 
         // link the hooks to the public path
         if acct
-            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .capabilities.get<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookPublicPath)
             .borrow() == nil {
             // link the hooks to the public path
-            acct.unlink(FRC20FTShared.TransactionHookPublicPath)
-            acct.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
-                FRC20FTShared.TransactionHookPublicPath,
-                target: FRC20FTShared.TransactionHookStoragePath
+            acct.capabilities.unpublish(FRC20FTShared.TransactionHookPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookStoragePath),
+                at: FRC20FTShared.TransactionHookPublicPath
             )
         }
 
         // borrow the hooks reference
-        let hooksRef = acct.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+        let hooksRef = acct.storage
+            .borrow<auth(FRC20FTShared.Manage) &FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
 
         // Ensure Trading Records is initialized
-        if acct.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
+        if acct.storage.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
             let tradingRecords <- FRC20TradingRecord.createTradingRecords(nil)
-            acct.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
+            acct.storage.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
             // link the trading records to the public path
-            acct.unlink(FRC20TradingRecord.TradingRecordsPublicPath)
-            acct.link<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(FRC20TradingRecord.TradingRecordsPublicPath, target: FRC20TradingRecord.TradingRecordsStoragePath)
+            acct.capabilities.unpublish(FRC20TradingRecord.TradingRecordsPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20TradingRecord.TradingRecords>(FRC20TradingRecord.TradingRecordsStoragePath),
+                at: FRC20TradingRecord.TradingRecordsPublicPath
+            )
         }
 
         // Ensure trading record hook is added to the hooks
         // get the public capability of the trading record hook
         let tradingRecordsCap = acct
-            .getCapability<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(
+            .capabilities.get<&FRC20TradingRecord.TradingRecords>(
                 FRC20TradingRecord.TradingRecordsPublicPath
             )
         assert(tradingRecordsCap.check(), message: "The trading record hook is not valid")
@@ -93,11 +99,14 @@ transaction(
         }
 
         // Ensure Fixes Avatar is initialized
-        if acct.borrow<&AnyResource>(from: FixesAvatar.AvatarStoragePath) == nil {
-            acct.save(<- FixesAvatar.create(), to: FixesAvatar.AvatarStoragePath)
+        if acct.storage.borrow<&AnyResource>(from: FixesAvatar.AvatarStoragePath) == nil {
+            acct.storage.save(<- FixesAvatar.createProfile(), to: FixesAvatar.AvatarStoragePath)
             // link the avatar to the public path
-            acct.unlink(FixesAvatar.AvatarPublicPath)
-            acct.link<&FixesAvatar.Profile{FixesAvatar.ProfilePublic, FRC20FTShared.TransactionHook, MetadataViews.Resolver}>(FixesAvatar.AvatarPublicPath, target: FixesAvatar.AvatarStoragePath)
+            acct.capabilities.unpublish(FixesAvatar.AvatarPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FixesAvatar.Profile>(FixesAvatar.AvatarStoragePath),
+                at: FixesAvatar.AvatarPublicPath
+            )
         }
         let profileCap = FixesAvatar.getProfileCap(acct.address)
         assert(profileCap.check(), message: "The profile is not valid")
@@ -108,7 +117,8 @@ transaction(
         /** ------------- End -----------------------------------------------------------------  */
 
         // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         // For each buy item, check the listing

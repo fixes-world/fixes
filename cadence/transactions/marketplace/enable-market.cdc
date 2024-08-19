@@ -16,19 +16,21 @@ transaction(
     initialFundingAmt: UFix64,
     properties: {UInt8: String}
 ) {
-    let pool: &FRC20AccountsPool.Pool{FRC20AccountsPool.PoolPublic}
-    let ins: &Fixes.Inscription
-    let childAccountCap: Capability<&AuthAccount>
-    let manager: &FRC20MarketManager.Manager
+    let pool: &{FRC20AccountsPool.PoolPublic}
+    let ins: auth(Fixes.Extractable) &Fixes.Inscription
+    let childAccountCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
+    let manager: auth(FRC20MarketManager.Manage) &FRC20MarketManager.Manager
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
@@ -45,7 +47,8 @@ transaction(
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
         // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
 			?? panic("Could not borrow reference to the owner's Vault!")
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)
 
@@ -63,7 +66,7 @@ transaction(
         // ---- create market account ----
 
         // create a new Account, no keys needed
-        let newAccount = AuthAccount(payer: acct)
+        let newAccount = Account(payer: acct)
 
         // deposit 1.0 FLOW to the newly created account
         assert(initialFundingAmt >= 1.0, message: "initialFundingAmt must be >= 1.0")
@@ -71,23 +74,25 @@ transaction(
         // Get a reference to the signer's stored vault
         let flowToNewAccount <- vaultRef.withdraw(amount: initialFundingAmt)
 
-        let receiverRef = newAccount.getCapability(/public/flowTokenReceiver)
-            .borrow<&{FungibleToken.Receiver}>()
+        let receiverRef = newAccount.capabilities
+            .get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .borrow()
             ?? panic("Could not borrow receiver reference to the newly created account")
         receiverRef.deposit(from: <- flowToNewAccount)
 
         /* --- Link the AuthAccount Capability --- */
         //
-        self.childAccountCap = newAccount.linkAccount(HybridCustody.LinkedAccountPrivatePath)
-            ?? panic("problem linking account Capability for new account")
+        self.childAccountCap = newAccount.capabilities
+            .account.issue<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()
 
         // ---- ensure the FRC20MarketManager exists in your account ----
 
         // if the FRC20MarketManager doesn't exist in storage, create it
-        if acct.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath) == nil {
-            acct.save(<- FRC20MarketManager.createManager(), to: FRC20MarketManager.FRC20MarketManagerStoragePath)
+        if acct.storage.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath) == nil {
+            acct.storage.save(<- FRC20MarketManager.createManager(), to: FRC20MarketManager.FRC20MarketManagerStoragePath)
         }
-        self.manager = acct.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath)
+        self.manager = acct.storage
+            .borrow<auth(FRC20MarketManager.Manage) &FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath)
             ?? panic("Could not borrow reference to the FRC20MarketManager")
     }
 

@@ -7,15 +7,15 @@ import "FRC20StakingManager"
 transaction() {
     let heartbeat: &FixesHeartbeat.Heartbeat
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Start -- Fixes Heartbeat Initialization ------------  */
         // ensure resource
-        if acct.borrow<&AnyResource>(from: FixesHeartbeat.storagePath) == nil {
-            acct.save(<- FixesHeartbeat.create(), to: FixesHeartbeat.storagePath)
+        if acct.storage.borrow<&AnyResource>(from: FixesHeartbeat.storagePath) == nil {
+            acct.storage.save(<- FixesHeartbeat.createHeartbeat(), to: FixesHeartbeat.storagePath)
         }
         /** ------------- End ---------------------------------------------------------- */
 
-        self.heartbeat = acct.borrow<&FixesHeartbeat.Heartbeat>(from: FixesHeartbeat.storagePath)
+        self.heartbeat = acct.storage.borrow<&FixesHeartbeat.Heartbeat>(from: FixesHeartbeat.storagePath)
             ?? panic("Could not borrow a reference to the heartbeat")
     }
 
