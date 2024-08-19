@@ -1,6 +1,7 @@
 // Third Party Imports
 import "NonFungibleToken"
 import "MetadataViews"
+import "FungibleToken"
 import "FlowToken"
 // Fixes imports
 import "Fixes"
@@ -20,9 +21,9 @@ transaction(
     hexSignature: String,
     timestamp: UInt64,
 ) {
-    let ins: &Fixes.Inscription
+    let ins: auth(Fixes.Extractable) &Fixes.Inscription
 
-    prepare(signer: AuthAccount) {
+    prepare(signer: auth(Storage, Capabilities) &Account) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
         let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
             ?? panic("Could not borrow a reference to the EVMAgency!")
@@ -38,52 +39,52 @@ transaction(
 
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         /** ------------- Start -- FRC20 Semi NFT Collection Initialization ------------  */
         // ensure resource
-        if acct.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
-            acct.save(<- FRC20SemiNFT.createEmptyCollection(), to: FRC20SemiNFT.CollectionStoragePath)
+        if acct.storage.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
+            acct.storage.save(<- FRC20SemiNFT.createEmptyCollection(nftType: Type<@FRC20SemiNFT.NFT>()), to: FRC20SemiNFT.CollectionStoragePath)
         }
 
         // link to public capability
         if acct
-            .getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath)
+            .capabilities.get<&FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionPublicPath)
             .borrow() == nil {
-            acct.unlink(FRC20SemiNFT.CollectionPublicPath)
-            acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(
-                FRC20SemiNFT.CollectionPublicPath,
-                target: FRC20SemiNFT.CollectionStoragePath
-            )
-            // Link private path (will be deprecated in Cadence 1.0)
-            acct.unlink(FRC20SemiNFT.CollectionPrivatePath)
-            acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(
-                FRC20SemiNFT.CollectionPrivatePath,
-                target: FRC20SemiNFT.CollectionStoragePath
+            acct.capabilities.unpublish(FRC20SemiNFT.CollectionPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20SemiNFT.Collection>(
+                    FRC20SemiNFT.CollectionStoragePath
+                ),
+                at: FRC20SemiNFT.CollectionPublicPath
             )
         }
         /** ------------- End ---------------------------------------------------------- */
 
         /** ------------- Start -- FRC20 Delegator General Initialization -------------  */
-        if acct.borrow<&AnyResource>(from: FRC20Staking.DelegatorStoragePath) == nil {
-            let semiNFTCol = acct
-                .getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPrivatePath)
-            acct.save(<- FRC20Staking.createDelegator(semiNFTCol), to: FRC20Staking.DelegatorStoragePath)
+        if acct.storage.borrow<&AnyResource>(from: FRC20Staking.DelegatorStoragePath) == nil {
+            let cap = acct.capabilities.storage
+                .issue<auth(NonFungibleToken.Withdraw, NonFungibleToken.Update) &FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionStoragePath)
+            acct.storage.save(<- FRC20Staking.createDelegator(cap), to: FRC20Staking.DelegatorStoragePath)
         }
 
         if acct
-            .getCapability<&FRC20Staking.Delegator{FRC20Staking.DelegatorPublic}>(FRC20Staking.DelegatorPublicPath)
+            .capabilities.get<&FRC20Staking.Delegator>(FRC20Staking.DelegatorPublicPath)
             .borrow() == nil {
-            acct.unlink(FRC20Staking.DelegatorPublicPath)
-            acct.link<&FRC20Staking.Delegator{FRC20Staking.DelegatorPublic}>(
-                FRC20Staking.DelegatorPublicPath,
-                target: FRC20Staking.DelegatorStoragePath
+            acct.capabilities.unpublish(FRC20Staking.DelegatorPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20Staking.Delegator>(
+                    FRC20Staking.DelegatorStoragePath
+                ),
+                at: FRC20Staking.DelegatorPublicPath
             )
         }
         /** ------------- End ---------------------------------------------------------- */
@@ -96,7 +97,8 @@ transaction(
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
         // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
         // Withdraw tokens from the signer's stored vault
         let flowToReserve <- vaultRef.withdraw(amount: estimatedReqValue)

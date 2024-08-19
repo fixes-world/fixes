@@ -17,10 +17,10 @@ transaction(
     timestamp: UInt64,
 ) {
     let address: Address
-    let store: &Fixes.InscriptionsStore
+    let store: auth(Fixes.Manage) &Fixes.InscriptionsStore
     let flowCost: @FlowToken.Vault
 
-    prepare(signer: AuthAccount) {
+    prepare(signer: auth(Storage, Capabilities) &Account) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
         let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
             ?? panic("Could not borrow a reference to the EVMAgency!")
@@ -38,28 +38,30 @@ transaction(
 
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        self.store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        self.store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         /** ------------- Initialize TicketCollection - Start ---------------- */
         // If the user doesn't have a TicketCollection yet, create one
-        if acct.borrow<&FGameLottery.TicketCollection>(from: FGameLottery.userCollectionStoragePath) == nil {
-            acct.save(<- FGameLottery.createTicketCollection(), to: FGameLottery.userCollectionStoragePath)
+        if acct.storage.borrow<&FGameLottery.TicketCollection>(from: FGameLottery.userCollectionStoragePath) == nil {
+            acct.storage.save(<- FGameLottery.createTicketCollection(), to: FGameLottery.userCollectionStoragePath)
         }
         // Link public capability to the account
         // @deprecated after Cadence 1.0
         if acct
-            .getCapability<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>(FGameLottery.userCollectionPublicPath)
+            .capabilities.get<&FGameLottery.TicketCollection>(FGameLottery.userCollectionPublicPath)
             .borrow() == nil {
-            acct.unlink(FGameLottery.userCollectionPublicPath)
-            acct.link<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>(
-                FGameLottery.userCollectionPublicPath,
-                target: FGameLottery.userCollectionStoragePath
+            acct.capabilities.unpublish(FGameLottery.userCollectionPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FGameLottery.TicketCollection>(FGameLottery.userCollectionStoragePath),
+                at: FGameLottery.userCollectionPublicPath
             )
         }
         /** ------------- End ------------------------------------------------ */
@@ -71,7 +73,8 @@ transaction(
             : FGameLotteryFactory.getFIXESLotteryFlowCost(ticketAmt, powerupType, acct.address)
 
         // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
         self.flowCost <- vaultRef.withdraw(amount: estimateFlowCost) as! @FlowToken.Vault
     }

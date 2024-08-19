@@ -18,9 +18,9 @@ transaction(
     hexSignature: String,
     timestamp: UInt64,
 ) {
-    let semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>
+    let semiNFTColCap: Capability<auth(NonFungibleToken.Withdraw, NonFungibleToken.Update) &FRC20SemiNFT.Collection>
 
-    prepare(signer: AuthAccount) {
+    prepare(signer: auth(Storage, Capabilities) &Account) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
         let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
             ?? panic("Could not borrow a reference to the EVMAgency!")
@@ -36,43 +36,41 @@ transaction(
 
         /** ------------- Start -- FRC20 Semi NFT Collection Initialization ------------  */
         // ensure resource
-        if acct.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
-            acct.save(<- FRC20SemiNFT.createEmptyCollection(), to: FRC20SemiNFT.CollectionStoragePath)
+        if acct.storage.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
+            acct.storage.save(<- FRC20SemiNFT.createEmptyCollection(nftType: Type<@FRC20SemiNFT.NFT>()), to: FRC20SemiNFT.CollectionStoragePath)
         }
 
         // link to public capability
         if acct
-            .getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath)
+            .capabilities.get<&FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionPublicPath)
             .borrow() == nil {
-            acct.unlink(FRC20SemiNFT.CollectionPublicPath)
-            acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(
-                FRC20SemiNFT.CollectionPublicPath,
-                target: FRC20SemiNFT.CollectionStoragePath
-            )
-            // Link private path (will be deprecated in Cadence 1.0)
-            acct.unlink(FRC20SemiNFT.CollectionPrivatePath)
-            acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(
-                FRC20SemiNFT.CollectionPrivatePath,
-                target: FRC20SemiNFT.CollectionStoragePath
+            acct.capabilities.unpublish(FRC20SemiNFT.CollectionPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20SemiNFT.Collection>(
+                    FRC20SemiNFT.CollectionStoragePath
+                ),
+                at: FRC20SemiNFT.CollectionPublicPath
             )
         }
         /** ------------- End ---------------------------------------------------------- */
 
-        self.semiNFTColCap = acct
-                .getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPrivatePath)
+        self.semiNFTColCap = acct.capabilities.storage
+            .issue<auth(NonFungibleToken.Withdraw, NonFungibleToken.Update) &FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionStoragePath)
 
         /** ------------- Start -- FRC20 Delegator General Initialization -------------  */
-        if acct.borrow<&AnyResource>(from: FRC20Staking.DelegatorStoragePath) == nil {
-            acct.save(<- FRC20Staking.createDelegator(self.semiNFTColCap), to: FRC20Staking.DelegatorStoragePath)
+        if acct.storage.borrow<&AnyResource>(from: FRC20Staking.DelegatorStoragePath) == nil {
+            acct.storage.save(<- FRC20Staking.createDelegator(self.semiNFTColCap), to: FRC20Staking.DelegatorStoragePath)
         }
 
         if acct
-            .getCapability<&FRC20Staking.Delegator{FRC20Staking.DelegatorPublic}>(FRC20Staking.DelegatorPublicPath)
+            .capabilities.get<&FRC20Staking.Delegator>(FRC20Staking.DelegatorPublicPath)
             .borrow() == nil {
-            acct.unlink(FRC20Staking.DelegatorPublicPath)
-            acct.link<&FRC20Staking.Delegator{FRC20Staking.DelegatorPublic}>(
-                FRC20Staking.DelegatorPublicPath,
-                target: FRC20Staking.DelegatorStoragePath
+            acct.capabilities.unpublish(FRC20Staking.DelegatorPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20Staking.Delegator>(
+                    FRC20Staking.DelegatorStoragePath
+                ),
+                at: FRC20Staking.DelegatorPublicPath
             )
         }
         /** ------------- End ---------------------------------------------------------- */

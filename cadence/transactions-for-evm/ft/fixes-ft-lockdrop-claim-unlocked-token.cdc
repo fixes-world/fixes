@@ -1,5 +1,4 @@
 import "FungibleToken"
-import "MetadataViews"
 import "ViewResolver"
 import "FlowToken"
 import "stFlowToken"
@@ -18,11 +17,11 @@ transaction(
     hexSignature: String,
     timestamp: UInt64,
 ) {
-    let ins: &Fixes.Inscription
-    let pool: &FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}
+    let ins: auth(Fixes.Extractable) &Fixes.Inscription
+    let pool: &FixesTokenLockDrops.DropsPool
     let recipient: &{FungibleToken.Receiver}?
 
-    prepare(signer: AuthAccount) {
+    prepare(signer: auth(Storage, Capabilities) &Account) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
         let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
             ?? panic("Could not borrow a reference to the EVMAgency!")
@@ -38,11 +37,13 @@ transaction(
 
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
@@ -71,7 +72,7 @@ transaction(
             let recieverPath = lockingType == FixesTokenLockDrops.SupportedLockingTick.FlowToken
                 ? /public/flowTokenReceiver
                 : stFlowToken.tokenReceiverPath
-            self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(recieverPath)
+            self.recipient = acct.capabilities.get<&{FungibleToken.Receiver}>(recieverPath)
                 .borrow() ?? panic("Could not borrow a reference to the recipient's Receiver!")
         } else {
             self.recipient = nil
@@ -79,7 +80,8 @@ transaction(
         /** ------------- End ----------------------------------------------- */
 
         // Get a reference to the signer's stored vault
-        let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let flowVaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         /** ------------- Create the Inscription - Start ------------- */

@@ -1,7 +1,8 @@
+import "FungibleToken"
 import "FlowToken"
+import "FRC20Indexer"
 import "Fixes"
 import "FixesInscriptionFactory"
-import "FRC20Indexer"
 import "EVMAgent"
 
 transaction(
@@ -12,7 +13,7 @@ transaction(
     hexSignature: String,
     timestamp: UInt64,
 ) {
-    prepare(signer: AuthAccount) {
+    prepare(signer: auth(Storage, Capabilities) &Account) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
         let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
             ?? panic("Could not borrow a reference to the EVMAgency!")
@@ -28,16 +29,19 @@ transaction(
 
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
         ?? panic("Could not borrow reference to the owner's Vault!")
 
         // Get a reference to the Fixes Indexer

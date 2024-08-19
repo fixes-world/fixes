@@ -7,6 +7,9 @@ import "Fixes"
 import "FixesInscriptionFactory"
 import "FixesFungibleTokenInterface"
 import "FRC20FTShared"
+import "FixesHeartbeat"
+import "FRC20TradingRecord"
+import "FixesAvatar"
 import "FRC20AccountsPool"
 import "FixesTradablePool"
 import "EVMAgent"
@@ -20,11 +23,11 @@ transaction(
     timestamp: UInt64,
 ) {
     let tickerName: String
-    let ins: &Fixes.Inscription
-    let pool: &FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface, FixesFungibleTokenInterface.IMinterHolder, FungibleToken.Receiver}
+    let ins: auth(Fixes.Extractable) &Fixes.Inscription
+    let pool: &FixesTradablePool.TradableLiquidityPool
     let recipient: &{FungibleToken.Receiver}
 
-    prepare(signer: AuthAccount) {
+    prepare(signer: auth(Storage, Capabilities) &Account) {
         /** ------------- EVMAgency: verify and borrow AuthAccount ------------- */
         let agency = EVMAgent.borrowAgencyByEVMPublicKey(hexPublicKey)
             ?? panic("Could not borrow a reference to the EVMAgency!")
@@ -40,16 +43,86 @@ transaction(
 
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
+        /** ------------- Start -- TradingRecords General Initialization -------------  */
+        // Ensure hooks are initialized
+        if acct.storage.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
+            let hooks <- FRC20FTShared.createHooks()
+            acct.storage.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+        }
+
+        // link the hooks to the public path
+        if acct
+            .capabilities.get<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookPublicPath)
+            .borrow() == nil {
+            // link the hooks to the public path
+            acct.capabilities.unpublish(FRC20FTShared.TransactionHookPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookStoragePath),
+                at: FRC20FTShared.TransactionHookPublicPath
+            )
+        }
+
+        // borrow the hooks reference
+        let hooksRef = acct.storage
+            .borrow<auth(FRC20FTShared.Manage) &FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+            ?? panic("The hooks were not created")
+
+        // Ensure Trading Records is initialized
+        if acct.storage.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
+            let tradingRecords <- FRC20TradingRecord.createTradingRecords(nil)
+            acct.storage.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
+            // link the trading records to the public path
+            acct.capabilities.unpublish(FRC20TradingRecord.TradingRecordsPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20TradingRecord.TradingRecords>(FRC20TradingRecord.TradingRecordsStoragePath),
+                at: FRC20TradingRecord.TradingRecordsPublicPath
+            )
+        }
+
+        // Ensure trading record hook is added to the hooks
+        // get the public capability of the trading record hook
+        let tradingRecordsCap = acct
+            .capabilities.get<&FRC20TradingRecord.TradingRecords>(
+                FRC20TradingRecord.TradingRecordsPublicPath
+            )
+        assert(tradingRecordsCap.check(), message: "The trading record hook is not valid")
+        // get the reference of the trading record hook
+        let recordsRef = tradingRecordsCap.borrow() ?? panic("The trading record hook is not valid")
+        if !hooksRef.hasHook(recordsRef.getType()) {
+            hooksRef.addHook(tradingRecordsCap)
+        }
+
+        // Ensure Fixes Avatar is initialized
+        if acct.storage.borrow<&AnyResource>(from: FixesAvatar.AvatarStoragePath) == nil {
+            acct.storage.save(<- FixesAvatar.createProfile(), to: FixesAvatar.AvatarStoragePath)
+            // link the avatar to the public path
+            acct.capabilities.unpublish(FixesAvatar.AvatarPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FixesAvatar.Profile>(FixesAvatar.AvatarStoragePath),
+                at: FixesAvatar.AvatarPublicPath
+            )
+        }
+        let profileCap = FixesAvatar.getProfileCap(acct.address)
+        assert(profileCap.check(), message: "The profile is not valid")
+        let profileRef = profileCap.borrow() ?? panic("The profile is not valid")
+        if !hooksRef.hasHook(profileRef.getType()) {
+            hooksRef.addHook(profileCap)
+        }
+        /** ------------- End -----------------------------------------------------------------  */
+
         // Get a reference to the signer's stored vault
-        let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let flowVaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         self.tickerName = "$".concat(symbol)
@@ -88,24 +161,26 @@ transaction(
         /** ------------- Prepare the token recipient - Start -------------- */
         let tokenVaultData = self.pool.getTokenVaultData()
         // ensure storage path
-        if acct.borrow<&AnyResource>(from: tokenVaultData.storagePath) == nil {
+        if acct.storage.borrow<&AnyResource>(from: tokenVaultData.storagePath) == nil {
             // save the empty vault
-            acct.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
-            // save the public capability
+            acct.storage.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
 
-            // @deprecated after Cadence 1.0
+            // save the public capability to the stored vault
             // Create a public capability to the stored Vault that exposes
             // the `deposit` method through the `Receiver` interface.
-            acct.link<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath, target: tokenVaultData.storagePath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&{FungibleToken.Receiver}>(tokenVaultData.storagePath),
+                at: tokenVaultData.receiverPath
+            )
             // Create a public capability to the stored Vault that only exposes
             // the `balance` field and the `resolveView` method through the `Balance` interface
-            acct.link<&{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(
-                tokenVaultData.metadataPath,
-                target: tokenVaultData.storagePath
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&{FungibleToken.Vault}>(tokenVaultData.storagePath),
+                at: tokenVaultData.metadataPath
             )
         }
 
-        self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath)
+        self.recipient = acct.capabilities.get<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath)
             .borrow()
             ?? panic("Could not borrow a reference to the recipient's Receiver!")
         /** ------------- End ----------------------------------------------- */
