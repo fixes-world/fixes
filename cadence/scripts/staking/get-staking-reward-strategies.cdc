@@ -37,8 +37,7 @@ fun main(
         if rewardVestingDict[vesting.rewardTick] == nil {
             rewardVestingDict[vesting.rewardTick] = []
         }
-        let dictRef = (&rewardVestingDict[vesting.rewardTick] as &[FRC20StakingVesting.VestingInfo]?)!
-        dictRef.append(vesting)
+        rewardVestingDict[vesting.rewardTick]?.append(vesting)
     }
     // get reward details
     for rewardTick in strategies {

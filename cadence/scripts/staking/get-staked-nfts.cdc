@@ -19,7 +19,7 @@ fun main(
     }
 
     let ret: [StakedNFTInfo] = []
-    let retRef = &ret as &[StakedNFTInfo]
+    let retRef = &ret as auth(Mutate) &[StakedNFTInfo]
     var startAt = page * size
     var restSize = size
 
@@ -83,7 +83,7 @@ fun main(
 
 access(all)
 fun tryAddStakedNFT(
-    ret: &[StakedNFTInfo],
+    ret: auth(Mutate) &[StakedNFTInfo],
     tick: String?,
     nft: &FRC20SemiNFT.NFT,
     locked: Bool,
