@@ -23,7 +23,7 @@ transaction(
 ) {
     let tickerName: String
     let pool: &FixesTradablePool.TradableLiquidityPool
-    let provider: &{FungibleToken.Provider}
+    let provider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
     let recipient: &{FungibleToken.Receiver}
 
     prepare(signer: auth(Storage, Capabilities) &Account) {
@@ -152,7 +152,8 @@ transaction(
         }
         /** ------------- End ----------------------------------------------- */
 
-        self.provider = acct.storage.borrow<&{FungibleToken.Provider}>(from: tokenVaultData.storagePath)
+        self.provider = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &{FungibleToken.Provider}>(from: tokenVaultData.storagePath)
             ?? panic("Could not borrow a reference to the Token Provider!")
 
         self.recipient = Fixes.borrowFlowTokenReceiver(acct.address)

@@ -596,7 +596,7 @@ access(all) contract FRC20NFTWrapper {
 
         /// Register a new Wrapper
         access(all)
-        fun registerWrapper(wrapper: &Wrapper)
+        fun registerWrapper(wrapper: auth(Manage) &Wrapper)
     }
 
     /// The resource for the Wrapper indexer contract
@@ -675,7 +675,7 @@ access(all) contract FRC20NFTWrapper {
 
         /// Register a new Wrapper
         access(all)
-        fun registerWrapper(wrapper: &Wrapper) {
+        fun registerWrapper(wrapper: auth(Manage) &Wrapper) {
             pre {
                 wrapper.owner != nil: "Wrapper owner is nil"
             }
@@ -801,7 +801,8 @@ access(all) contract FRC20NFTWrapper {
             ?? panic("Could not borrow indexer public reference")
 
         // register the wrapper to the indexer
-        let wrapper = self.account.storage.borrow<&Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
+        let wrapper = self.account.storage
+            .borrow<auth(Manage) &Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
             ?? panic("Could not borrow wrapper public reference")
         indexerRef.registerWrapper(wrapper: wrapper)
 

@@ -20,8 +20,8 @@ transaction(
     messages: [String],
     params: [{String: String}]
 ) {
-    let voter: &FRC20Votes.VoterIdentity
-    let flowVault: &FlowToken.Vault
+    let voter: auth(NonFungibleToken.Withdraw) &FRC20Votes.VoterIdentity
+    let flowVault: auth(FungibleToken.Withdraw) &FlowToken.Vault
 
     prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -79,7 +79,7 @@ transaction(
         }
         /** ------------- End -------------------------------------------------- */
 
-        self.voter = acct.storage.borrow<&FRC20Votes.VoterIdentity>(from: FRC20Votes.VoterStoragePath)
+        self.voter = acct.storage.borrow<auth(NonFungibleToken.Withdraw) &FRC20Votes.VoterIdentity>(from: FRC20Votes.VoterStoragePath)
             ?? panic("Could not borrow a reference to the Voter Resource!")
 
         // Get a reference to the signer's stored vault

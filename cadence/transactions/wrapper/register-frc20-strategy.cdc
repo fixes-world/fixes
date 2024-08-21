@@ -50,7 +50,8 @@ transaction(
 
                 let wrapperIndexer = FRC20NFTWrapper.borrowWrapperIndexerPublic()
                 if !wrapperIndexer.hasRegisteredWrapper(addr: acct.address) {
-                    let ref = acct.storage.borrow<&FRC20NFTWrapper.Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
+                    let ref = acct.storage
+                        .borrow<auth(FRC20NFTWrapper.Manage) &FRC20NFTWrapper.Wrapper>(from: FRC20NFTWrapper.FRC20NFTWrapperStoragePath)
                         ?? panic("Could not borrow reference to the owner's Wrapper!")
                     wrapperIndexer.registerWrapper(wrapper: ref)
                 }

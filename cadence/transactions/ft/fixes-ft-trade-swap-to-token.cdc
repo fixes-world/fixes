@@ -19,7 +19,7 @@ transaction(
 ) {
     let tickerName: String
     let pool: &FixesTradablePool.TradableLiquidityPool
-    let provider: &{FungibleToken.Provider}
+    let provider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider}
     let recipient: &{FungibleToken.Receiver}
 
     prepare(acct: auth(Storage, Capabilities) &Account) {

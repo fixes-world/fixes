@@ -15,7 +15,8 @@ transaction(
         if acct.storage.borrow<&Fixes.ArchivedInscriptions>(from: archivePath) == nil {
             acct.storage.save<@Fixes.ArchivedInscriptions>(<- Fixes.createArchivedInscriptions(), to: archivePath)
         }
-        let archiveRef = acct.storage.borrow<&Fixes.ArchivedInscriptions>(from: archivePath)
+        let archiveRef = acct
+            .storage.borrow<auth(Fixes.Manage) &Fixes.ArchivedInscriptions>(from: archivePath)
             ?? panic("Could not borrow a reference to the Archived Inscriptions!")
 
         for insId in insIds {

@@ -20,7 +20,7 @@ transaction(
     githubUrl: String?,
 ) {
     let tickerName: String
-    let managerRef: &FungibleTokenManager.Manager
+    let managerRef: auth(FungibleTokenManager.Sudo) &FungibleTokenManager.Manager
 
     prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -49,7 +49,7 @@ transaction(
             )
         }
 
-        self.managerRef = acct.storage.borrow<&FungibleTokenManager.Manager>(from: managerPath)
+        self.managerRef = acct.storage.borrow<auth(FungibleTokenManager.Sudo) &FungibleTokenManager.Manager>(from: managerPath)
             ?? panic("Could not borrow a reference to the Fungible Token Manager")
         /** ------------- End -------------------------------------------------- */
 

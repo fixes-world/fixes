@@ -975,7 +975,7 @@ access(all) contract FRC20Votes {
         /// Create a new proposal.
         access(all)
         fun createProposal(
-            voter: &VoterIdentity,
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
             tick: String,
             title: String,
             description: String,
@@ -989,14 +989,30 @@ access(all) contract FRC20Votes {
         )
         /// Vote on a proposal.
         access(all)
-        fun vote(voter: &VoterIdentity, proposalId: UInt64, choice: Int)
+        fun vote(
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
+            proposalId: UInt64,
+            choice: Int,
+        )
         // --- Write Methods: Proposer ---
         access(all)
-        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, description: String?, discussionLink: String?)
+        fun updateProposal(
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
+            proposalId: UInt64,
+            title: String?,
+            description: String?,
+            discussionLink: String?,
+        )
         access(all)
-        fun cancelProposal(voter: &VoterIdentity, proposalId: UInt64)
+        fun cancelProposal(
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
+            proposalId: UInt64,
+        )
         access(all)
-        fun executeProposal(voter: &VoterIdentity, proposalId: UInt64)
+        fun executeProposal(
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
+            proposalId: UInt64,
+        )
     }
 
     /// The resource of the FixesVotes manager.
@@ -1078,7 +1094,7 @@ access(all) contract FRC20Votes {
         ///
         access(all)
         fun createProposal(
-            voter: &VoterIdentity,
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
             tick: String,
             title: String,
             description: String,
@@ -1155,7 +1171,7 @@ access(all) contract FRC20Votes {
 
         access(all)
         fun vote(
-            voter: &VoterIdentity,
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
             proposalId: UInt64,
             choice: Int,
         ) {
@@ -1173,7 +1189,13 @@ access(all) contract FRC20Votes {
         /// Update the proposal.
         ///
         access(all)
-        fun updateProposal(voter: &VoterIdentity, proposalId: UInt64, title: String?, description: String?, discussionLink: String?) {
+        fun updateProposal(
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
+            proposalId: UInt64,
+            title: String?,
+            description: String?,
+            discussionLink: String?
+        ) {
             let proposalRef = self.borrowProposalRef(proposalId)
                 ?? panic("The proposal is not found")
             let detailsRef = proposalRef.borrowDetails()
@@ -1199,7 +1221,10 @@ access(all) contract FRC20Votes {
         /// Cancel the proposal.
         ///
         access(all)
-        fun cancelProposal(voter: &VoterIdentity, proposalId: UInt64) {
+        fun cancelProposal(
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
+            proposalId: UInt64
+        ) {
             let proposalRef = self.borrowProposalRef(proposalId)
                 ?? panic("The proposal is not found")
             let detailsRef = proposalRef.borrowDetails()
@@ -1224,7 +1249,10 @@ access(all) contract FRC20Votes {
         /// Manual execute the proposal.
         ///
         access(all)
-        fun executeProposal(voter: &VoterIdentity, proposalId: UInt64) {
+        fun executeProposal(
+            voter: auth(NonFungibleToken.Withdraw) &VoterIdentity,
+            proposalId: UInt64
+        ) {
             let proposalRef = self.borrowProposalRef(proposalId)
                 ?? panic("The proposal is not found")
             let detailsRef = proposalRef.borrowDetails()

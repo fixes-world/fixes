@@ -12,7 +12,7 @@ transaction(
     description: String?,
     discussionLink: String?,
 ) {
-    let voter: &FRC20Votes.VoterIdentity
+    let voter: auth(NonFungibleToken.Withdraw) &FRC20Votes.VoterIdentity
 
     prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -70,7 +70,7 @@ transaction(
         }
         /** ------------- End -------------------------------------------------- */
 
-        self.voter = acct.storage.borrow<&FRC20Votes.VoterIdentity>(from: FRC20Votes.VoterStoragePath)
+        self.voter = acct.storage.borrow<auth(NonFungibleToken.Withdraw) &FRC20Votes.VoterIdentity>(from: FRC20Votes.VoterStoragePath)
             ?? panic("Could not borrow a reference to the Voter Resource!")
     }
 
