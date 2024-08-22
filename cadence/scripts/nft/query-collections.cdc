@@ -12,7 +12,7 @@ fun main(
 
     // set default values
     let defaultBannerMedia = MetadataViews.Media(
-        file: MetadataViews.HTTPFile(url: "https://i.imgur.com/Wdy3GG7.jpg"),
+        file: MetadataViews.HTTPFile(url: "https://i.imgur.com/4DOuqFf.jpeg"),
         mediaType: "image/jpeg"
     )
     let defaultSquareMedia = MetadataViews.Media(

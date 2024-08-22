@@ -478,7 +478,7 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
             case Type<MetadataViews.NFTCollectionDisplay>():
                 let bannerMedia = MetadataViews.Media(
                     file: MetadataViews.HTTPFile(
-                        url: "https://i.imgur.com/Wdy3GG7.jpg"
+                        url: "https://i.imgur.com/4DOuqFf.jpeg"
                     ),
                     mediaType: "image/jpeg"
                 )
