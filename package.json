@@ -15,7 +15,7 @@
 		"lines:contracts": "find ./cadence/contracts \\( -name '*.cdc' \\) -not -path '*/node_modules/*' -not -path '*/tests/*' -not -path '*/deps/*' -not -path '*/dist/*' | xargs wc -l",
 		"deploy:emulator": "flow-c1 project deploy --update",
 		"deploy:testnet": "flow-c1 project deploy --update --network testnet",
-		"deploy:mainnet": "flow project deploy --update --network mainnet",
+		"deploy:mainnet": "flow-c1 project deploy --update --network mainnet",
 		"hb:emulator": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=emulator-account",
 		"hb:testnet": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=testnet-user --network=testnet --gas-limit=9999",
 		"hb:mainnet": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=mainnet-user --network=mainnet --gas-limit=9999",
