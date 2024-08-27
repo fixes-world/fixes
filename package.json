@@ -1,6 +1,6 @@
 {
 	"name": "@fixes/contracts",
-	"version": "1.0.0-alpha.4",
+	"version": "1.0.0",
 	"exports": {
 		"./contracts/*": "./cadence/contracts/*",
 		"./transactions/*": "./cadence/transactions/*",
