@@ -34,8 +34,8 @@ access(all) contract FGameLotteryFactory {
     ///
     access(all)
     fun initializeFIXESLotteryPool(
-        _ controller: &FGameLotteryRegistry.RegistryController,
-        newAccount: Capability<&AuthAccount>,
+        _ controller: auth(FGameLotteryRegistry.Manage) &FGameLotteryRegistry.RegistryController,
+        newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
     ) {
         // initialize with 3 days
         let epochInterval: UFix64 = UFix64(3 * 24 * 60 * 60) // 3 days
@@ -54,8 +54,8 @@ access(all) contract FGameLotteryFactory {
     ///
     access(all)
     fun initializeFIXESMintingLotteryPool(
-        _ controller: &FGameLotteryRegistry.RegistryController,
-        newAccount: Capability<&AuthAccount>,
+        _ controller: auth(FGameLotteryRegistry.Manage) &FGameLotteryRegistry.RegistryController,
+        newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
     ) {
         // initialize with 3 days
         let epochInterval: UFix64 = UFix64(3 * 24 * 60 * 60) // 3 days
@@ -87,12 +87,12 @@ access(all) contract FGameLotteryFactory {
     ///
     access(contract)
     fun _initializeLotteryPool(
-        _ controller: &FGameLotteryRegistry.RegistryController,
+        _ controller: auth(FGameLotteryRegistry.Manage) &FGameLotteryRegistry.RegistryController,
         name: String,
         rewardTick: String,
         ticketPrice: UFix64,
         epochInterval: UFix64,
-        newAccount: Capability<&AuthAccount>,
+        newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
     ) {
         let registry = FGameLotteryRegistry.borrowRegistry()
         assert(
@@ -183,8 +183,8 @@ access(all) contract FGameLotteryFactory {
         ticketAmount: UInt64,
         powerup: PowerUpType,
         withMinting: Bool,
-        recipient: Capability<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>,
-        inscriptionStore: &Fixes.InscriptionsStore,
+        recipient: Capability<&FGameLottery.TicketCollection>,
+        inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
     ): @FlowToken.Vault {
         pre {
             recipient.address == inscriptionStore.owner?.address: "Recipient must be the owner of the inscription store"
@@ -307,8 +307,8 @@ access(all) contract FGameLotteryFactory {
         flowVault: @FlowToken.Vault,
         ticketAmount: UInt64,
         powerup: PowerUpType,
-        recipient: Capability<&FGameLottery.TicketCollection{FGameLottery.TicketCollectionPublic}>,
-        inscriptionStore: &Fixes.InscriptionsStore,
+        recipient: Capability<&FGameLottery.TicketCollection>,
+        inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
     ): @FlowToken.Vault {
         pre {
             recipient.address == inscriptionStore.owner?.address: "Recipient must be the owner of the inscription store"

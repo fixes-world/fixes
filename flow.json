@@ -265,6 +265,409 @@
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "b7248baa24a95c3f"
 			}
+		},
+		"AddressUtils": {
+			"source": "imports-c1/a340dc0a4ec828ab/AddressUtils.cdc",
+			"aliases": {
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"ArrayUtils": {
+			"source": "imports-c1/a340dc0a4ec828ab/ArrayUtils.cdc",
+			"aliases": {
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"BlackHole": {
+			"source": "imports-c1/4396883a58c3a2d1/BlackHole.cdc",
+			"aliases": {
+				"mainnet": "4396883a58c3a2d1",
+				"testnet": "ad26718c4b6b921b"
+			}
+		},
+		"Burner": {
+			"source": "imports-c1/f233dcee88fe0abe/Burner.cdc",
+			"aliases": {
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"CapabilityDelegator": {
+			"source": "imports-c1/d8a7e05a7ac670c0/CapabilityDelegator.cdc",
+			"aliases": {
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"CapabilityFactory": {
+			"source": "imports-c1/d8a7e05a7ac670c0/CapabilityFactory.cdc",
+			"aliases": {
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"CapabilityFilter": {
+			"source": "imports-c1/d8a7e05a7ac670c0/CapabilityFilter.cdc",
+			"aliases": {
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"Clock": {
+			"source": "imports-c1/097bafa4e0b48eef/Clock.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"DapperUtilityCoin": {
+			"source": "imports-c1/ead892083b3e2c6c/DapperUtilityCoin.cdc",
+			"aliases": {
+				"mainnet": "ead892083b3e2c6c"
+			}
+		},
+		"Debug": {
+			"source": "imports-c1/097bafa4e0b48eef/Debug.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"DelegatorManager": {
+			"source": "imports-c1/d6f80565193ad727/DelegatorManager.cdc",
+			"aliases": {
+				"mainnet": "d6f80565193ad727",
+				"testnet": "e45c64ecfe31e465"
+			}
+		},
+		"Domains": {
+			"source": "imports-c1/233eb012d34b0070/Domains.cdc",
+			"aliases": {
+				"mainnet": "233eb012d34b0070",
+				"testnet": "b05b2abb42335e88"
+			}
+		},
+		"FIND": {
+			"source": "imports-c1/097bafa4e0b48eef/FIND.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FNSConfig": {
+			"source": "imports-c1/233eb012d34b0070/FNSConfig.cdc",
+			"aliases": {
+				"mainnet": "233eb012d34b0070",
+				"testnet": "b05b2abb42335e88"
+			}
+		},
+		"FTViewUtils": {
+			"source": "imports-c1/15a918087ab12d86/FTViewUtils.cdc",
+			"aliases": {
+				"mainnet": "15a918087ab12d86",
+				"testnet": "b86f928a1fa7798e"
+			}
+		},
+		"FUSD": {
+			"source": "imports-c1/3c5959b568896393/FUSD.cdc",
+			"aliases": {
+				"mainnet": "3c5959b568896393"
+			}
+		},
+		"FiatToken": {
+			"source": "imports-c1/b19436aae4d94622/FiatToken.cdc",
+			"aliases": {
+				"mainnet": "b19436aae4d94622"
+			}
+		},
+		"FindUtils": {
+			"source": "imports-c1/097bafa4e0b48eef/FindUtils.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FindViews": {
+			"source": "imports-c1/097bafa4e0b48eef/FindViews.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"FlowClusterQC": {
+			"source": "imports-c1/8624b52f9ddcd04a/FlowClusterQC.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "8624b52f9ddcd04a",
+				"testnet": "9eca2b38b18b5dfe"
+			}
+		},
+		"FlowDKG": {
+			"source": "imports-c1/8624b52f9ddcd04a/FlowDKG.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "8624b52f9ddcd04a",
+				"testnet": "9eca2b38b18b5dfe"
+			}
+		},
+		"FlowEpoch": {
+			"source": "imports-c1/8624b52f9ddcd04a/FlowEpoch.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "8624b52f9ddcd04a",
+				"testnet": "9eca2b38b18b5dfe"
+			}
+		},
+		"FlowFees": {
+			"source": "imports-c1/f919ee77447b7497/FlowFees.cdc",
+			"aliases": {
+				"emulator": "e5a8b7f23e8b548f",
+				"mainnet": "f919ee77447b7497",
+				"testnet": "912d5440f7e3769e"
+			}
+		},
+		"FlowIDTableStaking": {
+			"source": "imports-c1/8624b52f9ddcd04a/FlowIDTableStaking.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "8624b52f9ddcd04a",
+				"testnet": "9eca2b38b18b5dfe"
+			}
+		},
+		"FlowStorageFees": {
+			"source": "imports-c1/e467b9dd11fa00df/FlowStorageFees.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "e467b9dd11fa00df",
+				"testnet": "8c5303eaa26202d6"
+			}
+		},
+		"FlowToken": {
+			"source": "imports-c1/1654653399040a61/FlowToken.cdc",
+			"aliases": {
+				"emulator": "0ae53cb6e3f42a79",
+				"mainnet": "1654653399040a61",
+				"testnet": "7e60df042a9c0868"
+			}
+		},
+		"FungibleToken": {
+			"source": "imports-c1/f233dcee88fe0abe/FungibleToken.cdc",
+			"aliases": {
+				"emulator": "ee82856bf20e2aa6",
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"FungibleTokenMetadataViews": {
+			"source": "imports-c1/f233dcee88fe0abe/FungibleTokenMetadataViews.cdc",
+			"aliases": {
+				"mainnet": "f233dcee88fe0abe",
+				"testnet": "9a0766d93b6608b7"
+			}
+		},
+		"HybridCustody": {
+			"source": "imports-c1/d8a7e05a7ac670c0/HybridCustody.cdc",
+			"aliases": {
+				"mainnet": "d8a7e05a7ac670c0",
+				"testing": "0000000000000007",
+				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"LiquidStaking": {
+			"source": "imports-c1/d6f80565193ad727/LiquidStaking.cdc",
+			"aliases": {
+				"mainnet": "d6f80565193ad727",
+				"testnet": "e45c64ecfe31e465"
+			}
+		},
+		"LiquidStakingConfig": {
+			"source": "imports-c1/d6f80565193ad727/LiquidStakingConfig.cdc",
+			"aliases": {
+				"mainnet": "d6f80565193ad727",
+				"testnet": "e45c64ecfe31e465"
+			}
+		},
+		"LiquidStakingError": {
+			"source": "imports-c1/d6f80565193ad727/LiquidStakingError.cdc",
+			"aliases": {
+				"mainnet": "d6f80565193ad727",
+				"testnet": "e45c64ecfe31e465"
+			}
+		},
+		"MetadataViews": {
+			"source": "imports-c1/1d7e57aa55817448/MetadataViews.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"MigrationContractStaging": {
+			"source": "imports-c1/56100d46aa9b0212/MigrationContractStaging.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "56100d46aa9b0212",
+				"testnet": "2ceae959ed1a7e7a"
+			}
+		},
+		"NFTCatalog": {
+			"source": "imports-c1/49a7cda3a1eecc29/NFTCatalog.cdc",
+			"aliases": {
+				"mainnet": "49a7cda3a1eecc29",
+				"testnet": "324c34e1c517e4db"
+			}
+		},
+		"NFTRetrieval": {
+			"source": "imports-c1/49a7cda3a1eecc29/NFTRetrieval.cdc",
+			"aliases": {
+				"mainnet": "49a7cda3a1eecc29",
+				"testnet": "324c34e1c517e4db"
+			}
+		},
+		"NFTStorefrontV2": {
+			"source": "imports-c1/4eb8a10cb9f87357/NFTStorefrontV2.cdc",
+			"aliases": {
+				"mainnet": "4eb8a10cb9f87357"
+			}
+		},
+		"NonFungibleToken": {
+			"source": "imports-c1/1d7e57aa55817448/NonFungibleToken.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"OnChainMultiSig": {
+			"source": "imports-c1/220c1b4155f86f2f/OnChainMultiSig.cdc",
+			"aliases": {
+				"mainnet": "220c1b4155f86f2f"
+			}
+		},
+		"OracleConfig": {
+			"source": "imports-c1/cec15c814971c1dc/OracleConfig.cdc",
+			"aliases": {
+				"mainnet": "cec15c814971c1dc",
+				"testnet": "2a9b59c3e2b72ee0"
+			}
+		},
+		"OracleInterface": {
+			"source": "imports-c1/cec15c814971c1dc/OracleInterface.cdc",
+			"aliases": {
+				"mainnet": "cec15c814971c1dc",
+				"testnet": "2a9b59c3e2b72ee0"
+			}
+		},
+		"Profile": {
+			"source": "imports-c1/097bafa4e0b48eef/Profile.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"ProfileCache": {
+			"source": "imports-c1/097bafa4e0b48eef/ProfileCache.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"PublicPriceOracle": {
+			"source": "imports-c1/ec67451f8a58216a/PublicPriceOracle.cdc",
+			"aliases": {
+				"mainnet": "ec67451f8a58216a",
+				"testnet": "8232ce4a3aff4e94"
+			}
+		},
+		"Sender": {
+			"source": "imports-c1/097bafa4e0b48eef/Sender.cdc",
+			"aliases": {
+				"mainnet": "097bafa4e0b48eef",
+				"testnet": "35717efbbce11c74"
+			}
+		},
+		"StableSwapFactory": {
+			"source": "imports-c1/b063c16cac85dbd1/StableSwapFactory.cdc",
+			"aliases": {
+				"mainnet": "b063c16cac85dbd1",
+				"testnet": "cbed4c301441ded2"
+			}
+		},
+		"StringUtils": {
+			"source": "imports-c1/a340dc0a4ec828ab/StringUtils.cdc",
+			"aliases": {
+				"mainnet": "a340dc0a4ec828ab",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
+		"SwapConfig": {
+			"source": "imports-c1/b78ef7afa52ff906/SwapConfig.cdc",
+			"aliases": {
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapError": {
+			"source": "imports-c1/b78ef7afa52ff906/SwapError.cdc",
+			"aliases": {
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapFactory": {
+			"source": "imports-c1/b063c16cac85dbd1/SwapFactory.cdc",
+			"aliases": {
+				"mainnet": "b063c16cac85dbd1",
+				"testnet": "cbed4c301441ded2"
+			}
+		},
+		"SwapInterfaces": {
+			"source": "imports-c1/b78ef7afa52ff906/SwapInterfaces.cdc",
+			"aliases": {
+				"mainnet": "b78ef7afa52ff906",
+				"testnet": "ddb929038d45d4b3"
+			}
+		},
+		"SwapPair": {
+			"source": "imports-c1/ecbda466e7f191c7/SwapPair.cdc",
+			"aliases": {
+				"mainnet": "ecbda466e7f191c7",
+				"testnet": "c20df20fabe06457"
+			}
+		},
+		"TokenList": {
+			"source": "imports-c1/15a918087ab12d86/TokenList.cdc",
+			"aliases": {
+				"mainnet": "15a918087ab12d86",
+				"testnet": "b86f928a1fa7798e"
+			}
+		},
+		"ViewResolver": {
+			"source": "imports-c1/1d7e57aa55817448/ViewResolver.cdc",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "1d7e57aa55817448",
+				"testnet": "631e88ae7f1d7c20"
+			}
+		},
+		"ViewResolvers": {
+			"source": "imports-c1/15a918087ab12d86/ViewResolvers.cdc",
+			"aliases": {
+				"mainnet": "15a918087ab12d86",
+				"testnet": "b86f928a1fa7798e"
+			}
+		},
+		"stFlowToken": {
+			"source": "imports-c1/d6f80565193ad727/stFlowToken.cdc",
+			"aliases": {
+				"mainnet": "d6f80565193ad727",
+				"testnet": "e45c64ecfe31e465"
+			}
 		}
 	},
 	"dependencies": {
@@ -507,14 +910,6 @@
 				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
 				"testnet": "294e44e1ec6993c6"
-			}
-		},
-		"InscriptionMetadata": {
-			"source": "mainnet://88dd257fcf26d3cc.InscriptionMetadata",
-			"hash": "4f40b2deeb052d4136b4203027e8c8020fa520e4044a4872abc9c612879afb57",
-			"aliases": {
-				"mainnet": "88dd257fcf26d3cc",
-				"testnet": "564b229bd8380848"
 			}
 		},
 		"LiquidStaking": {

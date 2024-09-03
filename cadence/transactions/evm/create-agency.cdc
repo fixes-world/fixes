@@ -10,25 +10,28 @@ import "EVMAgent"
 transaction(
     initialFundingAmt: UFix64,
 ) {
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         // check if agency manager already exists
         assert(
-            acct.borrow<&AnyResource>(from: EVMAgent.evmAgencyManagerStoragePath) == nil,
+            acct.storage.borrow<&AnyResource>(from: EVMAgent.evmAgencyManagerStoragePath) == nil,
             message: "Agency Manager already exists!"
         )
 
         // Get a reference to the signer's stored vault
-        let vaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let vaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         assert(
@@ -55,20 +58,21 @@ transaction(
 
         /** ------------- Create new Account - Start ------------- */
         // create new account
-        let newAccount = AuthAccount(payer: acct)
-        let receiverRef = newAccount.getCapability(/public/flowTokenReceiver)
-            .borrow<&{FungibleToken.Receiver}>()
+        let newAccount = Account(payer: acct)
+        let receiverRef = newAccount
+            .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .borrow()
             ?? panic("Could not borrow receiver reference to the newly created account")
         receiverRef.deposit(from: <- vaultRef.withdraw(amount: initialFundingAmt))
 
-        let cap = newAccount.linkAccount(HybridCustody.LinkedAccountPrivatePath)
-            ?? panic("problem linking account Capability for new account")
+        let cap = newAccount.capabilities
+            .account.issue<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()
         /** ------------- End --------------------------------------- */
         // singleton resource
         let agencyCenter = EVMAgent.borrowAgencyCenter()
 
         // Create agency account
         let agencyMgr <- agencyCenter.createAgency(ins: insRef, cap)
-        acct.save(<- agencyMgr, to: EVMAgent.evmAgencyManagerStoragePath)
+        acct.storage.save(<- agencyMgr, to: EVMAgent.evmAgencyManagerStoragePath)
     }
 }

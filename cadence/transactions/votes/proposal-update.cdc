@@ -12,65 +12,65 @@ transaction(
     description: String?,
     discussionLink: String?,
 ) {
-    let voter: &FRC20Votes.VoterIdentity
+    let voter: auth(NonFungibleToken.Withdraw) &FRC20Votes.VoterIdentity
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         /** ------------- Start -- FRC20 Semi NFT Collection Initialization ------------  */
         // ensure resource
-        if acct.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
-            acct.save(<- FRC20SemiNFT.createEmptyCollection(), to: FRC20SemiNFT.CollectionStoragePath)
+        if acct.storage.borrow<&AnyResource>(from: FRC20SemiNFT.CollectionStoragePath) == nil {
+            acct.storage.save(<- FRC20SemiNFT.createEmptyCollection(nftType: Type<@FRC20SemiNFT.NFT>()), to: FRC20SemiNFT.CollectionStoragePath)
         }
 
         // link to public capability
-        // @deprecated after Cadence 1.0
         if acct
-            .getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPublicPath)
+            .capabilities.get<&FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionPublicPath)
             .borrow() == nil {
-            acct.unlink(FRC20SemiNFT.CollectionPublicPath)
-            acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(
-                FRC20SemiNFT.CollectionPublicPath,
-                target: FRC20SemiNFT.CollectionStoragePath
-            )
-            // Link private path (will be deprecated in Cadence 1.0)
-            acct.unlink(FRC20SemiNFT.CollectionPrivatePath)
-            acct.link<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(
-                FRC20SemiNFT.CollectionPrivatePath,
-                target: FRC20SemiNFT.CollectionStoragePath
+            acct.capabilities.unpublish(FRC20SemiNFT.CollectionPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20SemiNFT.Collection>(
+                    FRC20SemiNFT.CollectionStoragePath
+                ),
+                at: FRC20SemiNFT.CollectionPublicPath
             )
         }
         /** ------------- End ---------------------------------------------------------- */
 
         /** ------------- Initialize Voter Resource - Start -------------------- */
-        if acct.borrow<&AnyResource>(from: FRC20Votes.VoterStoragePath) == nil {
+        if acct.storage.borrow<&AnyResource>(from: FRC20Votes.VoterStoragePath) == nil {
             // get private cap
-            let cap = acct.getCapability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>(FRC20SemiNFT.CollectionPrivatePath)
-            acct.save(<- FRC20Votes.createVoter(cap), to: FRC20Votes.VoterStoragePath)
+            let cap = acct.capabilities.storage
+                .issue<auth(NonFungibleToken.Withdraw, NonFungibleToken.Update) &FRC20SemiNFT.Collection>(FRC20SemiNFT.CollectionStoragePath)
+            acct.storage.save(<- FRC20Votes.createVoter(cap), to: FRC20Votes.VoterStoragePath)
         }
 
         // link to public capability
-        // @deprecated after Cadence 1.0
         if acct
-            .getCapability<&FRC20Votes.VoterIdentity{FRC20Votes.VoterPublic}>(FRC20Votes.VoterPublicPath)
+            .capabilities
+            .get<&FRC20Votes.VoterIdentity>(FRC20Votes.VoterPublicPath)
             .borrow() == nil {
-            acct.unlink(FRC20Votes.VoterPublicPath)
-            acct.link<&FRC20Votes.VoterIdentity{FRC20Votes.VoterPublic, FRC20SemiNFT.FRC20SemiNFTCollectionPublic, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic}>(
-                FRC20Votes.VoterPublicPath,
-                target: FRC20Votes.VoterStoragePath
+            acct.capabilities.unpublish(FRC20Votes.VoterPublicPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FRC20Votes.VoterIdentity>(
+                    FRC20Votes.VoterStoragePath
+                ),
+                at: FRC20Votes.VoterPublicPath
             )
         }
         /** ------------- End -------------------------------------------------- */
 
-        self.voter = acct.borrow<&FRC20Votes.VoterIdentity>(from: FRC20Votes.VoterStoragePath)
+        self.voter = acct.storage.borrow<auth(NonFungibleToken.Withdraw) &FRC20Votes.VoterIdentity>(from: FRC20Votes.VoterStoragePath)
             ?? panic("Could not borrow a reference to the Voter Resource!")
     }
 

@@ -7,15 +7,16 @@ transaction(
     addr: Address,
     amount: UFix64
 ) {
-    let indexer: &FRC20Indexer.InscriptionIndexer
-    let receiverCap: Capability<&FlowToken.Vault{FungibleToken.Receiver}>
+    let indexer: auth(FRC20Indexer.Admin) &FRC20Indexer.InscriptionIndexer
+    let receiverCap: Capability<&{FungibleToken.Receiver}>
 
-    prepare(acct: AuthAccount) {
-        self.indexer = acct.borrow<&FRC20Indexer.InscriptionIndexer>(from: FRC20Indexer.IndexerStoragePath)
+    prepare(acct: auth(Storage, Capabilities) &Account) {
+        self.indexer = acct.storage
+            .borrow<auth(FRC20Indexer.Admin) &FRC20Indexer.InscriptionIndexer>(from: FRC20Indexer.IndexerStoragePath)
             ?? panic("Could not borrow a reference to the InscriptionIndexer")
 
         self.receiverCap = getAccount(addr)
-            .getCapability<&FlowToken.Vault{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
     }
 
     execute {

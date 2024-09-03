@@ -17,6 +17,10 @@ import "FRC20Staking"
 import "FRC20AccountsPool"
 
 access(all) contract FGameLotteryRegistry {
+
+    access(all) entitlement Admin
+    access(all) entitlement Manage
+
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -100,7 +104,7 @@ access(all) contract FGameLotteryRegistry {
 
         // --- Private methods ---
 
-        access(all)
+        access(Admin)
         fun updateWhitelist(address: Address, isWhitelisted: Bool) {
             self.whitelist[address] = isWhitelisted
 
@@ -114,20 +118,20 @@ access(all) contract FGameLotteryRegistry {
         /// Returns the address of the controller
         ///
         access(all)
-        fun getControllerAddress(): Address {
+        view fun getControllerAddress(): Address {
             return self.owner?.address ?? panic("The controller is not stored in the account")
         }
 
         /// Create a new staking pool
         ///
-        access(all)
+        access(Manage)
         fun createLotteryPool(
             name: String,
             rewardTick: String,
             ticketPrice: UFix64,
             epochInterval: UFix64,
-            newAccount: Capability<&AuthAccount>,
-        ){
+            newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
+        ) {
             pre {
                 FGameLotteryRegistry.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
             }
@@ -186,7 +190,7 @@ access(all) contract FGameLotteryRegistry {
 
         /// Ensure all staking resources are available
         ///
-        access(all)
+        access(Manage)
         fun ensureResourcesAvailable(
             name: String,
             rewardTick: String,
@@ -213,7 +217,7 @@ access(all) contract FGameLotteryRegistry {
             // - FRC20FTShared.SharedStore: Configuration
             // - FixesHeartbeat.IHeartbeatHook: Register to FixesHeartbeat with the scope of "FGameLottery"
 
-            if let pool = childAcctRef.borrow<&FGameLottery.LotteryPool>(from: FGameLottery.lotteryPoolStoragePath) {
+            if let pool = childAcctRef.storage.borrow<&FGameLottery.LotteryPool>(from: FGameLottery.lotteryPoolStoragePath) {
                 assert(
                     pool.name == name,
                     message: "The staking pool tick is not the same as the requested"
@@ -227,38 +231,41 @@ access(all) contract FGameLotteryRegistry {
                     epochInterval: epochInterval
                 )
                 // save the resource in the account
-                childAcctRef.save(<- pool, to: FGameLottery.lotteryPoolStoragePath)
+                childAcctRef.storage.save(<- pool, to: FGameLottery.lotteryPoolStoragePath)
 
                 isUpdated = true || isUpdated
             }
             // link the resource to the public path
             // @deprecated after Cadence 1.0
             if childAcctRef
-                .getCapability<&FGameLottery.LotteryPool{FGameLottery.LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook}>(FGameLottery.lotteryPoolPublicPath)
+                .capabilities.get<&FGameLottery.LotteryPool>(FGameLottery.lotteryPoolPublicPath)
                 .borrow() == nil {
-                childAcctRef.unlink(FGameLottery.lotteryPoolPublicPath)
-                childAcctRef.link<&FGameLottery.LotteryPool{FGameLottery.LotteryPoolPublic, FixesHeartbeat.IHeartbeatHook}>(
-                    FGameLottery.lotteryPoolPublicPath,
-                    target: FGameLottery.lotteryPoolStoragePath
+                childAcctRef.capabilities.unpublish(FGameLottery.lotteryPoolPublicPath)
+                childAcctRef.capabilities.publish(
+                    childAcctRef.capabilities.storage.issue<&FGameLottery.LotteryPool>(FGameLottery.lotteryPoolStoragePath),
+                    at: FGameLottery.lotteryPoolPublicPath,
                 )
 
                 isUpdated = true || isUpdated
             }
 
             // create the shared store and save it in the account
-            if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+            if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
                 let sharedStore <- FRC20FTShared.createSharedStore()
-                childAcctRef.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+                childAcctRef.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
 
                 isUpdated = true || isUpdated
             }
             // link the resource to the public path
             // @deprecated after Cadence 1.0
             if childAcctRef
-                .getCapability<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath)
+                .capabilities.get<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStorePublicPath)
                 .borrow() == nil {
-                childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
-                childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+                childAcctRef.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
+                childAcctRef.capabilities.publish(
+                    childAcctRef.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
+                    at: FRC20FTShared.SharedStorePublicPath
+                )
 
                 isUpdated = true || isUpdated
             }
@@ -308,9 +315,9 @@ access(all) contract FGameLotteryRegistry {
     /// Borrow Lottery Pool Registry
     ///
     access(all)
-    fun borrowRegistry(): &Registry{RegistryPublic} {
+    view fun borrowRegistry(): &Registry {
         return getAccount(self.account.address)
-            .getCapability<&Registry{RegistryPublic}>(self.registryPublicPath)
+            .capabilities.get<&Registry>(self.registryPublicPath)
             .borrow()
             ?? panic("Registry not found")
     }
@@ -327,13 +334,16 @@ access(all) contract FGameLotteryRegistry {
 
         // save registry
         let registry <- create Registry()
-        self.account.save(<- registry, to: self.registryStoragePath)
+        self.account.storage.save(<- registry, to: self.registryStoragePath)
         // @deprecated in Cadence 1.0
-        self.account.link<&Registry{RegistryPublic}>(self.registryPublicPath, target: self.registryStoragePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&Registry>(self.registryStoragePath),
+            at: self.registryPublicPath
+        )
 
         // create the controller
         let controller <- create RegistryController()
-        self.account.save(<-controller, to: self.registryControllerStoragePath)
+        self.account.storage.save(<-controller, to: self.registryControllerStoragePath)
 
         // Emit the ContractInitialized event
         emit ContractInitialized()

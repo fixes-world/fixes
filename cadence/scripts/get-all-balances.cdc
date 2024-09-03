@@ -11,8 +11,8 @@ fun main(
     let balances = indexer.getBalances(addr: addr)
     if includeFlowToken {
         let vaultRef = getAccount(addr)
-            .getCapability(/public/flowTokenBalance)
-            .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+            .capabilities.get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+            .borrow()
             ?? panic("Could not borrow Balance reference to the Vault")
         balances[""] = vaultRef.balance
     }

@@ -12,15 +12,16 @@ transaction(
     tick: String,
     properties: {UInt8: String}
 ) {
-    let manager: &FRC20MarketManager.Manager
-    let market: &FRC20Marketplace.Market{FRC20Marketplace.MarketPublic}
+    let manager: auth(FRC20MarketManager.Manage) &FRC20MarketManager.Manager
+    let market: &{FRC20Marketplace.MarketPublic}
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         // if the FRC20MarketManager doesn't exist in storage, create it
-        if acct.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath) == nil {
-            acct.save(<- FRC20MarketManager.createManager(), to: FRC20MarketManager.FRC20MarketManagerStoragePath)
+        if acct.storage.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath) == nil {
+            acct.storage.save(<- FRC20MarketManager.createManager(), to: FRC20MarketManager.FRC20MarketManagerStoragePath)
         }
-        self.manager = acct.borrow<&FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath)
+        self.manager = acct.storage
+            .borrow<auth(FRC20MarketManager.Manage) &FRC20MarketManager.Manager>(from: FRC20MarketManager.FRC20MarketManagerStoragePath)
             ?? panic("Could not borrow reference to the FRC20MarketManager")
 
         let pool = FRC20AccountsPool.borrowAccountsPool()

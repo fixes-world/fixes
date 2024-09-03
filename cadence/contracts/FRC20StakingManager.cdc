@@ -3,7 +3,8 @@
 
 # FRC20 Staking Manager
 
-TODO: Add description
+The staking manager contract is responsible for managing the staking pools and the staking process.
+It allows users to stake their FRC20 tokens, unstake them, claim rewards, and donate tokens to the staking pools.
 
 */
 // Third Party Imports
@@ -11,6 +12,8 @@ import "FungibleToken"
 import "FlowToken"
 import "NonFungibleToken"
 import "MetadataViews"
+import "ViewResolver"
+import "Burner"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -24,6 +27,10 @@ import "FRC20StakingVesting"
 import "FRC20StakingForwarder"
 
 access(all) contract FRC20StakingManager {
+
+    access(all) entitlement Admin
+    access(all) entitlement Manage
+
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -72,7 +79,7 @@ access(all) contract FRC20StakingManager {
             return self.whitelist[address] ?? false
         }
 
-        access(all)
+        access(Admin)
         fun updateWhitelist(address: Address, isWhitelisted: Bool) {
             self.whitelist[address] = isWhitelisted
 
@@ -87,16 +94,16 @@ access(all) contract FRC20StakingManager {
         /// Returns the address of the controller
         ///
         access(all)
-        fun getControllerAddress(): Address {
+        view fun getControllerAddress(): Address {
             return self.owner?.address ?? panic("The controller is not stored in the account")
         }
 
         /// Create a new staking pool
         ///
-        access(all)
+        access(Manage)
         fun enableAndCreateFRC20Staking(
             tick: String,
-            newAccount: Capability<&AuthAccount>,
+            newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
         ){
             pre {
                 FRC20StakingManager.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
@@ -129,7 +136,7 @@ access(all) contract FRC20StakingManager {
 
         /// Ensure all staking resources are available
         ///
-        access(all)
+        access(Manage)
         fun ensureStakingResourcesAvailable(tick: String) {
             pre {
                 FRC20StakingManager.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
@@ -151,7 +158,7 @@ access(all) contract FRC20StakingManager {
 
         /// Donate all shared pool FLOW tokens to the vesting pool
         ///
-        access(all)
+        access(Manage)
         fun donateAllSharedPoolFlowTokenToVesting(
             tick: String,
             childType: FRC20AccountsPool.ChildAccountType,
@@ -168,9 +175,10 @@ access(all) contract FRC20StakingManager {
             let childAcctRef = acctsPool.borrowChildAccount(type: childType, nil)
                 ?? panic("The shared pool account was not created")
 
-            let flowVaultRef = childAcctRef.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+            let flowVaultRef = childAcctRef.storage
+                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("The flow vault is not found")
-            let storageUsageBalance = UFix64(childAcctRef.storageUsed) / UFix64(childAcctRef.storageCapacity) * flowVaultRef.balance
+            let storageUsageBalance = UFix64(childAcctRef.storage.used) / UFix64(childAcctRef.storage.capacity) * flowVaultRef.balance
             // Keep the 2x of the storage usage balance
             let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 - 0.01
             // ensure the flow balance is enough
@@ -190,7 +198,7 @@ access(all) contract FRC20StakingManager {
 
         /// Donate FLOW in the child account to the vesting pool
         ///
-        access(all)
+        access(Manage)
         fun donateFlowTokenToVesting(
             tick: String,
             amount: UFix64,
@@ -207,9 +215,10 @@ access(all) contract FRC20StakingManager {
             let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.Staking, tick)
                 ?? panic("The staking account was not created")
 
-            let flowVaultRef = childAcctRef.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+            let flowVaultRef = childAcctRef.storage
+                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("The flow vault is not found")
-            let storageUsageBalance = UFix64(childAcctRef.storageUsed) / UFix64(childAcctRef.storageCapacity) * flowVaultRef.balance
+            let storageUsageBalance = UFix64(childAcctRef.storage.used) / UFix64(childAcctRef.storage.capacity) * flowVaultRef.balance
             // Keep the 2x of the storage usage balance
             let availbleBalance = flowVaultRef.balance - storageUsageBalance * 2.0 - 0.01
             // ensure the flow balance is enough
@@ -231,7 +240,7 @@ access(all) contract FRC20StakingManager {
         ///
         access(self)
         fun _donateTokenToVesting(
-            vault: @FungibleToken.Vault,
+            vault: @{FungibleToken.Vault},
             tick: String,
             vestingBatchAmount: UInt32,
             vestingInterval: UFix64,
@@ -253,7 +262,7 @@ access(all) contract FRC20StakingManager {
 
         /// Register a reward strategy
         ///
-        access(all)
+        access(Manage)
         fun registerRewardStrategy(
             stakeTick: String,
             rewardTick: String,
@@ -319,7 +328,7 @@ access(all) contract FRC20StakingManager {
         // - FRC20StakingVesting.Vault: Vesting vault for the staking pool
         // - FRC20StakingForwarder.Forwarder: Forward $FLOW to the staking pool
 
-        if let pool = childAcctRef.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath) {
+        if let pool = childAcctRef.storage.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath) {
             assert(
                 pool.tick == tick,
                 message: "The staking pool tick is not the same as the requested"
@@ -328,47 +337,53 @@ access(all) contract FRC20StakingManager {
             // create the staking and save it in the account
             let pool <- FRC20Staking.createPool(tick)
             // save the staking in the account
-            childAcctRef.save(<- pool, to: FRC20Staking.StakingPoolStoragePath)
+            childAcctRef.storage.save(<- pool, to: FRC20Staking.StakingPoolStoragePath)
             // reference of stake pool
-            let poolRef = childAcctRef.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath)
+            let poolRef = childAcctRef.storage.borrow<&FRC20Staking.Pool>(from: FRC20Staking.StakingPoolStoragePath)
                 ?? panic("The staking pool is not found")
             poolRef.initialize()
 
             // link the staking to the public path
-            childAcctRef.unlink(FRC20Staking.StakingPoolPublicPath)
-            childAcctRef.link<&FRC20Staking.Pool{FRC20Staking.PoolPublic}>(FRC20Staking.StakingPoolPublicPath, target: FRC20Staking.StakingPoolStoragePath)
+            childAcctRef.capabilities.unpublish(FRC20Staking.StakingPoolPublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20Staking.Pool>(FRC20Staking.StakingPoolStoragePath),
+                at: FRC20Staking.StakingPoolPublicPath
+            )
 
             isUpdated = true
         }
 
         // create the shared store and save it in the account
-        if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
             let sharedStore <- FRC20FTShared.createSharedStore()
-            childAcctRef.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+            childAcctRef.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
             // link the shared store to the public path
-            childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
-            childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+            childAcctRef.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
+                at: FRC20FTShared.SharedStorePublicPath
+            )
 
             isUpdated = true || isUpdated
         }
 
         // create the hooks and save it in the account
-        if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
-            childAcctRef.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+            childAcctRef.storage.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
 
             isUpdated = true || isUpdated
         }
 
         // link the hooks to the public path
         if childAcctRef
-            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .capabilities.get<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookPublicPath)
             .borrow() == nil {
             // link the hooks to the public path
-            childAcctRef.unlink(FRC20FTShared.TransactionHookPublicPath)
-            childAcctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
-                FRC20FTShared.TransactionHookPublicPath,
-                target: FRC20FTShared.TransactionHookStoragePath
+            childAcctRef.capabilities.unpublish(FRC20FTShared.TransactionHookPublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookStoragePath),
+                at: FRC20FTShared.TransactionHookPublicPath
             )
 
             isUpdated = true || isUpdated
@@ -389,26 +404,27 @@ access(all) contract FRC20StakingManager {
         // Add hooks to the shared hooks reference
 
         // borrow the hooks reference
-        let hooksRef = childAcctRef.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+        let hooksRef = childAcctRef.storage
+            .borrow<auth(FRC20FTShared.Manage) &FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
 
         // --- Vesting ---
 
-        if childAcctRef.borrow<&AnyResource>(from: FRC20StakingVesting.storagePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20StakingVesting.storagePath) == nil {
             let vesting <- FRC20StakingVesting.createVestingVault()
-            childAcctRef.save(<- vesting, to: FRC20StakingVesting.storagePath)
+            childAcctRef.storage.save(<- vesting, to: FRC20StakingVesting.storagePath)
 
             isUpdated = true || isUpdated
         }
 
         if childAcctRef
-            .getCapability<&FRC20StakingVesting.Vault{FRC20StakingVesting.VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20StakingVesting.publicPath)
+            .capabilities.get<&FRC20StakingVesting.Vault>(FRC20StakingVesting.publicPath)
             .borrow() == nil {
             // link the vesting to the public path
-            childAcctRef.unlink(FRC20StakingVesting.publicPath)
-            childAcctRef.link<&FRC20StakingVesting.Vault{FRC20StakingVesting.VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
-                FRC20StakingVesting.publicPath,
-                target: FRC20StakingVesting.storagePath
+            childAcctRef.capabilities.unpublish(FRC20StakingVesting.publicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20StakingVesting.Vault>(FRC20StakingVesting.storagePath),
+                at: FRC20StakingVesting.publicPath
             )
 
             isUpdated = true || isUpdated
@@ -417,7 +433,7 @@ access(all) contract FRC20StakingManager {
         // add vesting to hooks
 
         let vestingHookCap = childAcctRef
-            .getCapability<&FRC20StakingVesting.Vault{FRC20StakingVesting.VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20StakingVesting.publicPath)
+            .capabilities.get<&FRC20StakingVesting.Vault>(FRC20StakingVesting.publicPath)
         let vestingHookRef = vestingHookCap.borrow()
             ?? panic("Could not borrow the vesting hook reference")
         if !hooksRef.hasHook(vestingHookRef.getType()) {
@@ -431,29 +447,36 @@ access(all) contract FRC20StakingManager {
         // This is the standard receiver path of FlowToken
         let flowReceiverPath = /public/flowTokenReceiver
         // check if the forwarder is already created
-        if childAcctRef.borrow<&AnyResource>(from: FRC20StakingForwarder.StakingForwarderStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20StakingForwarder.StakingForwarderStoragePath) == nil {
             let forwarder <- FRC20StakingForwarder.createNewForwarder(childAcctRef.address)
-            childAcctRef.save(<- forwarder, to: FRC20StakingForwarder.StakingForwarderStoragePath)
+            childAcctRef.storage.save(<- forwarder, to: FRC20StakingForwarder.StakingForwarderStoragePath)
 
             // link public interface
-            childAcctRef.link<&FRC20StakingForwarder.Forwarder{FRC20StakingForwarder.ForwarderPublic}>(
-                FRC20StakingForwarder.StakingForwarderPublicPath,
-                target: FRC20StakingForwarder.StakingForwarderStoragePath
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20StakingForwarder.Forwarder>(FRC20StakingForwarder.StakingForwarderStoragePath),
+                at: FRC20StakingForwarder.StakingForwarderPublicPath
             )
 
             isUpdated = true || isUpdated
         }
 
          // Unlink the existing receiver capability for flowReceiverPath
-        if childAcctRef.getCapability(flowReceiverPath).check<&{FungibleToken.Receiver}>() {
+        if childAcctRef.capabilities.get<&{FungibleToken.Receiver}>(flowReceiverPath).check() {
             // link the forwarder to the public path
-            childAcctRef.unlink(flowReceiverPath)
+            childAcctRef.capabilities.unpublish(flowReceiverPath)
             // Link the new forwarding receiver capability
-            childAcctRef.link<&{FungibleToken.Receiver}>(flowReceiverPath, target: FRC20StakingForwarder.StakingForwarderStoragePath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&{FungibleToken.Receiver}>(FRC20StakingForwarder.StakingForwarderStoragePath),
+                at: flowReceiverPath
+            )
+
             // link the FlowToken to the forwarder fallback path
             let fallbackPath = Fixes.getFallbackFlowTokenPublicPath()
-            childAcctRef.unlink(fallbackPath)
-            childAcctRef.link<&FlowToken.Vault{FungibleToken.Receiver, FungibleToken.Balance}>(fallbackPath, target: /storage/flowTokenVault)
+            childAcctRef.capabilities.unpublish(fallbackPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FlowToken.Vault>(/storage/flowTokenVault),
+                at: fallbackPath
+            )
 
             isUpdated = true || isUpdated
         }
@@ -470,7 +493,7 @@ access(all) contract FRC20StakingManager {
             return true
         }
         let admin = self.account
-            .getCapability<&StakingAdmin{StakingAdminPublic}>(self.StakingAdminPublicPath)
+            .capabilities.get<&StakingAdmin>(self.StakingAdminPublicPath)
             .borrow()
             ?? panic("Could not borrow the admin reference")
         return admin.isWhitelisted(address: address)
@@ -522,7 +545,7 @@ access(all) contract FRC20StakingManager {
     /// Borrow the platform staking pool.
     ///
     access(all)
-    fun borrowPlatformStakingPool(): &FRC20Staking.Pool{FRC20Staking.PoolPublic} {
+    view fun borrowPlatformStakingPool(): &FRC20Staking.Pool {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         // Get the staking pool address
@@ -536,13 +559,13 @@ access(all) contract FRC20StakingManager {
     /// Stake tokens
     ///
     access(all)
-    fun stake(ins: &Fixes.Inscription) {
+    fun stake(ins: auth(Fixes.Extractable) &Fixes.Inscription) {
         // singleton resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "withdraw",
@@ -577,7 +600,7 @@ access(all) contract FRC20StakingManager {
     ///
     access(all)
     fun unstake(
-        _ semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>,
+        _ semiNFTColCap: Capability<auth(NonFungibleToken.Update, NonFungibleToken.Withdraw) &FRC20SemiNFT.Collection>,
         nftId: UInt64
     ) {
         pre {
@@ -602,7 +625,7 @@ access(all) contract FRC20StakingManager {
     ///
     access(all)
     fun claimUnlockedUnstakingChange(
-        ins: &Fixes.Inscription
+        ins: auth(Fixes.Extractable) &Fixes.Inscription
     ) {
         pre {
             ins.isExtractable(): "The inscription is not extractable"
@@ -617,7 +640,7 @@ access(all) contract FRC20StakingManager {
         )
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "deposit",
@@ -648,7 +671,7 @@ access(all) contract FRC20StakingManager {
     access(all)
     fun donateToStakingPool(
         tick: String,
-        ins: &Fixes.Inscription
+        ins: auth(Fixes.Extractable) &Fixes.Inscription
     ) {
         // singleton resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -687,7 +710,7 @@ access(all) contract FRC20StakingManager {
     access(all)
     fun donateToVesting(
         tick: String,
-        ins: &Fixes.Inscription,
+        ins: auth(Fixes.Extractable) &Fixes.Inscription,
         vestingBatchAmount: UInt32,
         vestingInterval: UFix64,
     ) {
@@ -749,7 +772,7 @@ access(all) contract FRC20StakingManager {
     access(contract)
     fun _withdrawDonateChange(
         tick: String,
-        ins: &Fixes.Inscription,
+        ins: auth(Fixes.Extractable) &Fixes.Inscription,
     ): @FRC20FTShared.Change {
         // singleton resources
         let frc20Indexer = FRC20Indexer.getIndexer()
@@ -762,7 +785,7 @@ access(all) contract FRC20StakingManager {
             ?? panic("The staking pool is not found")
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
         assert(
             op == "withdraw",
@@ -813,24 +836,19 @@ access(all) contract FRC20StakingManager {
     ///
     access(all)
     fun claimRewards(
-        _ semiNFTColCap: Capability<&FRC20SemiNFT.Collection{FRC20SemiNFT.FRC20SemiNFTCollectionPublic, FRC20SemiNFT.FRC20SemiNFTBorrowable, NonFungibleToken.Provider, NonFungibleToken.Receiver, NonFungibleToken.CollectionPublic, MetadataViews.ResolverCollection}>,
+        _ semiNFTColRef: auth(NonFungibleToken.Update) &FRC20SemiNFT.Collection,
         nftIds: [UInt64]
     ) {
-        pre {
-            semiNFTColCap.check(): "The semiNFT collection is not valid"
-        }
-
         // singleton resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
-        let ownerAddr = semiNFTColCap.address
-        let semiNFTCol = semiNFTColCap.borrow()
-            ?? panic("Could not borrow the semiNFT collection")
+        let ownerAddr = semiNFTColRef.owner?.address
+            ?? panic("The semiNFT collection owner is not found")
 
         // loop through all nftIds
         for nftId in nftIds {
-            let nft = semiNFTCol.borrowFRC20SemiNFT(id: nftId)
+            let nft = semiNFTColRef.borrowFRC20SemiNFT(id: nftId)
                 ?? panic("The semiNFT is not found")
             let poolAddress = nft.getFromAddress()
 
@@ -851,7 +869,7 @@ access(all) contract FRC20StakingManager {
                     // The reward is not empty, return the change to the user
                     frc20Indexer.returnChange(change: <- rewardChange)
                 } else {
-                    destroy rewardChange
+                    Burner.burn(<- rewardChange)
                 }
             } // end reward Ticks
         } // end nftIds
@@ -866,13 +884,15 @@ access(all) contract FRC20StakingManager {
 
         // create the admin account
         let admin <- create StakingAdmin()
-        self.account.save(<-admin, to: self.StakingAdminStoragePath)
-        // @deprecated in Cadence 1.0
-        self.account.link<&StakingAdmin{StakingAdminPublic}>(self.StakingAdminPublicPath, target: self.StakingAdminStoragePath)
+        self.account.storage.save(<-admin, to: self.StakingAdminStoragePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&StakingAdmin>(self.StakingAdminStoragePath),
+            at: self.StakingAdminPublicPath
+        )
 
         // create the controller
         let controller <- create StakingController()
-        self.account.save(<-controller, to: self.StakingControllerStoragePath)
+        self.account.storage.save(<-controller, to: self.StakingControllerStoragePath)
 
         emit ContractInitialized()
     }

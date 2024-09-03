@@ -13,18 +13,20 @@ import "FixesTokenLockDrops"
 transaction(
     symbol: String,
 ) {
-    let ins: &Fixes.Inscription
-    let pool: &FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}
+    let ins: auth(Fixes.Extractable) &Fixes.Inscription
+    let pool: &FixesTokenLockDrops.DropsPool
     let recipient: &{FungibleToken.Receiver}
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
@@ -46,30 +48,33 @@ transaction(
         /** ------------- Prepare the token recipient - Start -------------- */
         let tokenVaultData = self.pool.getTokenVaultData()
         // ensure storage path
-        if acct.borrow<&AnyResource>(from: tokenVaultData.storagePath) == nil {
+        if acct.storage.borrow<&AnyResource>(from: tokenVaultData.storagePath) == nil {
             // save the empty vault
-            acct.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
-            // save the public capability
+            acct.storage.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
 
-            // @deprecated after Cadence 1.0
+            // save the public capability to the stored vault
             // Create a public capability to the stored Vault that exposes
             // the `deposit` method through the `Receiver` interface.
-            acct.link<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath, target: tokenVaultData.storagePath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&{FungibleToken.Receiver}>(tokenVaultData.storagePath),
+                at: tokenVaultData.receiverPath
+            )
             // Create a public capability to the stored Vault that only exposes
             // the `balance` field and the `resolveView` method through the `Balance` interface
-            acct.link<&{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(
-                tokenVaultData.metadataPath,
-                target: tokenVaultData.storagePath
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&{FungibleToken.Vault}>(tokenVaultData.storagePath),
+                at: tokenVaultData.metadataPath
             )
         }
 
-        self.recipient = acct.getCapability<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath)
+        self.recipient = acct.capabilities.get<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath)
             .borrow()
             ?? panic("Could not borrow a reference to the recipient's Receiver!")
         /** ------------- End ----------------------------------------------- */
 
         // Get a reference to the signer's stored vault
-        let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let flowVaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         /** ------------- Create the Inscription - Start ------------- */

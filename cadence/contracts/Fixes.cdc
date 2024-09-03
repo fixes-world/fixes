@@ -7,12 +7,22 @@ This is the basic contract of the FIXeS protocol. It contains the logic to creat
 
 */
 import "MetadataViews"
+import "ViewResolver"
 import "FungibleToken"
 import "FlowToken"
+import "Burner"
 
 /// FIXES contract to store inscriptions
 ///
 access(all) contract Fixes {
+
+    /* --- Entitlement --- */
+    // Inscriptions entitlements
+    access(all) entitlement Writable;
+    access(all) entitlement Extractable;
+    // Inscriptions store entitlements
+    access(all) entitlement Manage;
+
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -141,7 +151,7 @@ access(all) contract Fixes {
 
     /// The resource that stores the inscriptions
     ///
-    access(all) resource Inscription: InscriptionPublic, MetadataViews.Resolver {
+    access(all) resource Inscription: InscriptionPublic, ViewResolver.Resolver, Burner.Burnable {
         /// the id of the inscription
         access(self) let id: UInt64
         /// the id of the parent inscription
@@ -170,10 +180,15 @@ access(all) contract Fixes {
             self.value <- value
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.value
-            emit InscriptionBurned(id: self.id)
+        /// Burn callback
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.isExtracted(): "Inscription should be extracted"
+            }
+            post {
+                emit InscriptionBurned(id: self.id)
+            }
         }
 
         /** ------ Functionality ------  */
@@ -201,7 +216,7 @@ access(all) contract Fixes {
 
         /// Fuse the inscription with another inscription
         ///
-        access(all)
+        access(Writable | Extractable)
         fun fuse(_ other: @Inscription) {
             pre {
                 !self.isExtracted(): "Inscription already extracted"
@@ -209,7 +224,9 @@ access(all) contract Fixes {
             let otherValue <- other.extract()
             let from = other.getId()
             let fusedValue = otherValue.balance
-            destroy other
+            // destroy
+            Burner.burn(<- other)
+
             let selfValue = (&self.value as &FlowToken.Vault?)!
             selfValue.deposit(from: <- otherValue)
 
@@ -222,7 +239,7 @@ access(all) contract Fixes {
 
         /// Deposit the inscription value
         ///
-        access(all)
+        access(Writable | Extractable)
         fun deposit(_ otherValue: @FlowToken.Vault) {
             pre {
                 !self.isExtracted(): "Inscription already extracted"
@@ -241,7 +258,7 @@ access(all) contract Fixes {
 
         /// Extract the inscription value
         ///
-        access(all)
+        access(Extractable)
         fun extract(): @FlowToken.Vault {
             pre {
                 !self.isExtracted(): "Inscription already extracted"
@@ -257,7 +274,7 @@ access(all) contract Fixes {
 
         /// Extract a part of the inscription value, but keep the inscription be not extracted
         ///
-        access(all)
+        access(Extractable)
         fun partialExtract(_ amount: UFix64): @FlowToken.Vault {
             pre {
                 !self.isExtracted(): "Inscription already extracted"
@@ -335,7 +352,7 @@ access(all) contract Fixes {
 
         access(all)
         view fun borrowData(): &InscriptionData {
-            return &self.data as &InscriptionData
+            return &self.data
         }
 
         access(all)
@@ -358,7 +375,7 @@ access(all) contract Fixes {
             return self.data.encoding
         }
 
-        /** ---- Implementation of MetadataViews.Resolver ---- */
+        /** ---- Implementation of ViewResolver.Resolver ---- */
 
         access(all)
         view fun getViews(): [Type] {
@@ -377,9 +394,9 @@ access(all) contract Fixes {
         fun resolveView(_ view: Type): AnyStruct? {
             let rarity = self.getInscriptionRarity()
             let ratityView = MetadataViews.Rarity(
-                UFix64(rarity.rawValue),
-                UFix64(ValueRarity.Legendary.rawValue),
-                nil
+                score: UFix64(rarity.rawValue),
+                max: UFix64(ValueRarity.Legendary.rawValue),
+                description: nil
             )
             let mimeType = self.getMimeType()
             let metadata = self.getMetadata()
@@ -420,15 +437,15 @@ access(all) contract Fixes {
                 return ratityView
             case Type<MetadataViews.Traits>():
                 return MetadataViews.Traits([
-                    MetadataViews.Trait(name: "id", value: self.getId(), nil, nil),
-                    MetadataViews.Trait(name: "mimeType", value: self.getMimeType(), nil, nil),
-                    MetadataViews.Trait(name: "metaProtocol", value: self.getMetaProtocol(), nil, nil),
-                    MetadataViews.Trait(name: "encoding", value: self.getContentEncoding(), nil, nil),
+                    MetadataViews.Trait(name: "id", value: self.getId(), displayType: nil, rarity: nil),
+                    MetadataViews.Trait(name: "mimeType", value: self.getMimeType(), displayType: nil, rarity: nil),
+                    MetadataViews.Trait(name: "metaProtocol", value: self.getMetaProtocol(), displayType: nil, rarity: nil),
+                    MetadataViews.Trait(name: "encoding", value: self.getContentEncoding(), displayType: nil, rarity: nil),
                     MetadataViews.Trait(
                         name: "rarity",
                         value: rarity.rawValue,
-                        nil,
-                        ratityView
+                        displayType: nil,
+                        rarity: ratityView
                     )
                 ])
             }
@@ -447,15 +464,15 @@ access(all) contract Fixes {
         view fun getLength(): Int
         // returns the inscription with the given id
         access(all)
-        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}?
+        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription?
     }
 
     /// The private interface to the inscriptions collection
     ///
     access(all) resource interface InscriptionsPrivate {
         // returns the inscription with the given id
-        access(all)
-        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription?
+        access(Manage)
+        view fun borrowInscriptionWritableRef(_ id: UInt64): auth(Extractable) &Fixes.Inscription?
     }
 
     /// The public interface to the archived inscriptions
@@ -464,16 +481,13 @@ access(all) contract Fixes {
         // returns true if the archived inscriptions reached the 10000 amount
         access(all)
         view fun isFull(): Bool
-        // archive the inscription
-        access(contract)
-        fun archive(_ ins: @Fixes.Inscription)
     }
 
     /// The public interface to the archivor
     ///
     access(all) resource interface Archivor {
         // archive the inscription
-        access(all)
+        access(Manage)
         fun archive(_ ins: @Fixes.Inscription)
     }
 
@@ -487,16 +501,11 @@ access(all) contract Fixes {
             self.inscriptions <- {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.inscriptions
-        }
-
         // --- Public Methods ---
 
         access(all)
         view fun isFull(): Bool {
-            return self.inscriptions.keys.length >= 8000
+            return self.inscriptions.length >= 8000
         }
 
         access(all)
@@ -506,22 +515,22 @@ access(all) contract Fixes {
 
         access(all)
         view fun getLength(): Int {
-            return self.inscriptions.keys.length
+            return self.inscriptions.length
         }
 
         access(all)
-        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription? {
             return self.borrowInscriptionWritableRef(id)
         }
 
         // --- Private Methods ---
 
-        access(all)
-        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription? {
-            return &self.inscriptions[id] as &Fixes.Inscription?
+        access(Manage)
+        view fun borrowInscriptionWritableRef(_ id: UInt64): auth(Extractable) &Fixes.Inscription? {
+            return &self.inscriptions[id]
         }
 
-        access(all)
+        access(Manage)
         fun archive(_ ins: @Fixes.Inscription) {
             pre {
                 ins.isExtracted(): "Inscription should be extracted"
@@ -533,7 +542,7 @@ access(all) contract Fixes {
 
             emit InscriptionArchived(id: id)
 
-            destroy old
+            Burner.burn(<- old)
         }
     }
 
@@ -541,12 +550,9 @@ access(all) contract Fixes {
     ///
     access(all) resource interface InscriptionsStorePublic {
         // ---- Access Control: Account Level ----
-        /// Store executable inscription
-        access(account)
-        fun store(_ ins: @Fixes.Inscription)
         // returns the inscription with the given id
         access(account)
-        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription?
+        view fun borrowInscriptionWritableRefInAccount(_ id: UInt64): auth(Extractable) &Fixes.Inscription?
     }
 
     /// The private interface to the inscriptions store
@@ -554,15 +560,15 @@ access(all) contract Fixes {
     access(all) resource interface InscriptionsStorePrivate {
         /// Store executable inscription
         ///
-        access(all)
+        access(Manage)
         fun store(_ ins: @Fixes.Inscription)
 
         /// Archive extracted inscription
         ///
-        access(all)
+        access(Manage)
         fun archive(
             id: UInt64,
-            archiveRef: &ArchivedInscriptions{ArchivedInscriptionsPublic}
+            archiveRef: auth(Manage) &ArchivedInscriptions
         )
     }
 
@@ -576,11 +582,6 @@ access(all) contract Fixes {
             self.inscriptions <- {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.inscriptions
-        }
-
         // --- Public Methods ---
 
         access(all)
@@ -590,24 +591,33 @@ access(all) contract Fixes {
 
         access(all)
         view fun getLength(): Int {
-            return self.inscriptions.keys.length
+            return self.inscriptions.length
         }
 
         access(all)
-        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription{Fixes.InscriptionPublic}? {
+        view fun borrowInscription(_ id: UInt64): &Fixes.Inscription? {
             return self.borrowInscriptionWritableRef(id)
         }
 
         // --- Private Methods ---
 
-        access(all)
-        fun borrowInscriptionWritableRef(_ id: UInt64): &Fixes.Inscription? {
-            return &self.inscriptions[id] as &Fixes.Inscription?
+        /// returns the inscription with the given id
+        ///
+        access(account)
+        view fun borrowInscriptionWritableRefInAccount(_ id: UInt64): auth(Extractable) &Fixes.Inscription? {
+            return self.borrowInscriptionWritableRef(id)
+        }
+
+        /// returns the inscription with the given id
+        ///
+        access(Manage)
+        view fun borrowInscriptionWritableRef(_ id: UInt64): auth(Extractable) &Fixes.Inscription? {
+            return &self.inscriptions[id]
         }
 
         /// Store executable inscription
         ///
-        access(all)
+        access(Manage)
         fun store(_ ins: @Fixes.Inscription) {
             pre {
                 !ins.isExtracted(): "Inscription should be not extracted"
@@ -615,15 +625,16 @@ access(all) contract Fixes {
             // inscription id should be unique
             let id = ins.getId()
             let old <- self.inscriptions.insert(key: id, <- ins)
-            destroy old
+
+            Burner.burn(<- old)
         }
 
         /// Archive extracted inscription
         ///
-        access(all)
+        access(Manage)
         fun archive(
             id: UInt64,
-            archiveRef: &ArchivedInscriptions{ArchivedInscriptionsPublic}
+            archiveRef: auth(Manage) &ArchivedInscriptions
         ) {
             pre {
                 !archiveRef.isFull(): "This archived inscriptions resource is full"
@@ -721,7 +732,7 @@ access(all) contract Fixes {
         _ addr: Address
     ): &{FungibleToken.Receiver}? {
         let cap = getAccount(addr)
-            .getCapability<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
         return cap.borrow()
     }
 
@@ -743,7 +754,7 @@ access(all) contract Fixes {
     /// Returns the fallback receiver assigned to the account
     ///
     access(all)
-    fun getFallbackFlowTokenPublicPath(): PublicPath {
+    view fun getFallbackFlowTokenPublicPath(): PublicPath {
         return PublicPath(identifier: "flowTokenReceiverDefault")!
     }
 

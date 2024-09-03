@@ -13,6 +13,7 @@ import "ViewResolver"
 import "MetadataViews"
 import "FungibleTokenMetadataViews"
 import "TokenList"
+import "Burner"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -34,29 +35,11 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// The event that is emitted when the contract is created
     access(all) event TokensInitialized(initialSupply: UFix64)
 
-    /// The event that is emitted when tokens are withdrawn from a Vault
-    access(all) event TokensWithdrawn(amount: UFix64, from: Address?)
-
-    /// The event that is emitted when tokens are deposited to a Vault
-    access(all) event TokensDeposited(amount: UFix64, to: Address?)
-
     /// The event that is emitted when new tokens are minted
     access(all) event TokensConvertedToStanard(amount: UFix64, by: Address)
 
     /// The event that is emitted when tokens are destroyed
     access(all) event TokensConvertedToFRC20(amount: UFix64, by: Address)
-
-    /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
-
-    /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataUpdated(typeIdentifier: String, id: String, value: String, owner: Address?)
-
-    /// The event that is emitted when the dna metadata is updated
-    access(all) event TokenDNAGenerated(identifier: String, value: String, mutatableAmount: UInt64, owner: Address?)
-
-    /// The event that is emitted when the dna mutatable is updated
-    access(all) event TokenDNAMutatableCharged(identifier: String, mutatableAmount: UInt64, owner: Address?)
 
     /// -------- Parameters --------
 
@@ -81,7 +64,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// out of thin air. A special Minter resource needs to be defined to mint
     /// new tokens.
     ///
-    access(all) resource Vault: FixesFungibleTokenInterface.Metadata, FixesFungibleTokenInterface.MetadataGenerator, FungibleToken.Provider, FungibleToken.Receiver, FungibleToken.Balance, MetadataViews.Resolver {
+    access(all) resource Vault: FixesFungibleTokenInterface.Vault, FungibleToken.Vault {
         /// The total balance of this vault
         access(all)
         var balance: UFix64
@@ -103,19 +86,13 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.metadata = {}
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            // You can not destroy a Change with a non-zero balance
+        /// The destroy method for the Vault
+        ///
+        access(contract)
+        fun burnCallback() {
             pre {
-                self.balance == UFix64(0): "Balance must be zero for destroy"
+                self.change == nil: "The change must be nil"
             }
-            destroy self.change
-            // call the burn callback
-            self.burnCallback()
-        }
-
-        /// Called when a fungible token is burned via the `Burner.burn()` method
-        access(contract) fun burnCallback() {
             if self.balance > 0.0 {
                 // update the total supply for the FungibleToken
                 FRC20FungibleToken.totalFungibleTokenSupply = FRC20FungibleToken.totalFungibleTokenSupply - self.balance
@@ -130,7 +107,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// account to be able to receive deposits of this token type.
         ///
         access(all) fun createEmptyVault(): @Vault {
-            return <- FRC20FungibleToken.createEmptyVault()
+            return <- FRC20FungibleToken.createEmptyVault(vaultType: Type<@Vault>())
         }
 
         /// ----- Internal Methods -----
@@ -138,8 +115,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the change reference
         ///
         access(contract)
-        fun borrowChangeRef(): &FRC20FTShared.Change? {
-            return &self.change as &FRC20FTShared.Change?
+        fun borrowChangeRef(): auth(FRC20FTShared.Write) &FRC20FTShared.Change? {
+            return &self.change
         }
 
         /// The initialize method for the Vault, a Vault for FRC20 must be initialized with a Change
@@ -205,14 +182,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
             let key = data.getType()
             self.metadata[key] = data
-
-            // emit the event
-            emit TokensMetadataInitialized(
-                typeIdentifier: key.identifier,
-                id: data.getId(),
-                value: data.toString(),
-                owner: self.owner?.address
-            )
         }
 
         /// The balance can be only updated by the change
@@ -244,7 +213,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// One inscription can activate DNA mutatable attempts.
         ///
         access(all)
-        fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription) {
+        fun chargeDNAMutatableAttempts(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
             pre {
                 ins.isExtractable(): "The inscription must be extractable"
             }
@@ -269,7 +238,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 self.initialize(<- newChange, false)
             }
 
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             assert(
                 meta["tick"]?.toLower() == self.getSymbol(),
                 message: "The token tick is not matched"
@@ -287,7 +256,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 ret.getBalance() == 0.0,
                 message: "The returned change balance must be zero"
             )
-            destroy ret
+            Burner.burn(<- ret)
 
             // borrow the DNA metadata
             let dnaRef = self.borrowMergeableDataRef(Type<FixesAssetMeta.DNA>())
@@ -296,13 +265,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             // update the DNA mutatable amount
             let addAmt = self.getMaxGenerateGeneAttempts()
             dnaRef.setValue("mutatableAmount", oldValue + addAmt)
-
-            // emit the event
-            emit TokenDNAMutatableCharged(
-                identifier: self.getDNAIdentifier(),
-                mutatableAmount: oldValue + addAmt,
-                owner: self.owner?.address
-            )
         }
 
         /// --------- Implement FungibleToken.Provider --------- ///
@@ -323,8 +285,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// @param amount: The amount of tokens to be withdrawn from the vault
         /// @return The Vault resource containing the withdrawn funds
         ///
-        access(all)
-        fun withdraw(amount: UFix64): @FungibleToken.Vault {
+        access(FungibleToken.Withdraw)
+        fun withdraw(amount: UFix64): @{FungibleToken.Vault} {
             pre {
                 self.isValidVault(): "The vault must be valid before withdraw"
             }
@@ -335,7 +297,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.syncBalance()
 
             // initialize the new vault with the amount
-            let newVault <- FRC20FungibleToken.createEmptyVault()
+            let newVault <- FRC20FungibleToken.createEmptyVault(vaultType: Type<@Vault>())
             newVault.initialize(<- newChange, false)
 
             // setup mergeable data, split from withdraw percentage
@@ -347,11 +309,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                     newVault.metadata[key] = splitData
 
                     // emit the event
-                    emit TokensMetadataUpdated(
-                        typeIdentifier: key.identifier,
-                        id: dataRef.getId(),
-                        value: dataRef.toString(),
-                        owner: self.owner?.address
+                    FRC20FungibleToken.emitMetadataUpdated(
+                        &self as auth(FixesFungibleTokenInterface.MetadataUpdate) &{FixesFungibleTokenInterface.Vault},
+                        dataRef
                     )
                 }
             }
@@ -359,11 +319,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             // Is the vault has DNA, then attempt to generate a new gene
             self._attemptGenerateGene(amount, oldBalance)
 
-            // emit the event
-            emit TokensWithdrawn(
-                amount: amount,
-                from: self.owner?.address
-            )
             return <- newVault
         }
 
@@ -371,14 +326,14 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// Function that takes a Vault object as an argument and adds
         /// its balance to the balance of the owners Vault.
-        /// It is allowed to destroy the sent Vault because the Vault
+        /// It is allowed to Burner.burn(the sent Vault because the Vault
         /// was a temporary holder of the tokens. The Vault's balance has
         /// been consumed and therefore can be destroyed.
         ///
         /// @param from: The Vault resource containing the funds that will be deposited
         ///
         access(all)
-        fun deposit(from: @FungibleToken.Vault) {
+        fun deposit(from: @{FungibleToken.Vault}) {
             post {
                 self.isValidVault(): "The vault must be valid after deposit"
             }
@@ -410,11 +365,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
                 let dataRef = self.borrowMergeableDataRef(key)!
                 // emit the event
-                emit TokensMetadataUpdated(
-                    typeIdentifier: key.identifier,
-                    id: dataRef.getId(),
-                    value: dataRef.toString(),
-                    owner: self.owner?.address
+                FRC20FungibleToken.emitMetadataUpdated(
+                    &self as auth(FixesFungibleTokenInterface.MetadataUpdate) &{FixesFungibleTokenInterface.Vault},
+                    dataRef
                 )
             }
 
@@ -426,7 +379,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             }
 
             // when change extracted, the balance is updated and vault is useless
-            destroy vault
+            Burner.burn(<- vault)
             let depositedBalance = change.getBalance()
 
             // borrow the change reference
@@ -438,14 +391,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
             // Is the vault has DNA, then attempt to generate a new gene
             self._attemptGenerateGene(depositedBalance, self.balance)
-
-            emit TokensDeposited(
-                amount: depositedBalance,
-                to: self.owner?.address
-            )
         }
 
-        /// --------- Implement MetadataViews.Resolver --------- ///
+        /// --------- Implement ViewResolver.Resolver --------- ///
 
         /// The way of getting all the Metadata Views implemented by FRC20FungibleToken
         ///
@@ -453,8 +401,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///         developers to know which parameter to pass to the resolveView() method.
         ///
         access(all)
-        fun getViews(): [Type] {
-            let contractViews = FRC20FungibleToken.getViews()
+        view fun getViews(): [Type] {
+            let contractViews = FRC20FungibleToken.getContractViews(resourceType: Type<@Vault>())
             return contractViews
         }
 
@@ -465,7 +413,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         ///
         access(all)
         fun resolveView(_ view: Type): AnyStruct? {
-            return FRC20FungibleToken.resolveView(view)
+            return FRC20FungibleToken.resolveContractView(resourceType: nil, viewType: view)
         }
 
         /// --------- Internal Methods --------- ///
@@ -473,8 +421,8 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the mergeable data by key
         ///
         access(contract)
-        view fun borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
-            return &self.metadata[type] as &{FixesTraits.MergeableData}?
+        view fun borrowMergeableDataRef(_ type: Type): auth(FixesTraits.Write) &{FixesTraits.MergeableData}? {
+            return &self.metadata[type]
         }
 
         /// Attempt to generate a new gene, max attempts for each action
@@ -494,16 +442,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 return
             }
             // every 10% of balance change will get a new attempt to mutate the DNA
-            // attempt to generate a new gene
-            if let newMergedDNA = self.attemptGenerateGene(remainingAmt) {
-                // emit the event
-                emit TokenDNAGenerated(
-                    identifier: self.getDNAIdentifier(),
-                    value: newMergedDNA.toString(),
-                    mutatableAmount: newMergedDNA.mutatableAmount,
-                    owner: self.owner?.address
-                )
-            }
+            self.attemptGenerateGene(remainingAmt)
         }
     }
 
@@ -512,7 +451,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     access(all) resource interface AdminInterface {
         // Only access by the contract
         access(contract)
-        fun borrowFRC20Controller(): &FRC20Agents.IndexerController
+        view fun borrowFRC20Controller(): auth(FRC20Agents.Manage) &FRC20Agents.IndexerController
     }
 
     /// The admin resource for the FRC20 FT
@@ -521,10 +460,10 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         access(self)
         let minter: @Minter
         access(contract)
-        var frc20IndexerController: Capability<&FRC20Agents.IndexerController>
+        var frc20IndexerController: Capability<auth(FRC20Agents.Manage) &FRC20Agents.IndexerController>
 
         init(
-            cap: Capability<&FRC20Agents.IndexerController>
+            cap: Capability<auth(FRC20Agents.Manage) &FRC20Agents.IndexerController>
         ) {
             pre {
                 cap.check(): "The capability must be valid"
@@ -533,17 +472,12 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             self.frc20IndexerController = cap
         }
 
-        // @deprecated in Cadence 1.0
-        destroy() {
-            destroy self.minter
-        }
-
         // ----- Implement AdminInterface -----
 
         /// Borrow the FRC20 Indexer Controller
         ///
         access(contract)
-        fun borrowFRC20Controller(): &FRC20Agents.IndexerController {
+        view fun borrowFRC20Controller(): auth(FRC20Agents.Manage) &FRC20Agents.IndexerController {
             return self.frc20IndexerController.borrow() ?? panic("The FRC20 Indexer Controller is not found")
         }
 
@@ -579,23 +513,23 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// Create a new Minter resource
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun createMinter(allowedAmount: UFix64): @Minter {
             panic("This method is invalid for FRC20FundibleToken")
         }
 
         /// Update the authorized users
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool) {
             panic("This method is invalid for FRC20FundibleToken")
         }
 
         /// Borrow the super minter resource
         ///
-        access(all)
-        view fun borrowSuperMinter(): &Minter {
-            return &self.minter as &Minter
+        access(FixesFungibleTokenInterface.Manage)
+        view fun borrowSuperMinter(): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IMinter} {
+            return &self.minter
         }
 
         // ----- Implement IMinterHolder -----
@@ -603,7 +537,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Borrow the minter reference
         ///
         access(contract)
-        view fun borrowMinter(): &{FixesFungibleTokenInterface.IMinter} {
+        view fun borrowMinter(): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IMinter} {
             return self.borrowSuperMinter()
         }
     }
@@ -668,29 +602,29 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         /// Get the vault data of the minting token
         ///
         access(all)
-        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
-            return FRC20FungibleToken.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+        fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            return FRC20FungibleToken.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
                 ?? panic("The vault data is not found")
         }
 
         /// Fake mint tokens
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun mintTokens(amount: UFix64): @FRC20FungibleToken.Vault {
             pre {
                 amount == 0.0: "The amount must be zero"
             }
             // Whatever the amount is, it is not mintable, always return empty vault
-            return <- FRC20FungibleToken.createEmptyVault()
+            return <- FRC20FungibleToken.createEmptyVault(vaultType: Type<@Vault>())
         }
 
         /// Mint tokens with user's inscription
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun initializeVaultByInscription(
-            vault: @FungibleToken.Vault,
-            ins: &Fixes.Inscription
-        ): @FungibleToken.Vault {
+            vault: @{FungibleToken.Vault},
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
+        ): @{FungibleToken.Vault} {
             let convertedVault <- FRC20FungibleToken.convertFromIndexer(ins: ins)
             assert(
                 convertedVault.isValidVault(),
@@ -701,7 +635,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                 message: "The converted vault must be of the same type as the token"
             )
             if vault.balance == 0.0 {
-                destroy vault
+                Burner.burn(<- vault)
             } else {
                 convertedVault.deposit(from: <- vault)
             }
@@ -710,10 +644,10 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         /// Burn tokens with user's inscription
         ///
-        access(all)
+        access(FixesFungibleTokenInterface.Manage)
         fun burnTokenWithInscription(
-            vault: @FungibleToken.Vault,
-            ins: &Fixes.Inscription
+            vault: @{FungibleToken.Vault},
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
         ) {
             FRC20FungibleToken.convertBackToIndexer(ins: ins, vault: <- vault)
         }
@@ -724,7 +658,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Issue new Fungible Tokens from a FRC20 FT Change
     ///
     access(contract)
-    fun convertFromIndexer(ins: &Fixes.Inscription): @FRC20FungibleToken.Vault {
+    fun convertFromIndexer(
+        ins: auth(Fixes.Extractable) &Fixes.Inscription
+    ): @FRC20FungibleToken.Vault {
         pre {
             ins.isExtractable(): "The inscription must be extractable"
         }
@@ -733,7 +669,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         TokenList.ensureFungibleTokenRegistered(self.account.address, "FRC20FungibleToken")
 
         let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         // ensure tick is the same
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
         assert(
@@ -761,7 +697,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
             message: "The balance is not matched"
         )
 
-        let retVault <- self.createEmptyVault()
+        let retVault <- self.createEmptyVault(vaultType: Type<@Vault>())
         retVault.initialize(<- change, true)
 
         // emit the event
@@ -781,14 +717,17 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Burn Fungible Tokens and convert into a FRC20 FT Change
     ///
     access(contract)
-    fun convertBackToIndexer(ins: &Fixes.Inscription, vault: @FungibleToken.Vault) {
+    fun convertBackToIndexer(
+        ins: auth(Fixes.Extractable) &Fixes.Inscription,
+        vault: @{FungibleToken.Vault}
+    ) {
         pre {
             ins.isExtractable(): "The inscription must be extractable"
             vault.isInstance(Type<@FRC20FungibleToken.Vault>()): "The vault must be of the same type as the token"
         }
 
         let frc20CtrlRef = FRC20FungibleToken.borrowFRC20Controller()
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         // ensure tick is the same
         let tick = meta["tick"]?.toLower() ?? panic("The token tick is not found")
         assert(
@@ -799,7 +738,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         let fromVault <- vault as! @FRC20FungibleToken.Vault
         let retChange <- fromVault.extract()
         // no need to emit the event, it is emitted in the extract function
-        destroy fromVault
+        Burner.burn(<- fromVault)
 
         let convertBalance = retChange.getBalance()
 
@@ -841,7 +780,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the FRC20 Indexer Controller
     ///
     access(contract)
-    view fun borrowFRC20Controller(): &FRC20Agents.IndexerController {
+    view fun borrowFRC20Controller(): auth(FRC20Agents.Manage) &FRC20Agents.IndexerController {
         let adminRef = self.borrowAdminPublic()
         return adminRef.borrowFRC20Controller()
     }
@@ -849,9 +788,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// Borrow the admin public reference
     ///
     access(contract)
-    view fun borrowAdminPublic(): &FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder} {
+    view fun borrowAdminPublic(): &FungibleTokenAdmin {
         return self.account
-            .getCapability<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(self.getAdminPublicPath())
+            .capabilities.get<&FungibleTokenAdmin>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -865,7 +804,7 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// @return The new Vault resource
     ///
     access(all)
-    fun createEmptyVault(): @Vault {
+    fun createEmptyVault(vaultType: Type): @Vault {
         return <-create Vault(balance: 0.0)
     }
 
@@ -875,18 +814,18 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     /// @return A structure representing the requested view.
     ///
     access(all)
-    fun resolveView(_ view: Type): AnyStruct? {
+    fun resolveContractView(resourceType: Type?, viewType: Type): AnyStruct? {
         // external url
         let externalUrl = FRC20FungibleToken.getExternalUrl()
-        switch view {
+        switch viewType {
             case Type<MetadataViews.ExternalURL>():
                 return externalUrl != nil
                     ? MetadataViews.ExternalURL(externalUrl!)
                     : MetadataViews.ExternalURL("https://fixes.world/")
             case Type<FungibleTokenMetadataViews.FTView>():
                 return FungibleTokenMetadataViews.FTView(
-                    ftDisplay: self.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?,
-                    ftVaultData: self.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+                    ftDisplay: self.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?,
+                    ftVaultData: self.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
                 )
             case Type<FungibleTokenMetadataViews.FTDisplay>():
                 let frc20Indexer = FRC20Indexer.getIndexer()
@@ -963,24 +902,22 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
                     storagePath: FRC20FungibleToken.getVaultStoragePath(),
                     receiverPath: FRC20FungibleToken.getReceiverPublicPath(),
                     metadataPath: FRC20FungibleToken.getVaultPublicPath(),
-                    providerPath: PrivatePath(identifier: prefix.concat("Vault"))!,
-                    receiverLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Receiver}>(),
-                    metadataLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(),
-                    providerLinkedType: Type<&FRC20FungibleToken.Vault{FungibleToken.Provider}>(),
+                    receiverLinkedType: Type<&{FungibleToken.Receiver}>(),
+                    metadataLinkedType: Type<&FRC20FungibleToken.Vault>(),
                     createEmptyVaultFunction: (fun (): @FRC20FungibleToken.Vault {
-                        return <-FRC20FungibleToken.createEmptyVault()
+                        return <-FRC20FungibleToken.createEmptyVault(vaultType: Type<@Vault>())
                     })
                 )
-            // case Type<FungibleTokenMetadataViews.TotalSupply>():
-            //     let indexer = FRC20Indexer.getIndexer()
-            //     let tick = FRC20FungibleToken.getTickerName()
-            //     if let tokenMeta = indexer.getTokenMeta(tick: tick) {
-            //         return FungibleTokenMetadataViews.TotalSupply(
-            //             totalSupply: tokenMeta.max
-            //         )
-            //     } else {
-            //         return nil
-            //     }
+            case Type<FungibleTokenMetadataViews.TotalSupply>():
+                let indexer = FRC20Indexer.getIndexer()
+                let tick = FRC20FungibleToken.getSymbol()
+                if let tokenMeta = indexer.getTokenMeta(tick: tick) {
+                    return FungibleTokenMetadataViews.TotalSupply(
+                        totalSupply: tokenMeta.max
+                    )
+                } else {
+                    return nil
+                }
         }
         return nil
     }
@@ -991,9 +928,9 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
     ///         developers to know which parameter to pass to the resolveView() method.
     ///
     access(all)
-    view fun getViews(): [Type] {
+    view fun getContractViews(resourceType: Type?): [Type] {
         return [
-            // Type<FungibleTokenMetadataViews.TotalSupply>(),
+            Type<FungibleTokenMetadataViews.TotalSupply>(),
             Type<MetadataViews.ExternalURL>(),
             Type<FungibleTokenMetadataViews.FTView>(),
             Type<FungibleTokenMetadataViews.FTDisplay>(),
@@ -1069,20 +1006,23 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         // Step.0 Ensure shared store exists
 
         // Initialize the shared store
-        if self.account.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+        if self.account.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
             let sharedStore <- FRC20FTShared.createSharedStore()
-            self.account.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+            self.account.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
         }
         // link the resource to the public path
-        // @deprecated after Cadence 1.0
         if self.account
-            .getCapability<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath)
+            .capabilities.get<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStorePublicPath)
             .borrow() == nil {
-            self.account.unlink(FRC20FTShared.SharedStorePublicPath)
-            self.account.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+            self.account.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
+            self.account.capabilities.publish(
+                self.account.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
+                at: FRC20FTShared.SharedStorePublicPath
+            )
         }
         // borrow the shared store
-        let store = self.account.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
+        let store = self.account.storage
+            .borrow<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath)
             ?? panic("The shared store is not found")
 
         // Step.1 Try get the ticker name from the shared store
@@ -1122,30 +1062,24 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         // setup the indexer controller
         let controlerPath = FRC20Agents.getIndexerControllerStoragePath()
         assert(
-            self.account.check<@FRC20Agents.IndexerController>(from: controlerPath),
+            self.account.storage.check<@FRC20Agents.IndexerController>(from: controlerPath),
             message: "The FRC20 Indexer Controller is not found"
-        )
-        // @deprecated in Cadence 1.0
-        let privPath = /private/FRC20IndxerController
-        self.account.link<&FRC20Agents.IndexerController>(
-            privPath,
-            target: controlerPath
         )
 
         // setup admin resource
-        let cap = self.account.getCapability<&FRC20Agents.IndexerController>(privPath)
+        let cap = self.account.capabilities.storage
+            .issue<auth(FRC20Agents.Manage) &FRC20Agents.IndexerController>(controlerPath)
         assert(
             cap.check(),
             message: "The capability must be valid"
         )
         let admin <- create FungibleTokenAdmin(cap: cap)
         let adminStoragePath = self.getAdminStoragePath()
-        self.account.save(<-admin, to: adminStoragePath)
+        self.account.storage.save(<-admin, to: adminStoragePath)
         // link the admin resource to the public path
-        // @deprecated after Cadence 1.0
-        self.account.link<&FungibleTokenAdmin{AdminInterface, FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IMinterHolder}>(
-            self.getAdminPublicPath(),
-            target: adminStoragePath
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&FungibleTokenAdmin>(adminStoragePath),
+            at: self.getAdminPublicPath()
         )
 
         // Ensure frc20 controller exists
@@ -1163,14 +1097,19 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
 
         // Create the Vault with the total supply of tokens and save it in storage.
         let vault <- create Vault(balance: 0.0)
-        self.account.save(<-vault, to: storagePath)
+        self.account.storage.save(<-vault, to: storagePath)
 
-        // @deprecated after Cadence 1.0
         // Create a public capability to the stored Vault that exposes
         // the `deposit` method through the `Receiver` interface.
-        self.account.link<&{FungibleToken.Receiver}>(receiverPath, target: storagePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&{FungibleToken.Receiver}>(storagePath),
+            at: receiverPath
+        )
         // Create a public capability to the stored Vault that only exposes
         // the `balance` field and the `resolveView` method through the `Balance` interface
-        self.account.link<&FRC20FungibleToken.Vault{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(publicPath, target: storagePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&FRC20FungibleToken.Vault>(storagePath),
+            at: publicPath
+        )
     }
 }

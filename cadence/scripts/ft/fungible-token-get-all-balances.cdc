@@ -12,12 +12,12 @@ fun main(
 ): [BalanceResult] {
     log("Getting balances for user: ".concat(userAddr.toString()))
     // search for all fungible tokens with FixesFungibleTokenInterface
-    let acct = getAuthAccount(userAddr)
+    let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(userAddr)
 
     let identifiers: [FTViewUtils.FTIdentity] = []
-    acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
+    acct.storage.forEachStored(fun (path: StoragePath, type: Type): Bool {
         // log("Checking at storage: ".concat(path.toString()))
-        if type.isSubtype(of: Type<@FixesFungibleTokenInterface.Vault>()) {
+        if type.isSubtype(of: Type<@{FixesFungibleTokenInterface.Vault}>()) {
             log("Found fungible token: ".concat(type.identifier))
             if let id = parseIdentity(type.identifier) {
                 identifiers.append(id)
@@ -32,7 +32,7 @@ fun main(
     for id in identifiers {
         let ftAcct = getAccount(id.address)
         let ftContractName = id.contractName
-        var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftContractName)
+        var ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftContractName)
         var info: FungibleTokenManager.FixesTokenInfo? = nil
         if includeInfo {
             info = FungibleTokenManager.buildFixesTokenInfo(id.address, nil)

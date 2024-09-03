@@ -29,15 +29,17 @@ access(all) contract FRC20StakingForwarder {
     access(all) resource interface ForwarderPublic {
         /// Helper function to check whether set `recipient` capability
         /// is not latent or the capability tied to a type is valid.
-        access(all) fun check(): Bool
+        access(all)
+        view fun check(): Bool
 
         /// Gets the fallback receiver assigned to the account
-        access(all) fun fallbackBorrow(): &{FungibleToken.Receiver}?
+        access(all)
+        view fun fallbackBorrow(): &{FungibleToken.Receiver}?
     }
 
     access(all) resource Forwarder: FungibleToken.Receiver, ForwarderPublic {
         /// The capability of staking pool
-        access(self) let pool: Capability<&FRC20Staking.Pool{FRC20Staking.PoolPublic}>
+        access(self) let pool: Capability<&FRC20Staking.Pool>
 
         init(_ poolAddr: Address) {
             post {
@@ -55,10 +57,10 @@ access(all) contract FRC20StakingForwarder {
 
         /// Gets the fallback receiver assigned to the account
         ///
-         access(all) fun fallbackBorrow(): &{FungibleToken.Receiver}? {
+         view access(all) fun fallbackBorrow(): &{FungibleToken.Receiver}? {
             let ownerAddress = self.owner?.address ?? panic("No owner set")
             let cap = getAccount(ownerAddress)
-                .getCapability<&{FungibleToken.Receiver}>(Fixes.getFallbackFlowTokenPublicPath())
+                .capabilities.get<&{FungibleToken.Receiver}>(Fixes.getFallbackFlowTokenPublicPath())
             return cap.check() ? cap.borrow() : nil
         }
 
@@ -86,12 +88,24 @@ access(all) contract FRC20StakingForwarder {
             return supportedVaults
         }
 
+        /// Returns whether or not the given type is accepted by the Receiver
+        /// A vault that can accept any type should just return true by default
+        access(all)
+        view fun isSupportedVaultType(type: Type): Bool {
+            pre {
+                self.check(): "Forwarder capability is not valid"
+            }
+            let supportedVaults = self.getSupportedVaultTypes()
+            return supportedVaults[type] ?? false
+        }
+
         // deposit
         //
         // Function that takes a Vault object as an argument and forwards
         // it to the recipient's Vault using the stored reference
         //
-        access(all) fun deposit(from: @FungibleToken.Vault) {
+        access(all)
+        fun deposit(from: @{FungibleToken.Vault}) {
             let poolRef = self.pool.borrow()
                 ?? panic("Could not borrow pool reference")
 
@@ -128,7 +142,8 @@ access(all) contract FRC20StakingForwarder {
 
     // createNewForwarder creates a new Forwarder reference with the provided recipient
     //
-    access(all) fun createNewForwarder(_ poolAddr: Address): @Forwarder {
+    access(all)
+    fun createNewForwarder(_ poolAddr: Address): @Forwarder {
         return <-create Forwarder(poolAddr)
     }
 

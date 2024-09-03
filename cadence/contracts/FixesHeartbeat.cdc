@@ -86,7 +86,7 @@ access(all) contract FixesHeartbeat {
                 // iterate all the hooks
                 for hookAddr in hooks.keys {
                     if let hookRef = getAccount(hookAddr)
-                        .getCapability<&{IHeartbeatHook}>(hooks[hookAddr]!)
+                        .capabilities.get<&{IHeartbeatHook}>(hooks[hookAddr]!)
                         .borrow()
                     {
                         hookRef.onHeartbeat(deltaTime)
@@ -105,8 +105,8 @@ access(all) contract FixesHeartbeat {
     /// Borrow the hook dictionary reference
     ///
     access(contract)
-    fun borrowHooksDictRef(scope: String): &{Address: PublicPath}? {
-        return &self.heartbeatScopes[scope] as &{Address: PublicPath}?
+    view fun borrowHooksDictRef(scope: String): auth(Mutate) &{Address: PublicPath}? {
+        return &self.heartbeatScopes[scope]
     }
 
     /** --- Account Level Functions --- */
@@ -123,7 +123,7 @@ access(all) contract FixesHeartbeat {
             self.heartbeatScopes[scope] = {}
         }
         let hookCap = getAccount(hookAddr)
-            .getCapability<&{IHeartbeatHook}>(hookPath)
+            .capabilities.get<&{IHeartbeatHook}>(hookPath)
         if hookCap.check() {
             if let hookRef = hookCap.borrow() {
                 let scopesRef = (self.borrowHooksDictRef(scope: scope))!
@@ -156,14 +156,14 @@ access(all) contract FixesHeartbeat {
     /// Create a new Heartbeat resource
     ///
     access(all)
-    fun create(): @Heartbeat {
+    fun createHeartbeat(): @Heartbeat {
         return <-create Heartbeat()
     }
 
     /// Check if the hook is added to the specified scope
     ///
     access(all)
-    fun hasHook(scope: String, hookAddr: Address): Bool {
+    view fun hasHook(scope: String, hookAddr: Address): Bool {
         if let hooks = FixesHeartbeat.borrowHooksDictRef(scope: scope) {
             return hooks[hookAddr] != nil
         }

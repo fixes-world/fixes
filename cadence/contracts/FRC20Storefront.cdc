@@ -3,12 +3,13 @@
 
 # FRC20Storefront
 
-TODO: Add description
+The FRC20Storefront contract is a resource that lists the FRC20 tokens for sale or purchase.
 
 */
 // Third-party imports
 import "FungibleToken"
 import "FlowToken"
+import "Burner"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -17,6 +18,8 @@ import "FRC20Indexer"
 import "FRC20AccountsPool"
 
 access(all) contract FRC20Storefront {
+
+    access(all) entitlement Owner
 
     /* --- Events --- */
 
@@ -146,7 +149,7 @@ access(all) contract FRC20Storefront {
 
         /// Initializer
         ///
-        init (
+        view init (
             storefrontId: UInt64,
             inscriptionId: UInt64,
             type: ListingType,
@@ -308,30 +311,30 @@ access(all) contract FRC20Storefront {
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
         access(all)
-        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
+        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault>]?
 
         /// Purchase the listing, buying the token.
         /// This pays the beneficiaries and returns the token to the buyer.
         ///
         access(all)
         fun takeBuyNow(
-            ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            commissionRecipient: Capability<&FlowToken.Vault>?,
         )
 
         /// Purchase the listing, selling the token.
         /// This pays the beneficiaries and returns the token to the buyer.
         access(all)
         fun takeSellNow(
-            ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            commissionRecipient: Capability<&FlowToken.Vault>?,
         )
 
         /** ---- Internal Methods ---- */
 
         /// borrow the inscription reference
         access(contract)
-        fun borrowInspection(): &Fixes.Inscription
+        fun borrowInspection(): auth(Fixes.Extractable) &Fixes.Inscription
     }
 
 
@@ -339,14 +342,14 @@ access(all) contract FRC20Storefront {
     /// A resource that allows an NFT to be sold for an amount of a given FungibleToken,
     /// and for the proceeds of that sale to be split between several recipients.
     ///
-    access(all) resource Listing: ListingPublic {
+    access(all) resource Listing: ListingPublic, Burner.Burnable {
         /// The simple (non-Capability, non-complex) details of the sale
         access(self)
         let details: ListingDetails
         /// An optional list of marketplaces capabilities that are approved
         /// to receive the marketplace commission.
         access(contract)
-        let commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?
+        let commissionRecipientCaps: [Capability<&FlowToken.Vault>]?
         /// The frozen change for this listing.
         access(contract)
         var frozenChange: @FRC20FTShared.Change?
@@ -355,8 +358,8 @@ access(all) contract FRC20Storefront {
         ///
         init (
             storefrontId: UInt64,
-            listIns: &Fixes.Inscription,
-            commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
+            listIns: auth(Fixes.Extractable) &Fixes.Inscription,
+            commissionRecipientCaps: [Capability<&FlowToken.Vault>]?,
             customID: String?
         ) {
             // Store the commission recipients capability
@@ -400,18 +403,19 @@ access(all) contract FRC20Storefront {
                 saleCuts: order?.cuts ?? panic("Unable to fetch the cuts"),
                 customID: customID
             )
-            // Destroy stored order
-            destroy order
+            // destroy stored order
+            Burner.burn(<- order)
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
+        /// burnCallback
+        access(contract)
+        fun burnCallback() {
             pre {
                 self.details.status == ListingStatus.Completed || self.details.status == ListingStatus.Cancelled:
                     "Listing must be purchased or cancelled"
                 self.frozenChange == nil: "Frozen change must be nil"
             }
-            destroy self.frozenChange
+            // DO NOTHING
         }
 
         // ListingPublic interface implementation
@@ -458,7 +462,7 @@ access(all) contract FRC20Storefront {
         /// Fetches the allowed marketplaces capabilities or commission receivers.
         /// If it returns `nil` then commission is up to grab by anyone.
         access(all)
-        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]? {
+        view fun getAllowedCommissionReceivers(): [Capability<&FlowToken.Vault>]? {
             return self.commissionRecipientCaps
         }
 
@@ -468,8 +472,8 @@ access(all) contract FRC20Storefront {
         ///
         access(all)
         fun takeBuyNow(
-            ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            commissionRecipient: Capability<&FlowToken.Vault>?,
         ) {
             pre {
                 self.details.type == ListingType.FixedPriceBuyNow: "Listing must be a buy now listing"
@@ -558,12 +562,12 @@ access(all) contract FRC20Storefront {
             if extractedFlowChange.getBalance() > 0.0 {
                 // If there is residual change, pay to the buyer
                 let residualVault <- extractedFlowChange.extractAsVault()
-                destroy extractedFlowChange
+                Burner.burn(<- extractedFlowChange)
                 let buyerVault = Fixes.borrowFlowTokenReceiver(buyer)
                     ?? panic("Unable to fetch the buyer vault")
                 buyerVault.deposit(from: <- residualVault)
             } else {
-                destroy extractedFlowChange
+                Burner.burn(<- extractedFlowChange)
             }
 
             // handle the transaction deal
@@ -582,8 +586,8 @@ access(all) contract FRC20Storefront {
         /// This pays the beneficiaries and returns the token to the buyer.
         access(all)
         fun takeSellNow(
-            ins: &Fixes.Inscription,
-            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            commissionRecipient: Capability<&FlowToken.Vault>?,
         ) {
             pre {
                 self.details.type == ListingType.FixedPriceSellNow: "Listing must be a buy now listing"
@@ -621,7 +625,7 @@ access(all) contract FRC20Storefront {
             )
 
             let detailRef = &self.details as &ListingDetails
-            var payment <- FlowToken.createEmptyVault() as! @FlowToken.Vault
+            var payment <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             let paymentRef = &payment as &FlowToken.Vault
 
             var transactedAmt: UFix64? = nil
@@ -762,7 +766,7 @@ access(all) contract FRC20Storefront {
                         change: <- (nilChange ?? panic("Unable to extract the change"))
                     )
                 } else {
-                    destroy nilChange
+                    Burner.burn(<- nilChange)
                 }
 
                 // emit ListingCompleted event
@@ -826,7 +830,7 @@ access(all) contract FRC20Storefront {
         /// borrow the inscription reference
         ///
         access(contract)
-        fun borrowInspection(): &Fixes.Inscription {
+        fun borrowInspection(): auth(Fixes.Extractable) &Fixes.Inscription {
             return self._borrowStorefront().borrowInspection(self.details.inscriptionId)
         }
 
@@ -838,7 +842,7 @@ access(all) contract FRC20Storefront {
         access(self)
         fun _payToSaleCuts(
             payment: @FlowToken.Vault,
-            commissionRecipient: Capability<&FlowToken.Vault{FungibleToken.Receiver}>?,
+            commissionRecipient: Capability<&FlowToken.Vault>?,
             paymentRecipient: &{FungibleToken.Receiver}?,
         ): UFix64 {
             // Some singleton resources
@@ -861,7 +865,7 @@ access(all) contract FRC20Storefront {
             let tokenTreasury = frc20Indexer.borrowTokenTreasuryReceiver(tick: listingTick)
             let platformTreasury = frc20Indexer.borowPlatformTreasuryReceiver()
 
-            let payToPlatformStakingPool = fun (_ payment: @FungibleToken.Vault) {
+            let payToPlatformStakingPool = fun (_ payment: @{FungibleToken.Vault}) {
                 if let flowVault = acctsPool.borrowFRC20StakingFlowTokenReceiver(tick: stakingFRC20Tick) {
                     flowVault.deposit(from: <- payment)
                 } else {
@@ -871,7 +875,7 @@ access(all) contract FRC20Storefront {
             }
 
             // The function to pay to marketplace staking pool
-            let payToMarketplaceShared = fun (_ payment: @FungibleToken.Vault) {
+            let payToMarketplaceShared = fun (_ payment: @{FungibleToken.Vault}) {
                 if let flowVault = acctsPool.borrowMarketSharedFlowTokenReceiver() {
                     flowVault.deposit(from: <- payment)
                 } else {
@@ -881,7 +885,7 @@ access(all) contract FRC20Storefront {
             }
 
             // The function to pay to marketplace campaign pool
-            let payToMarketplaceSpecific = fun (_ payment: @FungibleToken.Vault) {
+            let payToMarketplaceSpecific = fun (_ payment: @{FungibleToken.Vault}) {
                 if let flowVault = acctsPool.borrowFRC20MarketFlowTokenReceiver(tick: listingTick) {
                     flowVault.deposit(from: <- payment)
                 } else {
@@ -890,7 +894,7 @@ access(all) contract FRC20Storefront {
                 }
             }
 
-            let payToDeployer = fun (_ payment: @FungibleToken.Vault) {
+            let payToDeployer = fun (_ payment: @{FungibleToken.Vault}) {
                 if let flowVault = Fixes.borrowFlowTokenReceiver(listingTokenMeta.deployer) {
                     flowVault.deposit(from: <- payment)
                 } else {
@@ -900,7 +904,7 @@ access(all) contract FRC20Storefront {
             }
 
             // The function to pay the commission
-            let payCommissionFunc = fun (payment: @FungibleToken.Vault) {
+            let payCommissionFunc = fun (payment: @{FungibleToken.Vault}) {
                 // If commission recipient is nil, Throw panic.
                 if let commissionReceiver = commissionRecipient {
                     if eligibleCommissionReceivers != nil {
@@ -1024,7 +1028,7 @@ access(all) contract FRC20Storefront {
         /// Borrow the storefront resource.
         ///
         access(self)
-        fun _borrowStorefront(): &Storefront{StorefrontPublic} {
+        fun _borrowStorefront(): &{StorefrontPublic} {
             return FRC20Storefront.borrowStorefront(address: self.owner!.address)
                 ?? panic("Storefront not found")
         }
@@ -1040,17 +1044,17 @@ access(all) contract FRC20Storefront {
         /// createListing
         /// Allows the Storefront owner to create and insert Listings.
         ///
-        access(all)
+        access(Owner)
         fun createListing(
             ins: @Fixes.Inscription,
             marginVault: @FlowToken.Vault?,
-            commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
+            commissionRecipientCaps: [Capability<&FlowToken.Vault>]?,
             customID: String?
         ): UInt64
 
         /// Allows the Storefront owner to remove any sale listing, accepted or not.
         ///
-        access(all)
+        access(Owner)
         fun removeListing(listingResourceID: UInt64): @Fixes.Inscription
     }
 
@@ -1062,17 +1066,20 @@ access(all) contract FRC20Storefront {
         /** ---- Public Methods ---- */
         /// get all listingIDs
         access(all)
-        fun getListingIDs(): [UInt64]
+        view fun getListingIDs(): [UInt64]
+        /// get the length of the listing
+        access(all)
+        view fun getListingLength(): Int
         // Borrow the listing reference
         access(all)
-        fun borrowListing(_ listingResourceID: UInt64): &Listing{ListingPublic}?
+        view fun borrowListing(_ listingResourceID: UInt64): &Listing?
         // Cleanup methods
         access(all)
         fun tryCleanupFinishedListing(_ listingResourceID: UInt64)
         /** ---- Contract Methods ---- */
         /// borrow the inscription reference
         access(contract)
-        fun borrowInspection(_ id: UInt64): &Fixes.Inscription
+        view fun borrowInspection(_ id: UInt64): auth(Fixes.Extractable) &Fixes.Inscription
    }
 
     /// Storefront
@@ -1091,12 +1098,6 @@ access(all) contract FRC20Storefront {
         access(contract)
         var listedTicks: {String: [UInt64]}
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.inscriptions
-            destroy self.listings
-        }
-
         /// constructor
         ///
         init () {
@@ -1114,17 +1115,23 @@ access(all) contract FRC20Storefront {
         /// Returns an array of the Listing resource IDs that are in the collection
         ///
         access(all)
-        fun getListingIDs(): [UInt64] {
+        view fun getListingIDs(): [UInt64] {
             return self.listings.keys
+        }
+
+        /// get the length of the listing
+        access(all)
+        view fun getListingLength(): Int {
+            return self.listings.length
         }
 
         /// borrowSaleItem
         /// Returns a read-only view of the SaleItem for the given listingID if it is contained by this collection.
         ///
         access(all)
-        fun borrowListing(_ listingResourceID: UInt64): &Listing{ListingPublic}? {
+        view fun borrowListing(_ listingResourceID: UInt64): &Listing? {
              if self.listings[listingResourceID] != nil {
-                return &self.listings[listingResourceID] as &Listing{ListingPublic}?
+                return &self.listings[listingResourceID]
             } else {
                 return nil
             }
@@ -1135,18 +1142,18 @@ access(all) contract FRC20Storefront {
         /// insert
         /// Create and publish a Listing for an NFT.
         ///
-        access(all)
+        access(Owner)
         fun createListing(
             ins: @Fixes.Inscription,
             marginVault: @FlowToken.Vault?,
-            commissionRecipientCaps: [Capability<&FlowToken.Vault{FungibleToken.Receiver}>]?,
+            commissionRecipientCaps: [Capability<&FlowToken.Vault>]?,
             customID: String?
          ): UInt64 {
             pre {
                 self.owner != nil : "Resource doesn't have the assigned owner"
             }
 
-            var insRef = &ins as &Fixes.Inscription
+            var insRef = &ins as auth(Fixes.Extractable) &Fixes.Inscription
             assert(
                 FRC20Storefront.isListFRC20Inscription(ins: insRef),
                 message: "Given inscription is not a valid FRC20 listing inscription"
@@ -1157,7 +1164,7 @@ access(all) contract FRC20Storefront {
             // store the inscription to local
             let inscriptionId = insRef.getId()
             let nothing <- self.inscriptions[inscriptionId] <- ins
-            destroy nothing
+            Burner.burn(<- nothing)
 
             // borrow again to get the reference
             insRef = self.borrowInspection(inscriptionId)
@@ -1166,7 +1173,7 @@ access(all) contract FRC20Storefront {
             if marginVault != nil {
                 insRef.deposit(<- marginVault!)
             } else {
-                destroy marginVault
+                Burner.burn(<- marginVault)
             }
 
             // Instead of letting an arbitrary value be set for the UUID of a given NFT, the contract
@@ -1184,7 +1191,7 @@ access(all) contract FRC20Storefront {
             let oldListing <- self.listings[listingResourceID] <- listing
             // Note that oldListing will always be nil, but we have to handle it.
 
-            destroy oldListing
+            Burner.burn(<- oldListing)
 
             // Scraping addresses from the capabilities to emit in the event.
             var allowedCommissionReceivers : [Address]? = nil
@@ -1213,12 +1220,13 @@ access(all) contract FRC20Storefront {
             return listingResourceID
         }
 
-        /// Remove a Listing that has not yet been purchased from the collection and destroy it.
+        /// Remove a Listing that has not yet been purchased from the collection and Burner.burn(it.
         /// It can only be executed by the StorefrontManager resource owner.
         ///
-        access(all)
+        access(Owner)
         fun removeListing(listingResourceID: UInt64): @Fixes.Inscription {
-            let listingRef = self.borrowListingPrivate(listingResourceID)
+            let listingRef = self.borrowListing(listingResourceID)
+                ?? panic("Could not find listing with given id")
 
             let currentStatus: FRC20Storefront.ListingStatus = listingRef.getStatus()
             // If the listing is already completed, then we don't need to do anything.
@@ -1249,7 +1257,7 @@ access(all) contract FRC20Storefront {
                 withStatus: currentStatus.rawValue
             )
 
-            destroy listing
+            Burner.burn(<- listing)
 
             // return the inscription
             return <- self.inscriptions.remove(key: details.inscriptionId)!
@@ -1278,12 +1286,12 @@ access(all) contract FRC20Storefront {
                 customID: details.customID,
                 withStatus: details.status.rawValue
             )
-            // destroy listing
-            destroy listing
+            // Burner.burn(listing
+            Burner.burn(<- listing)
 
             // destory the inscription
             let ins <- self.inscriptions.remove(key: details.inscriptionId)
-            destroy ins
+            Burner.burn(<- ins)
         }
 
         /** ---- Internal Method ---- */
@@ -1291,15 +1299,9 @@ access(all) contract FRC20Storefront {
         /// borrow the inscription reference
         ///
         access(contract)
-        fun borrowInspection(_ id: UInt64): &Fixes.Inscription {
-            return &self.inscriptions[id] as &Fixes.Inscription? ?? panic("Inscription not found")
-        }
-
-        /// borrow the listing reference
-        ///
-        access(contract)
-        fun borrowListingPrivate(_ id: UInt64): &Listing {
-            return &self.listings[id] as &Listing? ?? panic("Listing not found")
+        view fun borrowInspection(_ id: UInt64): auth(Fixes.Extractable) &Fixes.Inscription {
+            return &self.inscriptions[id] as auth(Fixes.Extractable) &Fixes.Inscription?
+                ?? panic("Inscription not found")
         }
     }
 
@@ -1313,7 +1315,7 @@ access(all) contract FRC20Storefront {
         if !indexer.isValidFRC20Inscription(ins: ins) {
             return false
         }
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         let op = meta["op"]?.toLower()
         if op == nil || op!.slice(from: 0, upTo: 5) != "list-" {
             return false
@@ -1332,9 +1334,9 @@ access(all) contract FRC20Storefront {
     /// Borrow a Storefront from an account.
     ///
     access(all)
-    fun borrowStorefront(address: Address): &Storefront{StorefrontPublic}? {
+    view fun borrowStorefront(address: Address): &{StorefrontPublic}? {
         return getAccount(address)
-            .getCapability<&Storefront{StorefrontPublic}>(self.StorefrontPublicPath)
+            .capabilities.get<&{StorefrontPublic}>(self.StorefrontPublicPath)
             .borrow()
     }
 

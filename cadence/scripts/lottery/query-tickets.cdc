@@ -44,7 +44,7 @@ fun main(
                     poolName: poolNameCache[poolAddr] ?? panic("Invalid pool address"),
                     poolAddr: poolAddr,
                     lotteryId: ticket.lotteryId,
-                    numbers: ticket.numbers,
+                    numbers: FGameLottery.TicketNumber(white: *ticket.numbers.white, red: ticket.numbers.red),
                     boughtAt: ticket.boughtAt,
                     status: ticket.getStatus(),
                     powerup: ticket.getPowerup(),

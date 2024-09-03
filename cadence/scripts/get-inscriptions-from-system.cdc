@@ -7,9 +7,10 @@ fun main(
 ): [Inscription] {
     let frc20Indexer = FRC20Indexer.getIndexer()
     let systemAddr = frc20Indexer.owner!.address
-    let acct = getAuthAccount(systemAddr)
+    let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(systemAddr)
     let storePath = Fixes.getFixesStoreStoragePath()
-    if let storeRef = acct.borrow<&Fixes.InscriptionsStore>(from: storePath) {
+    if let storeRef = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) {
         var ret: [Inscription] = []
         for id in ids {
             if let ins = storeRef.borrowInscription(id) {

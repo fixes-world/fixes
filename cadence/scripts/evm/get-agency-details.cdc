@@ -4,8 +4,8 @@ access(all)
 fun main(
     addr: Address
 ): AgencyInfo? {
-    let acct = getAuthAccount(addr)
-    if let agencyMgr = acct.borrow<&EVMAgent.AgencyManager>(from: EVMAgent.evmAgencyManagerStoragePath) {
+    let acct = getAuthAccount<auth(Storage) &Account>(addr)
+    if let agencyMgr = acct.storage.borrow<auth(EVMAgent.Manage) &EVMAgent.AgencyManager>(from: EVMAgent.evmAgencyManagerStoragePath) {
         let agency = agencyMgr.borrowAgency()
         return AgencyInfo(
             address: agency.getOwnerAddress(),

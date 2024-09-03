@@ -4,14 +4,14 @@ access(all)
 fun main(
     addr: Address,
 ): [Inscription] {
-    let acct = getAuthAccount(addr)
+    let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(addr)
 
     let limit = 500
     var i = 0
     let ret: [Inscription] = []
-    acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
+    acct.storage.forEachStored(fun (path: StoragePath, type: Type): Bool {
         if type == Type<@Fixes.Inscription>() {
-            if let ins = acct.borrow<&Fixes.Inscription>(from: path) {
+            if let ins = acct.storage.borrow<&Fixes.Inscription>(from: path) {
                 ret.append(Inscription(
                     owner: addr,
                     id: ins.getId(),

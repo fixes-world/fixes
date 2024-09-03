@@ -17,16 +17,16 @@ fun main(
         var bal = 0.0
         if tick == "" {
             if let flowRef = getAccount(addr)
-                .getCapability(/public/flowTokenBalance)
-                .borrow<&{FungibleToken.Balance}>()
+                .capabilities.get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+                .borrow()
             {
                 bal = flowRef.balance
             }
             ret[""] = bal
         } else if tick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
             if let stFlowRef = getAccount(addr)
-                .getCapability(stFlowToken.tokenBalancePath)
-                .borrow<&{FungibleToken.Balance}>()
+                .capabilities.get<&{FungibleToken.Balance}>(stFlowToken.tokenBalancePath)
+                .borrow()
             {
                 bal = stFlowRef.balance
             }

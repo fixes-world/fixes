@@ -21,6 +21,7 @@ Game Schedule:
 */
 import "FungibleToken"
 import "FlowToken"
+import "Burner"
 // Fixes
 import "Fixes"
 import "FixesHeartbeat"
@@ -82,7 +83,7 @@ access(all) contract FGameRugRoyale {
         access(all) let holders: UInt64
         access(all) let trades: UInt64
 
-        init(
+        view init(
             _ address: Address,
             _ liquidity: UFix64,
             _ holders: UInt64,
@@ -103,7 +104,7 @@ access(all) contract FGameRugRoyale {
         access(all) let winners: [WinnerStatus]
         access(all) let at: UFix64
 
-        init(
+        view init(
             _ phase: GamePhase,
             _ participents: [Address],
             _ winners: [WinnerStatus]
@@ -124,7 +125,7 @@ access(all) contract FGameRugRoyale {
         access(all) let liquidity: UFix64
         access(all) let rewardLiquidity: UFix64
 
-        init(
+        view init(
             address: Address,
             holders: UInt64,
             trades: UInt64,
@@ -150,7 +151,7 @@ access(all) contract FGameRugRoyale {
         access(all) let phaseRecords: [BattlePhaseResult]
         access(all) let finalWinners: [WinnerResult]?
 
-        init(
+        view init(
             _ epochIndex: UInt64,
             _ epochStartAt: UFix64,
             _ activatedAt: UFix64?,
@@ -266,7 +267,7 @@ access(all) contract FGameRugRoyale {
         let epochStartAt: UFix64
         /// In-game liquidity vault
         access(self)
-        let inGameLiquidity: @FungibleToken.Vault
+        let inGameLiquidity: @{FungibleToken.Vault}
         /// All memecoin participants: FT Address => Capability
         access(self)
         let participants: {Address: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>}
@@ -295,18 +296,13 @@ access(all) contract FGameRugRoyale {
             self.epochIndex = epochIndex
             self.epochStartAt = getCurrentBlock().timestamp
             self.activatedAt = nil
-            self.inGameLiquidity <- FlowToken.createEmptyVault()
+            self.inGameLiquidity <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             self.participants = {}
             self.participantsAlive = {}
             self.escapedParticipants = []
             self.ruggedParticipants = []
             self.phaseRecords = []
             self.finalWinners = nil
-        }
-
-        // @deprecated in Cadence 1.0
-        destroy() {
-            destroy self.inGameLiquidity
         }
 
         // ------- Implement BattleRoyalePublic -------
@@ -394,12 +390,11 @@ access(all) contract FGameRugRoyale {
         view fun getAliveParticipants(): [Address] {
             var ret: [Address] = []
             let ref = &self.participantsAlive as &{Address: Bool}
-            self.participantsAlive.forEachKey(fun (key: Address): Bool {
+            for key in self.participantsAlive.keys {
                 if ref[key] == true {
                     ret = ret.concat([key])
                 }
-                return true
-            })
+            }
             return ret
         }
 
@@ -659,7 +654,7 @@ access(all) contract FGameRugRoyale {
                                     liquidity: amount
                                 )
                             } else {
-                                destroy vault
+                                Burner.burn(<- vault)
                             }
                         }
                     }
@@ -775,7 +770,7 @@ access(all) contract FGameRugRoyale {
         /// Get the liquidity holder reference
         ///
         access(self)
-        fun borrowLiquidHolderRef(_ address: Address): &{FixesFungibleTokenInterface.LiquidityHolder}? {
+        view fun borrowLiquidHolderRef(_ address: Address): &{FixesFungibleTokenInterface.LiquidityHolder}? {
             if let cap = self.participants[address] {
                 return cap.borrow()
             }
@@ -789,9 +784,9 @@ access(all) contract FGameRugRoyale {
         access(all)
         view fun getCurrentEpochIndex(): UInt64
         access(all)
-        view fun borrowGame(_ epochIndex: UInt64): &BattleRoyale{BattleRoyalePublic}?
+        view fun borrowGame(_ epochIndex: UInt64): &BattleRoyale?
         access(all)
-        view fun borrowCurrentGame(): &BattleRoyale{BattleRoyalePublic}?
+        view fun borrowCurrentGame(): &BattleRoyale?
 
         // --- read methods: default implement ---
 
@@ -823,7 +818,7 @@ access(all) contract FGameRugRoyale {
         /// Let the liquidity holder join the game
         access(all)
         fun joinGame(
-            ins: &Fixes.Inscription,
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
             _ cap: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>
         ) {
             pre {
@@ -851,11 +846,6 @@ access(all) contract FGameRugRoyale {
             self.currentEpochIndex = 0
         }
 
-        // @deprecated in Cadence 1.0
-        destroy() {
-            destroy self.games
-        }
-
         /** ---- Public Methods ---- */
 
         access(all)
@@ -864,12 +854,12 @@ access(all) contract FGameRugRoyale {
         }
 
         access(all)
-        view fun borrowGame(_ epochIndex: UInt64): &BattleRoyale{BattleRoyalePublic}? {
+        view fun borrowGame(_ epochIndex: UInt64): &BattleRoyale? {
             return self.borrowBattleRoyaleRef(epochIndex)
         }
 
         access(all)
-        view fun borrowCurrentGame(): &BattleRoyale{BattleRoyalePublic}? {
+        view fun borrowCurrentGame(): &BattleRoyale? {
             return self.borrowBattleRoyaleRef(self.currentEpochIndex)
         }
 
@@ -879,7 +869,7 @@ access(all) contract FGameRugRoyale {
         ///
         access(all)
         fun joinGame(
-            ins: &Fixes.Inscription,
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
             _ cap: Capability<&{FixesFungibleTokenInterface.LiquidityHolder}>
         ) {
             let currentGame = self.borrowCurrentGame()
@@ -899,7 +889,7 @@ access(all) contract FGameRugRoyale {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
             // inscription data
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             // check the symbol
             let tick = meta["tick"] ?? panic("The token symbol is not found")
             let acctKey = liquidityHolder.getAccountsPoolKey()
@@ -969,8 +959,8 @@ access(all) contract FGameRugRoyale {
         }
 
         access(self)
-        fun borrowBattleRoyaleRef(_ epochIndex: UInt64): &BattleRoyale? {
-            return &self.games[epochIndex] as &BattleRoyale?
+        view fun borrowBattleRoyaleRef(_ epochIndex: UInt64): &BattleRoyale? {
+            return &self.games[epochIndex]
         }
     }
 
@@ -1045,9 +1035,9 @@ access(all) contract FGameRugRoyale {
     /// Borrow the GameCenter
     ///
     access(all)
-    view fun borrowGameCenter(): &GameCenter{GameCenterPublic, FixesHeartbeat.IHeartbeatHook} {
+    view fun borrowGameCenter(): &GameCenter {
         return getAccount(self.account.address)
-            .getCapability<&GameCenter{GameCenterPublic, FixesHeartbeat.IHeartbeatHook}>(self.getGameCenterPublicPath())
+            .capabilities.get<&GameCenter>(self.getGameCenterPublicPath())
             .borrow()
             ?? panic("GameCenter not found")
     }
@@ -1078,13 +1068,12 @@ access(all) contract FGameRugRoyale {
     init() {
         // Create the GameCenter
         let storagePath = self.getGameCenterStoragePath()
-        self.account.save(<- create GameCenter(), to: storagePath)
+        self.account.storage.save(<- create GameCenter(), to: storagePath)
         // Link the GameCenter to the public path
         let publicPath = self.getGameCenterPublicPath()
-        // @deprecated in Cadence 1.0
-        self.account.link<&GameCenter{GameCenterPublic, FixesHeartbeat.IHeartbeatHook}>(
-            publicPath,
-            target: storagePath
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&GameCenter>(storagePath),
+            at: publicPath
         )
 
         //   - Add Heartbeat Hook

@@ -11,12 +11,13 @@ transaction(
     type: UInt8,
     initialFundingAmt: UFix64
 ) {
-    let acctsPool: &FRC20AccountsPool.Pool
+    let acctsPool: auth(FRC20AccountsPool.Admin) &FRC20AccountsPool.Pool
     let accountType: FRC20AccountsPool.ChildAccountType
-    let childAccountCap: Capability<&AuthAccount>
+    let childAccountCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
 
-    prepare(acct: AuthAccount) {
-        let pool = acct.borrow<&FRC20AccountsPool.Pool>(from: FRC20AccountsPool.AccountsPoolStoragePath)
+    prepare(acct: auth(Storage, Capabilities) &Account) {
+        let pool = acct.storage
+            .borrow<auth(FRC20AccountsPool.Admin) &FRC20AccountsPool.Pool>(from: FRC20AccountsPool.AccountsPoolStoragePath)
             ?? panic("There is no FRC20AccountsPool on this account")
 
         self.acctsPool = pool
@@ -25,25 +26,26 @@ transaction(
             ?? panic("Invalid child account type")
 
         // create a new Account, no keys needed
-        let newAccount = AuthAccount(payer: acct)
+        let newAccount = Account(payer: acct)
 
         // deposit 1.0 FLOW to the newly created account
         if initialFundingAmt > 0.0 {
             // Get a reference to the signer's stored vault
-            let vaultRef = acct.borrow<&FlowToken.Vault{FungibleToken.Provider}>(from: /storage/flowTokenVault)
+            let vaultRef = acct.storage
+                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("Could not borrow reference to the owner's Vault!")
             let flowToReserve <- vaultRef.withdraw(amount: initialFundingAmt)
 
-            let receiverRef = newAccount.getCapability(/public/flowTokenReceiver)
-                .borrow<&{FungibleToken.Receiver}>()
+            let receiverRef = newAccount.capabilities
+                .get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                .borrow()
                 ?? panic("Could not borrow receiver reference to the newly created account")
             receiverRef.deposit(from: <- flowToReserve)
         }
 
         /* --- Link the AuthAccount Capability --- */
         //
-        self.childAccountCap = newAccount.linkAccount(HybridCustody.LinkedAccountPrivatePath)
-            ?? panic("problem linking account Capability for new account")
+        self.childAccountCap = newAccount.capabilities.account.issue<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()
     }
 
     execute {

@@ -9,8 +9,9 @@ transaction(
     addr: Address,
     value: Bool,
 ) {
-    prepare(acct: AuthAccount) {
-        let stakingAdmin = acct.borrow<&FRC20StakingManager.StakingAdmin>(from: FRC20StakingManager.StakingAdminStoragePath)
+    prepare(acct: auth(Storage, Capabilities) &Account) {
+        let stakingAdmin = acct.storage
+            .borrow<auth(FRC20StakingManager.Admin) &FRC20StakingManager.StakingAdmin>(from: FRC20StakingManager.StakingAdminStoragePath)
             ?? panic("Could not borrow a reference to the StakingAdmin")
         stakingAdmin.updateWhitelist(address: addr, isWhitelisted: value)
     }

@@ -7,12 +7,12 @@ import "FRC20NFTWrapper"
 transaction(
     wrappedNftId: UInt64,
 ) {
-    let targetNFTCol: &{NonFungibleToken.CollectionPublic}
+    let targetNFTCol: &{NonFungibleToken.Collection}
     let nftToUnwrap: @FixesWrappedNFT.NFT
 
-    prepare(acct: AuthAccount) {
-        let wrappedNFTCol = acct
-            .borrow<&FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath)
+    prepare(acct: auth(Storage, Capabilities) &Account) {
+        let wrappedNFTCol = acct.storage
+            .borrow<auth(NonFungibleToken.Withdraw) &FixesWrappedNFT.Collection>(from: FixesWrappedNFT.CollectionStoragePath)
             ?? panic("Could not borrow FixesWrappedNFT collection")
 
         self.nftToUnwrap <- wrappedNFTCol.withdraw(withdrawID: wrappedNftId) as! @FixesWrappedNFT.NFT
@@ -21,10 +21,11 @@ transaction(
 
         // Find the nft to wrap
         let nftColType = FRC20NFTWrapper.asCollectionType(srcNftType.identifier)
-        var nftProviderRef: &{NonFungibleToken.CollectionPublic}? = nil
-        acct.forEachStored(fun (path: StoragePath, type: Type): Bool {
+        var nftProviderRef: &{NonFungibleToken.Collection}? = nil
+        acct.storage.forEachStored(fun (path: StoragePath, type: Type): Bool {
             if type == nftColType {
-                if let colRef = acct.borrow<&{NonFungibleToken.CollectionPublic}>(from: path) {
+                if let colRef = acct.storage
+                    .borrow<&{NonFungibleToken.Collection}>(from: path) {
                     nftProviderRef = colRef
                     return false
                 }

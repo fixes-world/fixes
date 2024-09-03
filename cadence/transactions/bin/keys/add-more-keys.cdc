@@ -1,7 +1,7 @@
 transaction(
     amount: Int
 ) {
-    prepare(service: AuthAccount) {
+    prepare(service: auth(Keys) &Account) {
         let keys = service.keys
         let firstKey = keys.get(keyIndex: 0) ?? panic("No Key 0")
 

@@ -36,27 +36,25 @@ access(all) contract FRC20VoteCommands {
         access(all)
         let inscriptionIds: [UInt64]
 
-        init() {
-            post {
-                self.verifyVoteCommands(): "Invalid vote commands"
-            }
-        }
-
         // ----- Readonly Mehtods -----
 
+        /// Get the command type.
         access(all)
         view fun getCommandType(): CommandType
+        // It is readonly, but it is not a view function.
         access(all)
-        view fun verifyVoteCommands(): Bool
+        fun verifyVoteCommands(): Bool
 
         /// Check if all inscriptions are extracted.
         ///
         access(all)
         view fun isAllInscriptionsExtracted(): Bool {
-            let insRefArr = self.borrowSystemInscriptionWritableRefs()
-            for insRef in insRefArr {
-                if !insRef.isExtracted() {
-                    return false
+            let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
+            for id in self.inscriptionIds {
+                if let insRef = store.borrowInscription(id) {
+                    if !insRef.isExtracted() {
+                        return false
+                    }
                 }
             }
             return true
@@ -75,7 +73,7 @@ access(all) contract FRC20VoteCommands {
             let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
-            let vault <- FlowToken.createEmptyVault()
+            let vault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             for insRef in insRefArr {
                 if !insRef.isExtracted() {
                     vault.deposit(from: <-insRef.extract())
@@ -95,11 +93,11 @@ access(all) contract FRC20VoteCommands {
         /// Borrow the system inscriptions references from store.
         ///
         access(contract)
-        fun borrowSystemInscriptionWritableRefs(): [&Fixes.Inscription] {
+        fun borrowSystemInscriptionWritableRefs(): [auth(Fixes.Extractable) &Fixes.Inscription] {
             let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
-            let ret: [&Fixes.Inscription] = []
+            let ret: [auth(Fixes.Extractable) &Fixes.Inscription] = []
             for id in self.inscriptionIds {
-                if let ref = store.borrowInscriptionWritableRef(id) {
+                if let ref = store.borrowInscriptionWritableRefInAccount(id) {
                     ret.append(ref)
                 }
             }
@@ -126,7 +124,7 @@ access(all) contract FRC20VoteCommands {
         }
 
         access(all)
-        view fun verifyVoteCommands(): Bool {
+        fun verifyVoteCommands(): Bool {
             return true
         }
 
@@ -147,6 +145,11 @@ access(all) contract FRC20VoteCommands {
 
         init(_ insIds: [UInt64]) {
             self.inscriptionIds = insIds
+
+            assert(
+                self.verifyVoteCommands(),
+                message: "Invalid vote commands"
+            )
         }
 
         // ----- Methods: Read -----
@@ -157,17 +160,18 @@ access(all) contract FRC20VoteCommands {
         }
 
         access(all)
-        view fun verifyVoteCommands(): Bool {
-            // Refs
-            let insRefArr = self.borrowSystemInscriptionWritableRefs()
-
+        fun verifyVoteCommands(): Bool {
             var isValid = false
-            isValid = insRefArr.length == 1
+            isValid = self.inscriptionIds.length == 1
             if isValid {
-                let ins = insRefArr[0]
-                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-                isValid = FRC20VoteCommands.isValidSystemInscription(ins)
-                    && meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil
+                let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
+                if let ins = store.borrowInscription(self.inscriptionIds[0]) {
+                    let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
+                    isValid = FRC20VoteCommands.isValidSystemInscription(ins)
+                        && meta["op"] == "burnable" && meta["tick"] != nil && meta["v"] != nil
+                } else {
+                    isValid = false
+                }
             }
             return isValid
         }
@@ -197,6 +201,11 @@ access(all) contract FRC20VoteCommands {
 
         init(_ insIds: [UInt64]) {
             self.inscriptionIds = insIds
+
+            assert(
+                self.verifyVoteCommands(),
+                message: "Invalid vote commands"
+            )
         }
 
         // ----- Methods: Read -----
@@ -207,14 +216,14 @@ access(all) contract FRC20VoteCommands {
         }
 
         access(all)
-        view fun verifyVoteCommands(): Bool {
+        fun verifyVoteCommands(): Bool {
             // Refs
             let insRefArr = self.borrowSystemInscriptionWritableRefs()
 
             var isValid = insRefArr.length == 1
             if isValid {
                 let ins = insRefArr[0]
-                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+                let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
                 isValid = FRC20VoteCommands.isValidSystemInscription(ins)
                     && meta["op"] == "burnUnsup" && meta["tick"] != nil && meta["perc"] != nil
             }
@@ -246,6 +255,11 @@ access(all) contract FRC20VoteCommands {
 
         init(_ insIds: [UInt64]) {
             self.inscriptionIds = insIds
+
+            assert(
+                self.verifyVoteCommands(),
+                message: "Invalid vote commands"
+            )
         }
 
         // ----- Methods: Read -----
@@ -256,16 +270,19 @@ access(all) contract FRC20VoteCommands {
         }
 
         access(all)
-        view fun verifyVoteCommands(): Bool {
-            // Refs
-            let insRefArr = self.borrowSystemInscriptionWritableRefs()
-
-            var isValid = insRefArr.length == 1
+        fun verifyVoteCommands(): Bool {
+            var isValid = self.inscriptionIds.length == 1
             if isValid {
-                let ins = insRefArr[0]
-                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-                isValid = FRC20VoteCommands.isValidSystemInscription(ins)
-                    && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "lottery" && meta["tick"] != nil && meta["amt"] != nil
+                let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
+                if let ins = store.borrowInscription(self.inscriptionIds[0]) {
+                    let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
+                    isValid = FRC20VoteCommands.isValidSystemInscription(ins)
+                        && meta["op"] == "withdrawFromTreasury"
+                        && meta["usage"] == "lottery"
+                        && meta["tick"] != nil && meta["amt"] != nil
+                } else {
+                    isValid = false
+                }
             }
             return isValid
         }
@@ -304,6 +321,11 @@ access(all) contract FRC20VoteCommands {
 
         init(_ insIds: [UInt64]) {
             self.inscriptionIds = insIds
+
+            assert(
+                self.verifyVoteCommands(),
+                message: "Invalid vote commands"
+            )
         }
 
         // ----- Methods: Read -----
@@ -314,18 +336,19 @@ access(all) contract FRC20VoteCommands {
         }
 
         access(all)
-        view fun verifyVoteCommands(): Bool {
-            // Refs
-            let insRefArr = self.borrowSystemInscriptionWritableRefs()
-
-            var isValid = insRefArr.length == 1
+        fun verifyVoteCommands(): Bool {
+            var isValid = self.inscriptionIds.length == 1
             if isValid {
-                let ins = insRefArr[0]
-                let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
-                isValid = FRC20VoteCommands.isValidSystemInscription(ins)
-                    && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "staking"
-                    && meta["tick"] != nil && meta["amt"] != nil
-                    && meta["batch"] != nil && meta["interval"] != nil
+                let store = FRC20VoteCommands.borrowSystemInscriptionsStore()
+                if let ins = store.borrowInscription(self.inscriptionIds[0]) {
+                    let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
+                    isValid = FRC20VoteCommands.isValidSystemInscription(ins)
+                        && meta["op"] == "withdrawFromTreasury" && meta["usage"] == "staking"
+                        && meta["tick"] != nil && meta["amt"] != nil
+                        && meta["batch"] != nil && meta["interval"] != nil
+                } else {
+                    isValid = false
+                }
             }
             return isValid
         }
@@ -342,7 +365,7 @@ access(all) contract FRC20VoteCommands {
                 return false
             }
             let ins = insRefArr[0]
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
 
             // singleton resources
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -373,7 +396,7 @@ access(all) contract FRC20VoteCommands {
     /// Check if the given inscription is a valid system inscription.
     ///
     access(contract)
-    fun isValidSystemInscription(_ ins: &Fixes.Inscription{Fixes.InscriptionPublic}): Bool {
+    view fun isValidSystemInscription(_ ins: &Fixes.Inscription): Bool {
         let frc20Indexer = FRC20Indexer.getIndexer()
         return ins.owner?.address == self.account.address
             && ins.isExtractable()
@@ -383,17 +406,17 @@ access(all) contract FRC20VoteCommands {
     /// Borrow the system inscriptions store.
     ///
     access(all)
-    fun borrowSystemInscriptionsStore(): &Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic} {
+    view fun borrowSystemInscriptionsStore(): &Fixes.InscriptionsStore {
         let storePubPath = Fixes.getFixesStorePublicPath()
         return self.account
-            .getCapability<&Fixes.InscriptionsStore{Fixes.InscriptionsStorePublic, Fixes.InscriptionsPublic}>(storePubPath)
+            .capabilities.get<&Fixes.InscriptionsStore>(storePubPath)
             .borrow() ?? panic("Fixes.InscriptionsStore is not found")
     }
 
     /// Build the inscription strings by the given command type and meta.
     ///
     access(all)
-    fun buildInscriptionStringsByCommand(_ type: CommandType, _ meta: {String: String}): [String] {
+    view fun buildInscriptionStringsByCommand(_ type: CommandType, _ meta: {String: String}): [String] {
         switch type {
         case CommandType.None:
             return []

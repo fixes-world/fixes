@@ -14,23 +14,26 @@ transaction(
     tick: String,
     amount: UFix64,
 ) {
-    let ins: &Fixes.Inscription
-    let converter: &FRC20Converter.FTConverter{FRC20Converter.IConverter}
-    let tokenToTransfer: @FungibleToken.Vault
+    let ins: auth(Fixes.Extractable) &Fixes.Inscription
+    let converter: &FRC20Converter.FTConverter
+    let tokenToTransfer: @{FungibleToken.Vault}
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         // Get a reference to the signer's stored vault
-        let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let flowVaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         /** ------------- Create the Inscription - Start ------------- */
@@ -67,27 +70,31 @@ transaction(
         let recieverPath = ftContract.getReceiverPublicPath()
 
         // ensure the Vault Resource exists
-        if acct.borrow<&AnyResource>(from: storagePath) == nil {
-            acct.save(<- ftContract.createEmptyVault(), to: storagePath)
+        if acct.storage.borrow<&AnyResource>(from: storagePath) == nil {
+            let vaultType = self.converter.getTokenType()
+            acct.storage.save(<- ftContract.createEmptyVault(vaultType: vaultType), to: storagePath)
 
-            // @deprecated after Cadence 1.0
             // Create a public capability to the stored Vault that exposes
             // the `deposit` method through the `Receiver` interface.
-            acct.unlink(recieverPath)
-            acct.link<&{FungibleToken.Receiver}>(recieverPath, target: storagePath)
+            acct.capabilities.unpublish(recieverPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&{FungibleToken.Receiver}>(storagePath),
+                at: recieverPath
+            )
 
             // Create a public capability to the stored Vault that only exposes
             // the `balance` field and the `resolveView` method through the `Balance` interface
             let metadataPath = ftContract.getVaultPublicPath()
-            acct.unlink(metadataPath)
-            acct.link<&{FungibleToken.Balance, MetadataViews.Resolver, FixesFungibleTokenInterface.Metadata}>(
-                metadataPath,
-                target: storagePath
+            acct.capabilities.unpublish(metadataPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&{FungibleToken.Vault}>(storagePath),
+                at: metadataPath
             )
         }
-        /** ------------- End -------------------------------------------------- */
+        /** ------------- End ----------------------------------------------- */
 
-        let tokenVault = acct.borrow<&FungibleToken.Vault>(from: storagePath)
+        let tokenVault = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &{FungibleToken.Vault}>(from: storagePath)
             ?? panic("Could not borrow a reference to the stored Fungible Token Vault!")
 
         self.tokenToTransfer <- tokenVault.withdraw(amount: amount)

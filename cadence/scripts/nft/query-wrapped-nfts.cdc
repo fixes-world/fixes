@@ -21,9 +21,8 @@ fun main(
     ]
 
     let collection = getAccount(addr)
-        .getCapability<&FixesWrappedNFT.Collection{FixesWrappedNFT.FixesWrappedNFTCollectionPublic,NonFungibleToken.CollectionPublic,NonFungibleToken.Receiver,MetadataViews.ResolverCollection}>(
-            FixesWrappedNFT.CollectionPublicPath
-        ).borrow()
+        .capabilities.get<&FixesWrappedNFT.Collection>(FixesWrappedNFT.CollectionPublicPath)
+        .borrow()
         ?? panic("Could not borrow capability from public collection")
 
     let nftIDs = collection.getIDs()
@@ -34,7 +33,7 @@ fun main(
     let sliced = nftIDs.slice(from: page * size, upTo: endIdx)
     let ret: [WrappedNFTView] = []
     for id in sliced {
-        if let nft = collection.borrowFixesWrappedNFT(id: id) {
+        if let nft = collection.borrowFixesWrappedNFT(id) {
             let nftView = MetadataViews.getNFTView(id: id, viewResolver: nft)
             let extras: [AnyStruct] = []
             if nftView.display == nil {

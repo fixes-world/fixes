@@ -3,7 +3,7 @@
 
 # FixesAvatar
 
-TODO: Add description
+It is responsible for managing the user's profile, properties, and NFTs.
 
 */
 
@@ -11,6 +11,8 @@ TODO: Add description
 import "NonFungibleToken"
 import "FungibleToken"
 import "MetadataViews"
+import "ViewResolver"
+import "Burner"
 // Fixes Imports
 import "FixesTraits"
 import "FRC20FTShared"
@@ -18,7 +20,11 @@ import "FRC20FTShared"
 /// The `FixesAvatar` contract
 ///
 access(all) contract FixesAvatar {
+
+    access(all) entitlement Manage
+
     /* --- Events --- */
+
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
 
@@ -39,27 +45,27 @@ access(all) contract FixesAvatar {
         view fun getProperty(_ name: String): String?
 
         access(all)
-        view fun getEnabledTraits(): [MetadataViews.Trait]
-
-        access(all)
         view fun getOwnedTraitIDs(): [UInt64]
 
         access(all)
         view fun getOwnedTrait(_ id: UInt64): FixesTraits.TraitWithOffset?
 
         access(all)
-        view fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait?
+        fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait?
+
+        access(all)
+        fun getEnabledTraits(): [MetadataViews.Trait]
     }
 
     /// The resource that stores the metadata for this contract
     ///
-    access(all) resource Profile: ProfilePublic, FRC20FTShared.TransactionHook, MetadataViews.Resolver {
+    access(all) resource Profile: ProfilePublic, FRC20FTShared.TransactionHook, ViewResolver.Resolver {
         // Holds the properties for this profile, key is the property name, value is the property value
         access(self)
         let properties: {String: String}
         // Holds NFTs for this profile, key is the NFT type, value is a map of NFT ID to NFT
         access(self)
-        let nfts: @{Type: {UInt64: NonFungibleToken.NFT}}
+        let nfts: @{Type: {UInt64: {NonFungibleToken.NFT}}}
         // Holds the owned entities for this profile
         access(self)
         let ownedEntities: @{UInt64: FixesTraits.Entry}
@@ -72,12 +78,6 @@ access(all) contract FixesAvatar {
             self.nfts <- {}
             self.ownedEntities <- {}
             self.enabledEntities = []
-        }
-
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.nfts
-            destroy self.ownedEntities
         }
 
         // ---- implement TransactionHook ----
@@ -122,7 +122,7 @@ access(all) contract FixesAvatar {
         /// Function that returns all the Metadata Views available for this profile
         ///
         access(all)
-        fun getViews(): [Type] {
+        view fun getViews(): [Type] {
             return [
                 Type<MetadataViews.Traits>()
             ]
@@ -149,19 +149,6 @@ access(all) contract FixesAvatar {
         }
 
         access(all)
-        view fun getEnabledTraits(): [MetadataViews.Trait] {
-            let traits: [MetadataViews.Trait] = []
-            for traitId in self.enabledEntities {
-                if let entry = self.borrowEntry(traitId) {
-                    if let view = entry.resolveView(Type<MetadataViews.Trait>()) {
-                        traits.append(view as! MetadataViews.Trait)
-                    }
-                }
-            }
-            return traits
-        }
-
-        access(all)
         view fun getOwnedTraitIDs(): [UInt64] {
             return self.ownedEntities.keys
         }
@@ -175,11 +162,24 @@ access(all) contract FixesAvatar {
         }
 
         access(all)
-        view fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait? {
+        fun getOwnedTraitView(_ id: UInt64): MetadataViews.Trait? {
             if let entry = self.borrowEntry(id) {
                 return entry.resolveView(Type<MetadataViews.Trait>()) as! MetadataViews.Trait?
             }
             return nil
+        }
+
+        access(all)
+        fun getEnabledTraits(): [MetadataViews.Trait] {
+            let traits: [MetadataViews.Trait] = []
+            for traitId in self.enabledEntities {
+                if let entry = self.borrowEntry(traitId) {
+                    if let view = entry.resolveView(Type<MetadataViews.Trait>()) {
+                        traits.append(view as! MetadataViews.Trait)
+                    }
+                }
+            }
+            return traits
         }
 
         // ---- Account Access methods ----
@@ -188,16 +188,16 @@ access(all) contract FixesAvatar {
         fun addTraitEntry(_ entry: @FixesTraits.Entry) {
             let uuid = entry.uuid
             if self.ownedEntities[uuid] != nil {
-                destroy entry
+                Burner.burn(<- entry)
                 return
             }
 
-            let ref = &entry as &FixesTraits.Entry
+            let trait = entry.getTrait()
+
             // Add the entry to the owned entities
             self.ownedEntities[uuid] <-! entry
 
             // emit the event
-            let trait = ref.getTrait()
             emit TraitEntryAdd(
                 owner: self.owner?.address,
                 traitId: uuid,
@@ -212,7 +212,7 @@ access(all) contract FixesAvatar {
 
         /// Set the property with the given name to the given value
         ///
-        access(all)
+        access(Manage)
         fun setProperty(_ name: String, _ value: String) {
             self.properties[name] = value
         }
@@ -220,8 +220,8 @@ access(all) contract FixesAvatar {
         // ---- Internal methods ----
 
         access(self)
-        fun borrowEntry(_ id: UInt64): &FixesTraits.Entry? {
-            return &self.ownedEntities[id] as &FixesTraits.Entry?
+        view fun borrowEntry(_ id: UInt64): auth(FixesTraits.Write) &FixesTraits.Entry? {
+            return &self.ownedEntities[id]
         }
     }
 
@@ -230,20 +230,22 @@ access(all) contract FixesAvatar {
     /// Creates a new `Profile` resource
     ///
     access(all)
-    fun create(): @Profile {
+    fun createProfile(): @Profile {
         return <-create Profile()
     }
 
     /// Returns the `Profile` public capability for the given address
     ///
     access(all)
-    fun getProfileCap(
-        _ addr: Address
-    ): Capability<&Profile{ProfilePublic, FRC20FTShared.TransactionHook, MetadataViews.Resolver}> {
-        return getAccount(addr)
-            .getCapability<&Profile{ProfilePublic, FRC20FTShared.TransactionHook, MetadataViews.Resolver}>(
-                self.AvatarPublicPath
-            )
+    view fun getProfileCap(_ addr: Address): Capability<&Profile> {
+        return getAccount(addr).capabilities.get<&Profile>(self.AvatarPublicPath)
+    }
+
+    /// Borrow the `Profile` reference
+    ///
+    access(all)
+    view fun borrowProfile(_ addr: Address): &Profile? {
+        return self.getProfileCap(addr).borrow()
     }
 
     init() {

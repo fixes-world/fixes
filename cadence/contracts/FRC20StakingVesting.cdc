@@ -3,13 +3,14 @@
 
 # FRC20StakingVesting
 
-TODO: Add description
+The `FRC20StakingVesting` contract is a contract that provides the vesting feature for the FRC20 token staking.
 
 */
 import "FixesHeartbeat"
 import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20Staking"
+import "Burner"
 
 /// The `FRC20StakingVesting` contract
 ///
@@ -58,7 +59,8 @@ access(all) contract FRC20StakingVesting {
         access(all) let vestingInterval: UFix64
         access(all) let lastVestedAt: UFix64
         access(all) let startedAt: UFix64
-        init(
+
+        view init(
             stakeTick: String,
             rewardTick: String,
             by: Address,
@@ -85,7 +87,7 @@ access(all) contract FRC20StakingVesting {
 
     /// Represents a vesting entry
     ///
-    access(all) resource VestingEntry {
+    access(all) resource VestingEntry: Burner.Burnable {
         // ---- Fields ----
         access(all)
         let stakeTick: String
@@ -132,9 +134,12 @@ access(all) contract FRC20StakingVesting {
             self.startedAt = getCurrentBlock().timestamp
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.remaining
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.remaining.isEmpty(): "The remaining change must be empty"
+            }
+            // NOTHING
         }
 
         /** ---- Public Methods ---- */
@@ -245,7 +250,7 @@ access(all) contract FRC20StakingVesting {
     access(all) resource interface VestingVaultPublic {
         /// Returns the vesting entries
         access(all)
-        view fun getVestingEntries(): [VestingInfo]
+        fun getVestingEntries(): [VestingInfo]
 
         /// Add a vesting entry
         access(account)
@@ -259,7 +264,7 @@ access(all) contract FRC20StakingVesting {
 
     /// The `VestingVault` resource
     ///
-    access(all) resource Vault: VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook {
+    access(all) resource Vault: VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook, Burner.Burnable {
         access(self)
         let entries: @[VestingEntry]
 
@@ -267,16 +272,19 @@ access(all) contract FRC20StakingVesting {
             self.entries <- []
         }
 
-        /// @deprecated after Cadence 1.0
-        destroy() {
-            destroy self.entries
+        access(contract)
+        fun burnCallback() {
+            pre {
+                self.entries.length == 0: "The entries must be empty"
+            }
+            // NOTHING
         }
 
         /** ---- Public Methods ---- */
 
         /// Returns the vesting entries
         access(all)
-        view fun getVestingEntries(): [VestingInfo] {
+        fun getVestingEntries(): [VestingInfo] {
             let ret: [VestingInfo] = []
             var i = 0
             let len = self.entries.length
@@ -386,8 +394,8 @@ access(all) contract FRC20StakingVesting {
                     // add the entry back to the list
                     self.entries.append(<- current)
                 } else {
-                    // destroy the entry if completed
-                    destroy current
+                    // Burner.burn(the entry if completed
+                    Burner.burn(<- current)
                 }
                 i = i + 1
             }
@@ -398,7 +406,7 @@ access(all) contract FRC20StakingVesting {
         /// Borrow the entry
         ///
         access(self)
-        fun borrowEntry(_ idx: Int): &VestingEntry? {
+        view fun borrowEntry(_ idx: Int): &VestingEntry? {
             if idx < 0 || idx >= self.entries.length {
                 return nil
             }
@@ -418,19 +426,15 @@ access(all) contract FRC20StakingVesting {
     /// Returns the `Vault` public capability
     ///
     access(all)
-    fun getVaultCap(
-        _ addr: Address
-    ): Capability<&Vault{VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}> {
+    view fun getVaultCap(_ addr: Address): Capability<&Vault> {
         return getAccount(addr)
-            .getCapability<&Vault{VestingVaultPublic, FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(self.publicPath)
+            .capabilities.get<&Vault>(self.publicPath)
     }
 
     /// Borrow the `Vault` resource
     ///
     access(all)
-    fun borrowVaultRef(
-        _ addr: Address
-    ): &Vault{VestingVaultPublic}? {
+    view fun borrowVaultRef(_ addr: Address): &Vault? {
         return self.getVaultCap(addr).borrow()
     }
 

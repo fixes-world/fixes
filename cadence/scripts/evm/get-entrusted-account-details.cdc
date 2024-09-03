@@ -8,11 +8,12 @@ fun main(
     addr: Address
 ): EntrustedAccountDetails? {
     if let status = EVMAgent.borrowEntrustStatus(addr) {
-        let acct = getAuthAccount(addr)
-        let owned = acct.borrow<&HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath)
+        let acct = getAuthAccount<auth(Storage, Capabilities) &Account>(addr)
+        let owned = acct.storage
+            .borrow<auth(HybridCustody.Owner) &HybridCustody.OwnedAccount>(from: HybridCustody.OwnedAccountStoragePath)
             ?? panic("owned account not found")
-        let flowRef = acct.getCapability(/public/flowTokenBalance)
-                .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+        let flowRef = acct.capabilities.get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+                .borrow()
         let agencyRef = status.borrowAgency()
         return EntrustedAccountDetails(
             address: addr,

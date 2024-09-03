@@ -20,6 +20,9 @@ import "FRC20Staking"
 import "FRC20AccountsPool"
 
 access(all) contract EVMAgent {
+
+    access(all) entitlement Manage
+
     /* --- Events --- */
 
     /// Event emitted when the contract is initialized
@@ -72,7 +75,7 @@ access(all) contract EVMAgent {
 
         /// Borrow the agency capability
         access(all)
-        fun borrowAgency(): &Agency{AgencyPublic}
+        view fun borrowAgency(): &Agency
         /// Get the flow spent by the entrusted account
         access(all)
         view fun getFeeSpent(): UFix64
@@ -86,13 +89,13 @@ access(all) contract EVMAgent {
     access(all) resource EntrustedStatus: IEntrustedStatus {
         access(all) let key: String
         // Capability to the agency
-        access(self) let agency: Capability<&Agency{AgencyPublic}>
+        access(self) let agency: Capability<&Agency>
         // record the flow spent by the entrusted account
         access(self) var feeSpent: UFix64
 
         init(
             key: String,
-            _ agency: Capability<&Agency{AgencyPublic}>
+            _ agency: Capability<&Agency>
         ) {
             self.key = key
             self.agency = agency
@@ -101,7 +104,7 @@ access(all) contract EVMAgent {
 
         /// Borrow the agency capability
         access(all)
-        fun borrowAgency(): &Agency{AgencyPublic} {
+        view fun borrowAgency(): &Agency {
             return self.agency.borrow() ?? panic("Agency not found")
         }
 
@@ -112,7 +115,8 @@ access(all) contract EVMAgent {
         }
 
         /// Add the spent flow fee
-        access(contract) fun addSpentFlowFee(_ amount: UFix64) {
+        access(contract)
+        fun addSpentFlowFee(_ amount: UFix64) {
             self.feeSpent = self.feeSpent + amount
         }
     }
@@ -122,23 +126,23 @@ access(all) contract EVMAgent {
     access(all) resource AgencyManager {
         // Capability to the agency
         access(self)
-        let agency: Capability<&Agency{AgencyPublic, AgencyPrivate}>
+        let agency: Capability<auth(Manage) &Agency>
 
         init(
-            _ agency: Capability<&Agency{AgencyPublic, AgencyPrivate}>
+            _ agency: Capability<auth(Manage) &Agency>
         ) {
             self.agency = agency
         }
 
         /// Borrow the agency capability
-        access(all)
-        fun borrowAgency(): &Agency{AgencyPublic, AgencyPrivate} {
+        access(Manage)
+        fun borrowAgency(): auth(Manage) &Agency {
             return self.agency.borrow() ?? panic("Agency not found")
         }
 
         /// Withdraw the flow from the agency
         ///
-        access(all)
+        access(Manage)
         fun withdraw(amt: UFix64): @FlowToken.Vault {
             let agency = self.borrowAgency()
             assert(
@@ -222,7 +226,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault
 
         /// Create a new entrusted account by the agency
@@ -231,7 +235,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault
 
         /// Verify the evm signature, if valid, borrow the reference of the entrusted account
@@ -243,18 +247,18 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
-        ): &AuthAccount
+        ): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account
     }
 
     /// Private interface to the agency
     ///
     access(all) resource interface AgencyPrivate  {
         /// Create a new agency manager
-        access(all)
+        access(Manage)
         fun createAgencyManager(): @AgencyManager
 
         /// Withdraw the flow from the agency
-        access(all)
+        access(Manage)
         fun withdraw(amt: UFix64): @FlowToken.Vault
     }
 
@@ -281,9 +285,9 @@ access(all) contract EVMAgent {
         }
 
         /// Setup the agency
-        access(all)
+        access(Manage)
         fun setup(
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ) {
             pre {
                 self.getOwnerAddress() == acctCap.address: "Only the owner can setup the agency"
@@ -303,19 +307,12 @@ access(all) contract EVMAgent {
                 ?? panic("Agency account not found")
 
             // linking capability
-            // @deprecated in Cadence 1.0
-            if authAcct.getCapability<&Agency{AgencyPublic}>(EVMAgent.evmAgencyPublicPath) != nil {
-                authAcct.unlink(EVMAgent.evmAgencyPublicPath)
-                authAcct.link<&Agency{AgencyPublic}>(EVMAgent.evmAgencyPublicPath, target: EVMAgent.evmAgencyStoragePath)
-            }
-
-            // link private capability
-            // @deprecated in Cadence 1.0
-            let privPathId = EVMAgent.getIdentifierPrefix().concat("_agency")
-            let privPath = PrivatePath(identifier: privPathId)!
-            if authAcct.getCapability<&Agency{AgencyPublic, AgencyPrivate}>(privPath) != nil {
-                authAcct.unlink(privPath)
-                authAcct.link<&Agency{AgencyPublic, AgencyPrivate}>(privPath, target: EVMAgent.evmAgencyStoragePath)
+            if authAcct.capabilities.get<&Agency>(EVMAgent.evmAgencyPublicPath) != nil {
+                authAcct.capabilities.unpublish(EVMAgent.evmAgencyPublicPath)
+                authAcct.capabilities.publish(
+                    authAcct.capabilities.storage.issue<&Agency>(EVMAgent.evmAgencyStoragePath),
+                    at: EVMAgent.evmAgencyPublicPath
+                )
             }
 
             // emit event
@@ -324,7 +321,7 @@ access(all) contract EVMAgent {
 
         /** ---- Private method ---- */
 
-        access(all)
+        access(Manage)
         fun createAgencyManager(): @AgencyManager {
             let cap = self._getSelfPrivCap()
 
@@ -336,10 +333,11 @@ access(all) contract EVMAgent {
 
         /// Withdraw the flow from the agency
         ///
-        access(all)
+        access(Manage)
         fun withdraw(amt: UFix64): @FlowToken.Vault {
             let acct = self._borrowAgencyAccount()
-            let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+            let flowVaultRef = acct.storage
+                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("The flow vault is not found")
             assert(
                 flowVaultRef.balance >= amt,
@@ -384,8 +382,8 @@ access(all) contract EVMAgent {
         access(all)
         view fun getFlowBalance(): UFix64 {
             if let ref = getAccount(self.getOwnerAddress())
-                .getCapability(/public/flowTokenBalance)
-                .borrow<&FlowToken.Vault{FungibleToken.Balance}>() {
+                .capabilities.get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+                .borrow() {
                 return ref.balance
             }
             return 0.0
@@ -400,7 +398,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault {
             let socialId = EVMAgent.getSocialId(platform, platformId)
 
@@ -440,7 +438,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault {
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
             assert(
@@ -473,7 +471,7 @@ access(all) contract EVMAgent {
         fun _createEntrustedAccount(
             accountKey: String,
             evmAddress: String,
-            _ acctCap: Capability<&AuthAccount>
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @FlowToken.Vault {
             pre {
                 acctCap.check(): "Invalid account capability"
@@ -487,17 +485,18 @@ access(all) contract EVMAgent {
             let entrustedAddress = entrustedAcct.address
             // Reference to the flow vault of the entrusted account
             let entrustedAcctFlowBalanceRef = entrustedAcct
-                .getCapability(/public/flowTokenBalance)
-                .borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+                .capabilities.get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+                .borrow()
                 ?? panic("Could not borrow Balance reference to the Vault")
             // Reference to the recipient's receiver
             let entrustedAcctFlowRecipientRef = entrustedAcct
-                .getCapability(/public/flowTokenReceiver)
-                .borrow<&FlowToken.Vault{FungibleToken.Receiver}>()
+                .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                .borrow()
                 ?? panic("Could not borrow receiver reference to the recipient's Vault")
 
             // Get the flow vault from the agency account
-            let flowVaultRef = agencyAcct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+            let flowVaultRef = agencyAcct.storage
+                .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("The flow vault is not found")
             let spentFlowAmt = EVMAgent.getAgencyFlowFee()
             // Withdraw 0.01 $FLOW from agency and deposit to the new account
@@ -548,7 +547,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64
-        ): &AuthAccount {
+        ): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account {
             let message = "op=".concat(methodFingerprint)
                 .concat(",params=").concat(params.length > 0 ? StringUtils.join(params, "|") : "")
             return self._verifyAndBorrowEntrustedAccount(
@@ -567,7 +566,7 @@ access(all) contract EVMAgent {
             hexPublicKey: String,
             hexSignature: String,
             timestamp: UInt64
-        ): &AuthAccount {
+        ): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account {
             let evmAddress = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPublicKey)
             let accountKey = self.getAccountKey(evmAddress)
             assert(
@@ -603,12 +602,12 @@ access(all) contract EVMAgent {
 
             // The entrusted account need to pay a fee to the agency
             let entrustedAcctFlowVauleRef = entrustedAcct
-                .borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+                .storage.borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
                 ?? panic("The flow vault is not found")
 
             let agencyFlowReceiptRef = self._borrowAgencyAccount()
-                .getCapability(/public/flowTokenReceiver)
-                .borrow<&{FungibleToken.Receiver}>()
+                .capabilities.get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+                .borrow()
                 ?? panic("Could not borrow receiver reference to the recipient's Vault")
 
             let fee = EVMAgent.getAgencyFlowFee()
@@ -618,7 +617,7 @@ access(all) contract EVMAgent {
             self.status.addEarnedFlowAmount(fee)
             // update the entrusted account status
             if let entrustedStatus = entrustedAcct
-                .borrow<&EntrustedStatus{IEntrustedStatus}>(from: EVMAgent.entrustedStatusStoragePath) {
+                .storage.borrow<&EntrustedStatus>(from: EVMAgent.entrustedStatusStoragePath) {
                 entrustedStatus.addSpentFlowFee(fee)
             }
 
@@ -651,16 +650,19 @@ access(all) contract EVMAgent {
             // - EVMAgent.EntrustedStatus
 
             // create the shared store and save it in the account
-            if childAcctRef.borrow<&AnyResource>(from: EVMAgent.entrustedStatusStoragePath) == nil {
+            if childAcctRef.storage.borrow<&AnyResource>(from: EVMAgent.entrustedStatusStoragePath) == nil {
                 let cap = EVMAgent.getAgencyPublicCap(self.getOwnerAddress())
                 assert(cap.check(), message: "Invalid agency capability")
 
                 let sharedStore <- create EVMAgent.EntrustedStatus(key: key, cap)
-                childAcctRef.save(<- sharedStore, to: EVMAgent.entrustedStatusStoragePath)
+                childAcctRef.storage.save(<- sharedStore, to: EVMAgent.entrustedStatusStoragePath)
 
                 // link the shared store to the public path
-                childAcctRef.unlink(EVMAgent.entrustedStatusPublicPath)
-                childAcctRef.link<&EVMAgent.EntrustedStatus{EVMAgent.IEntrustedStatus}>(EVMAgent.entrustedStatusPublicPath, target: EVMAgent.entrustedStatusStoragePath)
+                childAcctRef.capabilities.unpublish(EVMAgent.entrustedStatusPublicPath)
+                childAcctRef.capabilities.publish(
+                    childAcctRef.capabilities.storage.issue<&EVMAgent.EntrustedStatus>(EVMAgent.entrustedStatusStoragePath),
+                    at: EVMAgent.entrustedStatusPublicPath
+                )
 
                 isUpdated = true || isUpdated
             }
@@ -673,19 +675,15 @@ access(all) contract EVMAgent {
         /// Get the private capability of the agency
         ///
         access(self)
-        fun _getSelfPrivCap(): Capability<&Agency{AgencyPublic, AgencyPrivate}> {
+        fun _getSelfPrivCap(): Capability<auth(Manage) &Agency> {
             // get the agency account
             let authAcct = self._borrowAgencyAccount()
 
-            // @deprecated in Cadence 1.0
-            let privPathId = EVMAgent.getIdentifierPrefix().concat("_agency")
-            let privPath = PrivatePath(identifier: privPathId)!
-
-            return authAcct.getCapability<&Agency{AgencyPublic, AgencyPrivate}>(privPath)
+            return authAcct.capabilities.storage.issue<auth(Manage) &Agency>(EVMAgent.evmAgencyStoragePath)
         }
 
         access(self)
-        fun _borrowAgencyAccount(): &AuthAccount {
+        fun _borrowAgencyAccount(): auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             return acctsPool.borrowChildAccount(
                 type: FRC20AccountsPool.ChildAccountType.EVMAgency,
@@ -703,15 +701,17 @@ access(all) contract EVMAgent {
 
         /// Create a new agency
         access(all)
-        fun createAgency(ins: &Fixes.Inscription, _ acctCap: Capability<&AuthAccount>): @AgencyManager
+        fun createAgency(
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
+        ): @AgencyManager
 
         /// Get the agency by evm address
         access(all)
-        view fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}?
-
+        view fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency?
         /// Get the agency by address
         access(all)
-        view fun pickValidAgency(): &Agency{AgencyPublic}?
+        fun pickValidAgency(): &Agency?
     }
 
     /// Agency center resource
@@ -735,15 +735,15 @@ access(all) contract EVMAgent {
         ///
         access(all)
         fun createAgency(
-            ins: &Fixes.Inscription,
-            _ acctCap: Capability<&AuthAccount>
+            ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            _ acctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
         ): @AgencyManager {
             // singleton resources
             let acctPool = FRC20AccountsPool.borrowAccountsPool()
             let frc20Indexer = FRC20Indexer.getIndexer()
 
             // inscription data
-            let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+            let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             let op = meta["op"]?.toLower() ?? panic("The token operation is not found")
             assert(
                 op == "create-evm-agency" || op == "create-acct-agency",
@@ -774,9 +774,10 @@ access(all) contract EVMAgent {
             flowReceiverRef.deposit(from: <- ins.extract())
 
             // save the agency
-            acct.save(<- agency, to: EVMAgent.evmAgencyStoragePath)
+            acct.storage.save(<- agency, to: EVMAgent.evmAgencyStoragePath)
 
-            let agencyRef = acct.borrow<&Agency>(from: EVMAgent.evmAgencyStoragePath)
+            let agencyRef = acct.storage
+                .borrow<auth(Manage) &Agency>(from: EVMAgent.evmAgencyStoragePath)
                 ?? panic("Agency not found")
             agencyRef.setup(acctCap)
             // agency registered
@@ -789,7 +790,7 @@ access(all) contract EVMAgent {
         /// Get the agency by evm address
         ///
         access(all)
-        view fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency{AgencyPublic}? {
+        view fun borrowAgencyByEVMAddress(_ evmAddress: String): &Agency? {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             if let addr = acctsPool.getEntrustedAccountAddress(evmAddress) {
                 if let entrustStatus = EVMAgent.borrowEntrustStatus(addr) {
@@ -811,7 +812,7 @@ access(all) contract EVMAgent {
 
         /// Get the agency by address
         access(all)
-        fun pickValidAgency(): &Agency{AgencyPublic}? {
+        fun pickValidAgency(): &Agency? {
             let keys = self.agencies.keys
             if keys.length == 0 {
                 return nil
@@ -821,8 +822,8 @@ access(all) contract EVMAgent {
             for addr in keys {
                 // get flow balance of the agency
                 if let flowVaultRef = getAccount(addr)
-                    .getCapability(/public/flowTokenBalance)
-                    .borrow<&FlowToken.Vault{FungibleToken.Balance}>() {
+                    .capabilities.get<&{FungibleToken.Balance}>(/public/flowTokenBalance)
+                    .borrow() {
                     // only the agency with enough balance can be picked
                     if flowVaultRef.balance >= 0.1 {
                         filteredAddrs.append(addr)
@@ -833,8 +834,7 @@ access(all) contract EVMAgent {
                 return nil
             }
 
-            let rand = revertibleRandom()
-            let index = rand % UInt64(filteredAddrs.length)
+            let index = revertibleRandom<UInt64>(modulo: UInt64(filteredAddrs.length))
             // borrow the agency
             return EVMAgent.borrowAgency(filteredAddrs[index])
         }
@@ -864,31 +864,31 @@ access(all) contract EVMAgent {
     /// Get the capability to the entrusted status
     ///
     access(all)
-    fun borrowEntrustStatus(_ addr: Address): &EntrustedStatus{IEntrustedStatus}? {
+    view fun borrowEntrustStatus(_ addr: Address): &EntrustedStatus? {
         return getAccount(addr)
-            .getCapability<&EntrustedStatus{IEntrustedStatus}>(self.entrustedStatusPublicPath)
+            .capabilities.get<&EntrustedStatus>(self.entrustedStatusPublicPath)
             .borrow()
     }
 
     /// Get the capability to the agency
     ///
     access(all)
-    fun getAgencyPublicCap(_ addr: Address): Capability<&Agency{AgencyPublic}> {
+    view fun getAgencyPublicCap(_ addr: Address): Capability<&Agency> {
         return getAccount(addr)
-            .getCapability<&Agency{AgencyPublic}>(self.evmAgencyPublicPath)
+            .capabilities.get<&Agency>(self.evmAgencyPublicPath)
     }
 
     /// Borrow the reference to agency public
     ///
     access(all)
-    fun borrowAgency(_ addr: Address): &Agency{AgencyPublic}? {
+    view fun borrowAgency(_ addr: Address): &Agency? {
         return self.getAgencyPublicCap(addr).borrow()
     }
 
     /// Borrow the reference to agency public
     ///
     access(all)
-    fun borrowAgencyByEVMPublicKey(_ hexPubKey: String): &Agency{AgencyPublic}? {
+    view fun borrowAgencyByEVMPublicKey(_ hexPubKey: String): &Agency? {
         let center = self.borrowAgencyCenter()
         let evmAddr = ETHUtils.getETHAddressFromPublicKey(hexPublicKey: hexPubKey)
         return center.borrowAgencyByEVMAddress(evmAddr)
@@ -897,9 +897,9 @@ access(all) contract EVMAgent {
     /// Borrow the reference to agency center
     ///
     access(all)
-    fun borrowAgencyCenter(): &AgencyCenter{AgencyCenterPublic} {
+    view fun borrowAgencyCenter(): &AgencyCenter {
         return getAccount(self.account.address)
-            .getCapability<&AgencyCenter{AgencyCenterPublic}>(self.evmAgencyCenterPublicPath)
+            .capabilities.get<&AgencyCenter>(self.evmAgencyCenterPublicPath)
             .borrow() ?? panic("Agency center not found")
     }
 
@@ -918,9 +918,12 @@ access(all) contract EVMAgent {
 
         // Save the agency center resource
         let center <- create AgencyCenter()
-        self.account.save(<- center, to: self.evmAgencyCenterStoragePath)
+        self.account.storage.save(<- center, to: self.evmAgencyCenterStoragePath)
         // link the public path
-        self.account.link<&AgencyCenter{AgencyCenterPublic}>(self.evmAgencyCenterPublicPath, target: self.evmAgencyCenterStoragePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&AgencyCenter>(self.evmAgencyCenterStoragePath),
+            at: self.evmAgencyCenterPublicPath
+        )
 
         emit ContractInitialized()
     }

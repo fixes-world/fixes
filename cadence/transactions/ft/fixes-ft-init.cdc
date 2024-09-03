@@ -23,52 +23,55 @@ transaction(
     githubUrl: String?,
 ) {
     let tickerName: String
-    let newAcctRef: &AuthAccount
-    let newAcctCap: Capability<&AuthAccount>
-    let initFtIns: &Fixes.Inscription
+    let newAcctRef: auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account
+    let newAcctCap: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
+    let initFtIns: auth(Fixes.Extractable) &Fixes.Inscription
 
-    prepare(acct: AuthAccount) {
+    prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
         let storePath = Fixes.getFixesStoreStoragePath()
-        if acct.borrow<&Fixes.InscriptionsStore>(from: storePath) == nil {
-            acct.save(<- Fixes.createInscriptionsStore(), to: storePath)
+        if acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath) == nil {
+            acct.storage.save(<- Fixes.createInscriptionsStore(), to: storePath)
         }
 
-        let store = acct.borrow<&Fixes.InscriptionsStore>(from: storePath)
+        let store = acct.storage
+            .borrow<auth(Fixes.Manage) &Fixes.InscriptionsStore>(from: storePath)
             ?? panic("Could not borrow a reference to the Inscriptions Store!")
         /** ------------- End -------------------------------------------------- */
 
         /** ------------- Prepare the Fungible Token Manager - Start ----------- */
         let managerPath = FungibleTokenManager.getManagerStoragePath()
-        if acct.borrow<&FungibleTokenManager.Manager>(from: managerPath) == nil {
-            acct.save(<- FungibleTokenManager.createManager(), to: managerPath)
+        if acct.storage.borrow<&FungibleTokenManager.Manager>(from: managerPath) == nil {
+            acct.storage.save(<- FungibleTokenManager.createManager(), to: managerPath)
 
             // create the public capability for the manager
             let managerPubPath = FungibleTokenManager.getManagerPublicPath()
-            acct.unlink(managerPubPath)
-            acct.link<&FungibleTokenManager.Manager{FungibleTokenManager.ManagerPublic}>(
-                managerPubPath,
-                target: managerPath
+            acct.capabilities.unpublish(managerPubPath)
+            acct.capabilities.publish(
+                acct.capabilities.storage.issue<&FungibleTokenManager.Manager>(managerPath),
+                at: managerPubPath
             )
         }
         /** ------------- End -------------------------------------------------- */
 
         // Get a reference to the signer's stored vault
-        let flowVaultRef = acct.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)
+        let flowVaultRef = acct.storage
+            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
         /** ------------- Create new Account - Start ------------- */
         let initialFundingAmt = 0.5
         // create new account
-        let newAccount = AuthAccount(payer: acct)
-        let receiverRef = newAccount.getCapability(/public/flowTokenReceiver)
-            .borrow<&{FungibleToken.Receiver}>()
+        self.newAcctRef = Account(payer: acct)
+        let receiverRef = self.newAcctRef.capabilities
+            .get<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
+            .borrow()
             ?? panic("Could not borrow receiver reference to the newly created account")
         receiverRef.deposit(from: <- flowVaultRef.withdraw(amount: initialFundingAmt))
 
-        self.newAcctRef = &newAccount as &AuthAccount
-        self.newAcctCap = newAccount.linkAccount(HybridCustody.LinkedAccountPrivatePath)
-            ?? panic("problem linking account Capability for new account")
+        self.newAcctCap = self.newAcctRef.capabilities
+            .account.issue<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>()
         /** ------------- End --------------------------------------- */
 
         self.tickerName = "$".concat(symbol)
@@ -113,9 +116,10 @@ transaction(
             message: "Fungible Token contract address is not set"
         )
 
-        let store = self.newAcctRef.borrow<&FRC20FTShared.SharedStore>(
-            from: FRC20FTShared.SharedStoreStoragePath
-        ) ?? panic("The shared store was not created")
+        let store = self.newAcctRef.storage
+            .borrow<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>(
+                from: FRC20FTShared.SharedStoreStoragePath
+            ) ?? panic("The shared store was not created")
 
         let tokenSymbol = store.getByEnum(FRC20FTShared.ConfigType.FungibleTokenSymbol) as! String?
             ?? panic("Symbol is not set")

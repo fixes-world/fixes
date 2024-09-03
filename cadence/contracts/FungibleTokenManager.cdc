@@ -33,6 +33,9 @@ import "FRC20Converter"
 /// The Manager contract for Fungible Token
 ///
 access(all) contract FungibleTokenManager {
+
+    access(all) entitlement Sudo
+
     /* --- Events --- */
     /// Event emitted when the contract is initialized
     access(all) event ContractInitialized()
@@ -102,7 +105,7 @@ access(all) contract FungibleTokenManager {
         // ---- Developer Methods ----
 
         /// update all children contracts
-        access(all)
+        access(Sudo)
         fun updateAllChildrenContracts() {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
@@ -118,7 +121,7 @@ access(all) contract FungibleTokenManager {
         }
 
         // migrate all children contracts
-        access(all)
+        access(Sudo)
         fun stageAllChildrenContracts() {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
@@ -127,7 +130,7 @@ access(all) contract FungibleTokenManager {
         }
 
         // migrate all children contracts
-        access(all)
+        access(Sudo)
         fun stageChildrenContracts(page: Int) {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
@@ -147,7 +150,7 @@ access(all) contract FungibleTokenManager {
         }
 
         // migrate child
-        access(all)
+        access(Sudo)
         fun stageChildrenContract(key: String) {
             self._stageChildrenContracts(keys: [key])
         }
@@ -170,11 +173,11 @@ access(all) contract FungibleTokenManager {
                 let ftContractName = key[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
                 let ftContractCode = codes[ftContractName]!
                 if let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, key) {
-                    if acct.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath) == nil {
-                        acct.save(<-MigrationContractStaging.createHost(), to: MigrationContractStaging.HostStoragePath)
+                    if acct.storage.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath) == nil {
+                        acct.storage.save(<-MigrationContractStaging.createHost(), to: MigrationContractStaging.HostStoragePath)
                     }
                     // Assign Host reference
-                    let hostRef = acct.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath)!
+                    let hostRef = acct.storage.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath)!
                     MigrationContractStaging.stageContract(host: hostRef, name: ftContractName, code: ftContractCode)
                 }
             }
@@ -202,12 +205,12 @@ access(all) contract FungibleTokenManager {
         access(contract)
         fun setFungibleTokenManaged(
             _ symbol: String,
-            _ storeCap: Capability<&FRC20FTShared.SharedStore>?
+            _ storeCap: Capability<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>?
         )
         access(contract)
         fun addCreatedFungibleToken(
             _ symbol: String,
-            _ storeCap: Capability<&FRC20FTShared.SharedStore>
+            _ storeCap: Capability<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>
         )
     }
 
@@ -217,7 +220,7 @@ access(all) contract FungibleTokenManager {
         access(self)
         let managedSymbols: [String]
         access(self)
-        let managedStores: {String: Capability<&FRC20FTShared.SharedStore>}
+        let managedStores: {String: Capability<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>}
 
         init() {
             self.managedStores = {}
@@ -275,8 +278,8 @@ access(all) contract FungibleTokenManager {
 
         /// Borrow the shared store of the managed fungible token
         ///
-        access(all)
-        view fun borrowManagedFTStore(_ symbol: String): &FRC20FTShared.SharedStore? {
+        access(Sudo)
+        view fun borrowManagedFTStore(_ symbol: String): auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore? {
             if let cap = self.managedStores[symbol] {
                 return cap.borrow()
             }
@@ -290,7 +293,7 @@ access(all) contract FungibleTokenManager {
         access(contract)
         fun setFungibleTokenManaged(
             _ symbol: String,
-            _ storeCap: Capability<&FRC20FTShared.SharedStore>?
+            _ storeCap: Capability<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>?
         ) {
             pre {
                 storeCap == nil || storeCap!.check() == true: "The store capability is invalid"
@@ -316,7 +319,7 @@ access(all) contract FungibleTokenManager {
         access(contract)
         fun addCreatedFungibleToken(
             _ symbol: String,
-            _ storeCap: Capability<&FRC20FTShared.SharedStore>
+            _ storeCap: Capability<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>
         ) {
             pre {
                 storeCap.check() == true: "The store capability is invalid"
@@ -354,9 +357,9 @@ access(all) contract FungibleTokenManager {
     /// Borrow the Manager Resource
     ///
     access(all)
-    view fun borrowFTManager(_ addr: Address): &Manager{ManagerPublic}? {
+    view fun borrowFTManager(_ addr: Address): &Manager? {
         return getAccount(addr)
-            .getCapability<&Manager{ManagerPublic}>(self.getManagerPublicPath())
+            .capabilities.get<&Manager>(self.getManagerPublicPath())
             .borrow()
     }
 
@@ -393,13 +396,13 @@ access(all) contract FungibleTokenManager {
     /// Borrow the ft interface
     ///
     access(all)
-    view fun borrowFixesFTInterface(_ addr: Address): &FixesFungibleTokenInterface? {
+    view fun borrowFixesFTInterface(_ addr: Address): &{FixesFungibleTokenInterface}? {
         let ftAcct = getAccount(addr)
         var ftName = "FixesFungibleToken"
-        var ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+        var ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
         if ftContract == nil {
             ftName = "FRC20FungibleToken"
-            ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
         }
         return ftContract
     }
@@ -416,16 +419,16 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun buildStandardTokenView(_ ftAddress: Address, _ ftName: String): FTViewUtils.StandardTokenView? {
-        if let viewResolver = getAccount(ftAddress).contracts.borrow<&ViewResolver>(name: ftName) {
-            let vaultData = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
-            let display = viewResolver.resolveView(Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?
+        if let viewResolver = getAccount(ftAddress).contracts.borrow<&{ViewResolver}>(name: ftName) {
+            let vaultData = viewResolver.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTVaultData>()) as! FungibleTokenMetadataViews.FTVaultData?
+            let display = viewResolver.resolveContractView(resourceType: nil, viewType: Type<FungibleTokenMetadataViews.FTDisplay>()) as! FungibleTokenMetadataViews.FTDisplay?
             if vaultData == nil || display == nil {
                 return nil
             }
             return FTViewUtils.StandardTokenView(
                 identity: FTViewUtils.FTIdentity(ftAddress, ftName),
                 decimals: 8,
-                tags: [] as [String],
+                tags: [],
                 dataSource: ftAddress,
                 paths: FTViewUtils.StandardTokenPaths(
                     vaultPath: vaultData!.storagePath,
@@ -466,7 +469,7 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun buildFixesTokenView(_ ftAddress: Address, _ ftName: String): FixesTokenView? {
-        if let ftInterface = getAccount(ftAddress).contracts.borrow<&FixesFungibleTokenInterface>(name: ftName) {
+        if let ftInterface = getAccount(ftAddress).contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName) {
             let deployer = ftInterface.getDeployerAddress()
             let symbol = ftInterface.getSymbol()
             let accountKey = ftName == "FixesFungibleToken" ? "$".concat(symbol) : symbol
@@ -556,15 +559,15 @@ access(all) contract FungibleTokenManager {
     fun buildFixesTokenInfo(_ ftAddress: Address, _ acctKey: String?): FixesTokenInfo? {
         let ftAcct = getAccount(ftAddress)
         var ftName = "FixesFungibleToken"
-        var ftContract: &FixesFungibleTokenInterface? = nil
+        var ftContract: &{FixesFungibleTokenInterface}? = nil
         if acctKey != nil {
             ftName = acctKey![0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
-            ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
         } else {
-            ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
             if ftContract == nil {
                 ftName = "FRC20FungibleToken"
-                ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftName)
+                ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftName)
             }
         }
         if ftContract == nil {
@@ -651,8 +654,8 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun initializeFixesFungibleTokenAccount(
-        _ ins: &Fixes.Inscription,
-        newAccount: Capability<&AuthAccount>,
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
+        newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
     ) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
@@ -715,7 +718,7 @@ access(all) contract FungibleTokenManager {
     /// Setup Tradable Pool Resources
     ///
     access(all)
-    fun setupTradablePoolResources(_ ins: &Fixes.Inscription) {
+    fun setupTradablePoolResources(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
         }
@@ -726,7 +729,7 @@ access(all) contract FungibleTokenManager {
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         let tick = meta["tick"] ?? panic("The token symbol is not found")
 
         let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
@@ -758,7 +761,7 @@ access(all) contract FungibleTokenManager {
         // add tradable pool resource
         let poolStoragePath = FixesTradablePool.getLiquidityPoolStoragePath()
         assert(
-            childAcctRef.borrow<&AnyResource>(from: poolStoragePath) == nil,
+            childAcctRef.storage.borrow<&AnyResource>(from: poolStoragePath) == nil,
             message: "The tradable pool is already created"
         )
 
@@ -767,17 +770,17 @@ access(all) contract FungibleTokenManager {
             ins: ins,
             <- minter
         )
-        childAcctRef.save(<- tradablePool, to: poolStoragePath)
+        childAcctRef.storage.save(<- tradablePool, to: poolStoragePath)
 
         // link the tradable pool to the public path
         let poolPublicPath = FixesTradablePool.getLiquidityPoolPublicPath()
-        // @deprecated in Cadence 1.0
-        childAcctRef.link<&FixesTradablePool.TradableLiquidityPool{FixesTradablePool.LiquidityPoolInterface, FixesFungibleTokenInterface.LiquidityHolder, FixesFungibleTokenInterface.IMinterHolder, FixesHeartbeat.IHeartbeatHook, FungibleToken.Receiver}>(
-            poolPublicPath,
-            target: poolStoragePath
+        childAcctRef.capabilities.publish(
+            childAcctRef.capabilities.storage.issue<&FixesTradablePool.TradableLiquidityPool>(poolStoragePath),
+            at: poolPublicPath
         )
 
-        let tradablePoolRef = childAcctRef.borrow<&FixesTradablePool.TradableLiquidityPool>(from: poolStoragePath)
+        let tradablePoolRef = childAcctRef.storage
+            .borrow<auth(FixesTradablePool.Manage) &FixesTradablePool.TradableLiquidityPool>(from: poolStoragePath)
             ?? panic("The tradable pool was not created")
         // Initialize the tradable pool
         tradablePoolRef.initialize()
@@ -805,16 +808,22 @@ access(all) contract FungibleTokenManager {
         let flowReceiverPath = /public/flowTokenReceiver
 
          // Unlink the existing receiver capability for flowReceiverPath
-        if childAcctRef.getCapability(flowReceiverPath).check<&{FungibleToken.Receiver}>() {
+        if childAcctRef.capabilities.get<&{FungibleToken.Receiver}>(flowReceiverPath).check() {
             // link the forwarder to the public path
-            childAcctRef.unlink(flowReceiverPath)
+            childAcctRef.capabilities.unpublish(flowReceiverPath)
             // Link the new forwarding receiver capability
-            childAcctRef.link<&{FungibleToken.Receiver}>(flowReceiverPath, target: poolStoragePath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&{FungibleToken.Receiver}>(poolStoragePath),
+                at: flowReceiverPath
+            )
 
             // link the FlowToken to the forwarder fallback path
             let fallbackPath = Fixes.getFallbackFlowTokenPublicPath()
-            childAcctRef.unlink(fallbackPath)
-            childAcctRef.link<&FlowToken.Vault{FungibleToken.Receiver, FungibleToken.Balance}>(fallbackPath, target: /storage/flowTokenVault)
+            childAcctRef.capabilities.unpublish(fallbackPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FlowToken.Vault>(/storage/flowTokenVault),
+                at: fallbackPath
+            )
         }
 
         // emit the event
@@ -822,7 +831,7 @@ access(all) contract FungibleTokenManager {
     }
 
     access(all)
-    fun setupLockDropsPool(_ ins: &Fixes.Inscription, lockingExchangeRates: {UFix64: UFix64}) {
+    fun setupLockDropsPool(_ ins: auth(Fixes.Extractable) &Fixes.Inscription, lockingExchangeRates: {UFix64: UFix64}) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
         }
@@ -855,7 +864,7 @@ access(all) contract FungibleTokenManager {
 
         let lockdropsStoragePath = FixesTokenLockDrops.getDropsPoolStoragePath()
         assert(
-            childAcctRef.borrow<&AnyResource>(from: lockdropsStoragePath) == nil,
+            childAcctRef.storage.borrow<&AnyResource>(from: lockdropsStoragePath) == nil,
             message: "The lockdrops pool is already created"
         )
 
@@ -883,14 +892,13 @@ access(all) contract FungibleTokenManager {
             activateTime,
             failureDeprecatedTime
         )
-        childAcctRef.save(<- lockdrops, to: lockdropsStoragePath)
+        childAcctRef.storage.save(<- lockdrops, to: lockdropsStoragePath)
 
         // link the lockdrops pool to the public path
         let lockdropsPublicPath = FixesTokenLockDrops.getDropsPoolPublicPath()
-        // @deprecated in Cadence 1.0
-        childAcctRef.link<&FixesTokenLockDrops.DropsPool{FixesTokenLockDrops.DropsPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(
-            lockdropsPublicPath,
-            target: lockdropsStoragePath
+        childAcctRef.capabilities.publish(
+            childAcctRef.capabilities.storage.issue<&FixesTokenLockDrops.DropsPool>(lockdropsStoragePath),
+            at: lockdropsPublicPath
         )
 
         // emit the event
@@ -900,7 +908,7 @@ access(all) contract FungibleTokenManager {
     /// Enable the Airdrop pool for the Fungible Token
     ///
     access(all)
-    fun setupAirdropsPool(_ ins: &Fixes.Inscription) {
+    fun setupAirdropsPool(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
         }
@@ -933,7 +941,7 @@ access(all) contract FungibleTokenManager {
 
         let storagePath = FixesTokenAirDrops.getAirdropPoolStoragePath()
         assert(
-            childAcctRef.borrow<&AnyResource>(from: storagePath) == nil,
+            childAcctRef.storage.borrow<&AnyResource>(from: storagePath) == nil,
             message: "The airdrop pool is already created"
         )
 
@@ -946,14 +954,13 @@ access(all) contract FungibleTokenManager {
 
         // create the airdrops pool
         let airdrops <- FixesTokenAirDrops.createDropsPool(ins, <- minter)
-        childAcctRef.save(<- airdrops, to: storagePath)
+        childAcctRef.storage.save(<- airdrops, to: storagePath)
 
         // link the airdrops pool to the public path
         let publicPath = FixesTokenAirDrops.getAirdropPoolPublicPath()
-        // @deprecated in Cadence 1.0
-        childAcctRef.link<&FixesTokenAirDrops.AirdropPool{FixesTokenAirDrops.AirdropPoolPoolPublic, FixesFungibleTokenInterface.IMinterHolder}>(
-            publicPath,
-            target: storagePath
+        childAcctRef.capabilities.publish(
+            childAcctRef.capabilities.storage.issue<&FixesTokenAirDrops.AirdropPool>(storagePath),
+            at: publicPath
         )
 
         // emit the event
@@ -962,7 +969,7 @@ access(all) contract FungibleTokenManager {
 
     access(self)
     fun _initializeMinter(
-        _ ins: &Fixes.Inscription,
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         usage: String,
         extrafields: [String]
     ): @{FixesFungibleTokenInterface.IMinter} {
@@ -1039,13 +1046,16 @@ access(all) contract FungibleTokenManager {
     /// Enable the FRC20 Fungible Token
     ///
     access(all)
-    fun initializeFRC20FungibleTokenAccount(_ ins: &Fixes.Inscription, newAccount: Capability<&AuthAccount>) {
+    fun initializeFRC20FungibleTokenAccount(
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
+        newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
+    ) {
         // singletoken resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         assert(
             meta["op"] == "exec" && meta["usage"] == "init-ft",
             message: "The inscription is not for initialize a Fungible Token account"
@@ -1093,9 +1103,9 @@ access(all) contract FungibleTokenManager {
         // Create the FRC20Agents.IndexerController and save it in the account
         // This is required for FRC20FungibleToken
         let ctrlStoragePath = FRC20Agents.getIndexerControllerStoragePath()
-        if childAcctRef.borrow<&AnyResource>(from: ctrlStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: ctrlStoragePath) == nil {
             let indexerController <- FRC20Agents.createIndexerController([tickerName])
-            childAcctRef.save(<- indexerController, to: ctrlStoragePath)
+            childAcctRef.storage.save(<- indexerController, to: ctrlStoragePath)
         }
 
         // deploy the contract of FRC20 Fungible Token to the account
@@ -1112,7 +1122,7 @@ access(all) contract FungibleTokenManager {
     /// Setup Tradable Pool Resources
     ///
     access(all)
-    fun setupFRC20ConverterResources(_ ins: &Fixes.Inscription) {
+    fun setupFRC20ConverterResources(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
         }
@@ -1124,7 +1134,7 @@ access(all) contract FungibleTokenManager {
         let frc20Indexer = FRC20Indexer.getIndexer()
 
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         let tickerName = meta["tick"]?.toLower() ?? panic("The token tick is not found")
 
         let callerAddr = ins.owner!.address
@@ -1156,27 +1166,19 @@ access(all) contract FungibleTokenManager {
         let contractRef = acctsPool.borrowFTContract(tickerName)
             ?? panic("The Fungible Token account was not created")
         let adminStoragePath = contractRef.getAdminStoragePath()
-        // @deprecated in Cadence 1.0
-        let privPath = /private/FRC20ConverterPrivate
-        childAcctRef.unlink(privPath)
-        // link the admin resource to the private path
-        childAcctRef.link<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(
-            privPath,
-            target: adminStoragePath
-        )
-        let adminCap = childAcctRef
-            .getCapability<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(privPath)
-        assert(
+
+        let adminCap = childAcctRef.capabilities.storage
+            .issue<auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IAdminWritable}>(adminStoragePath)
+         assert(
             adminCap.check(),
             message: "The admin resource is not available"
         )
         let converterStoragePath = FRC20Converter.getFTConverterStoragePath()
-        childAcctRef.save(<- FRC20Converter.createConverter(adminCap), to: converterStoragePath)
+        childAcctRef.storage.save(<- FRC20Converter.createConverter(adminCap), to: converterStoragePath)
         // link the converter to the public path
-        // @deprecated in Cadence 1.0
-        childAcctRef.link<&FRC20Converter.FTConverter{FRC20Converter.IConverter}>(
-            FRC20Converter.getFTConverterPublicPath(),
-            target: converterStoragePath
+        childAcctRef.capabilities.publish(
+            childAcctRef.capabilities.storage.issue<&FRC20Converter.FTConverter>(converterStoragePath),
+            at: FRC20Converter.getFTConverterPublicPath()
         )
 
         // emit the event
@@ -1189,11 +1191,11 @@ access(all) contract FungibleTokenManager {
     ///
     access(self)
     fun verifyExecutingInscription(
-        _ ins: &Fixes.Inscription,
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         usage: String
     ): {String: String} {
         // inscription data
-        let meta = FixesInscriptionFactory.parseMetadata(&ins.getData() as &Fixes.InscriptionData)
+        let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
         assert(
             meta["op"] == "exec",
             message: "The inscription operation must be 'exec'"
@@ -1214,7 +1216,7 @@ access(all) contract FungibleTokenManager {
     /// Borrow the Fixes Fungible Token Admin Resource
     ///
     access(self)
-    view fun borrowWritableTokenAdmin(tick: String): &{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable} {
+    view fun borrowWritableTokenAdmin(tick: String): auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IAdminWritable} {
         // try to borrow the account to check if it was created
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
         let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
@@ -1223,7 +1225,8 @@ access(all) contract FungibleTokenManager {
             ?? panic("The Fungible Token contract is not deployed")
         // Check if the admin resource is available
         let adminStoragePath = contractRef.getAdminStoragePath()
-        return childAcctRef.borrow<&{FixesFungibleTokenInterface.IGlobalPublic, FixesFungibleTokenInterface.IAdminWritable}>(from: adminStoragePath)
+        return childAcctRef.storage
+            .borrow<auth(FixesFungibleTokenInterface.Manage) &{FixesFungibleTokenInterface.IAdminWritable}>(from: adminStoragePath)
             ?? panic("The admin resource is not available")
     }
 
@@ -1247,27 +1250,31 @@ access(all) contract FungibleTokenManager {
         //   - Store the Deploying Time of the token
 
         // create the shared store and save it in the account
-        if childAcctRef.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
             let sharedStore <- FRC20FTShared.createSharedStore()
-            childAcctRef.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+            childAcctRef.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
 
             // link the shared store to the public path
-            childAcctRef.unlink(FRC20FTShared.SharedStorePublicPath)
-            childAcctRef.link<&FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic}>(FRC20FTShared.SharedStorePublicPath, target: FRC20FTShared.SharedStoreStoragePath)
+            // childAcctRef.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
+                at: FRC20FTShared.SharedStorePublicPath
+            )
 
             // Add token symbol to the managed list
             let managerRef = self.borrowFTManager(caller) ?? panic("The manager resource is not found")
             // create a private cap for shared store for the fungible token
-            let privId = "FRC20SharedStoreTempPriv_".concat(childAddr.toString())
-            let cap = childAcctRef.link<&FRC20FTShared.SharedStore>(PrivatePath(identifier: privId)!, target: FRC20FTShared.SharedStoreStoragePath)
-            assert(cap!.check(), message: "The shared store is not valid")
-            managerRef.addCreatedFungibleToken(tick, cap!)
+            let cap = childAcctRef.capabilities
+                .storage.issue<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath)
+            assert(cap.check(), message: "The shared store is not valid")
+            managerRef.addCreatedFungibleToken(tick, cap)
 
             isUpdated = true || isUpdated
         }
 
         // borrow the shared store
-        if let store = childAcctRef.borrow<&FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath) {
+        if let store = childAcctRef.storage
+            .borrow<auth(FRC20FTShared.Write) &FRC20FTShared.SharedStore>(from: FRC20FTShared.SharedStoreStoragePath) {
             // ensure the symbol is without the '$' sign
             var symbol = tick
             if symbol[0] == "$" {
@@ -1291,54 +1298,58 @@ access(all) contract FungibleTokenManager {
     /// Utility method to ensure the trading record resources are available
     ///
     access(self)
-    fun _ensureTradingRecordResourcesAvailable(_ acctRef: &AuthAccount, tick: String?): Bool {
+    fun _ensureTradingRecordResourcesAvailable(_ acctRef: auth(Storage, Capabilities) &Account, tick: String?): Bool {
         var isUpdated = false
 
         // - FRC20FTShared.Hooks
         //   - TradingRecord
 
         // create the hooks and save it in the account
-        if acctRef.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
+        if acctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.TransactionHookStoragePath) == nil {
             let hooks <- FRC20FTShared.createHooks()
-            acctRef.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
+            acctRef.storage.save(<- hooks, to: FRC20FTShared.TransactionHookStoragePath)
 
             isUpdated = true || isUpdated
         }
 
         // link the hooks to the public path
         if acctRef
-            .getCapability<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(FRC20FTShared.TransactionHookPublicPath)
+            .capabilities.get<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookPublicPath)
             .borrow() == nil {
             // link the hooks to the public path
-            acctRef.unlink(FRC20FTShared.TransactionHookPublicPath)
-            acctRef.link<&FRC20FTShared.Hooks{FRC20FTShared.TransactionHook, FixesHeartbeat.IHeartbeatHook}>(
-                FRC20FTShared.TransactionHookPublicPath,
-                target: FRC20FTShared.TransactionHookStoragePath
+            acctRef.capabilities.unpublish(FRC20FTShared.TransactionHookPublicPath)
+            acctRef.capabilities.publish(
+                acctRef.capabilities.storage.issue<&FRC20FTShared.Hooks>(FRC20FTShared.TransactionHookStoragePath),
+                at: FRC20FTShared.TransactionHookPublicPath
             )
 
             isUpdated = true || isUpdated
         }
 
         // ensure trading records are available
-        if acctRef.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
+        if acctRef.storage.borrow<&AnyResource>(from: FRC20TradingRecord.TradingRecordsStoragePath) == nil {
             let tradingRecords <- FRC20TradingRecord.createTradingRecords(tick)
-            acctRef.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
+            acctRef.storage.save(<- tradingRecords, to: FRC20TradingRecord.TradingRecordsStoragePath)
 
             // link the trading records to the public path
-            acctRef.unlink(FRC20TradingRecord.TradingRecordsPublicPath)
-            acctRef.link<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(FRC20TradingRecord.TradingRecordsPublicPath, target: FRC20TradingRecord.TradingRecordsStoragePath)
+            acctRef.capabilities.unpublish(FRC20TradingRecord.TradingRecordsPublicPath)
+            acctRef.capabilities.publish(
+                acctRef.capabilities.storage.issue<&FRC20TradingRecord.TradingRecords>(FRC20TradingRecord.TradingRecordsStoragePath),
+                at: FRC20TradingRecord.TradingRecordsPublicPath
+            )
 
             isUpdated = true || isUpdated
         }
 
         // borrow the hooks reference
-        let hooksRef = acctRef.borrow<&FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
+        let hooksRef = acctRef.storage
+            .borrow<auth(FRC20FTShared.Manage) &FRC20FTShared.Hooks>(from: FRC20FTShared.TransactionHookStoragePath)
             ?? panic("The hooks were not created")
 
         // add the trading records to the hooks, if it is not added yet
         // get the public capability of the trading record hook
         let tradingRecordsCap = acctRef
-            .getCapability<&FRC20TradingRecord.TradingRecords{FRC20TradingRecord.TradingRecordsPublic, FRC20TradingRecord.TradingStatusViewer, FRC20FTShared.TransactionHook}>(
+            .capabilities.get<&FRC20TradingRecord.TradingRecords>(
                 FRC20TradingRecord.TradingRecordsPublicPath
             )
         assert(tradingRecordsCap.check(), message: "The trading record hook is not valid")
@@ -1371,9 +1382,7 @@ access(all) contract FungibleTokenManager {
             if deployedContracts.contains(contractName) {
                 log("Updating the contract in the account: ".concat(childAddr.toString()))
                 // update the contract
-                // This method will update the contract, but it maybe deprecated in Cadence 1.0
-                childAcctRef.contracts.update__experimental(name: contractName, code: ftContract.code)
-                // childAcctRef.contracts.update(name: contractName, code: ftContract.code)
+                childAcctRef.contracts.update(name: contractName, code: ftContract.code)
             } else {
                 log("Deploying the contract to the account: ".concat(childAddr.toString()))
                 // add the contract
@@ -1394,12 +1403,14 @@ access(all) contract FungibleTokenManager {
 
         // create the admin account
         let admin <- create Admin()
-        self.account.save(<-admin, to: self.AdminStoragePath)
-        // @deprecated in Cadence 1.0
-        self.account.link<&Admin{AdminPublic}>(self.AdminPublicPath, target: self.AdminStoragePath)
+        self.account.storage.save(<-admin, to: self.AdminStoragePath)
+        self.account.capabilities.publish(
+            self.account.capabilities.storage.issue<&Admin>(self.AdminStoragePath),
+            at: self.AdminPublicPath
+        )
 
         // Setup FungibleToken Shared FRC20TradingRecord
-        self._ensureTradingRecordResourcesAvailable(&self.account as &AuthAccount, tick: nil)
+        self._ensureTradingRecordResourcesAvailable(self.account, tick: nil)
 
         emit ContractInitialized()
     }

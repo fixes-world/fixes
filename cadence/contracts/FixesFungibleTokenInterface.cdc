@@ -19,20 +19,75 @@ import "FRC20FTShared"
 /// This is the contract interface for all Fixes Fungible Token
 ///
 access(all) contract interface FixesFungibleTokenInterface {
+
+    access(all) entitlement MetadataUpdate;
+    access(all) entitlement Manage;
+
     // ------ Events -------
 
     /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataInitialized(typeIdentifier: String, id: String, value: String, owner: Address?)
+    access(all) event TokensMetadataInitialized(
+        ftIdentifier: String,
+        typeIdentifier: String,
+        id: String,
+        value: String,
+        owner: Address?
+    )
 
     /// The event that is emitted when the metadata is updated
-    access(all) event TokensMetadataUpdated(typeIdentifier: String, id: String, value: String, owner: Address?)
+    access(all) event TokensMetadataUpdated(
+        ftIdentifier: String,
+        typeIdentifier: String,
+        id: String,
+        value: String,
+        owner: Address?,
+    )
 
     /// The event that is emitted when the dna metadata is updated
-    access(all) event TokenDNAGenerated(identifier: String, value: String, mutatableAmount: UInt64, owner: Address?)
+    access(all) event TokenDNAGenerated(
+        ftIdentifier: String,
+        identifier: String,
+        value: String,
+        mutatableAmount: UInt64,
+        owner: Address?
+    )
 
     /// The event that is emitted when the dna mutatable is updated
-    access(all) event TokenDNAMutatableCharged(identifier: String, mutatableAmount: UInt64, owner: Address?)
+    access(all) event TokenDNAMutatableCharged(
+        ftIdentifier: String,
+        identifier: String,
+        mutatableAmount: UInt64,
+        owner: Address?
+    )
 
+    /// The event that is emitted when a new minter resource is created
+    access(all) event MinterCreated(
+        ftIdentifier: String,
+        allowedAmount: UFix64
+    )
+
+    /// The event that is emitted when the admin is updated
+    access(all) event AdminUserUpdated(
+        ftIdentifier: String,
+        addr: Address,
+        flag: Bool
+    )
+
+    /// Update the metadata
+    access(all) view
+    fun emitMetadataUpdated(
+        _ ref: auth(MetadataUpdate) &{FixesFungibleTokenInterface.Vault},
+        _ dataRef: &{FixesTraits.MergeableData},
+    ) {
+        // emit the event
+        emit TokensMetadataUpdated(
+            ftIdentifier: ref.getType().identifier,
+            typeIdentifier: dataRef.getType().identifier,
+            id: dataRef.getId(),
+            value: dataRef.toString(),
+            owner: ref.owner?.address
+        )
+    }
     /// -------- Resources and Interfaces --------
 
     /// The public interface for the Fungible Token
@@ -50,7 +105,17 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// DNA charging
         access(all)
-        fun chargeDNAMutatableAttempts(_ ins: &Fixes.Inscription)
+        fun chargeDNAMutatableAttempts(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
+            post {
+                // emit the event
+                emit TokenDNAMutatableCharged(
+                    ftIdentifier: self.getType().identifier,
+                    identifier: self.getDNAIdentifier(),
+                    mutatableAmount: self.getDNAMutatableAmount(),
+                    owner: self.owner?.address
+                )
+            }
+        }
 
         // ----- Public Methods - default implementation exsits -----
 
@@ -122,13 +187,23 @@ access(all) contract interface FixesFungibleTokenInterface {
             pre {
                 self.borrowMergeableDataRef(data.getType()) == nil: "The metadata key already exists"
             }
+            post {
+                // emit the event
+                emit TokensMetadataInitialized(
+                    ftIdentifier: self.getType().identifier,
+                    typeIdentifier: data.getType().identifier,
+                    id: data.getId(),
+                    value: data.toString(),
+                    owner: self.owner?.address
+                )
+            }
         }
 
         /// Borrow the mergeable data by key
         ///
         access(contract)
-        view fun borrowMergeableDataRef(_ type: Type): &{FixesTraits.MergeableData}? {
-            return &self.metadata[type] as &{FixesTraits.MergeableData}?
+        view fun borrowMergeableDataRef(_ type: Type): auth(FixesTraits.Write) &{FixesTraits.MergeableData}? {
+            return &self.metadata[type]
         }
     }
 
@@ -137,16 +212,16 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all) resource interface MetadataGenerator {
         /// Attempt to generate a new gene
         ///
-        access(all)
+        access(MetadataUpdate)
         fun attemptGenerateGene(_ attempt: UInt64): FixesAssetMeta.DNA?
     }
 
     /// The Implementation some method for the Metadata
     ///
-    access(all) resource Vault: Metadata, MetadataGenerator {
+    access(all) resource interface Vault: Metadata, MetadataGenerator {
         /// Attempt to generate a new gene
         ///
-        access(all)
+        access(MetadataUpdate)
         fun attemptGenerateGene(_ attempt: UInt64): FixesAssetMeta.DNA? {
             var max = attempt
             if max == 0 {
@@ -195,6 +270,16 @@ access(all) contract interface FixesFungibleTokenInterface {
                         .concat("NewMutatable: ").concat(newMutatableAmt.toString()))
                 }
             }
+
+            // emit the event
+            emit TokenDNAGenerated(
+                ftIdentifier: self.getType().identifier,
+                identifier: self.getDNAIdentifier(),
+                value: newDNA.toString(),
+                mutatableAmount: newDNA.mutatableAmount,
+                owner: self.owner?.address
+            )
+
             return newDNA
         }
     }
@@ -253,30 +338,43 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// The admin interface for the FT
     ///
-    access(all) resource interface IAdminWritable {
-        /// Check if the address is the admin
-        access(all)
-        view fun isAuthorizedUser(_ addr: Address): Bool
-
+    access(all) resource interface IAdminWritable: IGlobalPublic {
         /// Borrow the super minter resource
         ///
-        access(all)
-        view fun borrowSuperMinter(): &{IMinter}
+        access(Manage)
+        view fun borrowSuperMinter(): auth(Manage) &{IMinter}
 
         /// Update the authorized users
         ///
-        access(all)
-        fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool)
+        access(Manage)
+        fun updateAuthorizedUsers(_ addr: Address, _ isAdd: Bool) {
+            post {
+                // emit the event
+                emit AdminUserUpdated(
+                    ftIdentifier: self.borrowSuperMinter().getTokenType().identifier,
+                    addr: addr,
+                    flag: isAdd
+                )
+            }
+        }
 
         /// Create a new Minter resource
         ///
-        access(all)
-        fun createMinter(allowedAmount: UFix64): @{IMinter}
+        access(Manage)
+        fun createMinter(allowedAmount: UFix64): @{IMinter} {
+            post {
+                // emit the event
+                emit MinterCreated(
+                    ftIdentifier: self.borrowSuperMinter().getTokenType().identifier,
+                    allowedAmount: allowedAmount
+                )
+            }
+        }
     }
 
-    /// The minter resource interface
+    /// The token identity resource interface
     ///
-    access(all) resource interface IMinter {
+    access(all) resource interface ITokenBasics {
         /// Get the symbol of the minting token
         access(all)
         view fun getSymbol(): String
@@ -301,6 +399,38 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTotalSupply(): UFix64
 
+        /// Get the vault data of the minting token
+        /// Read-only buy using non-view function
+        access(all)
+        fun getVaultData(): FungibleTokenMetadataViews.FTVaultData
+    }
+
+    /// The token liquidity resource interface
+    ///
+    access(all) resource interface ITokenLiquidity {
+        /// Get the in-pool liquidity market cap
+        /// Read-only buy using non-view function
+        access(all)
+        fun getLiquidityMarketCap(): UFix64
+
+        /// Get the in-pool liquidity value
+        access(all)
+        view fun getLiquidityValue(): UFix64
+
+        /// Get the total token market cap
+        /// Read-only buy using non-view function
+        access(all)
+        fun getTotalTokenMarketCap(): UFix64
+
+        /// Get the total token supply value
+        access(all)
+        view fun getTotalTokenValue(): UFix64
+    }
+
+    /// The minter resource interface
+    ///
+    access(all) resource interface IMinter: ITokenBasics {
+
         /// Get the unsupplied amount
         access(all)
         view fun getUnsuppliedAmount(): UFix64 {
@@ -315,15 +445,11 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTotalAllowedMintableAmount(): UFix64
 
-        /// Get the vault data of the minting token
-        access(all)
-        view fun getVaultData(): FungibleTokenMetadataViews.FTVaultData
-
         /// Function that mints new tokens, adds them to the total supply,
         /// and returns them to the calling context.
         ///
-        access(all)
-        fun mintTokens(amount: UFix64): @FungibleToken.Vault {
+        access(Manage)
+        fun mintTokens(amount: UFix64): @{FungibleToken.Vault} {
             pre {
                 amount <= self.getMaxSupply() - self.getTotalSupply(): "The amount must be less than or equal to the remaining supply"
             }
@@ -331,11 +457,11 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Mint tokens with user's inscription
         ///
-        access(all)
+        access(Manage)
         fun initializeVaultByInscription(
-            vault: @FungibleToken.Vault,
-            ins: &Fixes.Inscription
-        ): @FungibleToken.Vault {
+            vault: @{FungibleToken.Vault},
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
+        ): @{FungibleToken.Vault} {
             pre {
                 vault.getType() == self.getTokenType(): "The vault type must be the same"
             }
@@ -347,10 +473,10 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Burn tokens with user's inscription
         ///
-        access(all)
+        access(Manage)
         fun burnTokenWithInscription(
-            vault: @FungibleToken.Vault,
-            ins: &Fixes.Inscription
+            vault: @{FungibleToken.Vault},
+            ins: auth(Fixes.Extractable) &Fixes.Inscription
         ) {
             pre {
                 vault.getType() == self.getTokenType(): "The vault type must be the same"
@@ -363,7 +489,63 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// The minter holder resource interface
     ///
-    access(all) resource interface IMinterHolder {
+    access(all) resource interface IMinterHolder: ITokenBasics {
+
+        // ----- Implement FixesFungibleTokenInterface.ITokenBasics -----
+
+        /// Get the token symbol
+        access(all)
+        view fun getSymbol(): String {
+            let minterRef = self.borrowMinter()
+            return minterRef.getSymbol()
+        }
+
+        /// Get the token type
+        access(all)
+        view fun getTokenType(): Type {
+            let minterRef = self.borrowMinter()
+            return minterRef.getTokenType()
+        }
+
+        /// Get the key in the accounts pool
+        access(all)
+        view fun getAccountsPoolKey(): String? {
+            let minterRef = self.borrowMinter()
+            return minterRef.getAccountsPoolKey()
+        }
+
+        /// Get the contract address of the minting token
+        access(all)
+        view fun getContractAddress(): Address {
+            let minterRef = self.borrowMinter()
+            return minterRef.getContractAddress()
+        }
+
+        /// Get the max supply of the token
+        access(all)
+        view fun getMaxSupply(): UFix64 {
+            let minter = self.borrowMinter()
+            return minter.getMaxSupply()
+        }
+
+        /// Get the total supply of the token
+        access(all)
+        view fun getTotalSupply(): UFix64 {
+            let minter = self.borrowMinter()
+            // The circulating supply is the total supply minus the balance in the vault
+            return minter.getTotalSupply()
+        }
+
+        /// Get the vault data of the minting token
+        /// Read-only buy using non-view function
+        access(all)
+        fun getVaultData(): FungibleTokenMetadataViews.FTVaultData {
+            let minterRef = self.borrowMinter()
+            return minterRef.getVaultData()
+        }
+
+        // ----- Interfaces of IMinterHolder -----
+
         /// Get the total minted amount
         access(all)
         view fun getTotalMintedAmount(): UFix64 {
@@ -389,25 +571,11 @@ access(all) contract interface FixesFungibleTokenInterface {
             return self.getCurrentMintableAmount() > 0.0
         }
 
-        /// Get the token type
-        access(all)
-        view fun getTokenType(): Type {
-            let minterRef = self.borrowMinter()
-            return minterRef.getTokenType()
-        }
-
         /// Get the token vault data
         access(all)
-        view fun getTokenVaultData(): FungibleTokenMetadataViews.FTVaultData {
+        fun getTokenVaultData(): FungibleTokenMetadataViews.FTVaultData {
             let minterRef = self.borrowMinter()
             return minterRef.getVaultData()
-        }
-
-        /// Get the max supply of the token
-        access(all)
-        view fun getMaxSupply(): UFix64 {
-            let minterRef = self.borrowMinter()
-            return minterRef.getMaxSupply()
         }
 
         /// Get the circulating supply of the token
@@ -419,12 +587,12 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Borrow the minter reference
         access(contract)
-        view fun borrowMinter(): &{IMinter}
+        view fun borrowMinter(): auth(Manage) &{IMinter}
     }
 
     /// The public interface for the liquidity holder
     ///
-    access(all) resource interface LiquidityHolder {
+    access(all) resource interface LiquidityHolder: ITokenLiquidity {
         // --- read methods ---
 
         /// Check if the address is authorized user for the liquidity holder
@@ -435,21 +603,9 @@ access(all) contract interface FixesFungibleTokenInterface {
         access(all)
         view fun getTokenType(): Type
 
-        /// Get the token symbol
-        access(all)
-        view fun getTokenSymbol(): String
-
         /// Get the key in the accounts pool
         access(all)
         view fun getAccountsPoolKey(): String?
-
-        /// Get the liquidity market cap
-        access(all)
-        view fun getLiquidityMarketCap(): UFix64
-
-        /// Get the liquidity pool value
-        access(all)
-        view fun getLiquidityValue(): UFix64
 
         /// Get the flow balance in pool
         access(all)
@@ -485,14 +641,6 @@ access(all) contract interface FixesFungibleTokenInterface {
             return currentFlowBalance / tokenBalance
         }
 
-        /// Get the total token market cap
-        access(all)
-        view fun getTotalTokenMarketCap(): UFix64
-
-        /// Get the total token supply value
-        access(all)
-        view fun getTotalTokenValue(): UFix64
-
         /// Get the token holders
         access(all)
         view fun getHolders(): UInt64
@@ -504,7 +652,7 @@ access(all) contract interface FixesFungibleTokenInterface {
 
         /// Pull liquidity from the pool
         access(account)
-        fun pullLiquidity(): @FungibleToken.Vault {
+        fun pullLiquidity(): @{FungibleToken.Vault} {
             pre {
                 self.getLiquidityValue() > 0.0: "No liquidity to pull"
             }
@@ -515,7 +663,7 @@ access(all) contract interface FixesFungibleTokenInterface {
         }
         /// Push liquidity to the pool
         access(account)
-        fun addLiquidity(_ vault: @FungibleToken.Vault) {
+        fun addLiquidity(_ vault: @{FungibleToken.Vault}) {
             pre {
                 vault.balance > 0.0: "No liquidity to push"
                 vault.isInstance(Type<@FlowToken.Vault>()): "Invalid result type"
@@ -549,7 +697,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// Borrow the shared store
     ///
     access(all)
-    view fun borrowSharedStore(): &FRC20FTShared.SharedStore{FRC20FTShared.SharedStorePublic} {
+    view fun borrowSharedStore(): &FRC20FTShared.SharedStore {
         return FRC20FTShared.borrowStoreRef(self.account.address) ?? panic("Config store not found")
     }
 
@@ -641,7 +789,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all)
     view fun borrowTokenMetadata(_ addr: Address): &{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}? {
         return getAccount(addr)
-            .getCapability<&{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}>(self.getVaultPublicPath())
+            .capabilities.get<&{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}>(self.getVaultPublicPath())
             .borrow()
     }
 
@@ -650,7 +798,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all)
     view fun borrowVaultReceiver(_ addr: Address): &{FungibleToken.Receiver}? {
         return getAccount(addr)
-            .getCapability<&{FungibleToken.Receiver}>(self.getReceiverPublicPath())
+            .capabilities.get<&{FungibleToken.Receiver}>(self.getReceiverPublicPath())
             .borrow()
     }
 
@@ -659,7 +807,7 @@ access(all) contract interface FixesFungibleTokenInterface {
     access(all)
     view fun borrowGlobalPublic(): &{IGlobalPublic} {
         return self.account
-            .getCapability<&{IGlobalPublic}>(self.getAdminPublicPath())
+            .capabilities.get<&{IGlobalPublic}>(self.getAdminPublicPath())
             .borrow() ?? panic("The FungibleToken Admin is not found")
     }
 
@@ -705,5 +853,5 @@ access(all) contract interface FixesFungibleTokenInterface {
 
     /// Create a new vault
     access(all)
-    fun createEmptyVault(): @FungibleToken.Vault
+    fun createEmptyVault(vaultType: Type): @{FungibleToken.Vault}
 }

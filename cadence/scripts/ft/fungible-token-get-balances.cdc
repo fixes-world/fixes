@@ -16,7 +16,7 @@ fun main(
         let ftAcct = getAccount(ftAddr)
         var info: FungibleTokenManager.FixesTokenInfo? = nil
         var ftContractName = "FixesFungibleToken"
-        var ftContract: &FixesFungibleTokenInterface? = nil
+        var ftContract: &{FixesFungibleTokenInterface}? = nil
         if includeInfo {
             info = FungibleTokenManager.buildFixesTokenInfo(ftAddr, nil)
             if info != nil {
@@ -24,12 +24,12 @@ fun main(
             } else {
                 continue
             }
-            ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftContractName)
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftContractName)
         } else {
-            ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftContractName)
+            ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftContractName)
             if ftContract == nil {
                 ftContractName = "FRC20FungibleToken"
-                ftContract = ftAcct.contracts.borrow<&FixesFungibleTokenInterface>(name: ftContractName)
+                ftContract = ftAcct.contracts.borrow<&{FixesFungibleTokenInterface}>(name: ftContractName)
             }
         }
         if ftContract == nil {
