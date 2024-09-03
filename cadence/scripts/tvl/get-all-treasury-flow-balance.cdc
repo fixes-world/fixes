@@ -2,6 +2,9 @@ import "FRC20Indexer"
 import "FGameLottery"
 import "FGameLotteryRegistry"
 import "FGameLotteryFactory"
+import "FRC20FTShared"
+import "FRC20Staking"
+import "FRC20AccountsPool"
 
 access(all)
 fun main(): UFix64 {
@@ -13,6 +16,7 @@ fun main(): UFix64 {
         let balance = indexer.getPoolBalance(tick: tick)
         totalBalance = totalBalance + balance
     }
+
     // FLOW lottery jackpot balance
     let registry = FGameLotteryRegistry.borrowRegistry()
     let flowLotteryPoolName = FGameLotteryFactory.getFIXESMintingLotteryPoolName()
@@ -22,5 +26,17 @@ fun main(): UFix64 {
             totalBalance = totalBalance + jackpotBalance
         }
     }
+
+    // Unclaimed FLOW Reward in the staking reward pool
+    let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+    let platformStakingTick = FRC20FTShared.getPlatformStakingTickerName()
+    if let stakingPoolAddr = acctsPool.getFRC20StakingAddress(tick: platformStakingTick) {
+        if let stakingPool = FRC20Staking.borrowPool(stakingPoolAddr) {
+            if let detail = stakingPool.getRewardDetails("") {
+                totalBalance = totalBalance + detail.totalReward
+            }
+        }
+    }
+
     return totalBalance
 }
