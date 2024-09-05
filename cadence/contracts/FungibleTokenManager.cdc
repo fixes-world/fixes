@@ -10,7 +10,6 @@ This contract is used to manage the account and contract of Fixes' Fungible Toke
 import "FungibleToken"
 import "FlowToken"
 import "StringUtils"
-import "MigrationContractStaging"
 import "FTViewUtils"
 import "ViewResolver"
 import "FungibleTokenMetadataViews"
@@ -116,69 +115,6 @@ access(all) contract FungibleTokenManager {
                     FungibleTokenManager._updateFungibleTokenContractInAccount(tick, contractName: "FixesFungibleToken")
                 } else {
                     FungibleTokenManager._updateFungibleTokenContractInAccount(tick, contractName: "FRC20FungibleToken")
-                }
-            }
-        }
-
-        // migrate all children contracts
-        access(Sudo)
-        fun stageAllChildrenContracts() {
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
-            // stage the contracts
-            self._stageChildrenContracts(keys: dict.keys)
-        }
-
-        // migrate all children contracts
-        access(Sudo)
-        fun stageChildrenContracts(page: Int) {
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            let dict = acctsPool.getAddresses(type: FRC20AccountsPool.ChildAccountType.FungibleToken)
-            let keys = dict.keys
-            // paginate the keys
-            let pageSize = 5
-            let start = page * pageSize
-            var end = start + pageSize
-            if end > keys.length {
-                end = keys.length
-            }
-            if start >= end {
-                return
-            }
-            // stage the contracts
-            self._stageChildrenContracts(keys: keys.slice(from: start, upTo: end))
-        }
-
-        // migrate child
-        access(Sudo)
-        fun stageChildrenContract(key: String) {
-            self._stageChildrenContracts(keys: [key])
-        }
-
-        // migrate the children contracts
-        access(self)
-        fun _stageChildrenContracts(keys: [String]) {
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
-            // get the statged template codes
-            let serviceAddr = Fixes.getPlatformAddress()
-            let codes: {String: String} = {}
-            codes["FixesFungibleToken"] = MigrationContractStaging.getStagedContractCode(address: serviceAddr, name: "FixesFungibleToken")
-            codes["FRC20FungibleToken"] = MigrationContractStaging.getStagedContractCode(address: serviceAddr, name: "FRC20FungibleToken")
-            assert(
-                codes["FixesFungibleToken"] != nil && codes["FRC20FungibleToken"] != nil,
-                message: "The staged contract codes are not found"
-            )
-            // migrate the contracts
-            for key in keys {
-                let ftContractName = key[0] == "$" ? "FixesFungibleToken" : "FRC20FungibleToken"
-                let ftContractCode = codes[ftContractName]!
-                if let acct = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, key) {
-                    if acct.storage.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath) == nil {
-                        acct.storage.save(<-MigrationContractStaging.createHost(), to: MigrationContractStaging.HostStoragePath)
-                    }
-                    // Assign Host reference
-                    let hostRef = acct.storage.borrow<&MigrationContractStaging.Host>(from: MigrationContractStaging.HostStoragePath)!
-                    MigrationContractStaging.stageContract(host: hostRef, name: ftContractName, code: ftContractCode)
                 }
             }
         }
