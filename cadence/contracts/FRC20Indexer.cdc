@@ -1,5 +1,5 @@
 /**
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FRC20 Indexer
 

@@ -54,7 +54,6 @@ transaction(
             acct.storage.save(<- FGameLottery.createTicketCollection(), to: FGameLottery.userCollectionStoragePath)
         }
         // Link public capability to the account
-        // @deprecated after Cadence 1.0
         if acct
             .capabilities.get<&FGameLottery.TicketCollection>(FGameLottery.userCollectionPublicPath)
             .borrow() == nil {

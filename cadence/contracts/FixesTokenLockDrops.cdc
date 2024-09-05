@@ -1,6 +1,6 @@
 /**
 
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FixesTokenLockDrops
 
@@ -1196,7 +1196,6 @@ access(all) contract FixesTokenLockDrops {
     ///
     access(all)
     view fun borrowLockingCenter(): &LockingCenter {
-        // @deprecated in Cadence 1.0
         return getAccount(self.account.address)
             .capabilities.get<&LockingCenter>(self.getLockingCenterPublicPath())
             .borrow()
@@ -1207,7 +1206,6 @@ access(all) contract FixesTokenLockDrops {
     ///
     access(all)
     view fun borrowDropsPool(_ addr: Address): &DropsPool? {
-        // @deprecated in Cadence 1.0
         return getAccount(addr)
             .capabilities.get<&DropsPool>(self.getDropsPoolPublicPath())
             .borrow()

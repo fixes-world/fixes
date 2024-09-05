@@ -1,5 +1,5 @@
 /**
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FRC20 Accounts Pool
 
@@ -553,7 +553,6 @@ access(all) contract FRC20AccountsPool {
 
             // check that paths are all configured properly
             // public path
-            // @deprecated after Cadence 1.0
             child.capabilities.unpublish(HybridCustody.OwnedAccountPublicPath)
             child.capabilities.publish(
                 child.capabilities.storage.issue<&HybridCustody.OwnedAccount>(HybridCustody.OwnedAccountStoragePath),

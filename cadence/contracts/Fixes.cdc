@@ -1,7 +1,7 @@
 /**
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
-# FIXeS Core Contract
+# Fixes Core Contract
 
 This is the basic contract of the FIXeS protocol. It contains the logic to create and manage inscriptions.
 
@@ -12,7 +12,7 @@ import "FungibleToken"
 import "FlowToken"
 import "Burner"
 
-/// FIXES contract to store inscriptions
+/// Fixes contract to store inscriptions
 ///
 access(all) contract Fixes {
 

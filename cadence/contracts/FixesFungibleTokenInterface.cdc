@@ -1,6 +1,6 @@
 /**
 
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FixesFungibleTokenInterface
 
@@ -180,7 +180,6 @@ access(all) contract interface FixesFungibleTokenInterface {
         // ---- Internal methods - implement required ----
 
         /// Set the metadata by key
-        /// Using entitlement in Cadence 1.0
         ///
         access(contract)
         fun initializeMetadata(_ data: {FixesTraits.MergeableData}) {

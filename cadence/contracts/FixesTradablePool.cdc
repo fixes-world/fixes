@@ -1,6 +1,6 @@
 /**
 
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FixesTradablePool
 
@@ -1931,7 +1931,6 @@ access(all) contract FixesTradablePool {
     ///
     access(all)
     view fun borrowTradablePool(_ addr: Address): &TradableLiquidityPool? {
-        // @deprecated in Cadence 1.0
         return getAccount(addr)
             .capabilities.get<&TradableLiquidityPool>(self.getLiquidityPoolPublicPath())
             .borrow()

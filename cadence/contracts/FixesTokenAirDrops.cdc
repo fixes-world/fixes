@@ -1,6 +1,6 @@
 /**
 
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FixesTokenAirDrops
 
@@ -351,7 +351,6 @@ access(all) contract FixesTokenAirDrops {
     ///
     access(all)
     view fun borrowAirdropPool(_ addr: Address): &AirdropPool? {
-        // @deprecated in Cadence 1.0
         return getAccount(addr)
             .capabilities.get<&AirdropPool>(self.getAirdropPoolPublicPath())
             .borrow()

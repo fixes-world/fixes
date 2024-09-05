@@ -1,5 +1,5 @@
 /**
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FGameLotteryRegistry
 
@@ -236,7 +236,6 @@ access(all) contract FGameLotteryRegistry {
                 isUpdated = true || isUpdated
             }
             // link the resource to the public path
-            // @deprecated after Cadence 1.0
             if childAcctRef
                 .capabilities.get<&FGameLottery.LotteryPool>(FGameLottery.lotteryPoolPublicPath)
                 .borrow() == nil {
@@ -257,7 +256,6 @@ access(all) contract FGameLotteryRegistry {
                 isUpdated = true || isUpdated
             }
             // link the resource to the public path
-            // @deprecated after Cadence 1.0
             if childAcctRef
                 .capabilities.get<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStorePublicPath)
                 .borrow() == nil {
@@ -335,7 +333,6 @@ access(all) contract FGameLotteryRegistry {
         // save registry
         let registry <- create Registry()
         self.account.storage.save(<- registry, to: self.registryStoragePath)
-        // @deprecated in Cadence 1.0
         self.account.capabilities.publish(
             self.account.capabilities.storage.issue<&Registry>(self.registryStoragePath),
             at: self.registryPublicPath

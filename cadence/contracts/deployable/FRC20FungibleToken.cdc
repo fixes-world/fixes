@@ -1,6 +1,6 @@
 /**
 
-> Author: FIXeS World <https://fixes.world/>
+> Author: Fixes Lab <https://github.com/fixes-world/>
 
 # FRC20FungibleToken
 
@@ -173,7 +173,6 @@ access(all) contract FRC20FungibleToken: FixesFungibleTokenInterface, FungibleTo
         }
 
         /// Set the metadata by key
-        /// Using entitlement in Cadence 1.0
         ///
         access(contract)
         fun initializeMetadata(_ data: {FixesTraits.MergeableData}) {
