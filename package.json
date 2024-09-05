@@ -1,6 +1,6 @@
 {
 	"name": "@fixes/contracts",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"exports": {
 		"./contracts/*": "./cadence/contracts/*",
 		"./transactions/*": "./cadence/transactions/*",
@@ -13,16 +13,14 @@
 		"fund:emulator": "flow flix execute transfer-flow 1000.0 0x01cf0e2f2f715450 --signer=emulator-account",
 		"lines": "find . \\( -name '*.cdc' -o -name '*.ts' -o -name '*.prisma' -o -name '*.vue' \\) -not -path '*/node_modules/*' -not -path '*/tests/*' -not -path '*/deps/*' -not -path '*/dist/*' -not -path '*/imports*' | xargs wc -l",
 		"lines:contracts": "find ./cadence/contracts \\( -name '*.cdc' \\) -not -path '*/node_modules/*' -not -path '*/tests/*' -not -path '*/deps/*' -not -path '*/dist/*' | xargs wc -l",
-		"deploy:emulator": "flow-c1 project deploy --update",
-		"deploy:testnet": "flow-c1 project deploy --update --network testnet",
-		"deploy:mainnet": "flow-c1 project deploy --update --network mainnet",
+		"deploy:emulator": "flow project deploy --update",
+		"deploy:testnet": "flow project deploy --update --network testnet",
+		"deploy:mainnet": "flow project deploy --update --network mainnet",
 		"hb:emulator": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=emulator-account",
 		"hb:testnet": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=testnet-user --network=testnet --gas-limit=9999",
 		"hb:mainnet": "flow transactions send ./cadence/transactions/heartbeats/universal.cdc --signer=mainnet-user --network=mainnet --gas-limit=9999",
 		"upgrade-ft:emulator": "flow transactions send ./cadence/transactions/bin/ft/upgrade-fts.cdc --signer=emulator-account",
 		"upgrade-ft:testnet": "flow transactions send ./cadence/transactions/bin/ft/upgrade-fts.cdc --signer=testnet-admin --network=testnet --gas-limit=9999",
-		"upgrade-ft:mainnet": "flow transactions send ./cadence/transactions/bin/ft/upgrade-fts.cdc --signer=mainnet-admin --network=mainnet --gas-limit=9999",
-		"stage-ft:testnet": "flow transactions send ./cadence/transactions/bin/ft/stage-fts.cdc --signer=testnet-admin --network=testnet --gas-limit=9999",
-		"stage-ft:mainnet": "flow transactions send ./cadence/transactions/bin/ft/stage-fts.cdc --signer=mainnet-admin --network=mainnet --gas-limit=9999"
+		"upgrade-ft:mainnet": "flow transactions send ./cadence/transactions/bin/ft/upgrade-fts.cdc --signer=mainnet-admin --network=mainnet --gas-limit=9999"
 	}
 }
