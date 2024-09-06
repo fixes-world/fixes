@@ -9,25 +9,25 @@ fun main(
         return name.concat(".find")
     } else {
         let account = getAccount(address)
-        let collectionCap = account.capabilities.get<&{Domains.CollectionPublic}>(Domains.CollectionPublicPath)
-
-        if collectionCap.check() != true {
+        let exists = account.capabilities.exists(Domains.CollectionPublicPath)
+        if exists == false {
             return nil
         }
 
-        var flownsName = ""
-        let collection = collectionCap.borrow()!
-        let ids = collection.getIDs()
+        var flownsName: String? = nil
 
-        for id in ids {
-            let domain = collection.borrowDomain(id: id)!
-            let isDefault = domain.getText(key: "isDefault")
-            flownsName = domain.getDomainName()
-            if isDefault == "true" {
-                break
-            }
+        if let collection = account.capabilities.get<&Domains.Collection>(Domains.CollectionPublicPath).borrow() {
+            var counter = 0
+            collection.forEachID(fun (id: UInt64): Bool {
+                let domain = collection.borrowDomain(id: id)!
+                flownsName = domain.getDomainName()
+                counter = counter + 1
+                if domain.getText(key: "isDefault") == "true" || counter > 10 {
+                    return false
+                }
+                return true
+            })
         }
-
         return flownsName
     }
 }
