@@ -77,22 +77,25 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         access(all)
         view fun getViews(): [Type] {
             var nftViews: [Type] = []
-            if let nftRef = &self.wrappedNFT as &{NonFungibleToken.NFT}? {
-                nftViews = nftRef.getViews()
-                if !nftViews.contains(Type<MetadataViews.ExternalURL>()) {
-                    nftViews = nftViews.concat([Type<MetadataViews.ExternalURL>()])
-                }
-                if !nftViews.contains(Type<MetadataViews.NFTCollectionData>()) {
-                    nftViews = nftViews.concat([Type<MetadataViews.NFTCollectionData>()])
-                }
-                if !nftViews.contains(Type<MetadataViews.NFTCollectionDisplay>()) {
-                    nftViews = nftViews.concat([Type<MetadataViews.NFTCollectionDisplay>()])
-                }
-                if !nftViews.contains(Type<MetadataViews.Traits>()) {
-                    nftViews = nftViews.concat([Type<MetadataViews.Traits>()])
-                }
-                if !nftViews.contains(Type<MetadataViews.Royalties>()) {
-                    nftViews = nftViews.concat([Type<MetadataViews.Royalties>()])
+            let isWrappedValid = self.isWrappedValidNFT()
+            if isWrappedValid {
+                if let nftRef = &self.wrappedNFT as &{NonFungibleToken.NFT}? {
+                    nftViews = nftRef.getViews()
+                    if !nftViews.contains(Type<MetadataViews.ExternalURL>()) {
+                        nftViews = nftViews.concat([Type<MetadataViews.ExternalURL>()])
+                    }
+                    if !nftViews.contains(Type<MetadataViews.NFTCollectionData>()) {
+                        nftViews = nftViews.concat([Type<MetadataViews.NFTCollectionData>()])
+                    }
+                    if !nftViews.contains(Type<MetadataViews.NFTCollectionDisplay>()) {
+                        nftViews = nftViews.concat([Type<MetadataViews.NFTCollectionDisplay>()])
+                    }
+                    if !nftViews.contains(Type<MetadataViews.Traits>()) {
+                        nftViews = nftViews.concat([Type<MetadataViews.Traits>()])
+                    }
+                    if !nftViews.contains(Type<MetadataViews.Royalties>()) {
+                        nftViews = nftViews.concat([Type<MetadataViews.Royalties>()])
+                    }
                 }
             }
             if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
@@ -131,40 +134,53 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
                 }
                 return nil
             } else {
-                if let nftRef = &self.wrappedNFT as &{NonFungibleToken.NFT}? {
-                    let originSupportedViews = nftRef.getViews()
-                    var originView: AnyStruct? = nil
-                    if originSupportedViews.contains(view) {
-                        originView = nftRef.resolveView(view)
-                    }
-                    // For Traits view, we need to add the srcNFTType and srcNFTId trait
-                    if view == Type<MetadataViews.Traits>() {
-                        let traits = MetadataViews.Traits([])
-                        if  let originTraits = originView as! MetadataViews.Traits? {
-                            for t in originTraits.traits {
-                                traits.addTrait(t)
+                let isWrappedValid = self.isWrappedValidNFT()
+                if isWrappedValid {
+                    if let nftRef = &self.wrappedNFT as &{NonFungibleToken.NFT}? {
+                        let originSupportedViews = nftRef.getViews()
+                        var originView: AnyStruct? = nil
+                        if originSupportedViews.contains(view) {
+                            originView = nftRef.resolveView(view)
+                        }
+                        // For Traits view, we need to add the srcNFTType and srcNFTId trait
+                        if view == Type<MetadataViews.Traits>() {
+                            let traits = MetadataViews.Traits([])
+                            if  let originTraits = originView as! MetadataViews.Traits? {
+                                for t in originTraits.traits {
+                                    traits.addTrait(t)
+                                }
                             }
+                            traits.addTrait(MetadataViews.Trait(name: "srcNFTType", value: nftRef.getType().identifier, displayType: nil, rarity: nil))
+                            traits.addTrait(MetadataViews.Trait(name: "srcNFTId", value: nftRef.id, displayType: nil, rarity: nil))
+                            if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
+                                traits.addTrait(MetadataViews.Trait(name: "inscriptionId", value: insRef.getId(), displayType: nil, rarity: nil))
+                            }
+                            return traits
+                        } else if view == Type<MetadataViews.Royalties>() {
+                            // No royalties for FixesWrappedNFT
+                            return MetadataViews.Royalties([])
+                        } else if originView != nil {
+                            return originView
                         }
-                        traits.addTrait(MetadataViews.Trait(name: "srcNFTType", value: nftRef.getType().identifier, displayType: nil, rarity: nil))
-                        traits.addTrait(MetadataViews.Trait(name: "srcNFTId", value: nftRef.id, displayType: nil, rarity: nil))
-                        if let insRef = &self.wrappedInscription as &Fixes.Inscription? {
-                            traits.addTrait(MetadataViews.Trait(name: "inscriptionId", value: insRef.getId(), displayType: nil, rarity: nil))
-                        }
-                        return traits
-                    } else if view == Type<MetadataViews.Royalties>() {
-                        // No royalties for FixesWrappedNFT
-                        return MetadataViews.Royalties([])
-                    } else if originView != nil {
-                        return originView
                     }
                 }
                 return nil
             }
         }
 
+        /// Check if the NFT has a valid NFT
+        ///
+        access(all)
+        view fun isWrappedValidNFT(): Bool {
+            if let wrappedType = self.wrappedNFT?.getType() {
+                return wrappedType.isRecovered == false
+            }
+            return false
+        }
+
         /// Borrow the NFT's type
         access(all)
-        fun getWrappedType(): Type? {
+        view fun getWrappedType(): Type? {
             if let nftRef = &self.wrappedNFT as &{NonFungibleToken.NFT}? {
                 return nftRef.getType()
             }
@@ -174,28 +190,28 @@ access(all) contract FixesWrappedNFT: NonFungibleToken, ViewResolver {
         /// Check if the NFT has an NFT
         ///
         access(all)
-        fun hasWrappedNFT(): Bool {
+        view fun hasWrappedNFT(): Bool {
             return self.wrappedNFT != nil
         }
 
         /// Check if the NFT has an inscription
         ///
         access(all)
-        fun hasWrappedInscription(): Bool {
+        view fun hasWrappedInscription(): Bool {
             return self.wrappedInscription != nil
         }
 
         /// Borrow the NFT's injected inscription
         ///
         access(all)
-        fun borrowInscriptionPublic(): &Fixes.Inscription? {
+        view fun borrowInscriptionPublic(): &Fixes.Inscription? {
             return self.borrowInscription()
         }
 
         /// Borrow the NFT's injected inscription
         ///
         access(account)
-        fun borrowInscription(): auth(Fixes.Extractable) &Fixes.Inscription? {
+        view fun borrowInscription(): auth(Fixes.Extractable) &Fixes.Inscription? {
             return &self.wrappedInscription
         }
 
