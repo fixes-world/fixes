@@ -296,6 +296,7 @@
 			"source": "testnet://9a0766d93b6608b7.Burner",
 			"hash": "71af18e227984cd434a3ad00bb2f3618b76482842bae920ee55662c37c8bf331",
 			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "f233dcee88fe0abe",
 				"testnet": "9a0766d93b6608b7"
 			}
@@ -335,6 +336,22 @@
 				"testnet": "35717efbbce11c74"
 			}
 		},
+		"CrossVMNFT": {
+			"source": "testnet://dfc20aee650fcbdf.CrossVMNFT",
+			"hash": "958fc8d2a69374bca68020da39e5876a2e2f8bf1ca398eac4746b936d1808a91",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"CrossVMToken": {
+			"source": "testnet://dfc20aee650fcbdf.CrossVMToken",
+			"hash": "dc1a738126da0644e14200c1539c311429a9a33cf8061a0bc6460809553dc8d5",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
 		"DapperUtilityCoin": {
 			"source": "testnet://82ec283f88a62e65.DapperUtilityCoin",
 			"hash": "b2fb77ca1a6e05bcf1497f1ef95e66916d8940e68ae6d98f67dfd6956aaba27c",
@@ -365,6 +382,15 @@
 			"aliases": {
 				"mainnet": "233eb012d34b0070",
 				"testnet": "b05b2abb42335e88"
+			}
+		},
+		"EVM": {
+			"source": "testnet://8c5303eaa26202d6.EVM",
+			"hash": "8e9725379ed6d799c9d7a9b94fcddba48613920725d99e4dc075c950678da467",
+			"aliases": {
+				"emulator": "f8d6e0586b0a20c7",
+				"mainnet": "e467b9dd11fa00df",
+				"testnet": "8c5303eaa26202d6"
 			}
 		},
 		"FIND": {
@@ -420,7 +446,6 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "8624b52f9ddcd04a",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "9eca2b38b18b5dfe"
 			}
 		},
@@ -430,8 +455,63 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "8624b52f9ddcd04a",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "9eca2b38b18b5dfe"
+			}
+		},
+		"FlowEVMBridge": {
+			"source": "testnet://dfc20aee650fcbdf.FlowEVMBridge",
+			"hash": "1cb9a12b1db09ad84c11817625e13e33a7a5f69f00f217a24971e9f79e149ac4",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"FlowEVMBridgeConfig": {
+			"source": "testnet://dfc20aee650fcbdf.FlowEVMBridgeConfig",
+			"hash": "4fcd914696692a3b0d6e2f609672dec81b239fe12359ab4a0793ff34b02b1038",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"FlowEVMBridgeHandlerInterfaces": {
+			"source": "testnet://dfc20aee650fcbdf.FlowEVMBridgeHandlerInterfaces",
+			"hash": "dec0c63d94bcede2040ad42e8fcddbfb7731cfdd9a93b56fa678396148c81ac8",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"FlowEVMBridgeNFTEscrow": {
+			"source": "testnet://dfc20aee650fcbdf.FlowEVMBridgeNFTEscrow",
+			"hash": "0ee890a15d6b88a91572079a81af478e3bb1249c70a8c1a4dc08a955755915a3",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"FlowEVMBridgeTemplates": {
+			"source": "testnet://dfc20aee650fcbdf.FlowEVMBridgeTemplates",
+			"hash": "24e28415f0b53b68d4a525fdf2106529c00ff5b60a18d20a853b01b638363880",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"FlowEVMBridgeTokenEscrow": {
+			"source": "testnet://dfc20aee650fcbdf.FlowEVMBridgeTokenEscrow",
+			"hash": "4fdc941742fb6f72f4bad93539316e97e1b637365246b6a001e088e4ba2597fd",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"FlowEVMBridgeUtils": {
+			"source": "testnet://dfc20aee650fcbdf.FlowEVMBridgeUtils",
+			"hash": "a326596efb08b8f5fae596916fb0d6b5e77485ae6b9d7043062b33006804a1f5",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
 			}
 		},
 		"FlowEpoch": {
@@ -440,7 +520,6 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "8624b52f9ddcd04a",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "9eca2b38b18b5dfe"
 			}
 		},
@@ -450,7 +529,6 @@
 			"aliases": {
 				"emulator": "e5a8b7f23e8b548f",
 				"mainnet": "f919ee77447b7497",
-				"previewnet": "ab086ce9cc29fc80",
 				"testnet": "912d5440f7e3769e"
 			}
 		},
@@ -460,7 +538,6 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "8624b52f9ddcd04a",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "9eca2b38b18b5dfe"
 			}
 		},
@@ -470,7 +547,6 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "e467b9dd11fa00df",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "8c5303eaa26202d6"
 			}
 		},
@@ -480,27 +556,24 @@
 			"aliases": {
 				"emulator": "0ae53cb6e3f42a79",
 				"mainnet": "1654653399040a61",
-				"previewnet": "4445e7ad11568276",
 				"testnet": "7e60df042a9c0868"
 			}
 		},
 		"FungibleToken": {
 			"source": "testnet://9a0766d93b6608b7.FungibleToken",
-			"hash": "154d9000cc0b992664c1d315826a4bc47e744fbc7f2e99daf823e5101945042a",
+			"hash": "b0f9da73434113e5b304e4bbf41e0da7e47d6e805a6733c05cf547a7767ea819",
 			"aliases": {
 				"emulator": "ee82856bf20e2aa6",
 				"mainnet": "f233dcee88fe0abe",
-				"previewnet": "a0225e7000ac82a9",
 				"testnet": "9a0766d93b6608b7"
 			}
 		},
 		"FungibleTokenMetadataViews": {
 			"source": "testnet://9a0766d93b6608b7.FungibleTokenMetadataViews",
-			"hash": "64ec97395c0a3958510ea663563f59d5a6beb7943d69b903db94c11d76be6296",
+			"hash": "085d02742eb50e6200cf2a4ad4551857313513afa7205c1e85f5966547a56df3",
 			"aliases": {
 				"emulator": "ee82856bf20e2aa6",
 				"mainnet": "f233dcee88fe0abe",
-				"previewnet": "a0225e7000ac82a9",
 				"testnet": "9a0766d93b6608b7"
 			}
 		},
@@ -511,6 +584,62 @@
 				"mainnet": "d8a7e05a7ac670c0",
 				"testing": "0000000000000007",
 				"testnet": "294e44e1ec6993c6"
+			}
+		},
+		"IBridgePermissions": {
+			"source": "testnet://dfc20aee650fcbdf.IBridgePermissions",
+			"hash": "7b2b7cdfbc8749def124808875e37d0f2d1b3aebdceb728dec0c59890b2d701b",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"ICrossVM": {
+			"source": "testnet://dfc20aee650fcbdf.ICrossVM",
+			"hash": "4f86af9fff6a0a7f5e727614085d72503e7ee2d6dd32f44ff3b5681a62f06635",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"ICrossVMAsset": {
+			"source": "testnet://dfc20aee650fcbdf.ICrossVMAsset",
+			"hash": "5a7b8efda674d6542a2ff41e3cc861344e354c7a669fd848277accf7f5f79083",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"IEVMBridgeNFTMinter": {
+			"source": "testnet://dfc20aee650fcbdf.IEVMBridgeNFTMinter",
+			"hash": "bf86d7d2a83fa9024bf91eee834a2f29be495b73a554b9792e60351b8380bb96",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"IEVMBridgeTokenMinter": {
+			"source": "testnet://dfc20aee650fcbdf.IEVMBridgeTokenMinter",
+			"hash": "b47748eddd6bc1828414c6e498d7c3b87a0912566a1eb4e6a92fff1f6dc30a73",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"IFlowEVMNFTBridge": {
+			"source": "testnet://dfc20aee650fcbdf.IFlowEVMNFTBridge",
+			"hash": "a5c1b9080dd01ff7d5128c8b7339cd002dfccb2ddd30a7844e7a994eb5042073",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"IFlowEVMTokenBridge": {
+			"source": "testnet://dfc20aee650fcbdf.IFlowEVMTokenBridge",
+			"hash": "f17d96907c1e32500c723be70c02d2f2b2ec864bd8a4656e1854452d0c2f44f4",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
 			}
 		},
 		"LiquidStaking": {
@@ -539,11 +668,10 @@
 		},
 		"MetadataViews": {
 			"source": "testnet://631e88ae7f1d7c20.MetadataViews",
-			"hash": "77e2c3c4afb855af657ecae6611a99acf47a102144c68f4663de42ae700adf5b",
+			"hash": "d467bbde7bcf59dafbe5d472b44dcc6018ca53697baf1aea523f8ff145455eee",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "631e88ae7f1d7c20"
 			}
 		},
@@ -565,11 +693,10 @@
 		},
 		"NonFungibleToken": {
 			"source": "testnet://631e88ae7f1d7c20.NonFungibleToken",
-			"hash": "ea1b5fa55b6648064c77a6fd83084a3a0be2a6f4386b3b259c89e4f62ab8f6c0",
+			"hash": "ac40c5a3ec05884ae48cb52ebf680deebb21e8a0143cd7d9b1dc88b0f107e088",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "631e88ae7f1d7c20"
 			}
 		},
@@ -619,6 +746,22 @@
 			"aliases": {
 				"mainnet": "097bafa4e0b48eef",
 				"testnet": "35717efbbce11c74"
+			}
+		},
+		"Serialize": {
+			"source": "testnet://dfc20aee650fcbdf.Serialize",
+			"hash": "71106798938f37e5271e396513d672d089ede66ff34793bb9da037d392bd26d0",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
+			}
+		},
+		"SerializeMetadata": {
+			"source": "testnet://dfc20aee650fcbdf.SerializeMetadata",
+			"hash": "ccf45be6c2dea7a7e8a0e5e6cebf42e79a3f661086273b4df02b663579c5960f",
+			"aliases": {
+				"mainnet": "1e4aa0b87d10b141",
+				"testnet": "dfc20aee650fcbdf"
 			}
 		},
 		"StableSwapFactory": {
@@ -691,7 +834,6 @@
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "1d7e57aa55817448",
-				"previewnet": "b6763b4399a888c8",
 				"testnet": "631e88ae7f1d7c20"
 			}
 		},
@@ -715,7 +857,6 @@
 	"networks": {
 		"emulator": "127.0.0.1:3569",
 		"mainnet": "access.mainnet.nodes.onflow.org:9000",
-		"previewnet": "access.previewnet.nodes.onflow.org:9000",
 		"testing": "127.0.0.1:3569",
 		"testnet": "access.devnet.nodes.onflow.org:9000"
 	},
@@ -833,6 +974,24 @@
 				"OracleConfig",
 				"OracleInterface",
 				"PublicPriceOracle",
+				"FlowEVMBridge",
+				"IBridgePermissions",
+				"ICrossVM",
+				"IEVMBridgeNFTMinter",
+				"IEVMBridgeTokenMinter",
+				"IFlowEVMNFTBridge",
+				"FlowEVMBridgeConfig",
+				"FlowEVMBridgeHandlerInterfaces",
+				"CrossVMNFT",
+				"ICrossVMAsset",
+				"IFlowEVMTokenBridge",
+				"CrossVMToken",
+				"FlowEVMBridgeUtils",
+				"SerializeMetadata",
+				"Serialize",
+				"FlowEVMBridgeNFTEscrow",
+				"FlowEVMBridgeTokenEscrow",
+				"FlowEVMBridgeTemplates",
 				"BlackHole",
 				"ViewResolvers",
 				"FTViewUtils",
