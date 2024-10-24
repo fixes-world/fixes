@@ -393,6 +393,14 @@
 				"testnet": "8c5303eaa26202d6"
 			}
 		},
+		"EVMTokenList": {
+			"source": "testnet://b86f928a1fa7798e.EVMTokenList",
+			"hash": "fe424bb3aa3c8faa82dc4572ec9eff2d863f6656eaeb8f024fec8e7a680d3a30",
+			"aliases": {
+				"mainnet": "15a918087ab12d86",
+				"testnet": "b86f928a1fa7798e"
+			}
+		},
 		"FIND": {
 			"source": "testnet://35717efbbce11c74.FIND",
 			"hash": "7b9ccd7b9f7d47683038c7078fdc603c0625bef7523131cef25461fc03b66e2f",
@@ -411,7 +419,7 @@
 		},
 		"FTViewUtils": {
 			"source": "testnet://b86f928a1fa7798e.FTViewUtils",
-			"hash": "e7b5ccf29765e72f7b7cec52f9c3cb19966eca0f2c07d805f40e7e223969ea04",
+			"hash": "ca157c31b6511e250c6f700226fd731248db69a6a10c1634d6a696f73adec64c",
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
 				"testnet": "b86f928a1fa7798e"
@@ -683,12 +691,28 @@
 				"testnet": "324c34e1c517e4db"
 			}
 		},
+		"NFTList": {
+			"source": "testnet://b86f928a1fa7798e.NFTList",
+			"hash": "c85e766d1b9bbce55b12ab7aa940d6c186327540c483ce21b7797db58fbd52da",
+			"aliases": {
+				"mainnet": "15a918087ab12d86",
+				"testnet": "b86f928a1fa7798e"
+			}
+		},
 		"NFTRetrieval": {
 			"source": "testnet://324c34e1c517e4db.NFTRetrieval",
 			"hash": "57b2ba4385352789c6836b143cf915ecb045a971aaaf8918b3fe1f6b8e542568",
 			"aliases": {
 				"mainnet": "49a7cda3a1eecc29",
 				"testnet": "324c34e1c517e4db"
+			}
+		},
+		"NFTViewUtils": {
+			"source": "testnet://b86f928a1fa7798e.NFTViewUtils",
+			"hash": "2a8b21b13838679832c0e191c5929a13dc1c3d4fbdcd370757e677d56342dc51",
+			"aliases": {
+				"mainnet": "15a918087ab12d86",
+				"testnet": "b86f928a1fa7798e"
 			}
 		},
 		"NonFungibleToken": {
@@ -822,7 +846,7 @@
 		},
 		"TokenList": {
 			"source": "testnet://b86f928a1fa7798e.TokenList",
-			"hash": "19de216d729ab8d93f78a8110edd9cb62df4f572c152dc002b8d1c13ddc27bed",
+			"hash": "9c445d2a2988a1c65dfe595f1beadcbe7762ca928b8749bace6a475cc06e2e6d",
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
 				"testnet": "b86f928a1fa7798e"
@@ -839,7 +863,7 @@
 		},
 		"ViewResolvers": {
 			"source": "testnet://b86f928a1fa7798e.ViewResolvers",
-			"hash": "707fe738995655913a12af3b4ffb28e24430dbd790574470ec8ddfbe9cefdb0b",
+			"hash": "ecaa39c73295e871005bc31c7b53e23e4b3e0877b60807228f827a07e899f883",
 			"aliases": {
 				"mainnet": "15a918087ab12d86",
 				"testnet": "b86f928a1fa7798e"
@@ -997,6 +1021,9 @@
 				"FTViewUtils",
 				"TokenList",
 				"ETHUtils",
+				"EVMTokenList",
+				"NFTList",
+				"NFTViewUtils",
 				"Fixes",
 				"FixesInscriptionFactory",
 				"FixesWrappedNFT",
