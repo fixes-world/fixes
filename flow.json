@@ -286,7 +286,7 @@
 		},
 		"BlackHole": {
 			"source": "testnet://ad26718c4b6b921b.BlackHole",
-			"hash": "d49277846e32b548ce8aef846c87d15eb2071f3d9b2cd1fe56d8dc1028105c27",
+			"hash": "78a2c2428dcb1043b1daafeae2c966a469d07d73405afed41b5616625213d155",
 			"aliases": {
 				"mainnet": "4396883a58c3a2d1",
 				"testnet": "ad26718c4b6b921b"
@@ -377,11 +377,11 @@
 			}
 		},
 		"Domains": {
-			"source": "mainnet://233eb012d34b0070.Domains",
-			"hash": "29164d9aa71f8a63de0025edee3ed3af5a10d609e8786ed430c59f2db4013432",
+			"source": "testnet://0752d5d15381f994.Domains",
+			"hash": "f78495a728d86762a125c77e0ad8f55ce2ee38fada20b2e5fda348abe2cb363b",
 			"aliases": {
 				"mainnet": "233eb012d34b0070",
-				"testnet": "b05b2abb42335e88"
+				"testnet": "0752d5d15381f994"
 			}
 		},
 		"EVM": {
@@ -410,11 +410,11 @@
 			}
 		},
 		"FNSConfig": {
-			"source": "mainnet://233eb012d34b0070.FNSConfig",
-			"hash": "14ccdb14d52835ccb7c0026b9af778b902ef4006975a0e78694a69513fac4146",
+			"source": "testnet://0752d5d15381f994.FNSConfig",
+			"hash": "4576d17a1e752e6cb82178601ac2236b19c1ec763088311b76a89a8805f8ac2d",
 			"aliases": {
 				"mainnet": "233eb012d34b0070",
-				"testnet": "b05b2abb42335e88"
+				"testnet": "0752d5d15381f994"
 			}
 		},
 		"FTViewUtils": {
@@ -542,7 +542,7 @@
 		},
 		"FlowIDTableStaking": {
 			"source": "testnet://9eca2b38b18b5dfe.FlowIDTableStaking",
-			"hash": "44f998ac44e2b088037af77413292c7306c70ac888cff8b32802ae07f90ca7f8",
+			"hash": "cdbbd2468aa2dbb3f3e6ca9e4aa9f12c4a3cc7c2bcb97321727056a9c66f9110",
 			"aliases": {
 				"emulator": "f8d6e0586b0a20c7",
 				"mainnet": "8624b52f9ddcd04a",
@@ -764,6 +764,14 @@
 				"testnet": "8232ce4a3aff4e94"
 			}
 		},
+		"ScopedFTProviders": {
+			"source": "testnet://31ad40c07a2a9788.ScopedFTProviders",
+			"hash": "f2eb9f86b561071aea67e665a6c03ac596ac6d8aa4125e3c79427c0fe2987ae6",
+			"aliases": {
+				"mainnet": "b063c16cac85dbd1",
+				"testnet": "31ad40c07a2a9788"
+			}
+		},
 		"Sender": {
 			"source": "testnet://35717efbbce11c74.Sender",
 			"hash": "cf37ac45beb10decfc889cda163fb927d8de927504b97dfe7f1e06edb3df59c0",
@@ -962,6 +970,7 @@
 				"StringUtils",
 				"ArrayUtils",
 				"AddressUtils",
+				"ScopedFTProviders",
 				"FIND",
 				"FUSD",
 				"Debug",
@@ -1016,6 +1025,8 @@
 				"FlowEVMBridgeNFTEscrow",
 				"FlowEVMBridgeTokenEscrow",
 				"FlowEVMBridgeTemplates",
+				"FNSConfig",
+				"Domains",
 				"BlackHole",
 				"ViewResolvers",
 				"FTViewUtils",
