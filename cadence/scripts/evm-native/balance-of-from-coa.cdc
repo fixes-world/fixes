@@ -12,24 +12,36 @@ import "FlowEVMBridgeConfig"
 /// @return The balance of the associated EVM FT of the identifier, reverting if the given FT does not implement the ERC20 method
 ///     "balanceOf(address)(uint256)"
 ///
-access(all) fun main(flowAddress: Address, identifier: String): UInt256 {
+access(all) fun main(flowAddress: Address, identifier: String): BalanceResult? {
     if let address: EVM.EVMAddress = getAuthAccount<auth(BorrowValue) &Account>(flowAddress)
         .storage.borrow<&EVM.CadenceOwnedAccount>(from: /storage/evm)?.address() {
         let bytes: [UInt8] = []
         for byte in address.bytes {
             bytes.append(byte)
         }
-        let constBytes = bytes.toConstantSized<[UInt8; 20]>()
-            ?? panic("Problem converting provided EVMAddress compatible byte array - check byte array contains 20 bytes")
-
-        if let type = CompositeType(identifier) {
-            if let address = FlowEVMBridgeConfig.getEVMAddressAssociated(with: type) {
-                return FlowEVMBridgeUtils.balanceOf(
-                    owner: EVM.EVMAddress(bytes: constBytes),
-                    evmContractAddress: address
-                )
+        if let constBytes = bytes.toConstantSized<[UInt8; 20]>() {
+            if let type = CompositeType(identifier) {
+                if let address = FlowEVMBridgeConfig.getEVMAddressAssociated(with: type) {
+                    return BalanceResult(
+                        balance: FlowEVMBridgeUtils.balanceOf(
+                            owner: EVM.EVMAddress(bytes: constBytes),
+                            evmContractAddress: address
+                        ),
+                        decimals: FlowEVMBridgeUtils.getTokenDecimals(evmContractAddress: address)
+                    )
+                }
             }
         }
     }
-    return 0
+    return nil
+}
+
+access(all) struct BalanceResult {
+    access(all) let balance: UInt256
+    access(all) let decimals: UInt8
+
+    init(balance: UInt256, decimals: UInt8) {
+        self.balance = balance
+        self.decimals = decimals
+    }
 }
