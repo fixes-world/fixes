@@ -22,9 +22,11 @@ access(all) fun main(flowAddress: Address, identifier: String): BalanceResult? {
         if let constBytes = bytes.toConstantSized<[UInt8; 20]>() {
             if let type = CompositeType(identifier) {
                 if let address = FlowEVMBridgeConfig.getEVMAddressAssociated(with: type) {
+                    let owner = EVM.EVMAddress(bytes: constBytes)
                     return BalanceResult(
+                        address: address.toString(),
                         balance: FlowEVMBridgeUtils.balanceOf(
-                            owner: EVM.EVMAddress(bytes: constBytes),
+                            owner: owner,
                             evmContractAddress: address
                         ),
                         decimals: FlowEVMBridgeUtils.getTokenDecimals(evmContractAddress: address)
@@ -37,10 +39,16 @@ access(all) fun main(flowAddress: Address, identifier: String): BalanceResult? {
 }
 
 access(all) struct BalanceResult {
+    access(all) let address: String
     access(all) let balance: UInt256
     access(all) let decimals: UInt8
 
-    init(balance: UInt256, decimals: UInt8) {
+    init(
+        address: String,
+        balance: UInt256,
+        decimals: UInt8
+    ) {
+        self.address = address
         self.balance = balance
         self.decimals = decimals
     }

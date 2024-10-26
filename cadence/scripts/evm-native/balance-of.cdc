@@ -14,6 +14,7 @@ import "FlowEVMBridgeUtils"
 access(all) fun main(owner: String, evmContractAddress: String): BalanceResult {
     let evmContract = EVM.addressFromString(evmContractAddress)
     return BalanceResult(
+        address: owner,
         balance: FlowEVMBridgeUtils.balanceOf(
             owner: EVM.addressFromString(owner),
             evmContractAddress: evmContract
@@ -23,10 +24,16 @@ access(all) fun main(owner: String, evmContractAddress: String): BalanceResult {
 }
 
 access(all) struct BalanceResult {
+    access(all) let address: String
     access(all) let balance: UInt256
     access(all) let decimals: UInt8
 
-    init(balance: UInt256, decimals: UInt8) {
+    init(
+        address: String,
+        balance: UInt256,
+        decimals: UInt8
+    ) {
+        self.address = address
         self.balance = balance
         self.decimals = decimals
     }
