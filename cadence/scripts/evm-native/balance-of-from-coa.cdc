@@ -13,27 +13,25 @@ import "FlowEVMBridgeConfig"
 ///     "balanceOf(address)(uint256)"
 ///
 access(all) fun main(flowAddress: Address, identifier: String): BalanceResult? {
-    if let address: EVM.EVMAddress = getAuthAccount<auth(BorrowValue) &Account>(flowAddress)
+    if let coaAddress: EVM.EVMAddress = getAuthAccount<auth(BorrowValue) &Account>(flowAddress)
         .storage.borrow<&EVM.CadenceOwnedAccount>(from: /storage/evm)?.address() {
-        let bytes: [UInt8] = []
-        for byte in address.bytes {
-            bytes.append(byte)
-        }
-        if let constBytes = bytes.toConstantSized<[UInt8; 20]>() {
-            if let type = CompositeType(identifier) {
-                if let address = FlowEVMBridgeConfig.getEVMAddressAssociated(with: type) {
-                    let owner = EVM.EVMAddress(bytes: constBytes)
-                    return BalanceResult(
-                        address: address.toString(),
-                        balance: FlowEVMBridgeUtils.balanceOf(
-                            owner: owner,
-                            evmContractAddress: address
-                        ),
-                        decimals: FlowEVMBridgeUtils.getTokenDecimals(evmContractAddress: address)
-                    )
-                }
+        if let type = CompositeType(identifier) {
+            if let ftAddress = FlowEVMBridgeConfig.getEVMAddressAssociated(with: type) {
+                return BalanceResult(
+                    address: coaAddress.toString(),
+                    balance: FlowEVMBridgeUtils.balanceOf(
+                        owner: coaAddress,
+                        evmContractAddress: ftAddress
+                    ),
+                    decimals: FlowEVMBridgeUtils.getTokenDecimals(evmContractAddress: ftAddress)
+                )
             }
         }
+        return BalanceResult(
+            address: coaAddress.toString(),
+            balance: 0,
+            decimals: 18
+        )
     }
     return nil
 }
