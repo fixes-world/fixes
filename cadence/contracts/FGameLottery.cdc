@@ -843,11 +843,7 @@ access(all) contract FGameLottery {
             self.checkingQueue = nil
             // Set the current pool
             let tick = jackpotPoolRef.getOriginalTick()
-            if tick != "" {
-                self.current <- FRC20FTShared.createEmptyChange(tick: tick, from: jackpotPoolRef.from)
-            } else {
-                self.current <- FRC20FTShared.createEmptyFlowChange(from: jackpotPoolRef.from)
-            }
+            self.current <- FRC20FTShared.createEmptyChange(tick: tick, from: jackpotPoolRef.from)
         }
 
         /** ---- Public Methods ---- */
@@ -1470,11 +1466,7 @@ access(all) contract FGameLottery {
             }
             self.name = name
             let accountAddr = FGameLottery.account.address
-            if rewardTick != "" {
-                self.jackpotPool <- FRC20FTShared.createEmptyChange(tick: rewardTick, from: accountAddr)
-            } else {
-                self.jackpotPool <- FRC20FTShared.createEmptyFlowChange(from: accountAddr)
-            }
+            self.jackpotPool <- FRC20FTShared.createEmptyChange(tick: rewardTick, from: accountAddr)
             self.initTicketPrice = ticketPrice
             self.initEpochInterval = epochInterval
             self.currentEpochIndex = 0
