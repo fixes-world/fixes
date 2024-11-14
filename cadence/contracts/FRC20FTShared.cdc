@@ -525,15 +525,15 @@ access(all) contract FRC20FTShared {
 
     /// Return if the given tick is a FTVault ticker.
     ///
-    access(all) view
-    fun isFTVaultTicker(tick: String): Bool {
+    access(all)
+    view fun isFTVaultTicker(tick: String): Bool {
         return tick == "" || tick.slice(from: 0, upTo: 1) == "@"
     }
 
     /// Built the Ticker Name
     ///
-    access(all) view
-    fun buildTicker(_ ftVaultType: Type): String? {
+    access(all)
+    view fun buildTicker(_ ftVaultType: Type): String? {
         if ftVaultType.isSubtype(of: Type<@{FungibleToken.Vault}>()) {
             return ftVaultType.isInstance(Type<@FlowToken.Vault>())
                 ? ""
