@@ -13,6 +13,7 @@ import "FungibleToken"
 import "FungibleTokenMetadataViews"
 import "FlowToken"
 import "Burner"
+import "BlackHole"
 // Fixes imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -1251,26 +1252,37 @@ access(all) contract FRC20Indexer {
             }
             let fromAddr = change.from
 
-            if change.isBackedByFlowTokenVault() {
-                let flowVault <- change.extractAsVault()
-                assert(
-                    flowVault.getType() == Type<@FlowToken.Vault>(),
-                    message: "The change should be a flow token vault"
-                )
-                // deposit the token change return to change's from address
-                let flowReceiver = Fixes.borrowFlowTokenReceiver(fromAddr)
-                    ?? panic("The flow receiver no found")
-                let supportedTypes = flowReceiver.getSupportedVaultTypes()
-                assert(
-                    supportedTypes[Type<@FlowToken.Vault>()] == true,
-                    message: "The receiver should support the $FLOW vault"
-                )
-                flowReceiver.deposit(from: <- (flowVault as! @FlowToken.Vault))
-                Burner.burn(<- change)
-            } else if !change.isBackedByVault() {
+            if !change.isBackedByVault() {
                 self._depositFromTokenChange(change: <- change, to: fromAddr)
             } else {
-                panic("The change should not be backed by a vault that not a flow token vault")
+                let vault <- change.extractAsVault()
+                let vaultType = vault.getType()
+                if vaultType == Type<@FlowToken.Vault>() {
+                    // deposit the token change return to change's from address
+                    let flowReceiver = Fixes.borrowFlowTokenReceiver(fromAddr)
+                        ?? panic("The flow receiver no found")
+                    assert(
+                        flowReceiver.isSupportedVaultType(type: vaultType),
+                        message: "The receiver should support the $FLOW vault"
+                    )
+                    flowReceiver.deposit(from: <- vault)
+                } else {
+                    let ftVaultData = FRC20FTShared.resolveFTVaultDataByTicker(change.getOriginalTick())
+                        ?? panic("Failed to resolve ticker")
+                    if let ftReceiver = getAccount(fromAddr).capabilities
+                        .borrow<&{FungibleToken.Vault}>(ftVaultData.receiverPath) {
+                        assert(
+                            ftReceiver.isSupportedVaultType(type: vaultType),
+                            message: "The receiver should support the $FLOW vault"
+                        )
+                        // Transfer to the Receiver
+                        ftReceiver.deposit(from: <- vault)
+                    } else {
+                        // IF receiver does not exist, just vanish the vault.
+                        BlackHole.vanish(<- vault)
+                    }
+                }
+                Burner.burn(<- change)
             }
         }
 
