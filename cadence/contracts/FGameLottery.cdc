@@ -1313,7 +1313,7 @@ access(all) contract FGameLottery {
                         platformFlowRecipient.deposit(from: <- sharedFeeVault)
                     }
                 } else {
-                    // Here is FRC20 token, all service fee will be deposited to the Staking shared pool
+                    // For non-Flow Token, all service fee will be deposited to the Staking shared pool
                     if let stakingAddress = acctsPool.getFRC20StakingAddress(tick: stakingFRC20Tick) {
                         if let stakingPool = FRC20Staking.borrowPool(stakingAddress) {
                             if let rewardStrategy = stakingPool.borrowRewardStrategy(feeTickName) {
@@ -1323,7 +1323,8 @@ access(all) contract FGameLottery {
                         }
                     }
                     if feeChange.getBalance() > 0.0 {
-                        // return to lottery pool address
+                        // return to lottery pool address or pool's FT Vault
+                        // If no FT Receiver exists, the Fee Vault will be burned
                         frc20Indexer.returnChange(change: <- feeChange.withdrawAsChange(amount: totalFeeAmount))
                     }
                 }
