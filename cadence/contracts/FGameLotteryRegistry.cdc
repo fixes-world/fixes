@@ -141,152 +141,174 @@ access(all) contract FGameLotteryRegistry {
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let registry = FGameLotteryRegistry.borrowRegistry()
 
-            assert(
-                registry.getLotteryPoolAddress(name) == nil,
-                message: "The lottery pool is already registered"
-            )
-
-            // Check if the token is already registered
-            if rewardTick != "" {
-                let meta = frc20Indexer.getTokenMeta(tick: rewardTick.toLower())
-                assert(
-                    meta != nil,
-                    message: "The token is not registered"
-                )
-            }
-
             // get the game world key
             let key = registry.getGameWorldKey(name)
-            let addr = acctsPool.getGameWorldAddress(key)
-            assert(addr == nil, message: "The game world account is already created")
+            let poolAddr = acctsPool.getGameWorldAddress(key)
+            assert(poolAddr == nil, message: "The game world account is already created")
 
             // create the account for the lottery at the accounts pool
             acctsPool.setupNewChildForGameWorld(key: key, newAccount)
 
-            // ensure all lottery resources are available
-            self.ensureResourcesAvailable(
+            // borrow child account
+            let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.GameWorld, key)
+                ?? panic("The staking account was not created")
+
+            let operatorAddr = self.getControllerAddress()
+
+            FGameLotteryRegistry.createLotteryPool(
+                operatorAddr: operatorAddr,
+                childAcctRef: childAcctRef,
                 name: name,
                 rewardTick: rewardTick,
                 ticketPrice: ticketPrice,
                 epochInterval: epochInterval
             )
+        }
+    }
 
-            // register the lottery pool
-            registry.onRegisterLotteryPool(name)
+    /** ---- Internal Methods --- Factory ---- */
 
-            let newAddr = acctsPool.getGameWorldAddress(key)
-                ?? panic("The game world account was not created")
+    /// Create a new staking pool
+    ///
+    access(contract)
+    fun createLotteryPool(
+        operatorAddr: Address,
+        childAcctRef: auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account,
+        name: String,
+        rewardTick: String,
+        ticketPrice: UFix64,
+        epochInterval: UFix64,
+    ) {
+        // singleton resources
+        let frc20Indexer = FRC20Indexer.getIndexer()
+        let registry = FGameLotteryRegistry.borrowRegistry()
 
-            // emit the event
-            emit LotteryPoolEnabled(
-                name: name,
-                tick: rewardTick,
-                ticketPrice: ticketPrice,
-                epochInterval: epochInterval,
-                address: newAddr,
-                by: self.getControllerAddress()
+        // ensure pool is not registered
+        assert(
+            FGameLottery.borrowLotteryPool(childAcctRef.address) == nil,
+            message: "The lottery pool is already registered"
+        )
+
+        // Check if the token is already registered
+        if !FRC20FTShared.isFTVaultTicker(tick: rewardTick) {
+            let meta = frc20Indexer.getTokenMeta(tick: rewardTick.toLower())
+            assert(
+                meta != nil,
+                message: "The token is not registered"
             )
         }
 
-        /// Ensure all staking resources are available
-        ///
-        access(Manage)
-        fun ensureResourcesAvailable(
-            name: String,
-            rewardTick: String,
-            ticketPrice: UFix64,
-            epochInterval: UFix64,
-        ) {
-            pre {
-                FGameLotteryRegistry.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
-            }
+        // ensure all lottery resources are available
+        self.ensureResourcesAvailable(
+            operatorAddr: operatorAddr,
+            childAcctRef: childAcctRef,
+            name: name,
+            rewardTick: rewardTick,
+            ticketPrice: ticketPrice,
+            epochInterval: epochInterval
+        )
 
-            // singleton resources
-            let registry = FGameLotteryRegistry.borrowRegistry()
-            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+        // register the lottery pool
+        registry.onRegisterLotteryPool(name)
 
-            // try to borrow the account to check if it was created
-            let key = registry.getGameWorldKey(name)
-            let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.GameWorld, key)
-                ?? panic("The staking account was not created")
+        // emit the event
+        emit LotteryPoolEnabled(
+            name: name,
+            tick: rewardTick,
+            ticketPrice: ticketPrice,
+            epochInterval: epochInterval,
+            address: childAcctRef.address,
+            by: operatorAddr
+        )
+    }
 
-            var isUpdated = false
+    /// Ensure all staking resources are available
+    ///
+    access(contract)
+    fun ensureResourcesAvailable(
+        operatorAddr: Address,
+        childAcctRef: auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account,
+        name: String,
+        rewardTick: String,
+        ticketPrice: UFix64,
+        epochInterval: UFix64,
+    ) {
+        var isUpdated = false
 
-            // The lottery pool should have the following resources in the account:
-            // - FGameLottery.LotteryPool: Lottery Pool resource
-            // - FRC20FTShared.SharedStore: Configuration
-            // - FixesHeartbeat.IHeartbeatHook: Register to FixesHeartbeat with the scope of "FGameLottery"
+        // The lottery pool should have the following resources in the account:
+        // - FGameLottery.LotteryPool: Lottery Pool resource
+        // - FRC20FTShared.SharedStore: Configuration
+        // - FixesHeartbeat.IHeartbeatHook: Register to FixesHeartbeat with the scope of "FGameLottery"
 
-            if let pool = childAcctRef.storage.borrow<&FGameLottery.LotteryPool>(from: FGameLottery.lotteryPoolStoragePath) {
-                assert(
-                    pool.name == name,
-                    message: "The staking pool tick is not the same as the requested"
-                )
-            } else {
-                // create the resource and save it in the account
-                let pool <- FGameLottery.createLotteryPool(
-                    name: name,
-                    rewardTick: rewardTick,
-                    ticketPrice: ticketPrice,
-                    epochInterval: epochInterval
-                )
-                // save the resource in the account
-                childAcctRef.storage.save(<- pool, to: FGameLottery.lotteryPoolStoragePath)
+        if let pool = childAcctRef.storage.borrow<&FGameLottery.LotteryPool>(from: FGameLottery.lotteryPoolStoragePath) {
+            assert(
+                pool.name == name,
+                message: "The staking pool tick is not the same as the requested"
+            )
+        } else {
+            // create the resource and save it in the account
+            let pool <- FGameLottery.createLotteryPool(
+                name: name,
+                rewardTick: rewardTick,
+                ticketPrice: ticketPrice,
+                epochInterval: epochInterval
+            )
+            // save the resource in the account
+            childAcctRef.storage.save(<- pool, to: FGameLottery.lotteryPoolStoragePath)
 
-                isUpdated = true || isUpdated
-            }
-            // link the resource to the public path
-            if childAcctRef
-                .capabilities.get<&FGameLottery.LotteryPool>(FGameLottery.lotteryPoolPublicPath)
-                .borrow() == nil {
-                childAcctRef.capabilities.unpublish(FGameLottery.lotteryPoolPublicPath)
-                childAcctRef.capabilities.publish(
-                    childAcctRef.capabilities.storage.issue<&FGameLottery.LotteryPool>(FGameLottery.lotteryPoolStoragePath),
-                    at: FGameLottery.lotteryPoolPublicPath,
-                )
+            isUpdated = true || isUpdated
+        }
+        // link the resource to the public path
+        if childAcctRef
+            .capabilities.get<&FGameLottery.LotteryPool>(FGameLottery.lotteryPoolPublicPath)
+            .borrow() == nil {
+            childAcctRef.capabilities.unpublish(FGameLottery.lotteryPoolPublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FGameLottery.LotteryPool>(FGameLottery.lotteryPoolStoragePath),
+                at: FGameLottery.lotteryPoolPublicPath,
+            )
 
-                isUpdated = true || isUpdated
-            }
+            isUpdated = true || isUpdated
+        }
 
-            // create the shared store and save it in the account
-            if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
-                let sharedStore <- FRC20FTShared.createSharedStore()
-                childAcctRef.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
+        // create the shared store and save it in the account
+        if childAcctRef.storage.borrow<&AnyResource>(from: FRC20FTShared.SharedStoreStoragePath) == nil {
+            let sharedStore <- FRC20FTShared.createSharedStore()
+            childAcctRef.storage.save(<- sharedStore, to: FRC20FTShared.SharedStoreStoragePath)
 
-                isUpdated = true || isUpdated
-            }
-            // link the resource to the public path
-            if childAcctRef
-                .capabilities.get<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStorePublicPath)
-                .borrow() == nil {
-                childAcctRef.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
-                childAcctRef.capabilities.publish(
-                    childAcctRef.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
-                    at: FRC20FTShared.SharedStorePublicPath
-                )
+            isUpdated = true || isUpdated
+        }
+        // link the resource to the public path
+        if childAcctRef
+            .capabilities.get<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStorePublicPath)
+            .borrow() == nil {
+            childAcctRef.capabilities.unpublish(FRC20FTShared.SharedStorePublicPath)
+            childAcctRef.capabilities.publish(
+                childAcctRef.capabilities.storage.issue<&FRC20FTShared.SharedStore>(FRC20FTShared.SharedStoreStoragePath),
+                at: FRC20FTShared.SharedStorePublicPath
+            )
 
-                isUpdated = true || isUpdated
-            }
+            isUpdated = true || isUpdated
+        }
 
-            // Register to FixesHeartbeat
-            let heartbeatScope = "FGameLottery"
-            if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: childAcctRef.address) {
-                FixesHeartbeat.addHook(
-                    scope: heartbeatScope,
-                    hookAddr: childAcctRef.address,
-                    hookPath: FGameLottery.lotteryPoolPublicPath
-                )
+        // Register to FixesHeartbeat
+        let heartbeatScope = "FGameLottery"
+        if !FixesHeartbeat.hasHook(scope: heartbeatScope, hookAddr: childAcctRef.address) {
+            FixesHeartbeat.addHook(
+                scope: heartbeatScope,
+                hookAddr: childAcctRef.address,
+                hookPath: FGameLottery.lotteryPoolPublicPath
+            )
 
-                isUpdated = true || isUpdated
-            }
+            isUpdated = true || isUpdated
+        }
 
-            if isUpdated {
-                emit LotteryPoolResourcesUpdated(
-                    name: name,
-                    address: acctsPool.getGameWorldAddress(key) ?? panic("The game world account was not created"),
-                    by: self.getControllerAddress()
-                )
-            }
+        if isUpdated {
+            emit LotteryPoolResourcesUpdated(
+                name: name,
+                address: childAcctRef.address,
+                by: operatorAddr
+            )
         }
     }
 
