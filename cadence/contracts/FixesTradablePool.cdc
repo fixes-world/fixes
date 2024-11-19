@@ -1062,6 +1062,16 @@ access(all) contract FixesTradablePool {
                 let protocolFeeVault <- payment.withdraw(amount: protocolFee)
                 let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformAddress())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
+                // split the protocol fee 40% to the staking pool and 60% to the platform
+                let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
+                let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+                if let poolAddr = acctsPool.getAddress(type: FRC20AccountsPool.ChildAccountType.Staking, stakingFRC20Tick) {
+                    if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(poolAddr) {
+                        // withdraw the tokens to the treasury
+                        stakingFlowReciever.deposit(from: <- protocolFeeVault.withdraw(amount: protocolFee * 0.4))
+                    }
+                }
+                // rest of the protocol fee goes to the platform
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
             if subjectFee > 0.0 {
@@ -1160,6 +1170,16 @@ access(all) contract FixesTradablePool {
                 let protocolFeeVault <- payment.withdraw(amount: protocolFee)
                 let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformAddress())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
+                // split the protocol fee 40% to the staking pool and 60% to the platform
+                let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
+                let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+                if let poolAddr = acctsPool.getAddress(type: FRC20AccountsPool.ChildAccountType.Staking, stakingFRC20Tick) {
+                    if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(poolAddr) {
+                        // withdraw the tokens to the treasury
+                        stakingFlowReciever.deposit(from: <- protocolFeeVault.withdraw(amount: protocolFee * 0.4))
+                    }
+                }
+                // rest of the protocol fee goes to the platform
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
             // withdraw the subject fee from the flow vault
