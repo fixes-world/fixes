@@ -7,6 +7,8 @@ This contract contains the factory for creating new Lottery Pool.
 
 */
 import "FlowToken"
+import "FungibleToken"
+import "BlackHole"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -14,6 +16,8 @@ import "FRC20FTShared"
 import "FRC20Indexer"
 import "FGameLottery"
 import "FGameLotteryRegistry"
+// Fixes Coins
+import "FixesTradablePool"
 
 access(all) contract FGameLotteryFactory {
 
@@ -190,13 +194,13 @@ access(all) contract FGameLotteryFactory {
     ///
     access(all)
     fun buyFIXESMintingLottery(
-        flowVault: @FlowToken.Vault,
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
         ticketAmount: UInt64,
         powerup: PowerUpType,
         withMinting: Bool,
         recipient: Capability<&FGameLottery.TicketCollection>,
         inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
-    ): @FlowToken.Vault {
+    ) {
         pre {
             recipient.address == inscriptionStore.owner?.address: "Recipient must be the owner of the inscription store"
         }
@@ -217,16 +221,17 @@ access(all) contract FGameLotteryFactory {
         let ticketsPayment = ticketPrice * UFix64(ticketAmount) * powerupValue
         // check if the FLOW balance is sufficient
         assert(
-            flowVault.balance >= ticketsPayment,
+            flowProvider.isAvailableToWithdraw(amount: ticketsPayment),
             message: "Insufficient FLOW balance"
         )
+        // Withdraw the FLOW from the provider
 
         // for minting available
         if withMinting && self.isFIXESMintingAvailable() {
             let totalCost: UFix64 = 1.0 * UFix64(ticketAmount) * powerupValue
             log("Total cost: ".concat(totalCost.toString()))
             assert(
-                flowVault.balance >= totalCost,
+                flowProvider.isAvailableToWithdraw(amount: totalCost),
                 message: "Insufficient FLOW balance"
             )
 
@@ -246,7 +251,7 @@ access(all) contract FGameLotteryFactory {
             while i < totalMintAmount && self.isFIXESMintingAvailable() {
                 // required $FLOW per mint
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
-                let costReserve <- flowVault.withdraw(amount: estimatedReqValue)
+                let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
                 // create minting $FIXES inscription and store it
                 let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
                     fixesMintingStr,
@@ -263,7 +268,7 @@ access(all) contract FGameLotteryFactory {
 
         // wrap the inscription change
         let change <- FRC20FTShared.wrapFungibleVaultChange(
-            ftVault: <- flowVault.withdraw(amount: ticketsPayment),
+            ftVault: <- flowProvider.withdraw(amount: ticketsPayment),
             from: recipient.address
         )
         // buy the tickets
@@ -274,9 +279,6 @@ access(all) contract FGameLotteryFactory {
             powerup: powerupValue,
             recipient: recipient,
         )
-
-        // return the remaining FLOW
-        return <- flowVault
     }
 
     /// Get the cost of buying FIXES Lottery Tickets
@@ -315,12 +317,12 @@ access(all) contract FGameLotteryFactory {
     ///
     access(all)
     fun buyFIXESLottery(
-        flowVault: @FlowToken.Vault,
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
         ticketAmount: UInt64,
         powerup: PowerUpType,
         recipient: Capability<&FGameLottery.TicketCollection>,
         inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
-    ): @FlowToken.Vault {
+    ) {
         pre {
             recipient.address == inscriptionStore.owner?.address: "Recipient must be the owner of the inscription store"
         }
@@ -358,7 +360,7 @@ access(all) contract FGameLotteryFactory {
             while i < totalMintAmount && self.isFIXESMintingAvailable() {
                 // required $FLOW per mint
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
-                let costReserve <- flowVault.withdraw(amount: estimatedReqValue)
+                let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
                 // create minting $FIXES inscription and store it
                 let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
                     fixesMintingStr,
@@ -387,7 +389,7 @@ access(all) contract FGameLotteryFactory {
         // build the inscription string
         let buyTicketsInsStr = FixesInscriptionFactory.buildLotteryBuyFIXESTickets(ticketAmountFinal, powerupValue)
         let estimatedBuyTicketsInsCost = FixesInscriptionFactory.estimateFrc20InsribeCost(buyTicketsInsStr)
-        let costReserve <- flowVault.withdraw(amount: estimatedBuyTicketsInsCost)
+        let costReserve <- flowProvider.withdraw(amount: estimatedBuyTicketsInsCost)
         // create the withdraw inscription
         let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
             buyTicketsInsStr,
@@ -407,7 +409,17 @@ access(all) contract FGameLotteryFactory {
             powerup: powerupValue,
             recipient: recipient,
         )
-        // return the remaining FLOW
-        return <- flowVault
+    }
+
+    /// Get the cost of buying FIXES Tradable Pool Tickets
+    ///
+    access(all)
+    fun buyCoinWithLotteryTicket(
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
+        flowAmount: UFix64,
+        recipient: Capability<&FGameLottery.TicketCollection>,
+        inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
+    ) {
+
     }
 }

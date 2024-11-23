@@ -772,11 +772,11 @@ access(all) contract FungibleTokenManager {
     access(all)
     fun setupLotteryPool(
         _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
-        intervalDays: UInt32,
+        epochDays: UInt8,
     ) {
         pre {
             ins.isExtractable(): "The inscription is not extracted"
-            intervalDays > 0 && intervalDays <= 15: "The interval days should be 1~15"
+            epochDays > 0 && epochDays <= 15: "The interval days should be 1~15"
         }
         post {
             ins.isExtracted(): "The inscription is not extracted"
@@ -815,7 +815,7 @@ access(all) contract FungibleTokenManager {
         let maxSupply = superMinter.getMaxSupply()
         // ticket price is MaxSupply/500_000
         let ticketPice = maxSupply / 500_000.0
-        let epochInterval = UFix64(intervalDays * 24 * 60 * 60)
+        let epochInterval = UFix64(epochDays * 24 * 60 * 60)
 
         FGameLotteryRegistry.createLotteryPool(
             operatorAddr: callerAddr,
