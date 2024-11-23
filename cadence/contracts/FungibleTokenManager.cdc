@@ -28,6 +28,7 @@ import "FRC20TradingRecord"
 import "FRC20StakingManager"
 import "FRC20Agents"
 import "FRC20Converter"
+import "FGameLotteryRegistry"
 
 /// The Manager contract for Fungible Token
 ///
@@ -761,6 +762,69 @@ access(all) contract FungibleTokenManager {
                 at: fallbackPath
             )
         }
+
+        // emit the event
+        emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)
+    }
+
+    /// Setup the lottery pool for some coin
+    ///
+    access(all)
+    fun setupLotteryPool(
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
+        intervalDays: UInt32,
+    ) {
+        pre {
+            ins.isExtractable(): "The inscription is not extracted"
+            intervalDays > 0 && intervalDays <= 15: "The interval days should be 1~15"
+        }
+        post {
+            ins.isExtracted(): "The inscription is not extracted"
+        }
+
+        // singletoken resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = self.verifyExecutingInscription(ins, usage: "setup-lottery")
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        // check if the caller is authorized
+        let callerAddr = ins.owner?.address ?? panic("The owner of the inscription is not found")
+        assert(
+            tokenAdminRef.isAuthorizedUser(callerAddr),
+            message: "You are not authorized to setup the tradable pool resources"
+        )
+
+        // borrow the super minter
+        let superMinter = tokenAdminRef.borrowSuperMinter()
+        assert(
+            tick == "$".concat(superMinter.getSymbol()),
+            message: "The token symbol is not valid"
+        )
+
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The child account was not created")
+
+        // Get the caller address
+        let ftContractAddr = childAcctRef.address
+
+        let tokenType = superMinter.getTokenType()
+        let maxSupply = superMinter.getMaxSupply()
+        // ticket price is MaxSupply/500_000
+        let ticketPice = maxSupply / 500_000.0
+        let epochInterval = UFix64(intervalDays * 24 * 60 * 60)
+
+        FGameLotteryRegistry.createLotteryPool(
+            operatorAddr: callerAddr,
+            childAcctRef: childAcctRef,
+            name: "FIXES_LOTTERY_POOL_FOR_".concat(tick),
+            rewardTick: FRC20FTShared.buildTicker(tokenType) ?? panic("The token type is not valid"),
+            ticketPrice: ticketPice,
+            epochInterval: epochInterval,
+        )
 
         // emit the event
         emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)

@@ -17,6 +17,48 @@ import "FGameLotteryRegistry"
 
 access(all) contract FGameLotteryFactory {
 
+    /* --- Enum --- */
+
+    /// PowerUp Types
+    ///
+    access(all) enum PowerUpType: UInt8 {
+        access(all) case x1
+        access(all) case x2
+        access(all) case x3
+        access(all) case x4
+        access(all) case x5
+        access(all) case x10
+        access(all) case x20
+        access(all) case x50
+        access(all) case x100
+    }
+
+    /// Get the value of the PowerUp
+    ///
+    access(all)
+    view fun getPowerUpValue(_ type: PowerUpType): UFix64 {
+        switch type {
+        case PowerUpType.x2:
+            return 2.0
+        case PowerUpType.x3:
+            return 3.0
+        case PowerUpType.x4:
+            return 4.0
+        case PowerUpType.x5:
+            return 5.0
+        case PowerUpType.x10:
+            return 10.0
+        case PowerUpType.x20:
+            return 20.0
+        case PowerUpType.x50:
+            return 50.0
+        case PowerUpType.x100:
+            return 100.0
+        }
+        // Default is x1
+        return 1.0
+    }
+
     /* --- Public Methods - Controller --- */
 
     access(all)
@@ -110,37 +152,6 @@ access(all) contract FGameLotteryFactory {
     }
 
     /* --- Public methods - User --- */
-
-    /// PowerUp Types
-    ///
-    access(all) enum PowerUpType: UInt8 {
-        access(all) case x1
-        access(all) case x2
-        access(all) case x3
-        access(all) case x4
-        access(all) case x5
-        access(all) case x10
-    }
-
-    /// Get the value of the PowerUp
-    ///
-    access(all)
-    view fun getPowerUpValue(_ type: PowerUpType): UFix64 {
-        switch type {
-        case PowerUpType.x2:
-            return 2.0
-        case PowerUpType.x3:
-            return 3.0
-        case PowerUpType.x4:
-            return 4.0
-        case PowerUpType.x5:
-            return 5.0
-        case PowerUpType.x10:
-            return 10.0
-        }
-        // Default is x1
-        return 1.0
-    }
 
     /// Check if the FIXES Minting is available
     ///

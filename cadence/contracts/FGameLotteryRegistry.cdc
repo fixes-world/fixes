@@ -137,7 +137,6 @@ access(all) contract FGameLotteryRegistry {
             }
 
             // singleton resources
-            let frc20Indexer = FRC20Indexer.getIndexer()
             let acctsPool = FRC20AccountsPool.borrowAccountsPool()
             let registry = FGameLotteryRegistry.borrowRegistry()
 
@@ -170,7 +169,7 @@ access(all) contract FGameLotteryRegistry {
 
     /// Create a new staking pool
     ///
-    access(contract)
+    access(account)
     fun createLotteryPool(
         operatorAddr: Address,
         childAcctRef: auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account,
