@@ -32,6 +32,7 @@ import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20StakingManager"
 import "FRC20Converter"
+import "FGameLottery"
 
 /// The bonding curve contract.
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
@@ -429,11 +430,9 @@ access(all) contract FixesTradablePool {
         ) {
             pre {
                 self.isInitialized(): "The liquidity pool is not initialized"
-                self.isLocalActive(): "The liquidity pool is not active"
                 ins.isExtractable(): "The inscription is not extractable"
                 ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
-                // TODO: change method in Standard V2
-                recipient.getSupportedVaultTypes()[self.getTokenType()] == true: "The recipient does not support the token type"
+                recipient.isSupportedVaultType(type: self.getTokenType()): "The recipient does not support the token type"
             }
             post {
                 ins.isExtracted(): "The inscription is not extracted"
@@ -449,14 +448,9 @@ access(all) contract FixesTradablePool {
         ) {
             pre {
                 self.isInitialized(): "The liquidity pool is not initialized"
-                self.isLocalActive(): "The liquidity pool is not active"
                 tokenVault.isInstance(self.getTokenType()): "The token vault is not the same type as the liquidity pool"
                 tokenVault.balance > 0.0: "The token vault balance must be greater than 0"
-                // TODO: change method in Standard V2
-                recipient.getSupportedVaultTypes()[Type<@FlowToken.Vault>()] == true: "The recipient does not support FlowToken.Vault"
-            }
-            post {
-                before(self.getTradablePoolCirculatingSupply()) == self.getTradablePoolCirculatingSupply() + before(tokenVault.balance): "The circulating supply is not updated"
+                recipient.isSupportedVaultType(type: Type<@FlowToken.Vault>()): "The recipient does not support FlowToken.Vault"
             }
         }
 
@@ -1011,7 +1005,7 @@ access(all) contract FixesTradablePool {
         access(all)
         fun buyTokens(
             _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
-            _ amount: UFix64?,
+            _ targetAmount: UFix64?,
             recipient: &{FungibleToken.Receiver},
         ) {
             let flowPaymentVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
@@ -1045,19 +1039,73 @@ access(all) contract FixesTradablePool {
                 .concat(" Flow Payment Vault: ").concat(flowPaymentVault.balance.toString())
             )
             // buy the coin with the Flow tokens
-            self._buyToken(ins, <- flowPaymentVault, amount, false, recipient: recipient)
+            let tokenVault <- self._buyTokens(ins, <- flowPaymentVault, targetAmount, false)
+            self._depositToken(<- tokenVault, recipient: recipient)
+        }
+
+        /// Buy the coin, but a portion of the Flow tokens will be used to buy the lottery tickets
+        ///
+        access(all)
+        fun buyTokensWithLottery (
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            recipient: &{FungibleToken.Receiver},
+        ): @{FungibleToken.Vault} {
+            let flowPaymentVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+            let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
+            // deposit the available Flow tokens in the inscription to the flow vault
+            if flowAvailableAmount > 0.0 {
+                flowPaymentVault.deposit(from: <- ins.partialExtract(flowAvailableAmount))
+            }
+
+            let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
+
+            // borrow the minter
+            let minter = self.borrowMinter()
+            let meta = FixesTradablePool.verifyAndExecuteInscription(ins, symbol: minter.getSymbol(), usage: "*")
+
+            log("Trader: ".concat(ins.owner?.address?.toString() ?? "Unknown")
+                .concat(" Inscription Value: ").concat(ins.getInscriptionValue().toString())
+                .concat(" Flow AvailableAmount: ").concat(flowAvailableAmount.toString())
+                .concat(" Flow Payment Vault: ").concat(flowPaymentVault.balance.toString())
+            )
+
+            let tokenYouObtained <- self._buyTokens(ins, <- flowPaymentVault, nil, true)
+            // check if lottery exists
+            if let lotteryPool = FGameLottery.borrowLotteryPool(self.getPoolAddress()) {
+                let tokenType = self.getTokenType()
+                let internalTicker = FRC20FTShared.buildTicker(tokenType) ?? panic("The token type is invalid")
+                // get the ticket price
+                let ticketPice =lotteryPool.getTicketPrice()
+                // ensure the ticket type is the same as the token type
+                assert(
+                    lotteryPool.getLotteryToken() == internalTicker,
+                    message: "The lottery token is not the same as the token type"
+                )
+                // 10% of the token you obtained will be used to buy the lottery tickets
+                // 90% of the token you obtained will be deposited to the recipient
+                let depositToUser = tokenYouObtained.balance * 0.9
+                // if no lottery, then deposit the token to the recipient
+                self._depositToken(<- tokenYouObtained.withdraw(amount: depositToUser), recipient: recipient)
+            } else {
+                // if no lottery, then deposit the token to the recipient
+                self._depositToken(<- tokenYouObtained.withdraw(amount: tokenYouObtained.balance), recipient: recipient)
+            }
+            return <- tokenYouObtained
         }
 
         /// Internal function to buy the token with the Flow Token
         ///
         access(self)
-        fun _buyToken(
+        fun _buyTokens(
             _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             _ flowPaymentVault: @FlowToken.Vault,
-            _ amount: UFix64?,
+            _ targetAmount: UFix64?,
             _ isExtendingBuy: Bool,
-            recipient: &{FungibleToken.Receiver},
-        ) {
+        ): @{FungibleToken.Vault} {
+            post {
+                result.getType().isInstance(self.getTokenType()): "The result vault is not the same type as the liquidity pool"
+            }
+
             let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
 
             // borrow the minter
@@ -1078,8 +1126,8 @@ access(all) contract FixesTradablePool {
 
             // currently bonding curve is active
             if self.isLocalActive() {
-                if amount != nil && amount! > 0.0 {
-                    buyAmount = amount!
+                if targetAmount != nil && targetAmount! > 0.0 {
+                    buyAmount = targetAmount!
                     price = self.getBuyPrice(buyAmount)
                     protocolFee = price * FixesTradablePool.getProtocolTradingFee()
                     subjectFee = price * self.getSubjectFeePercentage()
@@ -1215,24 +1263,17 @@ access(all) contract FixesTradablePool {
                 message: "The initialized coin vault does not have enough tokens"
             )
 
-            // deposit the tokens to the recipient
-            recipient.deposit(from: <- initializedCoinVault)
-
-            // the variables for the trade event
-            let poolAddr = self.getPoolAddress()
-            let traderAddr = recipient.owner?.address ?? callerAddr
-
             // invoke the transaction hook
             self._onTransactionDeal(
-                seller: poolAddr,
-                buyer: traderAddr,
+                seller: self.getPoolAddress(),
+                buyer: callerAddr,
                 dealAmount: recievedAmount,
                 dealPrice: totalCost
             )
 
             // emit the trade event
             emit Trade(
-                trader: traderAddr,
+                trader: callerAddr,
                 isBuy: true,
                 subject: self.getPoolAddress(),
                 ticker: minter.getSymbol(),
@@ -1242,6 +1283,23 @@ access(all) contract FixesTradablePool {
                 subjectFee: subjectFee,
                 supply: self.getTradablePoolCirculatingSupply()
             )
+
+            return <- initializedCoinVault
+        }
+
+        /// execute the real transfer action
+        ///
+        access(self)
+        fun _depositToken(
+            _ tokenToTransfer: @{FungibleToken.Vault},
+            recipient: &{FungibleToken.Receiver},
+        ) {
+            pre {
+                tokenToTransfer.isInstance(self.getTokenType()): "The token type is not the same as the pool"
+                recipient.isSupportedVaultType(type: tokenToTransfer.getType()): "The recipient does not support the token type"
+            }
+            // deposit the tokens to the recipient
+            recipient.deposit(from: <- tokenToTransfer)
         }
 
         /// Sell the token to the liquidity pool
@@ -1251,6 +1309,11 @@ access(all) contract FixesTradablePool {
             _ tokenVault: @{FungibleToken.Vault},
             recipient: &{FungibleToken.Receiver},
         ) {
+            if !self.isLocalActive() {
+                self.quickSwapToken(<- tokenVault, recipient)
+                return
+            }
+
             let minter = self.borrowMinter()
             // calculate the price
             let totalPrice = self.getSellPrice(tokenVault.balance)
