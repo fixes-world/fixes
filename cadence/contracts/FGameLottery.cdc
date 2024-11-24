@@ -1371,6 +1371,8 @@ access(all) contract FGameLottery {
         access(all)
         view fun getJackpotPoolBalance(): UFix64
         access(all)
+        view fun getPoolTotalBalance(): UFix64
+        access(all)
         view fun getServiceFee(): UFix64
         access(all)
         view fun isEpochAutoStart(): Bool
@@ -1526,9 +1528,23 @@ access(all) contract FGameLottery {
             return self.jackpotPool.getOriginalTick()
         }
 
+        /// Returns the current Jackpot pool balance
+        ///
         access(all)
         view fun getJackpotPoolBalance(): UFix64 {
             return self.jackpotPool.getBalance()
+        }
+
+        /// Returna the total balance of the pool
+        ///
+        access(all)
+        view fun getPoolTotalBalance(): UFix64 {
+            var totalBalance = self.jackpotPool.getBalance()
+            let epochIndex = self.currentEpochIndex
+            if let lotteryRef = self.borrowLottery(epochIndex) {
+                totalBalance = totalBalance + lotteryRef.getCurrentLotteryBalance()
+            }
+            return totalBalance
         }
 
         access(all)
