@@ -1618,7 +1618,7 @@ access(all) contract FixesTradablePool {
             if amount > 0.0 {
                 self.flowVault.deposit(from: <- vault)
             } else {
-                destroy vault
+                Burner.burn(<- vault)
                 return
             }
 
@@ -1876,8 +1876,8 @@ access(all) contract FixesTradablePool {
                         token0Vault.deposit(from: <- self.vault.withdraw(amount: token0Max))
                         token1Vault.deposit(from: <- self._withdrawFlowToken(part1EstimatedToken1In))
                     } else {
-                        destroy token0Vault
-                        destroy token1Vault
+                        Burner.burn(<- token0Vault)
+                        Burner.burn(<- token1Vault)
                         // DO NOT PANIC
                         return false
                     }

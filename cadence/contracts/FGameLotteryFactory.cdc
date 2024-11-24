@@ -6,6 +6,7 @@
 This contract contains the factory for creating new Lottery Pool.
 
 */
+import "Burner"
 import "FlowToken"
 import "FungibleToken"
 import "BlackHole"
@@ -411,15 +412,142 @@ access(all) contract FGameLotteryFactory {
         )
     }
 
+    /// Estimate the ticket information
+    ///
+    access(all) struct CoinTicketEstimate {
+        access(all) let poolAddr: Address
+        access(all) let tokenTicker: String
+        access(all) let tokenBoughtAmount: UFix64
+        access(all) let ticketPrice: UFix64
+        access(all) let ticketAmount: UInt64
+        access(all) let powerupValue: UFix64
+
+        view init(
+            poolAddr: Address,
+            tokenTicker: String,
+            tokenBoughtAmount: UFix64,
+            ticketPrice: UFix64,
+            ticketAmount: UInt64,
+            powerupValue: UFix64
+        ) {
+            self.poolAddr = poolAddr
+            self.tokenTicker = tokenTicker
+            self.tokenBoughtAmount = tokenBoughtAmount
+            self.ticketPrice = ticketPrice
+            self.ticketAmount = ticketAmount
+            self.powerupValue = powerupValue
+        }
+    }
+
+    // access(all)
+    // view fun estimateTicketInfo(
+    //     _ coinAddr: Address,
+    //     flowAmount: UFix64,
+    // ): CoinTicketEstimate {
+    //     // TODO
+    // }
+
     /// Get the cost of buying FIXES Tradable Pool Tickets
     ///
     access(all)
     fun buyCoinWithLotteryTicket(
+        _ coinAddr: Address,
         flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
         flowAmount: UFix64,
-        recipient: Capability<&FGameLottery.TicketCollection>,
+        ftReceiver: &{FungibleToken.Receiver},
+        ticketRecipient: Capability<&FGameLottery.TicketCollection>,
         inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
     ) {
+        pre {
+            ftReceiver.owner?.address == inscriptionStore.owner?.address: "FT Receiver must be the owner of the inscription store"
+            ticketRecipient.address == inscriptionStore.owner?.address: "Ticket Recipient must be the owner of the inscription store"
+        }
 
+        // resources
+        let lotteryPoolRef = FGameLottery.borrowLotteryPool(coinAddr)
+            ?? panic("Lottery pool not found")
+        let tradablePoolRef = FixesTradablePool.borrowTradablePool(coinAddr)
+            ?? panic("Tradable pool not found")
+
+        // coin's token type
+        let tokenType = tradablePoolRef.getTokenType()
+        assert(
+            ftReceiver.isSupportedVaultType(type: tokenType),
+            message: "Unsupported token type"
+        )
+        let tickerName = FRC20FTShared.buildTicker(tokenType) ?? panic("Ticker is not valid")
+
+        // ---- create the basic inscription ----
+        let dataStr = FixesInscriptionFactory.buildPureExecuting(
+            tick: tickerName,
+            usage: "init",
+            {}
+        )
+        // estimate the required storage
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+        let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
+        // create the inscription
+        let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+            dataStr,
+            <- (costReserve as! @FlowToken.Vault),
+            inscriptionStore
+        )
+        // apply the inscription
+        let ins = inscriptionStore.borrowInscriptionWritableRef(insId)!
+        // ---- end ----
+
+        // ---- deposit the but token cost to inscription ----
+        let flowCanUse = flowAmount - estimatedReqValue
+        let costVault <- flowProvider.withdraw(amount: flowCanUse)
+        ins.deposit(<- (costVault as! @FlowToken.Vault))
+        // ---- end ----
+
+        // buy token first
+        let tokenToBuyTickets <- tradablePoolRef.buyTokensWithLottery(ins, recipient: ftReceiver)
+        let ticketPrice = lotteryPoolRef.getTicketPrice()
+        let maxCounter = UInt64(tokenToBuyTickets.balance / ticketPrice)
+
+        // select the powerup value
+        var powerupValue = self.getPowerUpValue(PowerUpType.x1)
+        if maxCounter > 10000 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x100)
+        } else if maxCounter > 2000 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x50)
+        } else if maxCounter > 1000 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x20)
+        } else if maxCounter > 200 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x10)
+        } else if maxCounter > 100 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x5)
+        } else if maxCounter > 50 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x4)
+        } else if maxCounter > 20 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x3)
+        } else if maxCounter > 10 {
+            powerupValue = self.getPowerUpValue(PowerUpType.x2)
+        }
+        let ticketAmount = UInt64(tokenToBuyTickets.balance / (ticketPrice * powerupValue))
+        let ticketsPayment: UFix64 = UFix64(ticketAmount) * ticketPrice * powerupValue
+
+        // wrap the inscription change
+        let change <- FRC20FTShared.wrapFungibleVaultChange(
+            ftVault: <- tokenToBuyTickets.withdraw(amount: ticketsPayment),
+            from: ticketRecipient.address
+        )
+        // buy the tickets
+        lotteryPoolRef.buyTickets(
+            // withdraw flow token from the vault
+            payment: <- change,
+            amount: ticketAmount,
+            powerup: powerupValue,
+            recipient: ticketRecipient,
+        )
+
+        // handle rest of the tokens
+        if tokenToBuyTickets.balance > 0.0 {
+            ftReceiver.deposit(from: <- tokenToBuyTickets)
+        } else {
+            Burner.burn(<- tokenToBuyTickets)
+        }
     }
 }
