@@ -417,6 +417,26 @@ access(all) contract FixesTradablePool {
             amount: UFix64,
         ): UFix64
 
+        /// Get the estimated swap amount by amount out
+        ///
+        access(all)
+        view fun getSwapEstimatedAmountIn(
+            _ directionTokenToFlow: Bool,
+            amountOut: UFix64,
+        ): UFix64
+
+        /// Get the estimated token buying amount by cost
+        access(all)
+        view fun getEstimatedBuyingAmountByCost(_ cost: UFix64): UFix64
+
+        /// Get the estimated token buying cost by amount
+        access(all)
+        view fun getEstimatedBuyingCostByAmount(_ amount: UFix64): UFix64
+
+        /// Get the estimated token selling value by amount
+        access(all)
+        view fun getEstimatedSellingValueByAmount(_ amount: UFix64): UFix64
+
         // ----- Trade (Writable) -----
 
         /// Buy the token with the given inscription
@@ -735,6 +755,41 @@ access(all) contract FixesTradablePool {
                 return SwapConfig.getAmountIn(amountOut: amountOut, reserveIn: reserveToken, reserveOut: reserveFlow)
             } else {
                 return SwapConfig.getAmountIn(amountOut: amountOut, reserveIn: reserveFlow, reserveOut: reserveToken)
+            }
+        }
+
+        /// Get the estimated token amount by cost
+        ///
+        access(all)
+        view fun getEstimatedBuyingAmountByCost(_ cost: UFix64): UFix64 {
+            if !self.isLiquidityHandovered() {
+                return self.getBuyAmountAfterFee(cost)
+            } else {
+                let protocolFee = cost * FixesTradablePool.getProtocolTradingFee()
+                return self.getSwapEstimatedAmount(false, amount: cost - protocolFee)
+            }
+        }
+
+        /// Get the estimated token buying cost by amount
+        ///
+        access(all)
+        view fun getEstimatedBuyingCostByAmount(_ amount: UFix64): UFix64 {
+            if !self.isLiquidityHandovered() {
+                return self.getBuyPriceAfterFee(amount)
+            } else {
+                let cost = self.getSwapEstimatedAmountIn(false, amountOut: amount)
+                return cost / (1.0 - FixesTradablePool.getProtocolTradingFee())
+            }
+        }
+
+        /// Get the estimated token selling value by amount
+        ///
+        access(all)
+        view fun getEstimatedSellingValueByAmount(_ amount: UFix64): UFix64 {
+            if !self.isLiquidityHandovered() {
+                return self.getSellPriceAfterFee(amount)
+            } else {
+                return self.getSwapEstimatedAmount(true, amount: amount)
             }
         }
 
