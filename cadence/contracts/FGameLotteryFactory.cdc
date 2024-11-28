@@ -439,13 +439,45 @@ access(all) contract FGameLotteryFactory {
         }
     }
 
-    // access(all)
-    // view fun estimateTicketInfo(
-    //     _ coinAddr: Address,
-    //     flowAmount: UFix64,
-    // ): CoinTicketEstimate {
-    //     // TODO
-    // }
+    access(all)
+    view fun estimateButTokenWithTickets(
+        _ coinAddr: Address,
+        flowAmount: UFix64,
+    ): CoinTicketEstimate? {
+        let lotteryPoolRef = FGameLottery.borrowLotteryPool(coinAddr)
+            ?? panic("Lottery pool not found")
+
+        let tradablePoolRef = FixesTradablePool.borrowTradablePool(coinAddr)
+            ?? panic("Tradable pool not found")
+
+        // coin's token type
+        let tokenType = tradablePoolRef.getTokenType()
+        let tickerName = FRC20FTShared.buildTicker(tokenType) ?? panic("Ticker is not valid")
+
+        let tokenBoughtAmountInTotal = tradablePoolRef.getEstimatedBuyingAmountByCost(flowAmount)
+        let tokenBoughtAmount = tokenBoughtAmountInTotal * 0.9
+        let tokenToBuyTickets = tokenBoughtAmountInTotal - tokenBoughtAmount
+
+        let ticketPrice = lotteryPoolRef.getTicketPrice()
+        let maxCounter = UInt64(tokenToBuyTickets / ticketPrice)
+        if maxCounter == 0 {
+            return nil
+        }
+
+        // select the powerup value
+        var powerupValue = self.getBestPowerupValue(maxCounter)
+        let ticketAmount = UInt64(tokenToBuyTickets / (ticketPrice * powerupValue))
+        let ticketsPayment: UFix64 = UFix64(ticketAmount) * ticketPrice * powerupValue
+
+        return CoinTicketEstimate(
+            poolAddr: coinAddr,
+            tokenTicker: tickerName,
+            tokenBoughtAmount: tokenBoughtAmount + tokenToBuyTickets - ticketsPayment,
+            ticketPrice: ticketPrice,
+            ticketAmount: ticketAmount,
+            powerupValue: powerupValue
+        )
+    }
 
     /// Get the cost of buying FIXES Tradable Pool Tickets
     ///
@@ -508,24 +540,7 @@ access(all) contract FGameLotteryFactory {
         let maxCounter = UInt64(tokenToBuyTickets.balance / ticketPrice)
 
         // select the powerup value
-        var powerupValue = self.getPowerUpValue(PowerUpType.x1)
-        if maxCounter > 10000 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x100)
-        } else if maxCounter > 2000 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x50)
-        } else if maxCounter > 1000 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x20)
-        } else if maxCounter > 200 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x10)
-        } else if maxCounter > 100 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x5)
-        } else if maxCounter > 50 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x4)
-        } else if maxCounter > 20 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x3)
-        } else if maxCounter > 10 {
-            powerupValue = self.getPowerUpValue(PowerUpType.x2)
-        }
+        var powerupValue = self.getBestPowerupValue(maxCounter)
         let ticketAmount = UInt64(tokenToBuyTickets.balance / (ticketPrice * powerupValue))
         let ticketsPayment: UFix64 = UFix64(ticketAmount) * ticketPrice * powerupValue
 
@@ -549,5 +564,27 @@ access(all) contract FGameLotteryFactory {
         } else {
             Burner.burn(<- tokenToBuyTickets)
         }
+    }
+
+    access(all)
+    view fun getBestPowerupValue(_ maxCounter: UInt64): UFix64 {
+        if maxCounter > 10000 {
+            return self.getPowerUpValue(PowerUpType.x100)
+        } else if maxCounter > 2000 {
+            return self.getPowerUpValue(PowerUpType.x50)
+        } else if maxCounter > 1000 {
+            return self.getPowerUpValue(PowerUpType.x20)
+        } else if maxCounter > 200 {
+            return self.getPowerUpValue(PowerUpType.x10)
+        } else if maxCounter > 100 {
+            return self.getPowerUpValue(PowerUpType.x5)
+        } else if maxCounter > 50 {
+            return self.getPowerUpValue(PowerUpType.x4)
+        } else if maxCounter > 20 {
+            return self.getPowerUpValue(PowerUpType.x3)
+        } else if maxCounter > 10 {
+            return self.getPowerUpValue(PowerUpType.x2)
+        }
+        return self.getPowerUpValue(PowerUpType.x1)
     }
 }
