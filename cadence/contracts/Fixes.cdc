@@ -169,9 +169,6 @@ access(all) contract Fixes {
             encoding: String?,
             parentId: UInt64?
         ) {
-            post {
-                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
-            }
             self.id = Fixes.totalInscriptions
             Fixes.totalInscriptions = Fixes.totalInscriptions + 1
             self.parentId = parentId
@@ -204,7 +201,7 @@ access(all) contract Fixes {
         ///
         access(all)
         view fun isExtractable(): Bool {
-            return !self.isExtracted() && self.owner != nil
+            return !self.isExtracted() && self.isValueValid() && self.owner != nil
         }
 
         /// Check if the inscription value is valid
