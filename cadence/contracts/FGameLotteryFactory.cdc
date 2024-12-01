@@ -439,6 +439,8 @@ access(all) contract FGameLotteryFactory {
         }
     }
 
+    /// Estimate the cost of buying the coin with lottery tickets
+    ///
     access(all)
     view fun estimateButTokenWithTickets(
         _ coinAddr: Address,
@@ -454,7 +456,11 @@ access(all) contract FGameLotteryFactory {
         let tokenType = tradablePoolRef.getTokenType()
         let tickerName = FRC20FTShared.buildTicker(tokenType) ?? panic("Ticker is not valid")
 
-        let tokenBoughtAmountInTotal = tradablePoolRef.getEstimatedBuyingAmountByCost(flowAmount)
+        // estimate the required storage
+        let dataStr = FixesInscriptionFactory.buildPureExecuting(tick: tickerName, usage: "init", {})
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+
+        let tokenBoughtAmountInTotal = tradablePoolRef.getEstimatedBuyingAmountByCost(flowAmount - estimatedReqValue)
         let tokenBoughtAmount = tokenBoughtAmountInTotal * 0.9
         let tokenToBuyTickets = tokenBoughtAmountInTotal - tokenBoughtAmount
 
@@ -479,7 +485,7 @@ access(all) contract FGameLotteryFactory {
         )
     }
 
-    /// Get the cost of buying FIXES Tradable Pool Tickets
+    /// Buy the coin with lottery tickets
     ///
     access(all)
     fun buyCoinWithLotteryTicket(

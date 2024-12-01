@@ -437,57 +437,6 @@ access(all) contract FixesTradablePool {
         access(all)
         view fun getEstimatedSellingValueByAmount(_ amount: UFix64): UFix64
 
-        // ----- Trade (Writable) -----
-
-        /// Buy the token with the given inscription
-        /// - ins: The inscription to buy the token
-        /// - amount: The amount of token to buy, if nil, use all the inscription value to buy the token
-        access(all)
-        fun buyTokens(
-            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
-            _ amount: UFix64?,
-            recipient: &{FungibleToken.Receiver},
-        ) {
-            pre {
-                self.isInitialized(): "The liquidity pool is not initialized"
-                ins.isExtractable(): "The inscription is not extractable"
-                ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
-                recipient.isSupportedVaultType(type: self.getTokenType()): "The recipient does not support the token type"
-            }
-            post {
-                ins.isExtracted(): "The inscription is not extracted"
-            }
-        }
-
-        /// Sell the token to the liquidity pool
-        /// - tokenVault: The token vault to sell
-        access(all)
-        fun sellTokens(
-            _ tokenVault: @{FungibleToken.Vault},
-            recipient: &{FungibleToken.Receiver},
-        ) {
-            pre {
-                self.isInitialized(): "The liquidity pool is not initialized"
-                tokenVault.isInstance(self.getTokenType()): "The token vault is not the same type as the liquidity pool"
-                tokenVault.balance > 0.0: "The token vault balance must be greater than 0"
-                recipient.isSupportedVaultType(type: Type<@FlowToken.Vault>()): "The recipient does not support FlowToken.Vault"
-            }
-        }
-
-        /// Swap all tokens in the vault and deposit to the token out recipient
-        access(all)
-        fun quickSwapToken(
-            _ tokenInVault: @{FungibleToken.Vault},
-            _ tokenOutRecipient: &{FungibleToken.Receiver},
-        ) {
-            pre {
-                self.isInitialized(): "The liquidity pool is not initialized"
-                !self.isLocalActive(): "The liquidity pool is active"
-                tokenInVault.balance > 0.0: "The token vault balance must be greater than 0"
-                tokenInVault.isInstance(self.getTokenType()) || tokenInVault.isInstance(Type<@FlowToken.Vault>()): "The token vault is not the same type as the liquidity pool"
-            }
-        }
-
         // ---- Bonding Curve ----
 
         /// Get the curve type
@@ -1056,13 +1005,24 @@ access(all) contract FixesTradablePool {
         // ----- Trade (Writable) -----
 
         /// Buy the token with the given inscription
-        ///
+        /// - ins: The inscription to buy the token
+        /// - amount: The amount of token to buy, if nil, use all the inscription value to buy the token
         access(all)
         fun buyTokens(
             _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
-            _ targetAmount: UFix64?,
+            _ amount: UFix64?,
             recipient: &{FungibleToken.Receiver},
         ) {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                ins.isExtractable(): "The inscription is not extractable"
+                ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
+                recipient.isSupportedVaultType(type: self.getTokenType()): "The recipient does not support the token type"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+
             let flowPaymentVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
             // deposit the available Flow tokens in the inscription to the flow vault
@@ -1094,7 +1054,7 @@ access(all) contract FixesTradablePool {
                 .concat(" Flow Payment Vault: ").concat(flowPaymentVault.balance.toString())
             )
             // buy the coin with the Flow tokens
-            let tokenVault <- self._buyTokens(ins, <- flowPaymentVault, targetAmount, false)
+            let tokenVault <- self._buyTokens(ins, <- flowPaymentVault, amount, false)
             self._depositToken(<- tokenVault, recipient: recipient)
         }
 
@@ -1105,6 +1065,16 @@ access(all) contract FixesTradablePool {
             _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             recipient: &{FungibleToken.Receiver},
         ): @{FungibleToken.Vault} {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                ins.isExtractable(): "The inscription is not extractable"
+                ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
+                recipient.isSupportedVaultType(type: self.getTokenType()): "The recipient does not support the token type"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+
             let flowPaymentVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
             // deposit the available Flow tokens in the inscription to the flow vault
@@ -1358,12 +1328,19 @@ access(all) contract FixesTradablePool {
         }
 
         /// Sell the token to the liquidity pool
-        ///
+        /// - tokenVault: The token vault to sell
         access(all)
         fun sellTokens(
             _ tokenVault: @{FungibleToken.Vault},
             recipient: &{FungibleToken.Receiver},
         ) {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                tokenVault.isInstance(self.getTokenType()): "The token vault is not the same type as the liquidity pool"
+                tokenVault.balance > 0.0: "The token vault balance must be greater than 0"
+                recipient.isSupportedVaultType(type: Type<@FlowToken.Vault>()): "The recipient does not support FlowToken.Vault"
+            }
+
             if !self.isLocalActive() {
                 self.quickSwapToken(<- tokenVault, recipient)
                 return
@@ -1450,6 +1427,12 @@ access(all) contract FixesTradablePool {
             _ tokenInVault: @{FungibleToken.Vault},
             _ tokenOutRecipient: &{FungibleToken.Receiver},
         ) {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                !self.isLocalActive(): "The liquidity pool is active"
+                tokenInVault.balance > 0.0: "The token vault balance must be greater than 0"
+                tokenInVault.isInstance(self.getTokenType()) || tokenInVault.isInstance(Type<@FlowToken.Vault>()): "The token vault is not the same type as the liquidity pool"
+            }
             let supportTypes = tokenOutRecipient.getSupportedVaultTypes()
             let minterTokenType = self.getTokenType()
             let tokenInVaultType = tokenInVault.getType()
@@ -2045,6 +2028,61 @@ access(all) contract FixesTradablePool {
         )
 
         return <- pool
+    }
+
+    /// Buy the fungible token from the tradable pool
+    ///
+    access(all)
+    fun buy(
+        _ coinAddr: Address,
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
+        flowAmount: UFix64,
+        ftReceiver: &{FungibleToken.Receiver},
+        inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
+    ) {
+        pre {
+            ftReceiver.owner?.address == inscriptionStore.owner?.address: "FT Receiver must be the owner of the inscription store"
+        }
+
+        // resources
+        let tradablePoolRef = FixesTradablePool.borrowTradablePool(coinAddr)
+            ?? panic("Tradable pool not found")
+
+        // coin's token type
+        let tokenType = tradablePoolRef.getTokenType()
+        assert(
+            ftReceiver.isSupportedVaultType(type: tokenType),
+            message: "Unsupported token type"
+        )
+        let tickerName = FRC20FTShared.buildTicker(tokenType) ?? panic("Ticker is not valid")
+
+        // ---- create the basic inscription ----
+        let dataStr = FixesInscriptionFactory.buildPureExecuting(
+            tick: tickerName,
+            usage: "init",
+            {}
+        )
+        // estimate the required storage
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+        let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
+        // create the inscription
+        let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+            dataStr,
+            <- (costReserve as! @FlowToken.Vault),
+            inscriptionStore
+        )
+        // apply the inscription
+        let ins = inscriptionStore.borrowInscriptionWritableRef(insId)!
+        // ---- end ----
+
+        // ---- deposit the but token cost to inscription ----
+        let flowCanUse = flowAmount - estimatedReqValue
+        let costVault <- flowProvider.withdraw(amount: flowCanUse)
+        ins.deposit(<- (costVault as! @FlowToken.Vault))
+        // ---- end ----
+
+        // buy token
+        tradablePoolRef.buyTokens(ins, nil, recipient: ftReceiver)
     }
 
     /// Soft burn the vault
