@@ -2013,11 +2013,8 @@ access(all) contract FixesTradablePool {
         ins: auth(Fixes.Extractable) &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
     ): @TradableLiquidityPool {
-        pre {
-            ins.isExtractable(): "The inscription is not extractable"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription value must be empty after the execution"
         }
 
         // execute the inscription

@@ -594,11 +594,8 @@ access(all) contract FungibleTokenManager {
         _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
     ) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -656,11 +653,8 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun setupTradablePoolResources(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -775,11 +769,10 @@ access(all) contract FungibleTokenManager {
         epochDays: UInt8,
     ) {
         pre {
-            ins.isExtractable(): "The inscription is not extracted"
             epochDays > 0 && epochDays <= 15: "The interval days should be 1~15"
         }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
 
         // singletoken resources
@@ -832,11 +825,8 @@ access(all) contract FungibleTokenManager {
 
     access(all)
     fun setupLockDropsPool(_ ins: auth(Fixes.Extractable) &Fixes.Inscription, lockingExchangeRates: {UFix64: UFix64}) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -909,11 +899,8 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun setupAirdropsPool(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -1050,6 +1037,9 @@ access(all) contract FungibleTokenManager {
         _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
     ) {
+        post {
+            ins.isValueEmpty(): "The inscription is not empty"
+        }
         // singletoken resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -1123,11 +1113,8 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun setupFRC20ConverterResources(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()

@@ -147,6 +147,8 @@ access(all) contract Fixes {
         view fun isExtracted(): Bool
         access(all)
         view fun isExtractable(): Bool
+        access(all)
+        view fun isValueEmpty(): Bool
     }
 
     /// The resource that stores the inscriptions
@@ -328,6 +330,13 @@ access(all) contract Fixes {
             } else { // 100000 ~
                 return ValueRarity.Legendary
             }
+        }
+
+        /// Check if the inscription is empty
+        ///
+        access(all)
+        view fun isValueEmpty(): Bool {
+            return self.isExtracted() || self.getInscriptionValue() == 0.0
         }
 
         /** ---- Implementation of InscriptionPublic ---- */

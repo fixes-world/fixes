@@ -183,7 +183,7 @@ access(all) contract FixesTokenAirDrops {
             )
 
             // extract the inscription
-            FixesTradablePool.verifyAndExecuteInscription(
+            let _meta = FixesTradablePool.verifyAndExecuteInscription(
                 ins,
                 symbol: self.minter.getSymbol(),
                 usage: "set-claimables"
@@ -316,11 +316,8 @@ access(all) contract FixesTokenAirDrops {
         _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
     ): @AirdropPool {
-        pre {
-            ins.isExtractable(): "The inscription is not extractable"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not extracted"
         }
 
         // verify the inscription and get the meta data
