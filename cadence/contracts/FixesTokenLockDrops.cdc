@@ -1116,11 +1116,8 @@ access(all) contract FixesTokenLockDrops {
         _ activateTime: UFix64?,
         _ failureDeprecatedTime: UFix64?
     ): @DropsPool {
-        pre {
-            ins.isExtractable(): "The inscription is not extractable"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
 
         // verify the inscription and get the meta data

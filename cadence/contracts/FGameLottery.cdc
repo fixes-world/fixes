@@ -843,11 +843,7 @@ access(all) contract FGameLottery {
             self.checkingQueue = nil
             // Set the current pool
             let tick = jackpotPoolRef.getOriginalTick()
-            if tick != "" {
-                self.current <- FRC20FTShared.createEmptyChange(tick: tick, from: jackpotPoolRef.from)
-            } else {
-                self.current <- FRC20FTShared.createEmptyFlowChange(from: jackpotPoolRef.from)
-            }
+            self.current <- FRC20FTShared.createEmptyChange(tick: tick, from: jackpotPoolRef.from)
         }
 
         /** ---- Public Methods ---- */
@@ -1317,7 +1313,7 @@ access(all) contract FGameLottery {
                         platformFlowRecipient.deposit(from: <- sharedFeeVault)
                     }
                 } else {
-                    // Here is FRC20 token, all service fee will be deposited to the Staking shared pool
+                    // For non-Flow Token, all service fee will be deposited to the Staking shared pool
                     if let stakingAddress = acctsPool.getFRC20StakingAddress(tick: stakingFRC20Tick) {
                         if let stakingPool = FRC20Staking.borrowPool(stakingAddress) {
                             if let rewardStrategy = stakingPool.borrowRewardStrategy(feeTickName) {
@@ -1327,7 +1323,8 @@ access(all) contract FGameLottery {
                         }
                     }
                     if feeChange.getBalance() > 0.0 {
-                        // return to lottery pool address
+                        // return to lottery pool address or pool's FT Vault
+                        // If no FT Receiver exists, the Fee Vault will be burned
                         frc20Indexer.returnChange(change: <- feeChange.withdrawAsChange(amount: totalFeeAmount))
                     }
                 }
@@ -1373,6 +1370,8 @@ access(all) contract FGameLottery {
         view fun getTicketPrice(): UFix64
         access(all)
         view fun getJackpotPoolBalance(): UFix64
+        access(all)
+        view fun getPoolTotalBalance(): UFix64
         access(all)
         view fun getServiceFee(): UFix64
         access(all)
@@ -1470,11 +1469,7 @@ access(all) contract FGameLottery {
             }
             self.name = name
             let accountAddr = FGameLottery.account.address
-            if rewardTick != "" {
-                self.jackpotPool <- FRC20FTShared.createEmptyChange(tick: rewardTick, from: accountAddr)
-            } else {
-                self.jackpotPool <- FRC20FTShared.createEmptyFlowChange(from: accountAddr)
-            }
+            self.jackpotPool <- FRC20FTShared.createEmptyChange(tick: rewardTick, from: accountAddr)
             self.initTicketPrice = ticketPrice
             self.initEpochInterval = epochInterval
             self.currentEpochIndex = 0
@@ -1533,9 +1528,23 @@ access(all) contract FGameLottery {
             return self.jackpotPool.getOriginalTick()
         }
 
+        /// Returns the current Jackpot pool balance
+        ///
         access(all)
         view fun getJackpotPoolBalance(): UFix64 {
             return self.jackpotPool.getBalance()
+        }
+
+        /// Returna the total balance of the pool
+        ///
+        access(all)
+        view fun getPoolTotalBalance(): UFix64 {
+            var totalBalance = self.jackpotPool.getBalance()
+            let epochIndex = self.currentEpochIndex
+            if let lotteryRef = self.borrowLottery(epochIndex) {
+                totalBalance = totalBalance + lotteryRef.getCurrentLotteryBalance()
+            }
+            return totalBalance
         }
 
         access(all)

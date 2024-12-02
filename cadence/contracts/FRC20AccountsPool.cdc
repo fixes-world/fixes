@@ -325,11 +325,8 @@ access(all) contract FRC20AccountsPool {
         ///
         access(all)
         fun executeInscription(type: ChildAccountType, _ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
-            pre {
-                ins.isExtractable(): "The inscription must be extractable"
-            }
             post {
-                ins.isExtracted(): "The inscription must be extracted"
+                ins.isValueEmpty(): "Inscription must be consumed"
             }
             let meta = FixesInscriptionFactory.parseMetadata(ins.borrowData())
             assert(
@@ -340,35 +337,37 @@ access(all) contract FRC20AccountsPool {
                 meta["usage"] != nil,
                 message: "The usage is not found"
             )
-            let tick = meta["tick"] ?? panic("The ticker name is not found")
 
-            // extract the tokens
-            let extractedToken <- ins.extract()
-            let totalAmount = extractedToken.balance
+            // extract the tokens, if the token is extractable
+            if ins.isExtractable() {
+                let extractedToken <- ins.extract()
+                let totalAmount = extractedToken.balance
 
-            // 1/4 -> Platform Staking Account
-            let globalStore = FRC20FTShared.borrowGlobalStoreRef()
-            let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
-            if let addr = self.getAddress(type: ChildAccountType.Staking, stakingFRC20Tick) {
-                if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
-                    // withdraw the tokens to the treasury
-                    stakingFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.4))
+                // 1/4 -> Platform Staking Account
+                let globalStore = FRC20FTShared.borrowGlobalStoreRef()
+                let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
+                if let addr = self.getAddress(type: ChildAccountType.Staking, stakingFRC20Tick) {
+                    if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
+                        // withdraw the tokens to the treasury
+                        stakingFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.4))
+                    }
                 }
-            }
 
-            // 1/3 -> Token Child Account
-            if let addr = self.getAddress(type: type, tick) {
-                if let tickRelatedFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
-                    // the target account
-                    tickRelatedFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.3))
+                // 1/3 -> Token Child Account
+                let tick = meta["tick"] ?? panic("The ticker name is not found")
+                if let addr = self.getAddress(type: type, tick) {
+                    if let tickRelatedFlowReciever = Fixes.borrowFlowTokenReceiver(addr) {
+                        // the target account
+                        tickRelatedFlowReciever.deposit(from: <- extractedToken.withdraw(amount: totalAmount * 0.3))
+                    }
                 }
-            }
 
-            // 1/3 -> Protocol(System Account)
-            let systemFlowReciever = Fixes.borrowFlowTokenReceiver(self.owner?.address!)
-                ?? panic("Failed to borrow system flow token receiver")
-            // remaining the extracted tokens will be sent to the system account
-            systemFlowReciever.deposit(from: <- extractedToken)
+                // 1/3 -> Protocol(System Account)
+                let systemFlowReciever = Fixes.borrowFlowTokenReceiver(self.owner?.address!)
+                    ?? panic("Failed to borrow system flow token receiver")
+                // remaining the extracted tokens will be sent to the system account
+                systemFlowReciever.deposit(from: <- extractedToken)
+            }
         }
 
         /// ----- Access account methods -----

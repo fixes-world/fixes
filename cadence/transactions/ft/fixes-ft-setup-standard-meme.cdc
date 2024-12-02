@@ -8,13 +8,11 @@ import "FixesInscriptionFactory"
 import "FRC20FTShared"
 
 transaction(
-    symbol: String,
-    tradablePoolSupply: UFix64,
-    creatorFeePercentage: UFix64,
-    freeMintAmount: UFix64,
+    coinAddress: Address,
+    lotteryEpochDays: UInt8?,
 ) {
-    let tickerName: String
     let setupTradablePoolIns: auth(Fixes.Extractable) &Fixes.Inscription
+    let setupLotteryPoolIns: auth(Fixes.Extractable) &Fixes.Inscription
 
     prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -34,45 +32,43 @@ transaction(
             .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
             ?? panic("Could not borrow reference to the owner's Vault!")
 
-        self.tickerName = "$".concat(symbol)
+        let tokenInfo = FungibleTokenManager.buildFixesTokenInfo(coinAddress, nil)
+            ?? panic("Token doesn't exist in address: ".concat(coinAddress.toString()))
+        let tickerName = tokenInfo.view.accountKey
 
         /** ------------- Create the Inscription 2 - Start ------------- */
-        let fields: {String: String} = {}
-        if tradablePoolSupply > 0.0 {
-            fields["supply"] = tradablePoolSupply.toString()
-        }
-        if creatorFeePercentage > 0.0 {
-            fields["feePerc"] = creatorFeePercentage.toString()
-        }
-        if freeMintAmount > 0.0 {
-            fields["freeAmount"] = freeMintAmount.toString()
-        }
-        let tradablePoolInsDataStr = FixesInscriptionFactory.buildPureExecuting(
-            tick: self.tickerName,
-            usage: "setup-tradable-pool",
-            fields
-        )
-        // estimate the required storage
-        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(tradablePoolInsDataStr)
-        // get reserved cost
-        let flowToReserve <- (flowVaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
+        let tradablePoolInsDataStr = FixesInscriptionFactory.buildPureExecuting(tick: tickerName, usage: "setup-tradable-pool", {})
         // Create the Inscription first
         let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
             tradablePoolInsDataStr,
-            <- flowToReserve,
+            <- flowVaultRef.withdraw(
+                amount: FixesInscriptionFactory.estimateFrc20InsribeCost(tradablePoolInsDataStr)
+            ) as! @FlowToken.Vault,
             store
         )
         // borrow a reference to the new Inscription
         self.setupTradablePoolIns = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow a reference to the newly created Inscription!")
         /** ------------- End --------------------------------------- */
-    }
 
-    pre {
-        FungibleTokenManager.isTokenSymbolEnabled(self.tickerName) == true: "Token is already enabled"
+        /** ------------- Create the Inscription 2 - Start ------------- */
+        let setupLotteryStr = FixesInscriptionFactory.buildPureExecuting(tick: tickerName, usage: "setup-lottery", {})
+        // Create the Inscription first
+        let newInsId2 = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+            setupLotteryStr,
+            <- flowVaultRef.withdraw(amount: FixesInscriptionFactory.estimateFrc20InsribeCost(setupLotteryStr)) as! @FlowToken.Vault,
+            store
+        )
+        // borrow a reference to the new Inscription
+        self.setupLotteryPoolIns = store.borrowInscriptionWritableRef(newInsId2)
+            ?? panic("Could not borrow a reference to the newly created Inscription!")
+        /** ------------- End --------------------------------------- */
     }
 
     execute {
+        // Setup Tradable Pool
         FungibleTokenManager.setupTradablePoolResources(self.setupTradablePoolIns)
+        // Setup Lottery Pool
+        FungibleTokenManager.setupLotteryPool(self.setupLotteryPoolIns, epochDays: lotteryEpochDays ?? 3)
     }
 }

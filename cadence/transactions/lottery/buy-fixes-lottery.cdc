@@ -1,6 +1,8 @@
 // Thirdparty imports
 import "FungibleToken"
 import "FlowToken"
+import "ScopedFTProviders"
+import "FlowEVMBridgeConfig"
 // Fixes Imports
 import "Fixes"
 import "FGameLottery"
@@ -14,7 +16,7 @@ transaction(
 ) {
     let address: Address
     let store: auth(Fixes.Manage) &Fixes.InscriptionsStore
-    let flowCost: @FlowToken.Vault
+    let scopedProvider: @ScopedFTProviders.ScopedFTProvider
 
     prepare(acct: auth(Storage, Capabilities) &Account) {
         self.address = acct.address
@@ -54,11 +56,25 @@ transaction(
             ? FGameLotteryFactory.getFIXESMintingLotteryFlowCost(ticketAmt, powerupType, withMinting)
             : FGameLotteryFactory.getFIXESLotteryFlowCost(ticketAmt, powerupType, acct.address)
 
-        // Get a reference to the signer's stored vault
-        let vaultRef = acct.storage
-            .borrow<auth(FungibleToken.Withdraw) &FlowToken.Vault>(from: /storage/flowTokenVault)
-            ?? panic("Could not borrow reference to the owner's Vault!")
-        self.flowCost <- vaultRef.withdraw(amount: estimateFlowCost) as! @FlowToken.Vault
+        /* --- Configure a ScopedFTProvider --- */
+        //
+        // Issue and store bridge-dedicated Provider Capability in storage if necessary
+        if acct.storage.type(at: FlowEVMBridgeConfig.providerCapabilityStoragePath) == nil {
+            let providerCap = acct.capabilities.storage
+                .issue<auth(FungibleToken.Withdraw) &{FungibleToken.Provider}>(/storage/flowTokenVault)
+            acct.storage.save(providerCap, to: FlowEVMBridgeConfig.providerCapabilityStoragePath)
+        }
+        let providerCapCopy = acct.storage
+            .copy<Capability<auth(FungibleToken.Withdraw) &{FungibleToken.Provider}>>(
+                from: FlowEVMBridgeConfig.providerCapabilityStoragePath
+            ) ?? panic("Invalid FungibleToken Provider Capability found in storage at path "
+                .concat(FlowEVMBridgeConfig.providerCapabilityStoragePath.toString()))
+        let providerFilter = ScopedFTProviders.AllowanceFilter(estimateFlowCost)
+        self.scopedProvider <- ScopedFTProviders.createScopedFTProvider(
+            provider: providerCapCopy,
+            filters: [ providerFilter ],
+            expiration: getCurrentBlock().timestamp + 1.0
+        )
     }
 
     execute {
@@ -70,10 +86,9 @@ transaction(
         )
 
         // Purchase the lottery
-        var restVault: @FlowToken.Vault? <- nil
         if forFlow {
-            restVault <-! FGameLotteryFactory.buyFIXESMintingLottery(
-                flowVault: <- self.flowCost,
+            FGameLotteryFactory.buyFIXESMintingLottery(
+                flowProvider:  &self.scopedProvider as auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
                 ticketAmount: ticketAmt,
                 powerup: FGameLotteryFactory.PowerUpType(rawValue: powerupLv) ?? panic("Invalid powerup level"),
                 withMinting: withMinting,
@@ -81,24 +96,15 @@ transaction(
                 inscriptionStore: self.store
             )
         } else {
-            restVault <-! FGameLotteryFactory.buyFIXESLottery(
-                flowVault: <- self.flowCost,
+            FGameLotteryFactory.buyFIXESLottery(
+                flowProvider: &self.scopedProvider as auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
                 ticketAmount: ticketAmt,
                 powerup: FGameLotteryFactory.PowerUpType(rawValue: powerupLv) ?? panic("Invalid powerup level"),
                 recipient: ticketCollectionCap,
                 inscriptionStore: self.store
             )
         }
-
-        // If there's any remaining Flow in the vault, deposit it into the user's FlowToken receiver
-        if restVault?.balance! > 0.0 {
-            let flowTokenReceiver = Fixes.borrowFlowTokenReceiver(self.address)
-                ?? panic("Could not borrow a reference to the FlowToken Receiver!")
-            flowTokenReceiver.deposit(from: <- restVault!)
-        } else {
-            destroy restVault
-        }
-
+        destroy self.scopedProvider
         log("FIXES Lottery purchased!")
     }
 }
