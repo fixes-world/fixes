@@ -1128,7 +1128,11 @@ access(all) contract FixesTradablePool {
             _ isExtendingBuy: Bool,
         ): @{FungibleToken.Vault} {
             post {
-                result.getType().isInstance(self.getTokenType()): "The result vault is not the same type as the liquidity pool"
+                result.isInstance(self.getTokenType()):
+                    "The result vault is not the same type as the liquidity pool. Result Type: "
+                    .concat(result.getType().identifier)
+                    .concat(" Pool Type: ")
+                    .concat(self.getTokenType().identifier)
             }
 
             let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
