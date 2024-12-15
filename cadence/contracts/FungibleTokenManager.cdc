@@ -795,7 +795,7 @@ access(all) contract FungibleTokenManager {
         epochDays: UInt8,
     ) {
         pre {
-            epochDays > 0 && epochDays <= 15: "The interval days should be 1~15"
+            epochDays > 0 && epochDays <= 7: "The interval days should be 1~15"
         }
         post {
             ins.isValueEmpty(): "The inscription is not empty"
@@ -834,7 +834,7 @@ access(all) contract FungibleTokenManager {
         let maxSupply = superMinter.getMaxSupply()
         // ticket price is MaxSupply/500_000
         let ticketPice = maxSupply / 500_000.0
-        let epochInterval = UFix64(epochDays * 24 * 60 * 60)
+        let epochInterval = UFix64(UInt64(epochDays) * 24 * 60 * 60)
 
         FGameLotteryRegistry.createLotteryPool(
             operatorAddr: callerAddr,
@@ -844,6 +844,9 @@ access(all) contract FungibleTokenManager {
             ticketPrice: ticketPice,
             epochInterval: epochInterval,
         )
+
+        // execute the inscription
+        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
 
         // emit the event
         emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)

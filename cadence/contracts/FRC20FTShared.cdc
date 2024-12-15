@@ -537,7 +537,7 @@ access(all) contract FRC20FTShared {
         if ftVaultType.isSubtype(of: Type<@{FungibleToken.Vault}>()) {
             return ftVaultType.isInstance(Type<@FlowToken.Vault>())
                 ? ""
-                : "@".concat(ftVaultType.getType().identifier)
+                : "@".concat(ftVaultType.identifier)
         }
         return nil
     }
@@ -552,6 +552,10 @@ access(all) contract FRC20FTShared {
                 return FlowToken.resolveContractView(resourceType: nil, viewType: viewType) as! FungibleTokenMetadataViews.FTVaultData?
             } else {
                 let identifierSplits = tick.split(separator: ".") // should be @A.{address}.{ContractName}.{Vault}
+                assert(
+                    identifierSplits.length == 3 || identifierSplits.length == 4,
+                    message: "Invalid ticker because it is not a vaild type. Tick: ".concat(tick)
+                )
                 let contractAddr = Address.fromString("0x".concat(identifierSplits[1]))
                     ?? panic("Invalid ticker because it is not a vaild type.")
                 let contractName = identifierSplits[2]
