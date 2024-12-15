@@ -28,6 +28,7 @@ import "FRC20TradingRecord"
 import "FRC20StakingManager"
 import "FRC20Agents"
 import "FRC20Converter"
+import "FGameLottery"
 import "FGameLotteryRegistry"
 
 /// The Manager contract for Fungible Token
@@ -450,6 +451,11 @@ access(all) contract FungibleTokenManager {
             if airdropsPool != nil {
                 self.supportedMinters.append(airdropsPool!.getType())
             }
+            // Try to add lottery pool
+            let lotteryPool = FGameLottery.borrowLotteryPool(self.address)
+            if lotteryPool != nil {
+                self.supportedMinters.append(lotteryPool!.getType())
+            }
         }
 
         access(all)
@@ -465,6 +471,11 @@ access(all) contract FungibleTokenManager {
         access(all)
         view fun isAirdropsPoolSupported(): Bool {
             return self.supportedMinters.contains(Type<@FixesTokenAirDrops.AirdropPool>())
+        }
+
+        access(all)
+        view fun isLotteryPoolSupported(): Bool {
+            return self.supportedMinters.contains(Type<@FGameLottery.LotteryPool>())
         }
     }
 
@@ -570,6 +581,17 @@ access(all) contract FungibleTokenManager {
                 totalAllocatedSupply = totalAllocatedSupply + airdropsPool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + airdropsPool.getTotalMintedAmount()
             }
+            if modules.isLotteryPoolSupported() {
+                let lotteryPool = FGameLottery.borrowLotteryPool(ftAddress)!
+                info.setExtra("lottery:currentEpochIndex", lotteryPool.getCurrentEpochIndex()) // UInt64
+                info.setExtra("lottery:epochInternal", lotteryPool.getEpochInterval()) // UFix64
+                info.setExtra("lottery:lotteryToken", lotteryPool.getLotteryToken()) // String
+                info.setExtra("lottery:ticketPrice", lotteryPool.getTicketPrice()) // UFix64
+                info.setExtra("lottery:jackpotAmount", lotteryPool.getJackpotPoolBalance()) // UFix64
+                info.setExtra("lottery:totalPoolAmount", lotteryPool.getPoolTotalBalance()) // UFix64
+                info.setExtra("lottery:currentParticipants", lotteryPool.borrowCurrentLottery()?.getParticipantAmount() ?? 0) // UInt64
+            }
+
             // Total Supply Metadata
             info.setExtra("total:allocatedSupply", totalAllocatedSupply)
             info.setExtra("total:supplied", totalCirculatedSupply)
@@ -581,6 +603,10 @@ access(all) contract FungibleTokenManager {
                 info.setExtra("token:transactions", status.sales)
                 info.setExtra("token:totalTradedVolume", status.volume)
                 info.setExtra("token:totalTradedAmount", status.dealAmount)
+            } else {
+                info.setExtra("token:transactions", 0)
+                info.setExtra("token:totalTradedVolume", 0.0)
+                info.setExtra("token:totalTradedAmount", 0.0)
             }
             return info
         }
