@@ -2058,7 +2058,7 @@ access(all) contract FixesTradablePool {
             ftReceiver.isSupportedVaultType(type: tokenType),
             message: "Unsupported token type"
         )
-        let tickerName = FRC20FTShared.buildTicker(tokenType) ?? panic("Ticker is not valid")
+        let tickerName = "$".concat(tradablePoolRef.getSymbol())
 
         // ---- create the basic inscription ----
         let dataStr = FixesInscriptionFactory.buildPureExecuting(

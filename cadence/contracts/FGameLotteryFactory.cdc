@@ -513,9 +513,9 @@ access(all) contract FGameLotteryFactory {
             ftReceiver.isSupportedVaultType(type: tokenType),
             message: "Unsupported token type"
         )
-        let tickerName = FRC20FTShared.buildTicker(tokenType) ?? panic("Ticker is not valid")
 
         // ---- create the basic inscription ----
+        let tickerName = "$".concat(tradablePoolRef.getSymbol())
         let dataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: tickerName,
             usage: "init",
