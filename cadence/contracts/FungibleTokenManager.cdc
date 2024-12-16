@@ -533,6 +533,7 @@ access(all) contract FungibleTokenManager {
                 info.setExtra("tradable:supplied", tradablePool.getTradablePoolCirculatingSupply())
                 info.setExtra("tradable:flowInPool", tradablePool.getFlowBalanceInPool())
                 info.setExtra("tradable:liquidityMcap", tradablePool.getLiquidityMarketCap())
+                info.setExtra("tradable:burnedLPAmount", tradablePool.getBurnedLP())
                 info.setExtra("tradable:burnedSupply", tradablePool.getBurnedTokenAmount())
                 info.setExtra("tradable:burnedLiquidityValue", tradablePool.getBurnedLiquidityValue())
                 info.setExtra("tradable:targetMcap", FixesTradablePool.getTargetMarketCap())
