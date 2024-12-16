@@ -531,9 +531,10 @@ access(all) contract FungibleTokenManager {
                 let tradablePool = FixesTradablePool.borrowTradablePool(ftAddress)!
                 info.setExtra("tradable:allocatedSupply", tradablePool.getTotalAllowedMintableAmount())
                 info.setExtra("tradable:supplied", tradablePool.getTradablePoolCirculatingSupply())
-                info.setExtra("tradable:burnedSupply", tradablePool.getBurnedTokenAmount())
                 info.setExtra("tradable:flowInPool", tradablePool.getFlowBalanceInPool())
                 info.setExtra("tradable:liquidityMcap", tradablePool.getLiquidityMarketCap())
+                info.setExtra("tradable:burnedSupply", tradablePool.getBurnedTokenAmount())
+                info.setExtra("tradable:burnedLiquidityValue", tradablePool.getBurnedLiquidityValue())
                 info.setExtra("tradable:targetMcap", FixesTradablePool.getTargetMarketCap())
                 info.setExtra("tradable:isLocalActive", tradablePool.isLocalActive())
                 info.setExtra("tradable:isHandovered", tradablePool.isLiquidityHandovered())
