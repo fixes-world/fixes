@@ -547,6 +547,12 @@ access(all) contract FGameLottery {
         view fun getIDs(): [UInt64]
 
         access(all)
+        fun forEachID(_ f: fun (UInt64): Bool): Void
+
+        access(all)
+        fun slicedIDs(_ page: Int, _ size: Int): [UInt64]
+
+        access(all)
         view fun getTicketAmount(): Int
 
         access(all)
@@ -577,6 +583,30 @@ access(all) contract FGameLottery {
         access(all)
         view fun getIDs(): [UInt64] {
             return self.dscSortedIDs
+        }
+
+        /// Allows a given function to iterate through the list
+        /// of owned NFT IDs in a collection without first
+        /// having to load the entire list into memory
+        access(all)
+        fun forEachID(_ f: fun (UInt64): Bool): Void {
+            self.tickets.forEachKey(f)
+        }
+
+        /// Get the sliced ticket IDs
+        ///
+        access(all)
+        fun slicedIDs(_ page: Int, _ size: Int): [UInt64] {
+            var startAt = page * size
+            let max = self.dscSortedIDs.length
+            if startAt >= max {
+                return []
+            }
+            var upTo = startAt + size
+            if upTo > max {
+                upTo = max
+            }
+            return self.dscSortedIDs.slice(from: startAt, upTo: upTo)
         }
 
         /// Get the ticket amount
