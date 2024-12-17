@@ -535,7 +535,7 @@ access(all) contract FRC20FTShared {
     access(all)
     view fun buildTicker(_ ftVaultType: Type): String? {
         if ftVaultType.isSubtype(of: Type<@{FungibleToken.Vault}>()) {
-            return ftVaultType.isInstance(Type<@FlowToken.Vault>())
+            return ftVaultType.isSubtype(of: Type<@FlowToken.Vault>())
                 ? ""
                 : "@".concat(ftVaultType.identifier)
         }

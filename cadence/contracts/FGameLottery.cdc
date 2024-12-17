@@ -1598,7 +1598,9 @@ access(all) contract FGameLottery {
         ) {
             pre {
                 amount > 0: "Amount must be greater than 0"
-                payment.getOriginalTick() == self.jackpotPool.getOriginalTick(): "Invalid payment token"
+                payment.getOriginalTick() == self.jackpotPool.getOriginalTick()
+                    : "Invalid payment token, expected: ".concat(self.jackpotPool.getOriginalTick())
+                                    .concat(", got: ").concat(payment.getOriginalTick())
                 self.isCurrentLotteryActive(): "The current lottery is not active"
             }
 
