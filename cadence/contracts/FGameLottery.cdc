@@ -960,6 +960,10 @@ access(all) contract FGameLottery {
             pre {
                 self.getStatus() == LotteryStatus.ACTIVE: "The lottery is not active"
             }
+            post {
+                self.getCurrentLotteryBalance() == before(self.getCurrentLotteryBalance()) + before(payment.getBalance()):
+                    "The payment is not deposited to the lottery"
+            }
 
             // deposit the payment to the total bought
             let ref = self.borrowCurrentLotteryChange()
