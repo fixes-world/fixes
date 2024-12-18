@@ -6,6 +6,7 @@ import "FungibleTokenManager"
 import "Fixes"
 import "FixesInscriptionFactory"
 import "FRC20FTShared"
+import "FixesHeartbeat"
 
 transaction(
     symbol: String,
@@ -13,6 +14,7 @@ transaction(
 ) {
     let tickerName: String
     let setupPoolIns: auth(Fixes.Extractable) &Fixes.Inscription
+    let heartbeat: &FixesHeartbeat.Heartbeat
 
     prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -55,6 +57,16 @@ transaction(
         self.setupPoolIns = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow a reference to the newly created Inscription!")
         /** ------------- End --------------------------------------- */
+
+        /** ------------- Start -- Fixes Heartbeat Initialization ------------  */
+        // ensure resource
+        if acct.storage.borrow<&AnyResource>(from: FixesHeartbeat.storagePath) == nil {
+            acct.storage.save(<- FixesHeartbeat.createHeartbeat(), to: FixesHeartbeat.storagePath)
+        }
+        /** ------------- End ---------------------------------------------------------- */
+
+        self.heartbeat = acct.storage.borrow<&FixesHeartbeat.Heartbeat>(from: FixesHeartbeat.storagePath)
+            ?? panic("Could not borrow a reference to the heartbeat")
     }
 
     pre {
@@ -63,5 +75,7 @@ transaction(
 
     execute {
         FungibleTokenManager.setupLotteryPool(self.setupPoolIns, epochDays: epochDays)
+
+        self.heartbeat.tick(scope: "FGameLottery")
     }
 }
