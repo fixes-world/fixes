@@ -10,6 +10,7 @@ This contract is used to fetch the child account by verifying the signature of t
 import "FungibleToken"
 import "FlowToken"
 import "StringUtils"
+import "EVM"
 // Fixes Imports
 import "ETHUtils"
 import "Fixes"
@@ -648,6 +649,7 @@ access(all) contract EVMAgent {
             var isUpdated = false
             // The entrust account should have the following resources in the account:
             // - EVMAgent.EntrustedStatus
+            // - EVM Resource
 
             // create the shared store and save it in the account
             if childAcctRef.storage.borrow<&AnyResource>(from: EVMAgent.entrustedStatusStoragePath) == nil {
@@ -663,6 +665,21 @@ access(all) contract EVMAgent {
                     childAcctRef.capabilities.storage.issue<&EVMAgent.EntrustedStatus>(EVMAgent.entrustedStatusStoragePath),
                     at: EVMAgent.entrustedStatusPublicPath
                 )
+
+                isUpdated = true || isUpdated
+            }
+
+            // Create a new COA
+            let storagePath = StoragePath(identifier: "evm")!
+            let publicPath = PublicPath(identifier: "evm")!
+            if childAcctRef.storage.borrow<&AnyResource>(from: storagePath) == nil {
+                let coa <- EVM.createCadenceOwnedAccount()
+
+                // Save the COA to the new account
+                childAcctRef.storage.save<@EVM.CadenceOwnedAccount>(<-coa, to: storagePath)
+                let addressableCap = childAcctRef.capabilities.storage.issue<&EVM.CadenceOwnedAccount>(storagePath)
+                childAcctRef.capabilities.unpublish(publicPath)
+                childAcctRef.capabilities.publish(addressableCap, at: publicPath)
 
                 isUpdated = true || isUpdated
             }
