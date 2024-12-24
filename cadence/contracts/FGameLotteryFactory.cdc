@@ -461,8 +461,13 @@ access(all) contract FGameLotteryFactory {
         let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
 
         let tokenBoughtAmountInTotal = tradablePoolRef.getEstimatedBuyingAmountByCost(flowAmount - estimatedReqValue)
-        let tokenBoughtAmount = tokenBoughtAmountInTotal * 0.9
-        let tokenToBuyTickets = tokenBoughtAmountInTotal - tokenBoughtAmount
+
+        var tokenBoughtAmount = tokenBoughtAmountInTotal * 0.9
+        var tokenToBuyTickets = tokenBoughtAmountInTotal - tokenBoughtAmount
+        if !tradablePoolRef.isLocalActive() {
+            tokenBoughtAmount = 0.0
+            tokenToBuyTickets = tokenBoughtAmountInTotal
+        }
 
         let ticketPrice = lotteryPoolRef.getTicketPrice()
         let maxCounter = UInt64(tokenToBuyTickets / ticketPrice)
