@@ -1106,14 +1106,17 @@ access(all) contract FixesTradablePool {
                     lotteryPool.getLotteryToken() == internalTicker,
                     message: "The lottery token is not the same as the token type"
                 )
-                // 10% of the token you obtained will be used to buy the lottery tickets
-                // 90% of the token you obtained will be deposited to the recipient
-                let depositToUser = tokenYouObtained.balance * 0.9
-                // if no lottery, then deposit the token to the recipient
-                self._depositToken(<- tokenYouObtained.withdraw(amount: depositToUser), recipient: recipient)
+
+                // During bonding curve is active, the lottery ticket will be bought with 10% of the token you obtained
+                if !self.isLocalActive() {
+                    // 10% of the token you obtained will be used to buy the lottery tickets
+                    // 90% of the token you obtained will be deposited to the recipient
+                    var depositToUser = tokenYouObtained.balance * 0.9
+                    // if no lottery, then deposit the token to the recipient
+                    self._depositToken(<- tokenYouObtained.withdraw(amount: depositToUser), recipient: recipient)
+                }
             } else {
-                // if no lottery, then deposit the token to the recipient
-                self._depositToken(<- tokenYouObtained.withdraw(amount: tokenYouObtained.balance), recipient: recipient)
+                panic("The lottery pool does not exist")
             }
             return <- tokenYouObtained
         }

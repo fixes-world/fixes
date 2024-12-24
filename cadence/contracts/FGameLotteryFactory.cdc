@@ -542,27 +542,29 @@ access(all) contract FGameLotteryFactory {
 
         // buy token first
         let tokenToBuyTickets <- tradablePoolRef.buyTokensWithLottery(ins, recipient: ftReceiver)
-        let ticketPrice = lotteryPoolRef.getTicketPrice()
-        let maxCounter = UInt64(tokenToBuyTickets.balance / ticketPrice)
+        if tokenToBuyTickets.balance > 0.0 {
+            let ticketPrice = lotteryPoolRef.getTicketPrice()
+            let maxCounter = UInt64(tokenToBuyTickets.balance / ticketPrice)
 
-        // select the powerup value
-        var powerupValue = self.getBestPowerupValue(maxCounter)
-        let ticketAmount = UInt64(tokenToBuyTickets.balance / (ticketPrice * powerupValue))
-        let ticketsPayment: UFix64 = UFix64(ticketAmount) * ticketPrice * powerupValue
+            // select the powerup value
+            var powerupValue = self.getBestPowerupValue(maxCounter)
+            let ticketAmount = UInt64(tokenToBuyTickets.balance / (ticketPrice * powerupValue))
+            let ticketsPayment: UFix64 = UFix64(ticketAmount) * ticketPrice * powerupValue
 
-        // wrap the inscription change
-        let change <- FRC20FTShared.wrapFungibleVaultChange(
-            ftVault: <- tokenToBuyTickets.withdraw(amount: ticketsPayment),
-            from: ticketRecipient.address
-        )
-        // buy the tickets
-        lotteryPoolRef.buyTickets(
-            // withdraw flow token from the vault
-            payment: <- change,
-            amount: ticketAmount,
-            powerup: powerupValue,
-            recipient: ticketRecipient,
-        )
+            // wrap the inscription change
+            let change <- FRC20FTShared.wrapFungibleVaultChange(
+                ftVault: <- tokenToBuyTickets.withdraw(amount: ticketsPayment),
+                from: ticketRecipient.address
+            )
+            // buy the tickets
+            lotteryPoolRef.buyTickets(
+                // withdraw flow token from the vault
+                payment: <- change,
+                amount: ticketAmount,
+                powerup: powerupValue,
+                recipient: ticketRecipient,
+            )
+        }
 
         // handle rest of the tokens
         if tokenToBuyTickets.balance > 0.0 {
