@@ -1295,9 +1295,14 @@ access(all) contract FixesTradablePool {
                 message: "The initialized coin vault does not have enough tokens"
             )
 
+            var sellerAddr = self.getPoolAddress()
+            if !self.isLocalActive() {
+                sellerAddr = self.getSwapPairAddress() ?? panic("The swap pair address is missing")
+            }
+
             // invoke the transaction hook
             self._onTransactionDeal(
-                seller: self.getPoolAddress(),
+                seller: sellerAddr,
                 buyer: callerAddr,
                 dealAmount: recievedAmount,
                 dealPrice: totalCost
