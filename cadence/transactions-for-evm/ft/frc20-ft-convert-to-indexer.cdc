@@ -104,7 +104,7 @@ transaction(
             let metadataPath = ftContract.getVaultPublicPath()
             acct.capabilities.unpublish(metadataPath)
             acct.capabilities.publish(
-                acct.capabilities.storage.issue<&{FungibleToken.Vault}>(storagePath),
+                acct.capabilities.storage.issue<&{FungibleToken.Vault, FixesFungibleTokenInterface.Vault}>(storagePath),
                 at: metadataPath
             )
         }
