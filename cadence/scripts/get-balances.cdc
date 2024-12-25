@@ -25,7 +25,7 @@ fun main(
             ret[""] = bal
         } else if tick == "@".concat(Type<@stFlowToken.Vault>().identifier) {
             if let stFlowRef = getAccount(addr)
-                .capabilities.get<&{FungibleToken.Balance}>(stFlowToken.tokenBalancePath)
+                .capabilities.get<&{FungibleToken.Vault}>(stFlowToken.tokenBalancePath)
                 .borrow()
             {
                 bal = stFlowRef.balance

@@ -786,9 +786,9 @@ access(all) contract interface FixesFungibleTokenInterface {
     /// Get the token metadata of the address
     ///
     access(all)
-    view fun borrowTokenMetadata(_ addr: Address): &{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}? {
+    view fun borrowTokenMetadata(_ addr: Address): &{FungibleToken.Vault, FixesFungibleTokenInterface.Vault}? {
         return getAccount(addr)
-            .capabilities.get<&{FungibleToken.Balance, FixesFungibleTokenInterface.Metadata}>(self.getVaultPublicPath())
+            .capabilities.get<&{FungibleToken.Vault, FixesFungibleTokenInterface.Vault}>(self.getVaultPublicPath())
             .borrow()
     }
 
