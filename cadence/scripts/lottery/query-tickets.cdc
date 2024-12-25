@@ -16,16 +16,7 @@ fun main(
 ): [TicketEntry] {
     let ticketsCol = FGameLottery.getUserTicketCollection(addr)
     if let colRef = ticketsCol.borrow() {
-        let ids = colRef.getIDs()
-        var startAt = page * size
-        if startAt >= ids.length {
-            return []
-        }
-        var upTo = startAt + size
-        if upTo > ids.length {
-            upTo = ids.length
-        }
-        let sliced = ids.slice(from: startAt, upTo: upTo)
+        let sliced = colRef.slicedIDs(page, size)
         let ret: [TicketEntry] = []
         let poolNameCache: {Address: String} = {}
         let prizeTokenCache: {Address: String} = {}

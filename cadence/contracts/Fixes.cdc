@@ -147,6 +147,8 @@ access(all) contract Fixes {
         view fun isExtracted(): Bool
         access(all)
         view fun isExtractable(): Bool
+        access(all)
+        view fun isValueEmpty(): Bool
     }
 
     /// The resource that stores the inscriptions
@@ -169,9 +171,6 @@ access(all) contract Fixes {
             encoding: String?,
             parentId: UInt64?
         ) {
-            post {
-                self.isValueValid(): "Inscription value should be bigger than minimium $FLOW at least."
-            }
             self.id = Fixes.totalInscriptions
             Fixes.totalInscriptions = Fixes.totalInscriptions + 1
             self.parentId = parentId
@@ -204,7 +203,7 @@ access(all) contract Fixes {
         ///
         access(all)
         view fun isExtractable(): Bool {
-            return !self.isExtracted() && self.owner != nil
+            return !self.isExtracted() && self.isValueValid() && self.owner != nil
         }
 
         /// Check if the inscription value is valid
@@ -331,6 +330,13 @@ access(all) contract Fixes {
             } else { // 100000 ~
                 return ValueRarity.Legendary
             }
+        }
+
+        /// Check if the inscription is empty
+        ///
+        access(all)
+        view fun isValueEmpty(): Bool {
+            return self.isExtracted() || self.getInscriptionValue() == 0.0
         }
 
         /** ---- Implementation of InscriptionPublic ---- */

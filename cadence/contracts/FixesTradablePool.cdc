@@ -32,6 +32,7 @@ import "FRC20FTShared"
 import "FRC20AccountsPool"
 import "FRC20StakingManager"
 import "FRC20Converter"
+import "FGameLottery"
 
 /// The bonding curve contract.
 /// This contract allows users to buy and sell fungible tokens at a price that is determined by a bonding curve algorithm.
@@ -416,63 +417,25 @@ access(all) contract FixesTradablePool {
             amount: UFix64,
         ): UFix64
 
-        // ----- Trade (Writable) -----
-
-        /// Buy the token with the given inscription
-        /// - ins: The inscription to buy the token
-        /// - amount: The amount of token to buy, if nil, use all the inscription value to buy the token
+        /// Get the estimated swap amount by amount out
+        ///
         access(all)
-        fun buyTokens(
-            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
-            _ amount: UFix64?,
-            recipient: &{FungibleToken.Receiver},
-        ) {
-            pre {
-                self.isInitialized(): "The liquidity pool is not initialized"
-                self.isLocalActive(): "The liquidity pool is not active"
-                ins.isExtractable(): "The inscription is not extractable"
-                ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
-                // TODO: change method in Standard V2
-                recipient.getSupportedVaultTypes()[self.getTokenType()] == true: "The recipient does not support the token type"
-            }
-            post {
-                ins.isExtracted(): "The inscription is not extracted"
-            }
-        }
+        view fun getSwapEstimatedAmountIn(
+            _ directionTokenToFlow: Bool,
+            amountOut: UFix64,
+        ): UFix64
 
-        /// Sell the token to the liquidity pool
-        /// - tokenVault: The token vault to sell
+        /// Get the estimated token buying amount by cost
         access(all)
-        fun sellTokens(
-            _ tokenVault: @{FungibleToken.Vault},
-            recipient: &{FungibleToken.Receiver},
-        ) {
-            pre {
-                self.isInitialized(): "The liquidity pool is not initialized"
-                self.isLocalActive(): "The liquidity pool is not active"
-                tokenVault.isInstance(self.getTokenType()): "The token vault is not the same type as the liquidity pool"
-                tokenVault.balance > 0.0: "The token vault balance must be greater than 0"
-                // TODO: change method in Standard V2
-                recipient.getSupportedVaultTypes()[Type<@FlowToken.Vault>()] == true: "The recipient does not support FlowToken.Vault"
-            }
-            post {
-                before(self.getTradablePoolCirculatingSupply()) == self.getTradablePoolCirculatingSupply() + before(tokenVault.balance): "The circulating supply is not updated"
-            }
-        }
+        view fun getEstimatedBuyingAmountByCost(_ cost: UFix64): UFix64
 
-        /// Swap all tokens in the vault and deposit to the token out recipient
+        /// Get the estimated token buying cost by amount
         access(all)
-        fun quickSwapToken(
-            _ tokenInVault: @{FungibleToken.Vault},
-            _ tokenOutRecipient: &{FungibleToken.Receiver},
-        ) {
-            pre {
-                self.isInitialized(): "The liquidity pool is not initialized"
-                !self.isLocalActive(): "The liquidity pool is active"
-                tokenInVault.balance > 0.0: "The token vault balance must be greater than 0"
-                tokenInVault.isInstance(self.getTokenType()) || tokenInVault.isInstance(Type<@FlowToken.Vault>()): "The token vault is not the same type as the liquidity pool"
-            }
-        }
+        view fun getEstimatedBuyingCostByAmount(_ amount: UFix64): UFix64
+
+        /// Get the estimated token selling value by amount
+        access(all)
+        view fun getEstimatedSellingValueByAmount(_ amount: UFix64): UFix64
 
         // ---- Bonding Curve ----
 
@@ -701,10 +664,10 @@ access(all) contract FixesTradablePool {
             if self.isLocalActive() {
                 return self.getUnitPrice()
             }
-            return self.getSwapEstimatedAmount(true, amount: 1.0)
+            return self.getSwapEstimatedAmountIn(false, amountOut: 1.0)
         }
 
-        /// Get the estimated swap amount
+        /// Get the estimated swap amount by amount in
         ///
         access(all)
         view fun getSwapEstimatedAmount(
@@ -721,6 +684,61 @@ access(all) contract FixesTradablePool {
                 return SwapConfig.getAmountOut(amountIn: amount, reserveIn: reserveToken, reserveOut: reserveFlow)
             } else {
                 return SwapConfig.getAmountOut(amountIn: amount, reserveIn: reserveFlow, reserveOut: reserveToken)
+            }
+        }
+
+        /// Get the estimated swap amount by amount out
+        ///
+        access(all)
+        view fun getSwapEstimatedAmountIn(
+            _ directionTokenToFlow: Bool,
+            amountOut: UFix64,
+        ): UFix64 {
+            let pairInfo = self.getSwapPairReservedInfo()
+            if pairInfo == nil {
+                return 0.0
+            }
+            let reserveToken = pairInfo![0]
+            let reserveFlow = pairInfo![1]
+            if directionTokenToFlow {
+                return SwapConfig.getAmountIn(amountOut: amountOut, reserveIn: reserveToken, reserveOut: reserveFlow)
+            } else {
+                return SwapConfig.getAmountIn(amountOut: amountOut, reserveIn: reserveFlow, reserveOut: reserveToken)
+            }
+        }
+
+        /// Get the estimated token amount by cost
+        ///
+        access(all)
+        view fun getEstimatedBuyingAmountByCost(_ cost: UFix64): UFix64 {
+            if !self.isLiquidityHandovered() {
+                return self.getBuyAmountAfterFee(cost)
+            } else {
+                let protocolFee = cost * FixesTradablePool.getProtocolTradingFee()
+                return self.getSwapEstimatedAmount(false, amount: cost - protocolFee)
+            }
+        }
+
+        /// Get the estimated token buying cost by amount
+        ///
+        access(all)
+        view fun getEstimatedBuyingCostByAmount(_ amount: UFix64): UFix64 {
+            if !self.isLiquidityHandovered() {
+                return self.getBuyPriceAfterFee(amount)
+            } else {
+                let cost = self.getSwapEstimatedAmountIn(false, amountOut: amount)
+                return cost / (1.0 - FixesTradablePool.getProtocolTradingFee())
+            }
+        }
+
+        /// Get the estimated token selling value by amount
+        ///
+        access(all)
+        view fun getEstimatedSellingValueByAmount(_ amount: UFix64): UFix64 {
+            if !self.isLiquidityHandovered() {
+                return self.getSellPriceAfterFee(amount)
+            } else {
+                return self.getSwapEstimatedAmount(true, amount: amount)
             }
         }
 
@@ -987,13 +1005,24 @@ access(all) contract FixesTradablePool {
         // ----- Trade (Writable) -----
 
         /// Buy the token with the given inscription
-        ///
+        /// - ins: The inscription to buy the token
+        /// - amount: The amount of token to buy, if nil, use all the inscription value to buy the token
         access(all)
         fun buyTokens(
             _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
             _ amount: UFix64?,
             recipient: &{FungibleToken.Receiver},
         ) {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                ins.isExtractable(): "The inscription is not extractable"
+                ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
+                recipient.isSupportedVaultType(type: self.getTokenType()): "The recipient does not support the token type"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+
             let flowPaymentVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
             let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
             // deposit the available Flow tokens in the inscription to the flow vault
@@ -1019,32 +1048,140 @@ access(all) contract FixesTradablePool {
                 flowPaymentVault.deposit(from: <- refundAgent.extract())
             }
 
+            log("Trader: ".concat(ins.owner?.address?.toString() ?? "Unknown")
+                .concat(" Inscription Value: ").concat(ins.getInscriptionValue().toString())
+                .concat(" Flow AvailableAmount: ").concat(flowAvailableAmount.toString())
+                .concat(" Flow Payment Vault: ").concat(flowPaymentVault.balance.toString())
+            )
+            // buy the coin with the Flow tokens
+            let tokenVault <- self._buyTokens(ins, <- flowPaymentVault, amount, false)
+            self._depositToken(<- tokenVault, recipient: recipient)
+        }
+
+        /// Buy the coin, but a portion of the Flow tokens will be used to buy the lottery tickets
+        ///
+        access(all)
+        fun buyTokensWithLottery (
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            recipient: &{FungibleToken.Receiver},
+        ): @{FungibleToken.Vault} {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                ins.isExtractable(): "The inscription is not extractable"
+                ins.owner?.address == recipient.owner?.address: "The inscription owner is not the recipient owner"
+                recipient.isSupportedVaultType(type: self.getTokenType()): "The recipient does not support the token type"
+            }
+            post {
+                ins.isExtracted(): "The inscription is not extracted"
+            }
+
+            let flowPaymentVault <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+            let flowAvailableAmount = ins.getInscriptionValue() - ins.getMinCost()
+            // deposit the available Flow tokens in the inscription to the flow vault
+            if flowAvailableAmount > 0.0 {
+                flowPaymentVault.deposit(from: <- ins.partialExtract(flowAvailableAmount))
+            }
+
+            let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
+
             // borrow the minter
             let minter = self.borrowMinter()
+            let meta = FixesTradablePool.verifyAndExecuteInscription(ins, symbol: minter.getSymbol(), usage: "*")
+
+            log("Trader: ".concat(ins.owner?.address?.toString() ?? "Unknown")
+                .concat(" Inscription Value: ").concat(ins.getInscriptionValue().toString())
+                .concat(" Flow AvailableAmount: ").concat(flowAvailableAmount.toString())
+                .concat(" Flow Payment Vault: ").concat(flowPaymentVault.balance.toString())
+            )
+
+            let tokenYouObtained <- self._buyTokens(ins, <- flowPaymentVault, nil, true)
+            // check if lottery exists
+            if let lotteryPool = FGameLottery.borrowLotteryPool(self.getPoolAddress()) {
+                let tokenType = self.getTokenType()
+                let internalTicker = FRC20FTShared.buildTicker(tokenType) ?? panic("The token type is invalid")
+                // get the ticket price
+                let ticketPice =lotteryPool.getTicketPrice()
+                // ensure the ticket type is the same as the token type
+                assert(
+                    lotteryPool.getLotteryToken() == internalTicker,
+                    message: "The lottery token is not the same as the token type"
+                )
+
+                // During bonding curve is active, the lottery ticket will be bought with 10% of the token you obtained
+                if !self.isLocalActive() {
+                    // 10% of the token you obtained will be used to buy the lottery tickets
+                    // 90% of the token you obtained will be deposited to the recipient
+                    var depositToUser = tokenYouObtained.balance * 0.9
+                    // if no lottery, then deposit the token to the recipient
+                    self._depositToken(<- tokenYouObtained.withdraw(amount: depositToUser), recipient: recipient)
+                }
+            } else {
+                panic("The lottery pool does not exist")
+            }
+            return <- tokenYouObtained
+        }
+
+        /// Internal function to buy the token with the Flow Token
+        ///
+        access(self)
+        fun _buyTokens(
+            _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
+            _ flowPaymentVault: @FlowToken.Vault,
+            _ targetAmount: UFix64?,
+            _ isExtendingBuy: Bool,
+        ): @{FungibleToken.Vault} {
+            post {
+                result.isInstance(self.getTokenType()):
+                    "The result vault is not the same type as the liquidity pool. Result Type: "
+                    .concat(result.getType().identifier)
+                    .concat(" Pool Type: ")
+                    .concat(self.getTokenType().identifier)
+            }
+
+            let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
+
+            // borrow the minter
+            let minter = self.borrowMinter()
+
+            // initialize the vault by the inscription (the extracted inscription is also valid)
+            let vaultData = minter.getVaultData()
+            let initializedCoinVault <- minter.initializeVaultByInscription(
+                vault: <- vaultData.createEmptyVault(),
+                ins: ins
+            )
 
             // calculate the price
             var price: UFix64 = 0.0
             var protocolFee: UFix64 = 0.0
             var subjectFee: UFix64 = 0.0
             var buyAmount: UFix64 = 0.0
-            if amount != nil && amount! > 0.0 {
-                buyAmount = amount!
-                price = self.getBuyPrice(buyAmount)
-                protocolFee = price * FixesTradablePool.getProtocolTradingFee()
-                subjectFee = price * self.getSubjectFeePercentage()
+
+            // currently bonding curve is active
+            if self.isLocalActive() {
+                if targetAmount != nil && targetAmount! > 0.0 {
+                    buyAmount = targetAmount!
+                    price = self.getBuyPrice(buyAmount)
+                    protocolFee = price * FixesTradablePool.getProtocolTradingFee()
+                    subjectFee = price * self.getSubjectFeePercentage()
+                } else {
+                    protocolFee = flowPaymentVault.balance * FixesTradablePool.getProtocolTradingFee()
+                    subjectFee = flowPaymentVault.balance * self.getSubjectFeePercentage()
+                    price = flowPaymentVault.balance - protocolFee - subjectFee
+                    buyAmount = self.getBuyAmount(price)
+                }
             } else {
+                // the bonding curve is not active
+                // the price is from the swap pair
+                // we need to calculate the amount of tokens that can be bought with the given cost
                 protocolFee = flowPaymentVault.balance * FixesTradablePool.getProtocolTradingFee()
-                subjectFee = flowPaymentVault.balance * self.getSubjectFeePercentage()
-                price = flowPaymentVault.balance - protocolFee - subjectFee
-                buyAmount = self.getBuyAmount(price)
+                price = flowPaymentVault.balance - protocolFee
+                buyAmount = self.getSwapEstimatedAmount(false, amount: price)
             }
 
             // check the total cost
             let totalCost = price + protocolFee + subjectFee
 
-            log("Trader: ".concat(ins.owner!.address.toString())
-                .concat(" Inscription Value: ").concat(ins.getInscriptionValue().toString())
-                .concat(" Partial Extract: ").concat(flowAvailableAmount.toString())
+            log("Trader: ".concat(callerAddr.toString())
                 .concat(" Flow Payment Vault: ").concat(flowPaymentVault.balance.toString())
                 .concat(" Price: ").concat(price.toString())
                 .concat(" Buy Amount: ").concat(buyAmount.toString())
@@ -1054,14 +1191,26 @@ access(all) contract FixesTradablePool {
             )
 
             assert(
-                totalCost <= flowPaymentVault.balance,
+                flowPaymentVault.isAvailableToWithdraw(amount: totalCost),
                 message: "Insufficient payment: The total cost is greater than the available Flow tokens"
             )
+
+            // Pay the fee first
             let payment <- flowPaymentVault.withdraw(amount: totalCost)
             if protocolFee > 0.0 {
                 let protocolFeeVault <- payment.withdraw(amount: protocolFee)
                 let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformAddress())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
+                // split the protocol fee 40% to the staking pool and 60% to the platform
+                let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
+                let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+                if let poolAddr = acctsPool.getAddress(type: FRC20AccountsPool.ChildAccountType.Staking, stakingFRC20Tick) {
+                    if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(poolAddr) {
+                        // withdraw the tokens to the treasury
+                        stakingFlowReciever.deposit(from: <- protocolFeeVault.withdraw(amount: protocolFee * 0.4))
+                    }
+                }
+                // rest of the protocol fee goes to the platform
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
             if subjectFee > 0.0 {
@@ -1070,10 +1219,66 @@ access(all) contract FixesTradablePool {
                     ?? panic("The subject does not have a FlowTokenReceiver capability")
                 subjectFeeReceiverRef.deposit(from: <- subjectFeeVault)
             }
-            // deposit the payment to the flow vault in the liquidity pool
-            self._depositFlowToken(<- payment)
 
-            let callerAddr = ins.owner?.address ?? panic("The inscription owner is missing")
+            // check the BuyAmount
+            assert(
+                buyAmount > 0.0,
+                message: "The buy amount must be greater than 0"
+            )
+
+            // in bonding curve, the vault has enough tokens
+            if self.isLocalActive() {
+                // Check if the vault has enough tokens
+                assert(
+                    self.vault.balance >= buyAmount,
+                    message: "Insufficient token balance: The vault does not have enough tokens"
+                )
+                // deposit the tokens to the initialized return vault
+                initializedCoinVault.deposit(from: <- self.vault.withdraw(amount: buyAmount))
+            } else {
+                // For the bonding curve is not active
+                let restBalance = self.vault.balance
+                var tokenToBuyFromSwapPair = 0.0
+
+                // only extending buy can buy the rest of the tokens from the bonding curve
+                if isExtendingBuy {
+                    if restBalance >= buyAmount {
+                        // deposit the tokens to the initialized return vault
+                        initializedCoinVault.deposit(from: <- self.vault.withdraw(amount: buyAmount))
+                    } else if restBalance > 0.0 {
+                        initializedCoinVault.deposit(from: <- self.vault.withdraw(amount: self.vault.balance))
+                        tokenToBuyFromSwapPair = buyAmount - restBalance
+                    } else {
+                        tokenToBuyFromSwapPair = buyAmount
+                    }
+                } else {
+                    tokenToBuyFromSwapPair = buyAmount
+                }
+
+                // we need to by the rest of the tokens from the swap pair
+                if tokenToBuyFromSwapPair > 0.0 {
+                    let buyAmountInFlow = self.getSwapEstimatedAmountIn(false, amountOut: tokenToBuyFromSwapPair)
+
+                    assert(
+                        payment.isAvailableToWithdraw(amount: buyAmountInFlow),
+                        message: "Insufficient payment: The flow vault does not have enough tokens"
+                    )
+                    // swap and deposit the tokens to the initialized return vault
+                    let pairPublicRef = self.borrowSwapPairRef() ?? panic("The swap pair is missing")
+                    initializedCoinVault.deposit(from: <- pairPublicRef.swap(
+                        vaultIn: <- payment.withdraw(amount: buyAmountInFlow),
+                        exactAmountOut: nil
+                    ))
+                }
+            }
+
+            // deposit the payment to the flow vault in the liquidity pool
+            if payment.balance > 0.0 {
+                self._depositFlowToken(<- payment)
+            } else {
+                Burner.burn(<- payment)
+            }
+
             // return remaining Flow tokens to the inscription owner
             if flowPaymentVault.balance > 0.0 {
                 let ownerFlowVaultRef = Fixes.borrowFlowTokenReceiver(callerAddr)
@@ -1083,61 +1288,71 @@ access(all) contract FixesTradablePool {
                 Burner.burn(<- flowPaymentVault)
             }
 
-            // check the BuyAmount
+            let recievedAmount = initializedCoinVault.balance
+            // You should be able to deposit the tokens to the recipient
             assert(
-                buyAmount > 0.0,
-                message: "The buy amount must be greater than 0"
+                recievedAmount >= buyAmount,
+                message: "The initialized coin vault does not have enough tokens"
             )
-            // Check if the vault has enough tokens
-            assert(
-                self.vault.balance >= buyAmount,
-                message: "Insufficient token balance: The vault does not have enough tokens"
-            )
-            // initialize the vault by the inscription (the extracted inscription is also valid)
-            let vaultData = minter.getVaultData()
-            let initializedVault <- minter.initializeVaultByInscription(
-                vault: <- vaultData.createEmptyVault(),
-                ins: ins
-            )
-            // deposit the tokens to the initialized return vault
-            initializedVault.deposit(from: <- self.vault.withdraw(amount: buyAmount))
-
-            // deposit the tokens to the recipient
-            recipient.deposit(from: <- initializedVault)
-
-            // the variables for the trade event
-            let poolAddr = self.getPoolAddress()
-            let traderAddr = recipient.owner?.address ?? callerAddr
 
             // invoke the transaction hook
             self._onTransactionDeal(
-                seller: poolAddr,
-                buyer: traderAddr,
-                dealAmount: buyAmount,
+                seller: self.getPoolAddress(),
+                buyer: callerAddr,
+                dealAmount: recievedAmount,
                 dealPrice: totalCost
             )
 
             // emit the trade event
             emit Trade(
-                trader: traderAddr,
+                trader: callerAddr,
                 isBuy: true,
                 subject: self.getPoolAddress(),
                 ticker: minter.getSymbol(),
-                tokenAmount: buyAmount,
+                tokenAmount: recievedAmount,
                 flowAmount: totalCost,
                 protocolFee: protocolFee,
                 subjectFee: subjectFee,
                 supply: self.getTradablePoolCirculatingSupply()
             )
+
+            return <- initializedCoinVault
+        }
+
+        /// execute the real transfer action
+        ///
+        access(self)
+        fun _depositToken(
+            _ tokenToTransfer: @{FungibleToken.Vault},
+            recipient: &{FungibleToken.Receiver},
+        ) {
+            pre {
+                tokenToTransfer.isInstance(self.getTokenType()): "The token type is not the same as the pool"
+                recipient.isSupportedVaultType(type: tokenToTransfer.getType()): "The recipient does not support the token type"
+            }
+            // deposit the tokens to the recipient
+            recipient.deposit(from: <- tokenToTransfer)
         }
 
         /// Sell the token to the liquidity pool
-        ///
+        /// - tokenVault: The token vault to sell
         access(all)
         fun sellTokens(
             _ tokenVault: @{FungibleToken.Vault},
             recipient: &{FungibleToken.Receiver},
         ) {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                tokenVault.isInstance(self.getTokenType()): "The token vault is not the same type as the liquidity pool"
+                tokenVault.balance > 0.0: "The token vault balance must be greater than 0"
+                recipient.isSupportedVaultType(type: Type<@FlowToken.Vault>()): "The recipient does not support FlowToken.Vault"
+            }
+
+            if !self.isLocalActive() {
+                self.quickSwapToken(<- tokenVault, recipient)
+                return
+            }
+
             let minter = self.borrowMinter()
             // calculate the price
             let totalPrice = self.getSellPrice(tokenVault.balance)
@@ -1160,6 +1375,16 @@ access(all) contract FixesTradablePool {
                 let protocolFeeVault <- payment.withdraw(amount: protocolFee)
                 let protocolFeeReceiverRef = Fixes.borrowFlowTokenReceiver(Fixes.getPlatformAddress())
                     ?? panic("The protocol fee destination does not have a FlowTokenReceiver capability")
+                // split the protocol fee 40% to the staking pool and 60% to the platform
+                let stakingFRC20Tick = FRC20FTShared.getPlatformStakingTickerName()
+                let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+                if let poolAddr = acctsPool.getAddress(type: FRC20AccountsPool.ChildAccountType.Staking, stakingFRC20Tick) {
+                    if let stakingFlowReciever = Fixes.borrowFlowTokenReceiver(poolAddr) {
+                        // withdraw the tokens to the treasury
+                        stakingFlowReciever.deposit(from: <- protocolFeeVault.withdraw(amount: protocolFee * 0.4))
+                    }
+                }
+                // rest of the protocol fee goes to the platform
                 protocolFeeReceiverRef.deposit(from: <- protocolFeeVault)
             }
             // withdraw the subject fee from the flow vault
@@ -1209,10 +1434,16 @@ access(all) contract FixesTradablePool {
             _ tokenInVault: @{FungibleToken.Vault},
             _ tokenOutRecipient: &{FungibleToken.Receiver},
         ) {
+            pre {
+                self.isInitialized(): "The liquidity pool is not initialized"
+                !self.isLocalActive(): "The liquidity pool is active"
+                tokenInVault.balance > 0.0: "The token vault balance must be greater than 0"
+                tokenInVault.isInstance(self.getTokenType()) || tokenInVault.isInstance(Type<@FlowToken.Vault>()): "The token vault is not the same type as the liquidity pool"
+            }
             let supportTypes = tokenOutRecipient.getSupportedVaultTypes()
             let minterTokenType = self.getTokenType()
             let tokenInVaultType = tokenInVault.getType()
-            let isTokenInFlowToken = tokenInVaultType == Type<@FlowToken.Vault>()
+            let isTokenInFlowToken = tokenInVault.isInstance(Type<@FlowToken.Vault>())
             // check if the recipient supports the token type
             if isTokenInFlowToken {
                 assert(
@@ -1432,7 +1663,7 @@ access(all) contract FixesTradablePool {
             if amount > 0.0 {
                 self.flowVault.deposit(from: <- vault)
             } else {
-                destroy vault
+                Burner.burn(<- vault)
                 return
             }
 
@@ -1690,8 +1921,8 @@ access(all) contract FixesTradablePool {
                         token0Vault.deposit(from: <- self.vault.withdraw(amount: token0Max))
                         token1Vault.deposit(from: <- self._withdrawFlowToken(part1EstimatedToken1In))
                     } else {
-                        destroy token0Vault
-                        destroy token1Vault
+                        Burner.burn(<- token0Vault)
+                        Burner.burn(<- token1Vault)
                         // DO NOT PANIC
                         return false
                     }
@@ -1772,11 +2003,8 @@ access(all) contract FixesTradablePool {
         ins: auth(Fixes.Extractable) &Fixes.Inscription,
         _ minter: @{FixesFungibleTokenInterface.IMinter},
     ): @TradableLiquidityPool {
-        pre {
-            ins.isExtractable(): "The inscription is not extractable"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription value must be empty after the execution"
         }
 
         // execute the inscription
@@ -1807,6 +2035,61 @@ access(all) contract FixesTradablePool {
         )
 
         return <- pool
+    }
+
+    /// Buy the fungible token from the tradable pool
+    ///
+    access(all)
+    fun buy(
+        _ coinAddr: Address,
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
+        flowAmount: UFix64,
+        ftReceiver: &{FungibleToken.Receiver},
+        inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
+    ) {
+        pre {
+            ftReceiver.owner?.address == inscriptionStore.owner?.address: "FT Receiver must be the owner of the inscription store"
+        }
+
+        // resources
+        let tradablePoolRef = FixesTradablePool.borrowTradablePool(coinAddr)
+            ?? panic("Tradable pool not found")
+
+        // coin's token type
+        let tokenType = tradablePoolRef.getTokenType()
+        assert(
+            ftReceiver.isSupportedVaultType(type: tokenType),
+            message: "Unsupported token type"
+        )
+        let tickerName = "$".concat(tradablePoolRef.getSymbol())
+
+        // ---- create the basic inscription ----
+        let dataStr = FixesInscriptionFactory.buildPureExecuting(
+            tick: tickerName,
+            usage: "init",
+            {}
+        )
+        // estimate the required storage
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+        let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
+        // create the inscription
+        let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+            dataStr,
+            <- (costReserve as! @FlowToken.Vault),
+            inscriptionStore
+        )
+        // apply the inscription
+        let ins = inscriptionStore.borrowInscriptionWritableRef(insId)!
+        // ---- end ----
+
+        // ---- deposit the but token cost to inscription ----
+        let flowCanUse = flowAmount - estimatedReqValue
+        let costVault <- flowProvider.withdraw(amount: flowCanUse)
+        ins.deposit(<- (costVault as! @FlowToken.Vault))
+        // ---- end ----
+
+        // buy token
+        tradablePoolRef.buyTokens(ins, nil, recipient: ftReceiver)
     }
 
     /// Soft burn the vault

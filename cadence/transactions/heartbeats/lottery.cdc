@@ -1,6 +1,5 @@
 // Fixes imports
 import "FixesHeartbeat"
-import "FRC20AccountsPool"
 
 transaction() {
     let heartbeat: &FixesHeartbeat.Heartbeat

@@ -8,6 +8,7 @@ This contract is a shared library for FRC20 Fungible Token.
 */
 import "FlowToken"
 import "FungibleToken"
+import "FungibleTokenMetadataViews"
 import "Burner"
 // Fixes Imports
 import "FixesHeartbeat"
@@ -258,16 +259,23 @@ access(all) contract FRC20FTShared {
                     "Either FT Vault or balance must be not nil"
             }
 
-            // If the tick is "", it means the change is backed by FlowToken.Vault
-            if tick == "" {
+            if tick == "" || tick.slice(from: 0, upTo: 1) == "@" {
                 assert(
                     ftVault != nil && balance == nil,
                     message: "FT Vault must not be nil for tick = ''"
                 )
-                assert(
-                    ftVault.isInstance(OptionalType(Type<@FlowToken.Vault>())),
-                    message: "FT Vault must be an instance of FlowToken.Vault"
-                )
+                // If the tick is "", it means the change is backed by FlowToken.Vault
+                if tick == "" {
+                    assert(
+                        ftVault.isInstance(OptionalType(Type<@FlowToken.Vault>())),
+                        message: "FT Vault must be an instance of FlowToken.Vault"
+                    )
+                } else {
+                    assert(
+                        ftVault.getType().isSubtype(of: OptionalType(Type<@{FungibleToken.Vault}>())),
+                        message: "FT Vault must be an sub type of {FungibleToken.Vault}"
+                    )
+                }
             }
 
             self.tick = tick
@@ -515,6 +523,50 @@ access(all) contract FRC20FTShared {
         }
     }
 
+    /// Return if the given tick is a FTVault ticker.
+    ///
+    access(all)
+    view fun isFTVaultTicker(tick: String): Bool {
+        return tick == "" || tick.slice(from: 0, upTo: 1) == "@"
+    }
+
+    /// Built the Ticker Name
+    ///
+    access(all)
+    view fun buildTicker(_ ftVaultType: Type): String? {
+        if ftVaultType.isSubtype(of: Type<@{FungibleToken.Vault}>()) {
+            return ftVaultType.isSubtype(of: Type<@FlowToken.Vault>())
+                ? ""
+                : "@".concat(ftVaultType.identifier)
+        }
+        return nil
+    }
+
+    /// Resolve the FTVaultData
+    ///
+    access(all)
+    fun resolveFTVaultDataByTicker(_ tick: String): FungibleTokenMetadataViews.FTVaultData? {
+        let viewType = Type<FungibleTokenMetadataViews.FTVaultData>()
+        if self.isFTVaultTicker(tick: tick) {
+            if tick == "" {
+                return FlowToken.resolveContractView(resourceType: nil, viewType: viewType) as! FungibleTokenMetadataViews.FTVaultData?
+            } else {
+                let identifierSplits = tick.split(separator: ".") // should be @A.{address}.{ContractName}.{Vault}
+                assert(
+                    identifierSplits.length == 3 || identifierSplits.length == 4,
+                    message: "Invalid ticker because it is not a vaild type. Tick: ".concat(tick)
+                )
+                let contractAddr = Address.fromString("0x".concat(identifierSplits[1]))
+                    ?? panic("Invalid ticker because it is not a vaild type.")
+                let contractName = identifierSplits[2]
+                let ftContract = getAccount(contractAddr).contracts.borrow<&{FungibleToken}>(name: contractName)
+                    ?? panic("Invalid ticker because it is not a FungibleToken implementation.")
+                return ftContract.resolveContractView(resourceType: nil, viewType: viewType) as! FungibleTokenMetadataViews.FTVaultData?
+            }
+        }
+        return nil
+    }
+
     /// Create a new Change
     /// Only the owner of the account can call this method
     ///
@@ -540,12 +592,14 @@ access(all) contract FRC20FTShared {
         tick: String,
         from: Address,
     ): @Change {
-        if tick == "" {
+        if self.isFTVaultTicker(tick: tick) {
+            let ftVaultData = self.resolveFTVaultDataByTicker(tick)
+                ?? panic("Invalid ticker, because we can not resolve FTVaultData.")
             return <- self.createChange(
-                tick: "",
+                tick: tick,
                 from: from,
                 balance: nil,
-                ftVault: <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
+                ftVault: <- ftVaultData.createEmptyVault()
             )
         } else {
             return <- self.createChange(
@@ -589,7 +643,7 @@ access(all) contract FRC20FTShared {
         from: Address,
     ): @Change {
         pre {
-            tick != "": "Tick must not be empty"
+            !self.isFTVaultTicker(tick: tick): "Tick must not be frc20 ticker"
         }
         return <- self.createEmptyChange(
             tick: "!".concat(tick), // staked tick is prefixed with "!"
@@ -617,11 +671,8 @@ access(all) contract FRC20FTShared {
         ftVault: @{FungibleToken.Vault},
         from: Address,
     ): @Change {
-        let tick = ftVault.isInstance(Type<@FlowToken.Vault>())
-            ? ""
-            : ftVault.getType().identifier
         return <- self.createChange(
-            tick: tick,
+            tick: self.buildTicker(ftVault.getType()) ?? panic("Invalid FTVault"),
             from: from,
             balance: nil,
             ftVault: <- ftVault

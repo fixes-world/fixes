@@ -6,15 +6,15 @@ import "FungibleTokenManager"
 import "Fixes"
 import "FixesInscriptionFactory"
 import "FRC20FTShared"
+import "FixesHeartbeat"
 
 transaction(
     symbol: String,
-    tradablePoolSupply: UFix64,
-    creatorFeePercentage: UFix64,
-    freeMintAmount: UFix64,
+    epochDays: UInt8,
 ) {
     let tickerName: String
-    let setupTradablePoolIns: auth(Fixes.Extractable) &Fixes.Inscription
+    let setupPoolIns: auth(Fixes.Extractable) &Fixes.Inscription
+    let heartbeat: &FixesHeartbeat.Heartbeat
 
     prepare(acct: auth(Storage, Capabilities) &Account) {
         /** ------------- Prepare the Inscription Store - Start ---------------- */
@@ -38,34 +38,35 @@ transaction(
 
         /** ------------- Create the Inscription 2 - Start ------------- */
         let fields: {String: String} = {}
-        if tradablePoolSupply > 0.0 {
-            fields["supply"] = tradablePoolSupply.toString()
-        }
-        if creatorFeePercentage > 0.0 {
-            fields["feePerc"] = creatorFeePercentage.toString()
-        }
-        if freeMintAmount > 0.0 {
-            fields["freeAmount"] = freeMintAmount.toString()
-        }
-        let tradablePoolInsDataStr = FixesInscriptionFactory.buildPureExecuting(
+        let insDataStr = FixesInscriptionFactory.buildPureExecuting(
             tick: self.tickerName,
-            usage: "setup-tradable-pool",
+            usage: "setup-lottery",
             fields
         )
         // estimate the required storage
-        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(tradablePoolInsDataStr)
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(insDataStr)
         // get reserved cost
         let flowToReserve <- (flowVaultRef.withdraw(amount: estimatedReqValue) as! @FlowToken.Vault)
         // Create the Inscription first
         let newInsId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
-            tradablePoolInsDataStr,
+            insDataStr,
             <- flowToReserve,
             store
         )
         // borrow a reference to the new Inscription
-        self.setupTradablePoolIns = store.borrowInscriptionWritableRef(newInsId)
+        self.setupPoolIns = store.borrowInscriptionWritableRef(newInsId)
             ?? panic("Could not borrow a reference to the newly created Inscription!")
         /** ------------- End --------------------------------------- */
+
+        /** ------------- Start -- Fixes Heartbeat Initialization ------------  */
+        // ensure resource
+        if acct.storage.borrow<&AnyResource>(from: FixesHeartbeat.storagePath) == nil {
+            acct.storage.save(<- FixesHeartbeat.createHeartbeat(), to: FixesHeartbeat.storagePath)
+        }
+        /** ------------- End ---------------------------------------------------------- */
+
+        self.heartbeat = acct.storage.borrow<&FixesHeartbeat.Heartbeat>(from: FixesHeartbeat.storagePath)
+            ?? panic("Could not borrow a reference to the heartbeat")
     }
 
     pre {
@@ -73,6 +74,8 @@ transaction(
     }
 
     execute {
-        FungibleTokenManager.setupTradablePoolResources(self.setupTradablePoolIns)
+        FungibleTokenManager.setupLotteryPool(self.setupPoolIns, epochDays: epochDays)
+
+        self.heartbeat.tick(scope: "FGameLottery")
     }
 }

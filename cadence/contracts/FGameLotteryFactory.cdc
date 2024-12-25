@@ -6,7 +6,10 @@
 This contract contains the factory for creating new Lottery Pool.
 
 */
+import "Burner"
 import "FlowToken"
+import "FungibleToken"
+import "BlackHole"
 // Fixes Imports
 import "Fixes"
 import "FixesInscriptionFactory"
@@ -14,8 +17,52 @@ import "FRC20FTShared"
 import "FRC20Indexer"
 import "FGameLottery"
 import "FGameLotteryRegistry"
+// Fixes Coins
+import "FixesTradablePool"
 
 access(all) contract FGameLotteryFactory {
+
+    /* --- Enum --- */
+
+    /// PowerUp Types
+    ///
+    access(all) enum PowerUpType: UInt8 {
+        access(all) case x1
+        access(all) case x2
+        access(all) case x3
+        access(all) case x4
+        access(all) case x5
+        access(all) case x10
+        access(all) case x20
+        access(all) case x50
+        access(all) case x100
+    }
+
+    /// Get the value of the PowerUp
+    ///
+    access(all)
+    view fun getPowerUpValue(_ type: PowerUpType): UFix64 {
+        switch type {
+        case PowerUpType.x2:
+            return 2.0
+        case PowerUpType.x3:
+            return 3.0
+        case PowerUpType.x4:
+            return 4.0
+        case PowerUpType.x5:
+            return 5.0
+        case PowerUpType.x10:
+            return 10.0
+        case PowerUpType.x20:
+            return 20.0
+        case PowerUpType.x50:
+            return 50.0
+        case PowerUpType.x100:
+            return 100.0
+        }
+        // Default is x1
+        return 1.0
+    }
 
     /* --- Public Methods - Controller --- */
 
@@ -111,37 +158,6 @@ access(all) contract FGameLotteryFactory {
 
     /* --- Public methods - User --- */
 
-    /// PowerUp Types
-    ///
-    access(all) enum PowerUpType: UInt8 {
-        access(all) case x1
-        access(all) case x2
-        access(all) case x3
-        access(all) case x4
-        access(all) case x5
-        access(all) case x10
-    }
-
-    /// Get the value of the PowerUp
-    ///
-    access(all)
-    view fun getPowerUpValue(_ type: PowerUpType): UFix64 {
-        switch type {
-        case PowerUpType.x2:
-            return 2.0
-        case PowerUpType.x3:
-            return 3.0
-        case PowerUpType.x4:
-            return 4.0
-        case PowerUpType.x5:
-            return 5.0
-        case PowerUpType.x10:
-            return 10.0
-        }
-        // Default is x1
-        return 1.0
-    }
-
     /// Check if the FIXES Minting is available
     ///
     access(all)
@@ -179,13 +195,13 @@ access(all) contract FGameLotteryFactory {
     ///
     access(all)
     fun buyFIXESMintingLottery(
-        flowVault: @FlowToken.Vault,
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
         ticketAmount: UInt64,
         powerup: PowerUpType,
         withMinting: Bool,
         recipient: Capability<&FGameLottery.TicketCollection>,
         inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
-    ): @FlowToken.Vault {
+    ) {
         pre {
             recipient.address == inscriptionStore.owner?.address: "Recipient must be the owner of the inscription store"
         }
@@ -206,16 +222,17 @@ access(all) contract FGameLotteryFactory {
         let ticketsPayment = ticketPrice * UFix64(ticketAmount) * powerupValue
         // check if the FLOW balance is sufficient
         assert(
-            flowVault.balance >= ticketsPayment,
+            flowProvider.isAvailableToWithdraw(amount: ticketsPayment),
             message: "Insufficient FLOW balance"
         )
+        // Withdraw the FLOW from the provider
 
         // for minting available
         if withMinting && self.isFIXESMintingAvailable() {
             let totalCost: UFix64 = 1.0 * UFix64(ticketAmount) * powerupValue
             log("Total cost: ".concat(totalCost.toString()))
             assert(
-                flowVault.balance >= totalCost,
+                flowProvider.isAvailableToWithdraw(amount: totalCost),
                 message: "Insufficient FLOW balance"
             )
 
@@ -235,7 +252,7 @@ access(all) contract FGameLotteryFactory {
             while i < totalMintAmount && self.isFIXESMintingAvailable() {
                 // required $FLOW per mint
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
-                let costReserve <- flowVault.withdraw(amount: estimatedReqValue)
+                let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
                 // create minting $FIXES inscription and store it
                 let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
                     fixesMintingStr,
@@ -252,7 +269,7 @@ access(all) contract FGameLotteryFactory {
 
         // wrap the inscription change
         let change <- FRC20FTShared.wrapFungibleVaultChange(
-            ftVault: <- flowVault.withdraw(amount: ticketsPayment),
+            ftVault: <- flowProvider.withdraw(amount: ticketsPayment),
             from: recipient.address
         )
         // buy the tickets
@@ -263,9 +280,6 @@ access(all) contract FGameLotteryFactory {
             powerup: powerupValue,
             recipient: recipient,
         )
-
-        // return the remaining FLOW
-        return <- flowVault
     }
 
     /// Get the cost of buying FIXES Lottery Tickets
@@ -304,12 +318,12 @@ access(all) contract FGameLotteryFactory {
     ///
     access(all)
     fun buyFIXESLottery(
-        flowVault: @FlowToken.Vault,
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
         ticketAmount: UInt64,
         powerup: PowerUpType,
         recipient: Capability<&FGameLottery.TicketCollection>,
         inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
-    ): @FlowToken.Vault {
+    ) {
         pre {
             recipient.address == inscriptionStore.owner?.address: "Recipient must be the owner of the inscription store"
         }
@@ -347,7 +361,7 @@ access(all) contract FGameLotteryFactory {
             while i < totalMintAmount && self.isFIXESMintingAvailable() {
                 // required $FLOW per mint
                 let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(fixesMintingStr)
-                let costReserve <- flowVault.withdraw(amount: estimatedReqValue)
+                let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
                 // create minting $FIXES inscription and store it
                 let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
                     fixesMintingStr,
@@ -376,7 +390,7 @@ access(all) contract FGameLotteryFactory {
         // build the inscription string
         let buyTicketsInsStr = FixesInscriptionFactory.buildLotteryBuyFIXESTickets(ticketAmountFinal, powerupValue)
         let estimatedBuyTicketsInsCost = FixesInscriptionFactory.estimateFrc20InsribeCost(buyTicketsInsStr)
-        let costReserve <- flowVault.withdraw(amount: estimatedBuyTicketsInsCost)
+        let costReserve <- flowProvider.withdraw(amount: estimatedBuyTicketsInsCost)
         // create the withdraw inscription
         let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
             buyTicketsInsStr,
@@ -396,7 +410,194 @@ access(all) contract FGameLotteryFactory {
             powerup: powerupValue,
             recipient: recipient,
         )
-        // return the remaining FLOW
-        return <- flowVault
+    }
+
+    /// Estimate the ticket information
+    ///
+    access(all) struct CoinTicketEstimate {
+        access(all) let poolAddr: Address
+        access(all) let tokenTicker: String
+        access(all) let tokenBoughtAmount: UFix64
+        access(all) let ticketPrice: UFix64
+        access(all) let ticketAmount: UInt64
+        access(all) let powerupValue: UFix64
+
+        view init(
+            poolAddr: Address,
+            tokenTicker: String,
+            tokenBoughtAmount: UFix64,
+            ticketPrice: UFix64,
+            ticketAmount: UInt64,
+            powerupValue: UFix64
+        ) {
+            self.poolAddr = poolAddr
+            self.tokenTicker = tokenTicker
+            self.tokenBoughtAmount = tokenBoughtAmount
+            self.ticketPrice = ticketPrice
+            self.ticketAmount = ticketAmount
+            self.powerupValue = powerupValue
+        }
+    }
+
+    /// Estimate the cost of buying the coin with lottery tickets
+    ///
+    access(all)
+    view fun estimateButTokenWithTickets(
+        _ coinAddr: Address,
+        flowAmount: UFix64,
+    ): CoinTicketEstimate? {
+        let lotteryPoolRef = FGameLottery.borrowLotteryPool(coinAddr)
+            ?? panic("Lottery pool not found")
+
+        let tradablePoolRef = FixesTradablePool.borrowTradablePool(coinAddr)
+            ?? panic("Tradable pool not found")
+
+        // coin's token type
+        let tokenType = tradablePoolRef.getTokenType()
+        let tickerName = FRC20FTShared.buildTicker(tokenType) ?? panic("Ticker is not valid")
+
+        // estimate the required storage
+        let dataStr = FixesInscriptionFactory.buildPureExecuting(tick: tickerName, usage: "init", {})
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+
+        let tokenBoughtAmountInTotal = tradablePoolRef.getEstimatedBuyingAmountByCost(flowAmount - estimatedReqValue)
+
+        var tokenBoughtAmount = tokenBoughtAmountInTotal * 0.9
+        var tokenToBuyTickets = tokenBoughtAmountInTotal - tokenBoughtAmount
+        if !tradablePoolRef.isLocalActive() {
+            tokenBoughtAmount = 0.0
+            tokenToBuyTickets = tokenBoughtAmountInTotal
+        }
+
+        let ticketPrice = lotteryPoolRef.getTicketPrice()
+        let maxCounter = UInt64(tokenToBuyTickets / ticketPrice)
+        if maxCounter == 0 {
+            return nil
+        }
+
+        // select the powerup value
+        var powerupValue = self.getBestPowerupValue(maxCounter)
+        let ticketAmount = UInt64(tokenToBuyTickets / (ticketPrice * powerupValue))
+        let ticketsPayment: UFix64 = UFix64(ticketAmount) * ticketPrice * powerupValue
+
+        return CoinTicketEstimate(
+            poolAddr: coinAddr,
+            tokenTicker: tickerName,
+            tokenBoughtAmount: tokenBoughtAmount + tokenToBuyTickets - ticketsPayment,
+            ticketPrice: ticketPrice,
+            ticketAmount: ticketAmount,
+            powerupValue: powerupValue
+        )
+    }
+
+    /// Buy the coin with lottery tickets
+    ///
+    access(all)
+    fun buyCoinWithLotteryTicket(
+        _ coinAddr: Address,
+        flowProvider: auth(FungibleToken.Withdraw) &{FungibleToken.Provider},
+        flowAmount: UFix64,
+        ftReceiver: &{FungibleToken.Receiver},
+        ticketRecipient: Capability<&FGameLottery.TicketCollection>,
+        inscriptionStore: auth(Fixes.Manage) &Fixes.InscriptionsStore,
+    ) {
+        pre {
+            ftReceiver.owner?.address == inscriptionStore.owner?.address: "FT Receiver must be the owner of the inscription store"
+            ticketRecipient.address == inscriptionStore.owner?.address: "Ticket Recipient must be the owner of the inscription store"
+        }
+
+        // resources
+        let lotteryPoolRef = FGameLottery.borrowLotteryPool(coinAddr)
+            ?? panic("Lottery pool not found")
+        let tradablePoolRef = FixesTradablePool.borrowTradablePool(coinAddr)
+            ?? panic("Tradable pool not found")
+
+        // coin's token type
+        let tokenType = tradablePoolRef.getTokenType()
+        assert(
+            ftReceiver.isSupportedVaultType(type: tokenType),
+            message: "Unsupported token type"
+        )
+
+        // ---- create the basic inscription ----
+        let tickerName = "$".concat(tradablePoolRef.getSymbol())
+        let dataStr = FixesInscriptionFactory.buildPureExecuting(
+            tick: tickerName,
+            usage: "init",
+            {}
+        )
+        // estimate the required storage
+        let estimatedReqValue = FixesInscriptionFactory.estimateFrc20InsribeCost(dataStr)
+        let costReserve <- flowProvider.withdraw(amount: estimatedReqValue)
+        // create the inscription
+        let insId = FixesInscriptionFactory.createAndStoreFrc20Inscription(
+            dataStr,
+            <- (costReserve as! @FlowToken.Vault),
+            inscriptionStore
+        )
+        // apply the inscription
+        let ins = inscriptionStore.borrowInscriptionWritableRef(insId)!
+        // ---- end ----
+
+        // ---- deposit the but token cost to inscription ----
+        let flowCanUse = flowAmount - estimatedReqValue
+        let costVault <- flowProvider.withdraw(amount: flowCanUse)
+        ins.deposit(<- (costVault as! @FlowToken.Vault))
+        // ---- end ----
+
+        // buy token first
+        let tokenToBuyTickets <- tradablePoolRef.buyTokensWithLottery(ins, recipient: ftReceiver)
+        if tokenToBuyTickets.balance > 0.0 {
+            let ticketPrice = lotteryPoolRef.getTicketPrice()
+            let maxCounter = UInt64(tokenToBuyTickets.balance / ticketPrice)
+
+            // select the powerup value
+            var powerupValue = self.getBestPowerupValue(maxCounter)
+            let ticketAmount = UInt64(tokenToBuyTickets.balance / (ticketPrice * powerupValue))
+            let ticketsPayment: UFix64 = UFix64(ticketAmount) * ticketPrice * powerupValue
+
+            // wrap the inscription change
+            let change <- FRC20FTShared.wrapFungibleVaultChange(
+                ftVault: <- tokenToBuyTickets.withdraw(amount: ticketsPayment),
+                from: ticketRecipient.address
+            )
+            // buy the tickets
+            lotteryPoolRef.buyTickets(
+                // withdraw flow token from the vault
+                payment: <- change,
+                amount: ticketAmount,
+                powerup: powerupValue,
+                recipient: ticketRecipient,
+            )
+        }
+
+        // handle rest of the tokens
+        if tokenToBuyTickets.balance > 0.0 {
+            ftReceiver.deposit(from: <- tokenToBuyTickets)
+        } else {
+            Burner.burn(<- tokenToBuyTickets)
+        }
+    }
+
+    access(all)
+    view fun getBestPowerupValue(_ maxCounter: UInt64): UFix64 {
+        if maxCounter > 10000 {
+            return self.getPowerUpValue(PowerUpType.x100)
+        } else if maxCounter > 2000 {
+            return self.getPowerUpValue(PowerUpType.x50)
+        } else if maxCounter > 1000 {
+            return self.getPowerUpValue(PowerUpType.x20)
+        } else if maxCounter > 200 {
+            return self.getPowerUpValue(PowerUpType.x10)
+        } else if maxCounter > 100 {
+            return self.getPowerUpValue(PowerUpType.x5)
+        } else if maxCounter > 50 {
+            return self.getPowerUpValue(PowerUpType.x4)
+        } else if maxCounter > 20 {
+            return self.getPowerUpValue(PowerUpType.x3)
+        } else if maxCounter > 10 {
+            return self.getPowerUpValue(PowerUpType.x2)
+        }
+        return self.getPowerUpValue(PowerUpType.x1)
     }
 }

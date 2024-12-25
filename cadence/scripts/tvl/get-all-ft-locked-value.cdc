@@ -6,6 +6,7 @@ import "FixesFungibleTokenInterface"
 import "FixesTokenLockDrops"
 import "FixesTradablePool"
 import "FRC20Indexer"
+import "FGameLottery"
 
 access(all)
 fun main(): UFix64 {
@@ -20,6 +21,7 @@ fun main(): UFix64 {
     let tickerTotal: {String: UFix64} = {}
     // This is the soft burned LP value which is fully locked in the BlackHole Vault
     var flowLockedInBondingCurve = 0.0
+    var flowValueLockedInLotteryPool = 0.0
     addrsDict.forEachKey(fun (key: String): Bool {
         if let addr = addrsDict[key] {
             // sum up all locked token balances in LockDrops Pool
@@ -27,9 +29,16 @@ fun main(): UFix64 {
                 let lockedTokenSymbol = dropsPool.getLockingTokenTicker()
                 tickerTotal[lockedTokenSymbol] = (tickerTotal[lockedTokenSymbol] ?? 0.0) + dropsPool.getTotalLockedTokenBalance()
             }
-            // sum up all burned LP value in Tradable Pool
+            // sum up all locked flow in Bonding Curve
             if let tradablePool = FixesTradablePool.borrowTradablePool(addr) {
                 flowLockedInBondingCurve = flowLockedInBondingCurve + tradablePool.getFlowBalanceInPool()
+
+                // sum up all locked flow in Lottery Pool
+                if let lotteryPool = FGameLottery.borrowLotteryPool(addr) {
+                    let lotteryPoolBalance = lotteryPool.getPoolTotalBalance()
+                    let flowValue = tradablePool.getSwapEstimatedAmount(true, amount: lotteryPoolBalance)
+                    flowValueLockedInLotteryPool = flowValueLockedInLotteryPool + flowValue
+                }
             }
         }
         return true
@@ -51,5 +60,5 @@ fun main(): UFix64 {
         }
         return true
     })
-    return totalLockingTokenTVL + flowLockedInBondingCurve
+    return totalLockingTokenTVL + flowLockedInBondingCurve + flowValueLockedInLotteryPool
 }

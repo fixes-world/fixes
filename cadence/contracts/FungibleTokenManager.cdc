@@ -28,6 +28,8 @@ import "FRC20TradingRecord"
 import "FRC20StakingManager"
 import "FRC20Agents"
 import "FRC20Converter"
+import "FGameLottery"
+import "FGameLotteryRegistry"
 
 /// The Manager contract for Fungible Token
 ///
@@ -449,6 +451,11 @@ access(all) contract FungibleTokenManager {
             if airdropsPool != nil {
                 self.supportedMinters.append(airdropsPool!.getType())
             }
+            // Try to add lottery pool
+            let lotteryPool = FGameLottery.borrowLotteryPool(self.address)
+            if lotteryPool != nil {
+                self.supportedMinters.append(lotteryPool!.getType())
+            }
         }
 
         access(all)
@@ -464,6 +471,11 @@ access(all) contract FungibleTokenManager {
         access(all)
         view fun isAirdropsPoolSupported(): Bool {
             return self.supportedMinters.contains(Type<@FixesTokenAirDrops.AirdropPool>())
+        }
+
+        access(all)
+        view fun isLotteryPoolSupported(): Bool {
+            return self.supportedMinters.contains(Type<@FGameLottery.LotteryPool>())
         }
     }
 
@@ -519,9 +531,11 @@ access(all) contract FungibleTokenManager {
                 let tradablePool = FixesTradablePool.borrowTradablePool(ftAddress)!
                 info.setExtra("tradable:allocatedSupply", tradablePool.getTotalAllowedMintableAmount())
                 info.setExtra("tradable:supplied", tradablePool.getTradablePoolCirculatingSupply())
-                info.setExtra("tradable:burnedSupply", tradablePool.getBurnedTokenAmount())
                 info.setExtra("tradable:flowInPool", tradablePool.getFlowBalanceInPool())
                 info.setExtra("tradable:liquidityMcap", tradablePool.getLiquidityMarketCap())
+                info.setExtra("tradable:burnedLPAmount", tradablePool.getBurnedLP())
+                info.setExtra("tradable:burnedSupply", tradablePool.getBurnedTokenAmount())
+                info.setExtra("tradable:burnedLiquidityValue", tradablePool.getBurnedLiquidityValue())
                 info.setExtra("tradable:targetMcap", FixesTradablePool.getTargetMarketCap())
                 info.setExtra("tradable:isLocalActive", tradablePool.isLocalActive())
                 info.setExtra("tradable:isHandovered", tradablePool.isLiquidityHandovered())
@@ -569,6 +583,17 @@ access(all) contract FungibleTokenManager {
                 totalAllocatedSupply = totalAllocatedSupply + airdropsPool.getTotalAllowedMintableAmount()
                 totalCirculatedSupply = totalCirculatedSupply + airdropsPool.getTotalMintedAmount()
             }
+            if modules.isLotteryPoolSupported() {
+                let lotteryPool = FGameLottery.borrowLotteryPool(ftAddress)!
+                info.setExtra("lottery:currentEpochIndex", lotteryPool.getCurrentEpochIndex()) // UInt64
+                info.setExtra("lottery:epochInternal", lotteryPool.getEpochInterval()) // UFix64
+                info.setExtra("lottery:lotteryToken", lotteryPool.getLotteryToken()) // String
+                info.setExtra("lottery:ticketPrice", lotteryPool.getTicketPrice()) // UFix64
+                info.setExtra("lottery:jackpotAmount", lotteryPool.getJackpotPoolBalance()) // UFix64
+                info.setExtra("lottery:totalPoolAmount", lotteryPool.getPoolTotalBalance()) // UFix64
+                info.setExtra("lottery:currentParticipants", lotteryPool.borrowCurrentLottery()?.getParticipantAmount() ?? 0) // UInt64
+            }
+
             // Total Supply Metadata
             info.setExtra("total:allocatedSupply", totalAllocatedSupply)
             info.setExtra("total:supplied", totalCirculatedSupply)
@@ -580,6 +605,10 @@ access(all) contract FungibleTokenManager {
                 info.setExtra("token:transactions", status.sales)
                 info.setExtra("token:totalTradedVolume", status.volume)
                 info.setExtra("token:totalTradedAmount", status.dealAmount)
+            } else {
+                info.setExtra("token:transactions", 0)
+                info.setExtra("token:totalTradedVolume", 0.0)
+                info.setExtra("token:totalTradedAmount", 0.0)
             }
             return info
         }
@@ -593,11 +622,8 @@ access(all) contract FungibleTokenManager {
         _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>,
     ) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -655,11 +681,8 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun setupTradablePoolResources(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -766,13 +789,75 @@ access(all) contract FungibleTokenManager {
         emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)
     }
 
+    /// Setup the lottery pool for some coin
+    ///
     access(all)
-    fun setupLockDropsPool(_ ins: auth(Fixes.Extractable) &Fixes.Inscription, lockingExchangeRates: {UFix64: UFix64}) {
+    fun setupLotteryPool(
+        _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
+        epochDays: UInt8,
+    ) {
         pre {
-            ins.isExtractable(): "The inscription is not extracted"
+            epochDays > 0 && epochDays <= 7: "The interval days should be 1~15"
         }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
+        }
+
+        // singletoken resources
+        let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+
+        // inscription data
+        let meta = self.verifyExecutingInscription(ins, usage: "setup-lottery")
+        let tick = meta["tick"] ?? panic("The token symbol is not found")
+
+        let tokenAdminRef = self.borrowWritableTokenAdmin(tick: tick)
+        // check if the caller is authorized
+        let callerAddr = ins.owner?.address ?? panic("The owner of the inscription is not found")
+        assert(
+            tokenAdminRef.isAuthorizedUser(callerAddr),
+            message: "You are not authorized to setup the tradable pool resources"
+        )
+
+        // borrow the super minter
+        let superMinter = tokenAdminRef.borrowSuperMinter()
+        assert(
+            tick == "$".concat(superMinter.getSymbol()),
+            message: "The token symbol is not valid"
+        )
+
+        // try to borrow the account to check if it was created
+        let childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+            ?? panic("The child account was not created")
+
+        // Get the caller address
+        let ftContractAddr = childAcctRef.address
+
+        let tokenType = superMinter.getTokenType()
+        let maxSupply = superMinter.getMaxSupply()
+        // ticket price is MaxSupply/500_000
+        let ticketPice = maxSupply / 500_000.0
+        let epochInterval = UFix64(UInt64(epochDays) * 24 * 60 * 60)
+
+        FGameLotteryRegistry.createLotteryPool(
+            operatorAddr: callerAddr,
+            childAcctRef: childAcctRef,
+            name: "FIXES_LOTTERY_POOL_FOR_".concat(tick),
+            rewardTick: FRC20FTShared.buildTicker(tokenType) ?? panic("The token type is not valid"),
+            ticketPrice: ticketPice,
+            epochInterval: epochInterval,
+        )
+
+        // execute the inscription
+        acctsPool.executeInscription(type: FRC20AccountsPool.ChildAccountType.FungibleToken, ins)
+
+        // emit the event
+        emit FungibleTokenAccountResourcesUpdated(symbol: tick, account: ftContractAddr)
+    }
+
+    access(all)
+    fun setupLockDropsPool(_ ins: auth(Fixes.Extractable) &Fixes.Inscription, lockingExchangeRates: {UFix64: UFix64}) {
+        post {
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -845,11 +930,8 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun setupAirdropsPool(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -986,6 +1068,9 @@ access(all) contract FungibleTokenManager {
         _ ins: auth(Fixes.Extractable) &Fixes.Inscription,
         newAccount: Capability<auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account>
     ) {
+        post {
+            ins.isValueEmpty(): "The inscription is not empty"
+        }
         // singletoken resources
         let frc20Indexer = FRC20Indexer.getIndexer()
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()
@@ -1059,11 +1144,8 @@ access(all) contract FungibleTokenManager {
     ///
     access(all)
     fun setupFRC20ConverterResources(_ ins: auth(Fixes.Extractable) &Fixes.Inscription) {
-        pre {
-            ins.isExtractable(): "The inscription is not extracted"
-        }
         post {
-            ins.isExtracted(): "The inscription is not extracted"
+            ins.isValueEmpty(): "The inscription is not empty"
         }
         // singletoken resources
         let acctsPool = FRC20AccountsPool.borrowAccountsPool()

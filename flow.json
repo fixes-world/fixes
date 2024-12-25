@@ -35,13 +35,6 @@
 				"testnet": "b7248baa24a95c3f"
 			}
 		},
-		"FGameRugRoyale": {
-			"source": "cadence/contracts/FGameRugRoyale.cdc",
-			"aliases": {
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "b7248baa24a95c3f"
-			}
-		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
@@ -1070,8 +1063,7 @@
 				"FRC20Agents",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FungibleTokenManager",
-				"FGameRugRoyale"
+				"FungibleTokenManager"
 			]
 		},
 		"mainnet": {
