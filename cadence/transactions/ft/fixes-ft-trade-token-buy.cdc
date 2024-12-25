@@ -137,18 +137,25 @@ transaction(
         if acct.storage.borrow<&AnyResource>(from: tokenVaultData.storagePath) == nil {
             // save the empty vault
             acct.storage.save(<- tokenVaultData.createEmptyVault(), to: tokenVaultData.storagePath)
+        }
 
-            // save the public capability to the stored vault
+        // save the public capability to the stored vault
+        if acct.capabilities.get<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath).borrow() == nil {
+            acct.capabilities.unpublish(tokenVaultData.receiverPath)
             // Create a public capability to the stored Vault that exposes
             // the `deposit` method through the `Receiver` interface.
             acct.capabilities.publish(
                 acct.capabilities.storage.issue<&{FungibleToken.Receiver}>(tokenVaultData.storagePath),
                 at: tokenVaultData.receiverPath
             )
+        }
+
+        if acct.capabilities.get<&{FungibleToken.Vault, FixesFungibleTokenInterface.Vault}>(tokenVaultData.metadataPath).borrow() == nil {
+            acct.capabilities.unpublish(tokenVaultData.metadataPath)
             // Create a public capability to the stored Vault that only exposes
             // the `balance` field and the `resolveView` method through the `Balance` interface
             acct.capabilities.publish(
-                acct.capabilities.storage.issue<&{FungibleToken.Vault}>(tokenVaultData.storagePath),
+                acct.capabilities.storage.issue<&{FungibleToken.Vault, FixesFungibleTokenInterface.Vault}>(tokenVaultData.storagePath),
                 at: tokenVaultData.metadataPath
             )
         }

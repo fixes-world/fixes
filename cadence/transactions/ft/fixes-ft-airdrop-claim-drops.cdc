@@ -55,7 +55,7 @@ transaction(
         }
 
         // save the public capability to the stored vault
-        if acct.capabilities.get<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath) == nil {
+        if acct.capabilities.get<&{FungibleToken.Receiver}>(tokenVaultData.receiverPath).borrow() == nil {
             acct.capabilities.unpublish(tokenVaultData.receiverPath)
             // Create a public capability to the stored Vault that exposes
             // the `deposit` method through the `Receiver` interface.
@@ -65,7 +65,7 @@ transaction(
             )
         }
 
-        if acct.capabilities.get<&{FungibleToken.Vault, FixesFungibleTokenInterface.Vault}>(tokenVaultData.metadataPath) == nil {
+        if acct.capabilities.get<&{FungibleToken.Vault, FixesFungibleTokenInterface.Vault}>(tokenVaultData.metadataPath).borrow() == nil {
             acct.capabilities.unpublish(tokenVaultData.metadataPath)
             // Create a public capability to the stored Vault that only exposes
             // the `balance` field and the `resolveView` method through the `Balance` interface
