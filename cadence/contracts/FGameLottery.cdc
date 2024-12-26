@@ -1137,7 +1137,7 @@ access(all) contract FGameLottery {
                 var ratio = 1.0
                 var newJackpotAmount = 0.0
                 if minNewJackpotAmount >= nonJackpotTotal ||
-                  (totalBought >= nonJackpotTotal && oldJackpotAmount + totalBought - nonJackpotTotal >= minNewJackpotAmount) {
+                  (totalBought >= nonJackpotTotal && oldJackpotAmount - nonJackpotTotal + totalBought >= minNewJackpotAmount) {
                     // no need to downgrade the non-jackpot prize
                     let restAmount = totalBought - nonJackpotTotal
                     newJackpotAmount = oldJackpotAmount + restAmount
@@ -1147,7 +1147,7 @@ access(all) contract FGameLottery {
                     // deposit the new added amount to the jackpot pool
                     jackpotRef.forceMerge(from: <- self.current.withdrawAsChange(amount: restAmount))
                     // all remaining non-jackpot prize will be added to the jackpot
-                } else if totalBought < nonJackpotTotal && oldJackpotAmount + totalBought - nonJackpotTotal >= minNewJackpotAmount {
+                } else if totalBought < nonJackpotTotal && oldJackpotAmount - nonJackpotTotal + totalBought >= minNewJackpotAmount {
                     // withdraw from the jackpot pool to cover the non-jackpot prize
                     let requiredAmount = nonJackpotTotal - totalBought
                     let newJackpotAmount = oldJackpotAmount - requiredAmount
