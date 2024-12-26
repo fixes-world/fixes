@@ -449,7 +449,10 @@ access(all) contract FRC20FTShared {
         fun withdrawAsChange(amount: UFix64): @Change {
             pre {
                 self.getBalance() >= amount:
-                    "Amount withdrawn must be less than or equal than the balance of the Vault"
+                    "Amount withdrawn must be less than or equal than the balance of the Vault. Balance is: "
+                    .concat(self.getBalance().toString())
+                    .concat(", Amount to withdraw is: ")
+                    .concat(amount.toString())
             }
             post {
                 // result's type must be the same as the type of the original Change

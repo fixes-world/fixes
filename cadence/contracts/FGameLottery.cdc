@@ -762,7 +762,7 @@ access(all) contract FGameLottery {
             if self.jackpotWinners == nil {
                 self.jackpotWinners = [address]
             } else {
-                self.jackpotWinners?.append(address)
+                self.jackpotWinners?.append(address)!
             }
         }
 
@@ -985,7 +985,7 @@ access(all) contract FGameLottery {
             if self.participants[recipient.address] == nil {
                 self.participants[recipient.address] = [ticketId]
             } else {
-                self.participants[recipient.address]?.append(ticketId)
+                self.participants[recipient.address]?.append(ticketId)!
             }
 
             return ticketId
@@ -1015,8 +1015,8 @@ access(all) contract FGameLottery {
             )
             // set the verifying progress to 1.0 if there is no participant
             if participantAmount == 0 {
-                self.drawnResult!.setVerifyingProgress(1.0)
-                self.drawnResult!.setDisbursingProgress(1.0)
+                self.drawnResult?.setVerifyingProgress(1.0)!
+                self.drawnResult?.setDisbursingProgress(1.0)!
             }
             self.checkingQueue = self.participants.keys
 
@@ -1076,12 +1076,12 @@ access(all) contract FGameLottery {
                                     // update the winner count
                                     winnersCnt = winnersCnt + 1
                                     // add the winner to the result
-                                    self.drawnResult?.addWinner(addr)
+                                    self.drawnResult?.addWinner(addr)!
                                     // add the ticket to the disbursing queue
                                     self.disbursingQueque.append(TicketIdentifier(addr, ticketId))
                                     // update result data
                                     if prizeRank == PrizeRank.JACKPOT {
-                                        self.drawnResult?.addJackpotWinner(addr)
+                                        self.drawnResult?.addJackpotWinner(addr)!
                                         // emit event
                                         emit LotteryJackpotWinnerUpdated(
                                             poolAddr: pool.getAddress(),
@@ -1093,7 +1093,7 @@ access(all) contract FGameLottery {
                                         let powerup = ticketRef.getPowerup()
                                         let prize = basePrize * powerup
                                         nonJackpotAmount = nonJackpotAmount + prize
-                                        self.drawnResult?.incrementNonJackpotTotal(prizeRank, prize)
+                                        self.drawnResult?.incrementNonJackpotTotal(prizeRank, prize)!
                                     }
                                 } // end if prizeRank
                             } // end if ticketRef
@@ -1113,7 +1113,7 @@ access(all) contract FGameLottery {
             let totalParticipants = self.getParticipantAmount()
             let remainingUnChecked = UInt64(self.checkingQueue!.length)
             let progress = UFix64(totalParticipants - remainingUnChecked) / UFix64(totalParticipants)
-            self.drawnResult?.setVerifyingProgress(progress)
+            self.drawnResult?.setVerifyingProgress(progress)!
 
             // emit event
             emit LotteryParticipantsVerified(
@@ -1137,22 +1137,22 @@ access(all) contract FGameLottery {
                 var ratio = 1.0
                 var newJackpotAmount = 0.0
                 if minNewJackpotAmount >= nonJackpotTotal ||
-                  (totalBought >= nonJackpotTotal && oldJackpotAmount - nonJackpotTotal + totalBought >= minNewJackpotAmount) {
+                  (totalBought >= nonJackpotTotal && (oldJackpotAmount + totalBought).saturatingSubtract(nonJackpotTotal) >= minNewJackpotAmount) {
                     // no need to downgrade the non-jackpot prize
                     let restAmount = totalBought - nonJackpotTotal
                     newJackpotAmount = oldJackpotAmount + restAmount
                     // finalize the jackpot
-                    self.drawnResult?.updateJackpot(newJackpotAmount)
+                    self.drawnResult?.updateJackpot(newJackpotAmount)!
 
                     // deposit the new added amount to the jackpot pool
                     jackpotRef.forceMerge(from: <- self.current.withdrawAsChange(amount: restAmount))
                     // all remaining non-jackpot prize will be added to the jackpot
-                } else if totalBought < nonJackpotTotal && oldJackpotAmount - nonJackpotTotal + totalBought >= minNewJackpotAmount {
+                } else if totalBought < nonJackpotTotal && (oldJackpotAmount + totalBought).saturatingSubtract(nonJackpotTotal) >= minNewJackpotAmount {
                     // withdraw from the jackpot pool to cover the non-jackpot prize
                     let requiredAmount = nonJackpotTotal - totalBought
                     let newJackpotAmount = oldJackpotAmount - requiredAmount
                     // finalize the jackpot
-                    self.drawnResult?.updateJackpot(newJackpotAmount)
+                    self.drawnResult?.updateJackpot(newJackpotAmount)!
 
                     // withdraw the required amount from the jackpot pool
                     let change <- jackpotRef.withdrawAsChange(amount: requiredAmount)
@@ -1178,14 +1178,14 @@ access(all) contract FGameLottery {
                     }
                     newJackpotAmount = minNewJackpotAmount
                     // finalize the jackpot, the new jackpot amount is the min new jackpot amount
-                    self.drawnResult?.updateJackpot(minNewJackpotAmount)
+                    self.drawnResult?.updateJackpot(minNewJackpotAmount)!
 
                     // calculate the non-jackpot downgrade ratio
                     if nonJackpotTotal > 0.0 {
                         let currentPoolBalance = self.current.getBalance()
                         ratio = currentPoolBalance / nonJackpotTotal
                         // finalize the non-jackpot prize
-                        self.drawnResult?.setNonJackpotDowngradeRatio(ratio)
+                        self.drawnResult?.setNonJackpotDowngradeRatio(ratio)!
                     }
                 }
 
@@ -1224,7 +1224,7 @@ access(all) contract FGameLottery {
             let remainingWinners = self.disbursingQueque.length
             if totalWinners > 0 {
                 let progress = UFix64(totalWinners - remainingWinners) / UFix64(totalWinners)
-                self.drawnResult?.setDisbursingProgress(progress)
+                self.drawnResult?.setDisbursingProgress(progress)!
             }
 
             // emit event
@@ -1280,14 +1280,14 @@ access(all) contract FGameLottery {
             if prizeRank! == PrizeRank.JACKPOT {
                 // Disburse the jackpot prize
                 let jackpotPoolRef = pool.borrowJackpotPool()
-                let winners = self.drawnResult!.jackpotWinners
-                if winners == nil || winners!.length == 0 || !winners!.contains(ticketOwner) {
+                let winners = self.drawnResult?.jackpotWinners!
+                if winners == nil || winners.length == 0 || !winners.contains(ticketOwner) {
                     Burner.burn(<- rewardChange)
                     Burner.burn(<- feeChange)
                     return
                 }
-                let jackpotAmount = self.drawnResult!.jackpotAmount
-                let jackpotWinnerAmt = winners?.length!
+                let jackpotAmount = self.drawnResult?.jackpotAmount!
+                let jackpotWinnerAmt = winners.length
                 let withdrawAmount = jackpotAmount / UFix64(jackpotWinnerAmt)
                 if jackpotPoolRef.getBalance() < withdrawAmount {
                     Burner.burn(<- rewardChange)
@@ -1306,10 +1306,25 @@ access(all) contract FGameLottery {
                 // Get the base prize amount
                 let basePrize = pool.getWinnerPrizeByRank(prizeRank!)
 
+                let currentBalance = self.current.getBalance()
                 // Disburse the prize amount
                 let prizeAmountWithPowerup = basePrize * ticket.getPowerup()
-                let prizeDowngradeRatio = self.drawnResult!.nonJackpotDowngradeRatio
-                let prizeChange <- self.current.withdrawAsChange(amount: prizeAmountWithPowerup * prizeDowngradeRatio)
+                let prizeDowngradeRatio = self.drawnResult?.nonJackpotDowngradeRatio!
+                // re-calculate the prize amount with the downgrade ratio
+                var amountToDisburse = prizeAmountWithPowerup * prizeDowngradeRatio
+                if prizeDowngradeRatio == 1.0 && currentBalance < amountToDisburse {
+                    // Fix the issue of no enough balance to disburse the prize
+                    var halfBought = self.drawnResult?.totalBought! * 0.5
+                    if halfBought > currentBalance {
+                        halfBought = currentBalance
+                    }
+                    var newPrizeDowngradeRatio = halfBought / self.drawnResult?.nonJackpotTotal!
+                    if newPrizeDowngradeRatio > 1.0 {
+                        newPrizeDowngradeRatio = 1.0
+                    }
+                    amountToDisburse = prizeAmountWithPowerup * newPrizeDowngradeRatio
+                }
+                let prizeChange <- self.current.withdrawAsChange(amount: amountToDisburse)
 
                 // if PrizeRank is 3rd or higher, 16% of prize will be charged as the service fee
                 // if PrizeRank is lower than 3rd, no service fee will be charged
@@ -1375,7 +1390,7 @@ access(all) contract FGameLottery {
             ticket.onPrizeDisburse(prizeAmount)
         }
 
-        access(self)
+        access(contract)
         view fun borrowCurrentLotteryChange(): auth(FRC20FTShared.Write) &FRC20FTShared.Change {
             return &self.current
         }
@@ -1612,12 +1627,12 @@ access(all) contract FGameLottery {
 
         access(all)
         view fun borrowLottery(_ epochIndex: UInt64): &Lottery? {
-            return self.borrowLotteryRef(epochIndex)
+            return &self.lotteries[epochIndex]
         }
 
         access(all)
         view fun borrowCurrentLottery(): &Lottery? {
-            return self.borrowLotteryRef(self.currentEpochIndex)
+            return self.borrowLottery(self.currentEpochIndex)
         }
 
         /** ---- Public Methods: write ----- */
@@ -1648,7 +1663,7 @@ access(all) contract FGameLottery {
             )
 
             // Get the current lottery
-            let lotteryRef = self.borrowLotteryRef(self.currentEpochIndex)
+            let lotteryRef = self.borrowLottery(self.currentEpochIndex)
                 ?? panic("Lottery not found")
 
             // Create tickets
@@ -1738,6 +1753,26 @@ access(all) contract FGameLottery {
             )
         }
 
+        /// This is a hotfix method to gather the jackpot pool from all lotteries
+        access(Admin)
+        fun gatherJackpotPool() {
+            let jackpotRef = self.borrowJackpotPool()
+
+            let selfRef = &self as auth(Admin) &LotteryPool
+            self.lotteries.forEachKey(fun (epochIndex: UInt64): Bool {
+                if let ref = selfRef.borrowLottery(epochIndex) {
+                    if ref.getStatus() == LotteryStatus.DRAWN_AND_VERIFIED && !ref.isDisbursing() {
+                        let currentBalance = ref.getCurrentLotteryBalance()
+                        if currentBalance > 0.0 {
+                            let currPool = ref.borrowCurrentLotteryChange()
+                            jackpotRef.forceMerge(from: <- currPool.withdrawAsChange(amount: currentBalance))
+                        }
+                    }
+                }
+                return true
+            })
+        }
+
         /** ---- Heartbeat Implementation Methods ----- */
 
         /// The methods that is invoked when the heartbeat is executed
@@ -1752,7 +1787,7 @@ access(all) contract FGameLottery {
                 // DO NOTHING if the current lottery is active
             } else if self.isCurrentLotteryReadyToDraw() {
                 // Draw the current lottery if it is ready
-                let lotteryRef = self.borrowLotteryRef(self.currentEpochIndex)!
+                let lotteryRef = self.borrowLottery(self.currentEpochIndex)!
                 // draw the lottery
                 lotteryRef.drawLottery()
                 // append the current epoch index to the finished epoches
@@ -1771,7 +1806,7 @@ access(all) contract FGameLottery {
             // Step 1. Handle the finished epoches
             if self.finishedEpoches.length > 0 {
                 let firstFinsihedEpochIndex = self.finishedEpoches[0]
-                let lotteryRef = self.borrowLotteryRef(firstFinsihedEpochIndex)!
+                let lotteryRef = self.borrowLottery(firstFinsihedEpochIndex)!
 
                 // max entries to compute in one heartbeat
                 let heartbeatComputeEntries = 200
@@ -1790,6 +1825,13 @@ access(all) contract FGameLottery {
                 // check if the lottery is finished
                 status = lotteryRef.getStatus()
                 if status == LotteryStatus.DRAWN_AND_VERIFIED && !lotteryRef.isDisbursing() {
+                    // move all remaining balance to the jackpot pool
+                    let currentBalance = lotteryRef.getCurrentLotteryBalance()
+                    if currentBalance > 0.0 {
+                        let jackpotRef = self.borrowJackpotPool()
+                        let currRef = lotteryRef.borrowCurrentLotteryChange()
+                        jackpotRef.forceMerge(from: <- currRef.withdrawAsChange(amount: currentBalance))
+                    }
                     // remove the first finished epoch index and set the last sealed epoch index
                     self.lastSealedEpochIndex = self.finishedEpoches.removeFirst()
                 }
@@ -1807,11 +1849,6 @@ access(all) contract FGameLottery {
         view fun borrowConfigStore(): &FRC20FTShared.SharedStore {
             return FRC20FTShared.borrowStoreRef(self.owner!.address)
                 ?? panic("Config store not found")
-        }
-
-        access(self)
-        view fun borrowLotteryRef(_ epochIndex: UInt64): &Lottery? {
-            return &self.lotteries[epochIndex]
         }
     }
 

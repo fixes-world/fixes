@@ -163,6 +163,37 @@ access(all) contract FGameLotteryRegistry {
                 epochInterval: epochInterval
             )
         }
+
+        access(Manage)
+        fun gatherJackpots() {
+            pre {
+                FGameLotteryRegistry.isWhitelisted(self.getControllerAddress()): "The controller is not whitelisted"
+            }
+
+            // singleton resources
+            let acctsPool = FRC20AccountsPool.borrowAccountsPool()
+            let registry = FGameLotteryRegistry.borrowRegistry()
+
+            let names = registry.getLotteryPoolNames()
+            let coinPrefix = "FIXES_LOTTERY_POOL_FOR_"
+            for name in names {
+                var childAcctRef: auth(Storage, Contracts, Keys, Inbox, Capabilities) &Account? = nil
+                if name.contains(coinPrefix) {
+                    let tick = name.slice(from: coinPrefix.length, upTo: name.length)
+                    childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.FungibleToken, tick)
+                } else {
+                    let worldKey = registry.getGameWorldKey(name)
+                    childAcctRef = acctsPool.borrowChildAccount(type: FRC20AccountsPool.ChildAccountType.GameWorld, worldKey)
+                }
+                if childAcctRef == nil {
+                    continue
+                }
+                if let poolRef = childAcctRef!.storage
+                    .borrow<auth(FGameLottery.Admin) &FGameLottery.LotteryPool>(from: FGameLottery.lotteryPoolStoragePath) {
+                    poolRef.gatherJackpotPool()
+                }
+            }
+        }
     }
 
     /** ---- Internal Methods --- Factory ---- */

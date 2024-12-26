@@ -241,15 +241,8 @@ access(all) contract FixesAssetMeta {
         ///
         access(all)
         view fun toString(): String {
-            var genes: String = ""
-            for key in self.genes.keys {
-                let geneStr = self.genes[key]!.toString()
-                if genes != "" {
-                    genes = genes.concat(",")
-                }
-                genes = genes.concat(geneStr)
-            }
-            return genes
+            return "genes.count=".concat(self.genes.length.toString())
+            .concat(", mutatableAmount=").concat(self.mutatableAmount.toString())
         }
 
         /// Get the data keys
