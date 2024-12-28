@@ -1108,7 +1108,7 @@ access(all) contract FixesTradablePool {
                 )
 
                 // During bonding curve is active, the lottery ticket will be bought with 10% of the token you obtained
-                if !self.isLocalActive() {
+                if self.isLocalActive() {
                     // 10% of the token you obtained will be used to buy the lottery tickets
                     // 90% of the token you obtained will be deposited to the recipient
                     var depositToUser = tokenYouObtained.balance * 0.9
