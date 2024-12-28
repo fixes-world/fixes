@@ -245,6 +245,13 @@
 				"testnet": "b7248baa24a95c3f"
 			}
 		},
+		"FixesTVL": {
+			"source": "cadence/contracts/FixesTVL.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "b7248baa24a95c3f"
+			}
+		},
 		"FixesWrappedNFT": {
 			"source": "cadence/contracts/FixesWrappedNFT.cdc",
 			"aliases": {
@@ -1063,7 +1070,8 @@
 				"FRC20Agents",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FungibleTokenManager"
+				"FungibleTokenManager",
+				"FixesTVL"
 			]
 		},
 		"mainnet": {
@@ -1104,7 +1112,8 @@
 				"FRC20Agents",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FungibleTokenManager"
+				"FungibleTokenManager",
+				"FixesTVL"
 			]
 		},
 		"testnet": {
@@ -1145,7 +1154,8 @@
 				"FRC20Agents",
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
-				"FungibleTokenManager"
+				"FungibleTokenManager",
+				"FixesTVL"
 			]
 		}
 	}
