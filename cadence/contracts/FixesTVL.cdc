@@ -147,7 +147,7 @@ access(all) contract FixesTVL {
                     // sum up all locked flow in Lottery Pool
                     if let lotteryPool = FGameLottery.borrowLotteryPool(addr) {
                         let lotteryPoolBalance = lotteryPool.getPoolTotalBalance()
-                        let flowValue = tradablePool.getSwapEstimatedAmount(true, amount: lotteryPoolBalance)
+                        let flowValue = tradablePool.getEstimatedSellingValueByAmount(lotteryPoolBalance)
                         flowValueLockedInLotteryPool = flowValueLockedInLotteryPool + flowValue
                     }
                 }

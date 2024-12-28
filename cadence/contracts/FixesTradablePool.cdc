@@ -680,6 +680,11 @@ access(all) contract FixesTradablePool {
             }
             let reserveToken = pairInfo![0]
             let reserveFlow = pairInfo![1]
+
+            if reserveToken == 0.0 || reserveFlow == 0.0 {
+                return 0.0
+            }
+
             if directionTokenToFlow {
                 return SwapConfig.getAmountOut(amountIn: amount, reserveIn: reserveToken, reserveOut: reserveFlow)
             } else {
