@@ -17,6 +17,11 @@ access(all) contract FGameMishalBattleField {
     access(all) entitlement SessionManage
     access(all) entitlement Creator
 
+    // The Pawn resource is refered to as the character in the game.
+    access(all) resource Pawn {
+
+    }
+
     // The Commander resource is refered to as the player in the game.
     access(all) resource Commander {
     }
