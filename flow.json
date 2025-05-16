@@ -14,13 +14,6 @@
 				"testnet": "b7248baa24a95c3f"
 			}
 		},
-		"FGameBattleField": {
-			"source": "cadence/contracts/FGameBattleField.cdc",
-			"aliases": {
-				"mainnet": "d2abb5dbf5e08666",
-				"testnet": "b7248baa24a95c3f"
-			}
-		},
 		"FGameLottery": {
 			"source": "cadence/contracts/FGameLottery.cdc",
 			"aliases": {
@@ -37,6 +30,20 @@
 		},
 		"FGameLotteryRegistry": {
 			"source": "cadence/contracts/FGameLotteryRegistry.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "b7248baa24a95c3f"
+			}
+		},
+		"FGameMishal": {
+			"source": "cadence/contracts/FGameMishal.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "b7248baa24a95c3f"
+			}
+		},
+		"FGameMishalBattleField": {
+			"source": "cadence/contracts/FGameMishalBattleField.cdc",
 			"aliases": {
 				"mainnet": "d2abb5dbf5e08666",
 				"testnet": "b7248baa24a95c3f"
@@ -1079,7 +1086,8 @@
 				"FRC20FungibleToken",
 				"FungibleTokenManager",
 				"FixesTVL",
-				"FGameBattleField"
+				"FGameMishal",
+				"FGameMishalBattleField"
 			]
 		},
 		"mainnet": {
@@ -1122,7 +1130,8 @@
 				"FRC20FungibleToken",
 				"FungibleTokenManager",
 				"FixesTVL",
-				"FGameBattleField"
+				"FGameMishal",
+				"FGameMishalBattleField"
 			]
 		},
 		"testnet": {
@@ -1165,7 +1174,8 @@
 				"FRC20FungibleToken",
 				"FungibleTokenManager",
 				"FixesTVL",
-				"FGameBattleField"
+				"FGameMishal",
+				"FGameMishalBattleField"
 			]
 		}
 	}
