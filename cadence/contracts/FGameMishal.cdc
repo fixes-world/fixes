@@ -8,6 +8,7 @@ The basic elements of a Mishal Game will be defined here.
 
 */
 import "Burner"
+import "FungibleToken"
 // Fixes Imports
 import "Fixes"
 import "FixesHeartbeat"
@@ -26,6 +27,9 @@ access(all) contract FGameMishal {
 
     access(all) event UnitStatusApplied(_ unitUID: UInt64, _ attributes: Attributes, _ defence: Defence, _ potentiality: Potentiality)
 
+    access(all) event EntryDeposited(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ amount: UFix64, _ to: Address?, entryUUID: UInt64, collectionUUID: UInt64)
+    access(all) event EntryWithdrawn(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ amount: UFix64, _ from: Address?, entryUUID: UInt64, collectionUUID: UInt64)
+
     // ----- Contract Level Variables -----
 
     // The counter variable for the library items
@@ -38,6 +42,8 @@ access(all) contract FGameMishal {
 
     access(all) enum LibrarySettings: UInt8 {
         access(all) case INIT_POTENTIALITY
+        access(all) case INIT_ATTRIBUTE_VALUE
+        access(all) case INIT_DEFENCE_VALUE
     }
 
     access(all) enum LibraryCategory: UInt8 {
@@ -80,19 +86,22 @@ access(all) contract FGameMishal {
 
     // The Public Library resource is used to store the settings of Mishal Game.
     access(all) resource Library {
-        access(all) let settings: {LibrarySettings: Int64}
-        access(all) let objects: @{UInt64: Object}
-        access(all) let items: @{UInt64: Item}
-        access(all) let abilities: @{UInt64: Ability}
-        access(all) let shapes: @{UInt64: Shape}
-        access(all) let features: @{UInt64: Feature}
-        access(all) let creatures: @{UInt64: Creature}
+        access(contract) let settings: {LibrarySettings: Int64}
+
+        access(self) let objects: @{UInt64: Object}
+        access(self) let items: @{UInt64: Item}
+        access(self) let abilities: @{UInt64: Ability}
+        access(self) let shapes: @{UInt64: Shape}
+        access(self) let features: @{UInt64: Feature}
+        access(self) let creatures: @{UInt64: Creature}
         access(self) let nameToUID: {LibraryCategory: {String: UInt64}}
         access(self) let tagToUIDs: {LibraryCategory: {String: [UInt64]}}
 
         init() {
             self.settings = {
-                LibrarySettings.INIT_POTENTIALITY: 36
+                LibrarySettings.INIT_POTENTIALITY: 36,
+                LibrarySettings.INIT_ATTRIBUTE_VALUE: 3,
+                LibrarySettings.INIT_DEFENCE_VALUE: 0
             }
             self.objects <- {}
             self.items <- {}
@@ -937,10 +946,15 @@ access(all) contract FGameMishal {
     }
 
     // The ShapeCarrier resource interface is used to get the shape of the creature.
-    access(all) resource interface ShapeOverrides: CreatureSettingsCarrier {
+    access(all) resource interface ShapeCarrier: CreatureSettingsCarrier {
         access(all) let settings: {CreatureSettings: Int64}
 
         access(all) view fun borrowShape(): &Shape?
+
+        access(all) view
+        fun hasShape(): Bool {
+            return self.borrowShape() != nil
+        }
 
         access(all) view
         fun getGender(): Int64? {
@@ -1025,6 +1039,11 @@ access(all) contract FGameMishal {
         }
 
         access(all) view
+        fun getStringID(): String {
+            return self.library.toString().concat("-").concat(self.category.rawValue.toString()).concat("-").concat(self.id.toString())
+        }
+
+        access(all) view
         fun verify(_ type: LibraryCategory): Bool {
             if type != self.category {
                 return false
@@ -1101,12 +1120,178 @@ access(all) contract FGameMishal {
         }
     }
 
+    // The FungibleEntry resource is used to store the fungible entry.
+    access(all) resource FungibleEntry: FungibleToken.Vault {
+        access(all) let identifier: EntryIdentifier
+        access(all) var balance: UFix64
+
+        view init(identifier: EntryIdentifier, amount: UFix64) {
+            self.identifier = identifier
+            self.balance = amount
+        }
+
+        access(all) view fun getCount(): UInt64 {
+            return UInt64(self.balance)
+        }
+
+        access(all) view fun getViews(): [Type] {
+            return []
+        }
+
+        access(all) fun resolveView(_ view: Type): AnyStruct? {
+            return nil
+        }
+
+        access(all) view fun isAvailableToWithdraw(amount: UFix64): Bool {
+            return amount <= self.balance
+        }
+
+        access(FungibleToken.Withdraw) fun withdraw(amount: UFix64): @FungibleEntry {
+            self.balance = self.balance - amount
+            return <-create FungibleEntry(identifier: self.identifier, amount: amount)
+        }
+
+        access(all) fun deposit(from: @{FungibleToken.Vault}) {
+            let vault <- from as! @FungibleEntry
+            self.balance = self.balance + vault.balance
+            destroy vault
+        }
+
+        access(all) fun createEmptyVault(): @FungibleEntry {
+            return <-create FungibleEntry(identifier: self.identifier, amount: 0.0)
+        }
+    }
+
+    // The EntryCollection resource is used to store the entries.
+    access(all) resource EntryCollection {
+        access(all) let entries: @{String: FungibleEntry}
+        access(all) let categories: {LibraryCategory: [String]}
+
+        view init() {
+            self.entries <- {}
+            self.categories = {}
+        }
+
+        access(all) view fun getLength(): Int {
+            return self.entries.length
+        }
+
+        access(all) view fun getLengthByCategory(_ category: LibraryCategory): Int {
+            return self.categories[category]?.length ?? 0
+        }
+
+        access(all)
+        fun getEntryIdentifiers(_ category: LibraryCategory?): [EntryIdentifier] {
+            let ret: [EntryIdentifier] = []
+            let keys = category == nil ? self.entries.keys : self.getKeysByCategory(category!)
+            for id in keys {
+                if let ref = self.borrowEntryByID(id) {
+                    ret.append(EntryIdentifier(library: ref.identifier.library, category: ref.identifier.category, id: ref.identifier.id))
+                }
+            }
+            return ret
+        }
+
+        access(all)
+        fun borrowEnties(_ category: LibraryCategory?): [&FungibleEntry] {
+            let ret: [&FungibleEntry] = []
+            let keys = category == nil ? self.entries.keys : self.getKeysByCategory(category!)
+            for id in keys {
+                if let ref = self.borrowEntryByID(id) {
+                    ret.append(ref)
+                }
+            }
+            return ret
+        }
+
+        access(all) view
+        fun getKeysByCategory(_ category: LibraryCategory): [String] {
+            return self.categories[category] ?? []
+        }
+
+        access(all) view
+        fun borrowEntryByID(_ id: String): &FungibleEntry? {
+            return &self.entries[id]
+        }
+
+        access(all)
+        fun deposit(entry: @FungibleEntry) {
+            pre {
+                emit EntryDeposited(
+                    entry.identifier.library,
+                    entry.identifier.category.rawValue,
+                    entry.identifier.id,
+                    entry.balance,
+                    self.owner?.address,
+                    entryUUID: entry.uuid,
+                    collectionUUID: self.uuid
+                )
+            }
+            let uid = entry.identifier.getStringID()
+
+            if self.isNonFungible(entry.identifier.category) {
+                assert(entry.balance == 1.0 && self.entries[uid] == nil, message: "Non-fungible entry must have a balance of 1.0")
+            }
+
+            if let oldRef = self.borrowEntryByID(uid) {
+                oldRef.deposit(from: <- entry)
+            } else {
+                self.entries[uid] <-! entry
+            }
+        }
+
+        access(all)
+        fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry {
+            post {
+                result.identifier.getStringID() == id: "The ID of the withdrawn token must be the same as the requested ID"
+                emit EntryWithdrawn(
+                    result.identifier.library,
+                    result.identifier.category.rawValue,
+                    result.identifier.id,
+                    result.balance,
+                    self.owner?.address,
+                    entryUUID: result.uuid,
+                    collectionUUID: self.uuid
+                )
+            }
+            let ref = self.borrowEntryByID(id)
+                ?? panic("EntryCollection.withdraw: Could not withdraw an entry with ID ".concat(id).concat(". Check if the entry exists."))
+            if self.isNonFungible(ref.identifier.category) {
+                assert(amount == nil, message: "Non-fungible entry cannot have an amount")
+                return <- self.entries.remove(key: id)!
+            } else {
+                assert(amount != nil, message: "Fungible entry must have an amount")
+                assert(
+                    ref.isAvailableToWithdraw(amount: amount!),
+                    message: "EntryCollection.withdraw: The entry is not available to withdraw, amount: "
+                        .concat(amount!.toString())
+                        .concat(", available: ")
+                        .concat(ref.balance.toString())
+                )
+                return <- ref.withdraw(amount: amount!)
+            }
+        }
+
+        access(self) view
+        fun isNonFungible(_ category: LibraryCategory): Bool {
+            switch category {
+                case LibraryCategory.OBJECT:
+                    return false
+                case LibraryCategory.ITEM:
+                    return false
+                default:
+                    return true
+            }
+        }
+    }
+
     access(all) resource interface AbilitiesCarrier {
-        access(all) view fun borrowAbilityIdentifiers(): &[EntryIdentifier]
+        access(all) view fun getAbilitiesLength(): Int
+        access(all) fun getAbilityIdentifiers(): [EntryIdentifier]
 
         access(all)
         fun borrowAbilities(): [&Ability] {
-            return self.borrowAbilityIdentifiers()
+            return self.getAbilityIdentifiers()
                 .map(view fun (_ x: EntryIdentifier): &Ability? {
                     return x.borrowAbility()
                 })
@@ -1120,79 +1305,81 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun hasAbilities(): Bool {
-            return self.borrowAbilityIdentifiers().length > 0
+            return self.getAbilitiesLength() > 0
         }
     }
 
     access(all) resource interface ItemsCarrier {
-        access(all) view fun borrowItemIdentifiers(): &[EntryIdentifier]
+        access(all) view fun getItemsLength(): Int
+        access(all) fun borrowItemEntries(): [&FungibleEntry]
 
         access(all)
         fun borrowItems(): [&Item] {
-            return self.borrowItemIdentifiers()
-                .map(view fun (_ x: EntryIdentifier): &Item? {
-                    return x.borrowItem()
-                })
-                .filter(view fun (_ x: &Item?): Bool {
-                    return x != nil
-                })
-                .map(view fun (_ x: &Item?): &Item {
-                    return x!
-                })
+            let itemEntries = self.borrowItemEntries()
+
+            let ret: [&Item] = []
+            for itemEntry in itemEntries {
+                if let item = itemEntry.identifier.borrowItem() {
+                    var amount = itemEntry.getCount()
+                    while amount > 0 {
+                        ret.append(item)
+                        amount = amount - 1
+                    }
+                }
+            }
+            return ret
         }
 
         access(all) view
         fun hasItems(): Bool {
-            return self.borrowItemIdentifiers().length > 0
+            return self.getItemsLength() > 0
         }
     }
 
-    access(all) resource interface ShapeCarrier: ShapeOverrides {
-        access(all) let shape: EntryIdentifier?
+    access(all) resource interface UnitStaticBasicCapabiltiesCarrier: AbilitiesCarrier, ItemsCarrier, ShapeCarrier {
+        access(all) let collection: @EntryCollection
 
-        access(all) view
-        fun borrowShape(): &Shape? {
-            if let shape = self.shape {
-                return shape.borrowShape()
+        access(all) view fun getAbilitiesLength(): Int {
+            return self.collection.getLengthByCategory(LibraryCategory.ABILITY)
+        }
+
+        access(all)
+        fun getAbilityIdentifiers(): [EntryIdentifier] {
+            return self.collection.getEntryIdentifiers(LibraryCategory.ABILITY)
+        }
+
+        access(all) view fun getItemsLength(): Int {
+            return self.collection.getLengthByCategory(LibraryCategory.ITEM)
+        }
+
+        access(all)
+        fun borrowItemEntries(): [&FungibleEntry] {
+            return self.collection.borrowEnties(LibraryCategory.ITEM)
+        }
+
+        access(all) view fun borrowShape(): &Shape? {
+            let shape = self.collection.getKeysByCategory(LibraryCategory.SHAPE)
+            if shape.length > 0 {
+                if let entry = self.collection.borrowEntryByID(shape[0]) {
+                    return entry.identifier.borrowShape()
+                }
             }
             return nil
-        }
-
-        access(all) view
-        fun hasShape(): Bool {
-            return self.shape != nil
-        }
-    }
-
-    access(all) resource interface UnitStaticBasicCapabiltiesCarrier: AbilitiesCarrier, ItemsCarrier {
-        access(all) let abilities: [EntryIdentifier]
-        access(all) let items: [EntryIdentifier]
-
-        access(all) view
-        fun borrowAbilityIdentifiers(): &[EntryIdentifier] {
-            return &self.abilities
-        }
-
-        access(all) view
-        fun borrowItemIdentifiers(): &[EntryIdentifier] {
-            return &self.items
         }
     }
 
     // The Feature resource is used to define the features of the entry.
-    access(all) resource Feature: Nameable, OptionalStatusCarrier, UnitStaticBasicCapabiltiesCarrier, ShapeCarrier, EffectsCarrier {
+    access(all) resource Feature: Nameable, OptionalStatusCarrier, UnitStaticBasicCapabiltiesCarrier, EffectsCarrier {
         access(all) let name: String
         access(all) let tags: [String]
         access(all) let attributes: Attributes?
         access(all) let defence: Defence?
         access(all) let potentiality: Potentiality?
+        access(all) let collection: @EntryCollection
         access(all) let effects: [String]
-        access(all) let abilities: [EntryIdentifier]
-        access(all) let items: [EntryIdentifier]
-        access(all) let shape: EntryIdentifier?
         access(all) let settings: {CreatureSettings: Int64}
 
-        view init(
+        init(
             name: String,
             tags: [String],
             attributes: Attributes?,
@@ -1201,39 +1388,54 @@ access(all) contract FGameMishal {
             shape: EntryIdentifier?,
             abilities: [EntryIdentifier],
             items: [EntryIdentifier],
+            itemAmounts: {String: UFix64},
             effects: [String],
             settings: {CreatureSettings: Int64}
         ) {
-            self.name = name
-            self.tags = tags
-            self.attributes = attributes
-            self.defence = defence
-            self.potentiality = potentiality
-            self.shape = shape
-            self.abilities = abilities
-            self.items = items
-            self.effects = effects
-            self.settings = settings
-
-            // check identifiers
-            if self.shape != nil {
-                assert(self.shape!.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
-            }
             for abilityIdentifier in abilities {
                 assert(abilityIdentifier.verify(LibraryCategory.ABILITY), message: "Ability identifier is invalid")
             }
             for itemIdentifier in items {
                 assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
             }
+
+            self.name = name
+            self.tags = tags
+            self.attributes = attributes
+            self.defence = defence
+            self.potentiality = potentiality
+            self.effects = effects
+            self.settings = settings
+            self.collection <- create EntryCollection()
+
+            // Set the entries
+
+            // check identifiers
+            if shape != nil {
+                assert(shape!.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
+                self.collection.deposit(entry: <-create FungibleEntry(identifier: shape!, amount: 1.0))
+            }
+            for abilityIdentifier in abilities {
+                self.collection.deposit(entry: <-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
+            }
+            if items.length > 0 {
+                assert(itemAmounts.length == items.length, message: "Item amounts must be the same length as items")
+                for itemIdentifier in items {
+                    let id = itemIdentifier.getStringID()
+                    let amount = itemAmounts[id] ?? 0.0
+                    self.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
+                }
+            }
         }
     }
 
     access(all) resource interface FeaturesCarrier {
-        access(all) view fun borrowFeatureIdentifiers(): &[EntryIdentifier]
+        access(all) view fun getFeaturesLength(): Int
+        access(all) fun getFeatureIdentifiers(): [EntryIdentifier]
 
         access(all)
         fun borrowFeatures(): [&Feature] {
-            return self.borrowFeatureIdentifiers()
+            return self.getFeatureIdentifiers()
                 .map(view fun (_ x: EntryIdentifier): &Feature? {
                     return x.borrowFeature()
                 })
@@ -1247,37 +1449,43 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun hasFeatures(): Bool {
-            return self.borrowFeatureIdentifiers().length > 0
+            return self.getFeaturesLength() > 0
         }
     }
 
     access(all) resource interface UnitStaticCapabiltiesCarrier: UnitStaticBasicCapabiltiesCarrier, FeaturesCarrier {
-        access(all) let features: [EntryIdentifier]
-
-        access(all) view
-        fun borrowFeatureIdentifiers(): &[EntryIdentifier] {
-            return &self.features
-        }
-    }
-
-    access(all) resource interface CreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, ItemsCarrier, FeaturesCarrier, ShapeOverrides {
-        // The shape of the character
-        access(all) let shape: EntryIdentifier
-        // The base attributes of the character
-        access(all) let baseAttributes: Attributes
-        // The base defence of the character
-        access(all) let baseDefence: Defence
-        // The base potentiality of the character
-        access(all) let basePotentiality: Potentiality
-
-        access(all) view
-        fun borrowShape(): &Shape? {
-            return self.shape.borrowShape()
+        access(all) view fun getFeaturesLength(): Int {
+            return self.collection.getLengthByCategory(LibraryCategory.FEATURE)
         }
 
         access(all)
+        fun getFeatureIdentifiers(): [EntryIdentifier] {
+            return self.collection.getEntryIdentifiers(LibraryCategory.FEATURE)
+        }
+    }
+
+    access(all) resource interface BioCarrier {
+        access(all) let bioPrompts: [String]
+
+        access(all) view
+        fun borrowBioPrompts(): &[String] {
+            return &self.bioPrompts
+        }
+
+        access(Manage)
+        fun addBioPrompt(_ prompt: String) {
+            self.bioPrompts.append(prompt)
+        }
+    }
+
+    access(all) resource interface CreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, ItemsCarrier, FeaturesCarrier, ShapeCarrier {
+        access(all) view fun borrowSelfAttributes(): &Attributes
+        access(all) view fun borrowSelfDefence(): &Defence
+        access(all) view fun borrowSelfPotentiality(): &Potentiality
+
+        access(all)
         fun borrowAttributesElements(): [&Attributes] {
-            let ret: [&Attributes] = [&self.baseAttributes]
+            let ret: [&Attributes] = [self.borrowSelfAttributes()]
 
             // From Features
             let features = self.borrowFeatures()
@@ -1313,7 +1521,7 @@ access(all) contract FGameMishal {
 
         access(all)
         fun borrowDefenceElements(): [&Defence] {
-            let ret: [&Defence] = [&self.baseDefence]
+            let ret: [&Defence] = [self.borrowSelfDefence()]
 
             // From Features
             let features = self.borrowFeatures()
@@ -1339,7 +1547,7 @@ access(all) contract FGameMishal {
 
         access(all)
         fun borrowPotentialityElements(): [&Potentiality] {
-            let ret: [&Potentiality] = [&self.basePotentiality]
+            let ret: [&Potentiality] = [self.borrowSelfPotentiality()]
 
             // From Features
             let features = self.borrowFeatures()
@@ -1364,17 +1572,10 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource Creature: Nameable, CreatureInterface, UnitStaticCapabiltiesCarrier {
+    access(all) resource Creature: Nameable, CreatureInterface, UnitStaticCapabiltiesCarrier, BioCarrier {
         access(all) let name: String
         access(all) let tags: [String]
-        // The features of the character
-        access(all) let features: [EntryIdentifier]
-        // The abilities of the character
-        access(all) let abilities: [EntryIdentifier]
-        // The items of the character
-        access(all) let items: [EntryIdentifier]
-        // The shape of the character
-        access(all) let shape: EntryIdentifier
+        access(all) let collection: @EntryCollection
         // The settings of the character
         access(all) let settings: {CreatureSettings: Int64}
         // Main attributes of the character
@@ -1385,6 +1586,8 @@ access(all) contract FGameMishal {
         access(all) let basePotentiality: Potentiality
         // The merged status of the character
         access(all) let status: UnitStatus
+        // The bio prompts of the character
+        access(all) let bioPrompts: [String]
 
         init(
             name: String,
@@ -1395,101 +1598,139 @@ access(all) contract FGameMishal {
             features: [EntryIdentifier],
             abilities: [EntryIdentifier],
             items: [EntryIdentifier],
+            itemAmounts: {String: UFix64},
             shape: EntryIdentifier,
-            settings: {CreatureSettings: Int64}
+            settings: {CreatureSettings: Int64},
+            bioPrompts: [String]
         ) {
             self.name = name
             self.tags = tags
+            self.settings = settings
+            self.bioPrompts = bioPrompts
             self.baseAttributes = attributes
             self.baseDefence = defence
             self.basePotentiality = potentiality
-            self.features = features
-            self.abilities = abilities
-            self.items = items
-            self.shape = shape
-            self.settings = settings
             // Initialize the status
             self.status = UnitStatus(
                 attributes: self.baseAttributes,
                 defence: self.baseDefence,
                 potentiality: self.basePotentiality
             )
+            self.collection <- create EntryCollection()
 
-            // check identifiers
-            assert(self.shape.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
+            assert(shape.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
+            self.collection.deposit(entry: <-create FungibleEntry(identifier: shape, amount: 1.0))
+
             for featureIdentifier in features {
                 assert(featureIdentifier.verify(LibraryCategory.FEATURE), message: "Feature identifier is invalid")
+                self.collection.deposit(entry: <-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
             }
+
             for abilityIdentifier in abilities {
                 assert(abilityIdentifier.verify(LibraryCategory.ABILITY), message: "Ability identifier is invalid")
+                self.collection.deposit(entry: <-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
             }
-            for itemIdentifier in items {
-                assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
+
+            if items.length > 0 {
+                assert(itemAmounts.length == items.length, message: "Item amounts must be the same length as items")
+                for itemIdentifier in items {
+                    assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
+                    let id = itemIdentifier.getStringID()
+                    let amount = itemAmounts[id] ?? 0.0
+                    self.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
+                }
             }
 
             // apply the status
             self.applyStatus()
         }
+
+        access(all) view
+        fun borrowSelfAttributes(): &Attributes {
+            return &self.baseAttributes
+        }
+
+        access(all) view
+        fun borrowSelfDefence(): &Defence {
+            return &self.baseDefence
+        }
+
+        access(all) view
+        fun borrowSelfPotentiality(): &Potentiality {
+            return &self.basePotentiality
+        }
     }
 
     // ------------ Player ------------
 
-    // The Clonable resource inteface is used to clone the entry.
-    access(all) resource interface Clonable {
-        access(all) let identifier: EntryIdentifier
-        access(Manage) fun clone(): @{Clonable}
+    access(all) resource CultivableProperty {
+        access(contract) let library: Address
+
+        access(all) let attributes: Attributes
+        access(all) let defence: Defence
+        access(all) let potentiality: Potentiality
+
+        view init(
+            _ library: Address
+        ) {
+            self.library = library
+            let lib = FGameMishal.borrowLibrary(library) ?? panic("Library not found")
+            let initPtt = lib.settings[LibrarySettings.INIT_POTENTIALITY] ?? 36
+            let initDef = lib.settings[LibrarySettings.INIT_DEFENCE_VALUE] ?? 0
+            let initAttr = lib.settings[LibrarySettings.INIT_ATTRIBUTE_VALUE] ?? 3
+
+            self.attributes = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
+            self.defence = Defence(physical: initDef, endurance: initDef, resistance: initDef)
+            self.potentiality = Potentiality(initial: initPtt)
+        }
     }
 
     // The Pawn resource is refered to as the character in the game.
-    access(all) resource Pawn: CreatureInterface {
-        // Main attributes of the character
-        access(all) let baseAttributes: Attributes
-        // The base defence of the character
-        access(all) let baseDefence: Defence
-        // The potentiality of the character
-        access(all) let basePotentiality: Potentiality
-        // The features of the character
-        access(all) let features: [EntryIdentifier]
-        // The abilities of the character
-        access(all) let abilities: [EntryIdentifier]
-        // The items of the character
-        access(all) let items: [EntryIdentifier]
+    access(all) resource Pawn: CreatureInterface, BioCarrier {
         // The shape of the character
         access(all) let shape: EntryIdentifier
+        // The features of the character
+        access(all) let features: [EntryIdentifier]
+        // The merged status of the character
+        access(all) let status: UnitStatus
+        // The items of the character
+        access(all) let items: @[FungibleEntry]
         // The settings of the character
         access(all) let settings: {CreatureSettings: Int64}
+        // The bio prompts of the character
+        access(all) let bioPrompts: [String]
 
         view init(
-            attributes: Attributes,
-            defence: Defence,
-            potentiality: Potentiality,
-            features: [EntryIdentifier],
-            abilities: [EntryIdentifier],
-            items: [EntryIdentifier],
             shape: EntryIdentifier,
-            settings: {CreatureSettings: Int64}
+            features: [EntryIdentifier],
+            bioPrompts: [String]
         ) {
-            self.attributes = attributes
-            self.defence = defence
-            self.potentiality = potentiality
             self.features = features
-            self.abilities = abilities
-            self.items = items
             self.shape = shape
-            self.settings = settings
-
+            self.settings = {}
+            self.bioPrompts = bioPrompts
+            self.items <- []
 
             // check identifiers
             assert(self.shape.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
             for featureIdentifier in features {
                 assert(featureIdentifier.verify(LibraryCategory.FEATURE), message: "Feature identifier is invalid")
             }
-            for abilityIdentifier in abilities {
-                assert(abilityIdentifier.verify(LibraryCategory.ABILITY), message: "Ability identifier is invalid")
-            }
-            for itemIdentifier in items {
-                assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
-            }
+        }
+
+        access(all) view
+        fun borrowSelfAttributes(): &Attributes {
+            return &self.baseAttributes
+        }
+
+        access(all) view
+        fun borrowSelfDefence(): &Defence {
+            return &self.baseDefence
+        }
+
+        access(all) view
+        fun borrowSelfPotentiality(): &Potentiality {
+            return &self.baseDefence
         }
     }
 
