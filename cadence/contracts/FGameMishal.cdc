@@ -30,6 +30,9 @@ access(all) contract FGameMishal {
     access(all) event EntryDeposited(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ amount: UFix64, _ to: Address?, entryUUID: UInt64, collectionUUID: UInt64)
     access(all) event EntryWithdrawn(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ amount: UFix64, _ from: Address?, entryUUID: UInt64, collectionUUID: UInt64)
 
+    access(all) event CreatureItemEquipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64)
+    access(all) event CreatureItemUnequipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64)
+
     // ----- Contract Level Variables -----
 
     // The counter variable for the library items
@@ -575,6 +578,8 @@ access(all) contract FGameMishal {
         access(all) var defence: Defence
         access(all) var potentiality: Potentiality
 
+        access(all) var slotsOccupied: {EquipSlot: [String]}
+
         view init(
             attributes: Attributes,
             defence: Defence,
@@ -583,6 +588,7 @@ access(all) contract FGameMishal {
             self.attributes = attributes
             self.defence = defence
             self.potentiality = potentiality
+            self.slotsOccupied = {}
         }
 
         access(all) fun copy(): {Copyable} { return self }
@@ -1352,7 +1358,7 @@ access(all) contract FGameMishal {
 
     access(all) resource interface EquippedItemsCarrier: ItemsCarrier {
         access(all) view fun getSlotsAll(): {EquipSlot: UInt8}
-        access(all) view fun borrowSlotsOccupied(): &{EquipSlot: [String]}
+        access(Manage) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]}
 
         access(all)
         fun borrowEquippedItems(): [&Item] {
@@ -1398,19 +1404,76 @@ access(all) contract FGameMishal {
         access(all) view
         fun isItemEquippable(_ item: EntryIdentifier): Bool {
             if let itemRef = item.borrowItem() {
-                let allSlots = self.getSlotsAll()
-                let occupiedSlots = self.borrowSlotsOccupied()
-                let requiredSlots = itemRef.slotsOccupied;
-                for slot in requiredSlots.keys {
-                    let allCount = allSlots[slot] ?? 0
-                    let occupiedCount = UInt8(occupiedSlots[slot]?.length ?? 0)
-                    if allCount - occupiedCount < requiredSlots[slot]! {
-                        return false
-                    }
-                }
-                return true
+                return self._isItemEquippable(itemRef)
             }
             return false
+        }
+
+        access(Manage)
+        fun equipItem(_ item: EntryIdentifier) {
+            let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
+            let itemId = item.getStringID()
+            assert(self.borrowEntryByID(itemId) != nil, message: "Not Found in Inventory, Item: ".concat(itemId))
+            assert(!self.hasItemEquipped(item), message: "Already Equipped, Item: ".concat(itemId))
+            assert(self._isItemEquippable(itemRef), message: "Not Equippable, Item: ".concat(itemId))
+
+            let slots = self.borrowSlotsOccupied()
+            let requiredSlots = itemRef.slotsOccupied
+            for slot in requiredSlots.keys {
+                if let occupied = slots[slot] {
+                    let newOccupied: [String] = *occupied
+                    var toOccupy = requiredSlots[slot]!
+                    while toOccupy > 0 {
+                        newOccupied.append(itemId)
+                        toOccupy = toOccupy - 1
+                    }
+                    slots[slot] = newOccupied
+                }
+            }
+
+            emit CreatureItemEquipped(
+                item.library,
+                itemId,
+                self.owner?.address,
+                itemUUID: itemRef.uuid,
+            )
+        }
+
+        access(Manage)
+        fun unequipItem(_ item: EntryIdentifier) {
+            let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
+            let itemId = item.getStringID()
+            assert(self.borrowEntryByID(itemId) != nil, message: "Not Found in Inventory, Item: ".concat(itemId))
+            assert(self.hasItemEquipped(item), message: "Not Equipped, Item: ".concat(itemId))
+
+            let slots = self.borrowSlotsOccupied()
+            let requiredSlots = itemRef.slotsOccupied
+            for slot in requiredSlots.keys {
+                if let occupied = slots[slot] {
+                    let newOccupied: [String] = []
+                    for id in occupied {
+                        if id != itemId {
+                            newOccupied.append(id)
+                        }
+                    }
+                    slots[slot] = newOccupied
+                }
+            }
+        }
+
+        access(contract) view
+        fun _isItemEquippable(_ itemRef: &Item): Bool {
+            let allSlots = self.getSlotsAll()
+            let occupiedSlots = self.borrowSlotsOccupied()
+            let requiredSlots = itemRef.slotsOccupied;
+            for slot in requiredSlots.keys {
+                let allCount = allSlots[slot] ?? 0
+                let occupiedCount = UInt8(occupiedSlots[slot]?.length ?? 0)
+                if allCount - occupiedCount < requiredSlots[slot]! {
+                    return false
+                }
+            }
+            return true
         }
     }
 
@@ -1573,7 +1636,7 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource interface CreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, ItemsCarrier, FeaturesCarrier, ShapeCarrier {
+    access(all) resource interface CreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, EquippedItemsCarrier, FeaturesCarrier, ShapeCarrier {
         access(all) view fun borrowSelfAttributes(): &Attributes
         access(all) view fun borrowSelfDefence(): &Defence
         access(all) view fun borrowSelfPotentiality(): &Potentiality
@@ -1603,7 +1666,7 @@ access(all) contract FGameMishal {
             }
 
             // From Items
-            let items = self.borrowItems()
+            let items = self.borrowEquippedItems()
             for item in items {
                 if item.hasAttributes() {
                     if let attributes = item.borrowAttributes() {
@@ -1629,7 +1692,7 @@ access(all) contract FGameMishal {
             }
 
             // From Items
-            let items = self.borrowItems()
+            let items = self.borrowEquippedItems()
             for item in items {
                 if item.hasDefence() {
                     if let defence = item.borrowDefence() {
@@ -1655,7 +1718,7 @@ access(all) contract FGameMishal {
             }
 
             // From Items
-            let items = self.borrowItems()
+            let items = self.borrowEquippedItems()
             for item in items {
                 if item.hasPotentiality() {
                     if let potentiality = item.borrowPotentiality() {
