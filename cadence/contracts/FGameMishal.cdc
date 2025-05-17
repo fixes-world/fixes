@@ -1165,8 +1165,14 @@ access(all) contract FGameMishal {
         }
     }
 
+    // The EntryContainer resource interface is used to borrow the entry by ID.
+    access(all) resource interface EntryContainer {
+        access(all) view
+        fun borrowEntryByID(_ id: String): &FungibleEntry?
+    }
+
     // The EntryCollection resource is used to store the entries.
-    access(all) resource EntryCollection {
+    access(all) resource EntryCollection: EntryContainer {
         access(all) let entries: @{String: FungibleEntry}
         access(all) let categories: {LibraryCategory: [String]}
 
@@ -1196,7 +1202,7 @@ access(all) contract FGameMishal {
         }
 
         access(all)
-        fun borrowEnties(_ category: LibraryCategory?): [&FungibleEntry] {
+        fun borrowEntries(_ category: LibraryCategory?): [&FungibleEntry] {
             let ret: [&FungibleEntry] = []
             let keys = category == nil ? self.entries.keys : self.getKeysByCategory(category!)
             for id in keys {
@@ -1293,7 +1299,7 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource interface AbilitiesCarrier {
+    access(all) resource interface AbilitiesCarrier: EntryContainer {
         access(all) view fun getAbilitiesLength(): Int
         access(all) fun getAbilityIdentifiers(): [EntryIdentifier]
 
@@ -1317,7 +1323,7 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource interface ItemsCarrier {
+    access(all) resource interface ItemsCarrier: EntryContainer {
         access(all) view fun getItemsLength(): Int
         access(all) fun borrowItemEntries(): [&FungibleEntry]
 
@@ -1344,8 +1350,77 @@ access(all) contract FGameMishal {
         }
     }
 
+    access(all) resource interface EquippedItemsCarrier: ItemsCarrier {
+        access(all) view fun getSlotsAll(): {EquipSlot: UInt8}
+        access(all) view fun borrowSlotsOccupied(): &{EquipSlot: [String]}
+
+        access(all)
+        fun borrowEquippedItems(): [&Item] {
+            let ret: [&Item] = []
+
+            let slots = self.borrowSlotsOccupied()
+            // get unique ids
+            let uniqueIds: [String] = []
+            for slot in slots.keys {
+                if let occupied = slots[slot] {
+                    for id in occupied {
+                        if !uniqueIds.contains(id) {
+                            uniqueIds.append(id)
+                        }
+                    }
+                }
+            }
+            // borrow the items
+            for id in uniqueIds {
+                if let entry = self.borrowEntryByID(id) {
+                    if let item = entry.identifier.borrowItem() {
+                        ret.append(item)
+                    }
+                }
+            }
+            return ret
+        }
+
+        access(all) view
+        fun hasItemEquipped(_ item: EntryIdentifier): Bool {
+            let slots = self.borrowSlotsOccupied()
+            let id = item.getStringID()
+            for slot in slots.keys {
+                if let occupied = slots[slot] {
+                    if occupied.contains(id) {
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+
+        access(all) view
+        fun isItemEquippable(_ item: EntryIdentifier): Bool {
+            if let itemRef = item.borrowItem() {
+                let allSlots = self.getSlotsAll()
+                let occupiedSlots = self.borrowSlotsOccupied()
+                let requiredSlots = itemRef.slotsOccupied;
+                for slot in requiredSlots.keys {
+                    let allCount = allSlots[slot] ?? 0
+                    let occupiedCount = UInt8(occupiedSlots[slot]?.length ?? 0)
+                    if allCount - occupiedCount < requiredSlots[slot]! {
+                        return false
+                    }
+                }
+                return true
+            }
+            return false
+        }
+    }
+
     access(all) resource interface UnitCollectionBaseCarrier: AbilitiesCarrier, ItemsCarrier, ShapeCarrier {
         access(Manage) view fun borrowCollection(): auth(Manage) &EntryCollection
+
+        access(all) view fun borrowEntryByID(_ id: String): &FungibleEntry? {
+            let collection = self.borrowCollection()
+            return collection.borrowEntryByID(id)
+        }
 
         access(all) view fun getAbilitiesLength(): Int {
             let collection = self.borrowCollection()
@@ -1366,7 +1441,7 @@ access(all) contract FGameMishal {
         access(all)
         fun borrowItemEntries(): [&FungibleEntry] {
             let collection = self.borrowCollection()
-            return collection.borrowEnties(LibraryCategory.ITEM)
+            return collection.borrowEntries(LibraryCategory.ITEM)
         }
 
         access(all) view fun borrowShape(): &Shape? {
