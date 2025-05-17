@@ -24,6 +24,8 @@ access(all) contract FGameMishal {
     access(all) event LibraryEntryAdded(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ name: String, _ tags: [String])
     access(all) event LibraryEntryRemoved(_ library: Address, _ category: UInt8, _ uuid: UInt64)
 
+    access(all) event UnitStatusApplied(_ unitUID: UInt64, _ attributes: Attributes, _ defence: Defence, _ potentiality: Potentiality)
+
     // ----- Contract Level Variables -----
 
     // The counter variable for the library items
@@ -450,31 +452,22 @@ access(all) contract FGameMishal {
     }
 
     access(all) struct Potentiality: Copyable {
-        access(all) let initial: Int64
-        access(all) var current: Int64
-        access(all) var used: Int64
+        access(all) var initial: Int64
 
-        view init(initial: Int64) {
+        view init(
+            initial: Int64,
+        ) {
             self.initial = initial
-            self.current = initial
-            self.used = 0
         }
 
         access(all) fun copy(): {Copyable} { return self }
 
         access(contract)
-        fun add(amount: Int64) {
-            self.current = self.current + amount
-        }
-
-        access(contract)
-        fun use(amount: Int64) {
-            pre {
-                self.current >= amount:
-                    "Not enough potentiality"
+        fun add(_ amount: Int64) {
+            post {
+                self.initial >= 0: "Initial potentiality cannot be negative"
             }
-            self.current = self.current - amount
-            self.used = self.used + amount
+            self.initial = self.initial + amount
         }
     }
 
@@ -493,32 +486,32 @@ access(all) contract FGameMishal {
         access(all) fun copy(): {Copyable} { return self }
 
         access(contract)
-        fun setStrength(strength: Int64) {
+        fun setStrength(_ strength: Int64) {
             self.strength = strength
         }
 
         access(contract)
-        fun addStrength(strength: Int64) {
+        fun addStrength(_ strength: Int64) {
             self.strength = self.strength + strength
         }
 
         access(contract)
-        fun setVitality(vitality: Int64) {
+        fun setVitality(_ vitality: Int64) {
             self.vitality = vitality
         }
 
         access(contract)
-        fun addVitality(vitality: Int64) {
+        fun addVitality(_ vitality: Int64) {
             self.vitality = self.vitality + vitality
         }
 
         access(contract)
-        fun setSpirit(spirit: Int64) {
+        fun setSpirit(_ spirit: Int64) {
             self.spirit = spirit
         }
 
         access(contract)
-        fun addSpirit(spirit: Int64) {
+        fun addSpirit(_ spirit: Int64) {
             self.spirit = self.spirit + spirit
         }
     }
@@ -537,33 +530,82 @@ access(all) contract FGameMishal {
         access(all) fun copy(): {Copyable} { return self }
 
         access(contract)
-        fun setPhysical(physical: Int64) {
+        fun setPhysical(_ physical: Int64) {
             self.physical = physical
         }
 
         access(contract)
-        fun addPhysical(physical: Int64) {
+        fun addPhysical(_ physical: Int64) {
             self.physical = self.physical + physical
         }
 
         access(contract)
-        fun setEndurance(endurance: Int64) {
+        fun setEndurance(_ endurance: Int64) {
             self.endurance = endurance
         }
 
         access(contract)
-        fun addEndurance(endurance: Int64) {
+        fun addEndurance(_ endurance: Int64) {
             self.endurance = self.endurance + endurance
         }
 
         access(contract)
-        fun setResistance(resistance: Int64) {
+        fun setResistance(_ resistance: Int64) {
             self.resistance = resistance
         }
 
         access(contract)
-        fun addResistance(resistance: Int64) {
+        fun addResistance(_ resistance: Int64) {
             self.resistance = self.resistance + resistance
+        }
+    }
+
+    // The status of the unit
+    access(all) struct UnitStatus: Copyable {
+        access(all) var attributes: Attributes
+        access(all) var defence: Defence
+        access(all) var potentiality: Potentiality
+
+        view init(
+            attributes: Attributes,
+            defence: Defence,
+            potentiality: Potentiality
+        ) {
+            self.attributes = attributes
+            self.defence = defence
+            self.potentiality = potentiality
+        }
+
+        access(all) fun copy(): {Copyable} { return self }
+
+        access(contract)
+        fun setAttributes(_ attributes: Attributes) {
+            self.attributes = attributes
+        }
+
+        access(contract)
+        fun setDefence(_ defence: Defence) {
+            self.defence = defence
+        }
+
+        access(contract)
+        fun setPotentiality(_ potentiality: Potentiality) {
+            self.potentiality = potentiality
+        }
+
+        access(all) view
+        fun borrowAttributes(): &Attributes {
+            return &self.attributes
+        }
+
+        access(all) view
+        fun borrowDefence(): &Defence {
+            return &self.defence
+        }
+
+        access(all) view
+        fun borrowPotentiality(): &Potentiality {
+            return &self.potentiality
         }
     }
 
@@ -579,6 +621,47 @@ access(all) contract FGameMishal {
         access(all) view
         fun withTag(_ tag: String): Bool {
             return self.tags.contains(tag)
+        }
+    }
+
+    access(all) resource interface ValueCarrier {
+        // The value of the item
+        access(all) var value: UFix64?
+
+        access(all) view
+        fun hasValue(): Bool {
+            return self.value != nil
+        }
+
+        access(Manage)
+        fun setValue(value: UFix64) {
+            self.value = value
+        }
+
+        access(Manage)
+        fun addValue(value: UFix64) {
+            self.value = (self.value ?? 0.0) + value
+        }
+    }
+
+    access(all) resource interface EffectsCarrier {
+        access(all) let effects: [String]
+
+        access(all) view
+        fun hasEffects(): Bool {
+            return self.effects.length > 0
+        }
+
+        access(Manage)
+        fun addEffect(effect: String) {
+            self.effects.append(effect)
+        }
+
+        access(Manage)
+        fun removeEffect(effect: String) {
+            if let index = self.effects.firstIndex(of: effect) {
+                let _ = self.effects.remove(at: index)
+            }
         }
     }
 
@@ -635,66 +718,87 @@ access(all) contract FGameMishal {
         access(all) view fun getInitialPotentiality(): Int64 {
             return self.borrowPotentiality()?.initial ?? 0
         }
-
-        access(all) view fun getCurrentPotentiality(): Int64 {
-            return self.borrowPotentiality()?.current ?? 0
-        }
-
-        access(all) view fun getUsedPotentiality(): Int64 {
-            return self.borrowPotentiality()?.used ?? 0
-            }
     }
 
-    // The StatusCarrier resource interface is used to get the status of the entry.
+    // The OptionalStatusCarrier resource interface is used to get the optional status of the entry.
     access(all) resource interface OptionalStatusCarrier: AttributeCarrier, DefenceCarrier, PotentialityCarrier {
-        // TODO
-    }
+        access(all) let attributes: Attributes?
+        access(all) let defence: Defence?
+        access(all) let potentiality: Potentiality?
 
-    access(all) resource interface LiveStatusCarrier: AttributeCarrier, DefenceCarrier, PotentialityCarrier {
-        // TODO
-        access(all) let attributes: Attributes
-        access(all) let defence: Defence
-        access(all) let potentiality: Potentiality
-    }
-
-    access(all) resource interface ValueCarrier {
-        // The value of the item
-        access(all) var value: UFix64?
-
-        access(all) view
-        fun hasValue(): Bool {
-            return self.value != nil
+        access(all) view fun borrowAttributes(): &Attributes? {
+            return &self.attributes
         }
 
-        access(Manage)
-        fun setValue(value: UFix64) {
-            self.value = value
+        access(all) view fun borrowDefence(): &Defence? {
+            return &self.defence
         }
 
-        access(Manage)
-        fun addValue(value: UFix64) {
-            self.value = (self.value ?? 0.0) + value
+        access(all) view fun borrowPotentiality(): &Potentiality? {
+            return &self.potentiality
         }
     }
 
-    access(all) resource interface EffectsCarrier {
-        access(all) let effects: [String]
+    // The LiveUnitStatusCarrier resource interface is used to get the live status of the entry.
+    access(all) resource interface LiveUnitStatusCarrier: AttributeCarrier, DefenceCarrier, PotentialityCarrier {
+        access(all) view fun borrowStatus(): &UnitStatus
 
-        access(all) view
-        fun hasEffects(): Bool {
-            return self.effects.length > 0
+        access(all) view fun borrowAttributes(): &Attributes? {
+            return self.borrowStatus().borrowAttributes()
         }
 
-        access(Manage)
-        fun addEffect(effect: String) {
-            self.effects.append(effect)
+        access(all) view fun borrowDefence(): &Defence? {
+            return self.borrowStatus().borrowDefence()
         }
 
-        access(Manage)
-        fun removeEffect(effect: String) {
-            if let index = self.effects.firstIndex(of: effect) {
-                let _ = self.effects.remove(at: index)
+        access(all) view fun borrowPotentiality(): &Potentiality? {
+            return self.borrowStatus().borrowPotentiality()
+        }
+    }
+
+    access(all) resource interface ComposableUnitStatusCarrier: LiveUnitStatusCarrier {
+        access(all) let status: UnitStatus
+
+        access(all) view fun borrowStatus(): &UnitStatus {
+            return &self.status
+        }
+
+        access(all) fun borrowAttributesElements(): [&Attributes]
+        access(all) fun borrowDefenceElements(): [&Defence]
+        access(all) fun borrowPotentialityElements(): [&Potentiality]
+
+        access(contract)
+        fun applyStatus() {
+            // Calculate the new attributes of the unit
+            let attributes = self.borrowAttributesElements()
+            let newAttributes = Attributes(strength: 0, vitality: 0, spirit: 0)
+            for attribute in attributes {
+                newAttributes.addStrength(attribute.strength)
+                newAttributes.addVitality(attribute.vitality)
+                newAttributes.addSpirit(attribute.spirit)
             }
+            self.status.setAttributes(newAttributes)
+
+            // Calculate the new defence of the unit
+            let defence = self.borrowDefenceElements()
+            let newDefence = Defence(physical: 0, endurance: 0, resistance: 0)
+            for one in defence {
+                newDefence.addPhysical(one.physical)
+                newDefence.addEndurance(one.endurance)
+                newDefence.addResistance(one.resistance)
+            }
+            self.status.setDefence(newDefence)
+
+            // Calculate the new potentiality of the unit
+            let potentiality = self.borrowPotentialityElements()
+            let newPotentiality = Potentiality(initial: 0)
+            for one in potentiality {
+                newPotentiality.add(one.initial)
+            }
+            self.status.setPotentiality(newPotentiality)
+
+            // Emit the event
+            emit UnitStatusApplied(self.uuid, self.status.attributes, self.status.defence, self.status.potentiality)
         }
     }
 
@@ -729,11 +833,11 @@ access(all) contract FGameMishal {
         // The value of the item
         access(all) var value: UFix64?
         // Main attributes of the character
-        access(all) let attributes: Attributes
+        access(all) let attributes: Attributes?
         // The defence of the character
-        access(all) let defence: Defence
+        access(all) let defence: Defence?
         // The potentiality of the item
-        access(all) let potentiality: Potentiality
+        access(all) let potentiality: Potentiality?
         // The effects of the item
         access(all) let effects: [String]
         // The slots occupied by the item
@@ -745,8 +849,9 @@ access(all) contract FGameMishal {
             name: String,
             tags: [String],
             value: UFix64?,
-            attributes: Attributes,
-            defence: Defence,
+            attributes: Attributes?,
+            defence: Defence?,
+            potentiality: Potentiality?,
             effects: [String],
             slotsOccupied: {EquipSlot: UInt8},
             slotsProvided: {EquipSlot: UInt8},
@@ -756,6 +861,7 @@ access(all) contract FGameMishal {
             self.value = value
             self.attributes = attributes
             self.defence = defence
+            self.potentiality = potentiality
             self.effects = effects
             self.slotsOccupied = slotsOccupied
             self.slotsProvided = slotsProvided
@@ -764,6 +870,7 @@ access(all) contract FGameMishal {
 
     access(all) resource Ability: AttributeCarrier, EffectsCarrier, Nameable {
         access(all) let name: String
+        access(all) let tags: [String]
         access(all) let level: UInt64
         access(all) let occupy: Attributes
         access(all) let effects: [String]
@@ -771,10 +878,12 @@ access(all) contract FGameMishal {
         view init(
             level: UInt64,
             name: String,
+            tags: [String],
             occupy: Attributes,
             effects: [String]
         ) {
             self.name = name
+            self.tags = tags
             self.level = level
             self.occupy = occupy
             self.effects = effects
@@ -802,11 +911,13 @@ access(all) contract FGameMishal {
 
     access(all) resource Shape: CreatureSettingsCarrier, Nameable {
         access(all) let name: String
+        access(all) let tags: [String]
         access(all) let settings: {CreatureSettings: Int64}
         access(all) let slotsAvailable: {EquipSlot: UInt8}
 
         view init(
             name: String,
+            tags: [String],
             bodySize: Int64,
             occupyRange: Int64,
             moveSpeed: Int64,
@@ -814,6 +925,7 @@ access(all) contract FGameMishal {
             slotsAvailable: {EquipSlot: UInt8 }
         ) {
             self.name = name
+            self.tags = tags
             self.settings = {}
             self.slotsAvailable = slotsAvailable
 
@@ -990,11 +1102,11 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface AbilitiesCarrier {
-        access(all) let abilities: [EntryIdentifier]
+        access(all) view fun borrowAbilityIdentifiers(): &[EntryIdentifier]
 
         access(all)
         fun borrowAbilities(): [&Ability] {
-            return self.abilities
+            return self.borrowAbilityIdentifiers()
                 .map(view fun (_ x: EntryIdentifier): &Ability? {
                     return x.borrowAbility()
                 })
@@ -1008,16 +1120,16 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun hasAbilities(): Bool {
-            return self.abilities.length > 0
+            return self.borrowAbilityIdentifiers().length > 0
         }
     }
 
     access(all) resource interface ItemsCarrier {
-        access(all) let items: [EntryIdentifier]
+        access(all) view fun borrowItemIdentifiers(): &[EntryIdentifier]
 
         access(all)
         fun borrowItems(): [&Item] {
-            return self.items
+            return self.borrowItemIdentifiers()
                 .map(view fun (_ x: EntryIdentifier): &Item? {
                     return x.borrowItem()
                 })
@@ -1031,12 +1143,11 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun hasItems(): Bool {
-            return self.items.length > 0
+            return self.borrowItemIdentifiers().length > 0
         }
     }
 
-    access(all) resource interface ShapeCarrier: ShapeOverrides, Nameable {
-        access(all) let name: String
+    access(all) resource interface ShapeCarrier: ShapeOverrides {
         access(all) let shape: EntryIdentifier?
 
         access(all) view
@@ -1053,9 +1164,25 @@ access(all) contract FGameMishal {
         }
     }
 
+    access(all) resource interface UnitStaticBasicCapabiltiesCarrier: AbilitiesCarrier, ItemsCarrier {
+        access(all) let abilities: [EntryIdentifier]
+        access(all) let items: [EntryIdentifier]
+
+        access(all) view
+        fun borrowAbilityIdentifiers(): &[EntryIdentifier] {
+            return &self.abilities
+        }
+
+        access(all) view
+        fun borrowItemIdentifiers(): &[EntryIdentifier] {
+            return &self.items
+        }
+    }
+
     // The Feature resource is used to define the features of the entry.
-    access(all) resource Feature: Nameable, AbilitiesCarrier, ItemsCarrier, ShapeCarrier, EffectsCarrier {
+    access(all) resource Feature: Nameable, OptionalStatusCarrier, UnitStaticBasicCapabiltiesCarrier, ShapeCarrier, EffectsCarrier {
         access(all) let name: String
+        access(all) let tags: [String]
         access(all) let attributes: Attributes?
         access(all) let defence: Defence?
         access(all) let potentiality: Potentiality?
@@ -1067,6 +1194,7 @@ access(all) contract FGameMishal {
 
         view init(
             name: String,
+            tags: [String],
             attributes: Attributes?,
             defence: Defence?,
             potentiality: Potentiality?,
@@ -1077,6 +1205,7 @@ access(all) contract FGameMishal {
             settings: {CreatureSettings: Int64}
         ) {
             self.name = name
+            self.tags = tags
             self.attributes = attributes
             self.defence = defence
             self.potentiality = potentiality
@@ -1097,29 +1226,14 @@ access(all) contract FGameMishal {
                 assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
             }
         }
-
-        access(all) view
-        fun hasAttributes(): Bool {
-            return self.attributes != nil
-        }
-
-        access(all) view
-        fun hasDefence(): Bool {
-            return self.defence != nil
-        }
-
-        access(all) view
-        fun hasPotentiality(): Bool {
-            return self.potentiality != nil
-        }
     }
 
     access(all) resource interface FeaturesCarrier {
-        access(all) let features: [EntryIdentifier]
+        access(all) view fun borrowFeatureIdentifiers(): &[EntryIdentifier]
 
         access(all)
         fun borrowFeatures(): [&Feature] {
-            return self.features
+            return self.borrowFeatureIdentifiers()
                 .map(view fun (_ x: EntryIdentifier): &Feature? {
                     return x.borrowFeature()
                 })
@@ -1133,42 +1247,126 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun hasFeatures(): Bool {
-            return self.features.length > 0
+            return self.borrowFeatureIdentifiers().length > 0
         }
     }
 
-    access(all) resource interface CreatureInterface: LiveStatusCarrier, FeaturesCarrier, AbilitiesCarrier, ItemsCarrier, ShapeOverrides {
-        // Main attributes of the character
-        access(all) let attributes: Attributes
-        // The defence of the character
-        access(all) let defence: Defence
-        // The potentiality of the character
-        access(all) let potentiality: Potentiality
-        // The features of the character
+    access(all) resource interface UnitStaticCapabiltiesCarrier: UnitStaticBasicCapabiltiesCarrier, FeaturesCarrier {
         access(all) let features: [EntryIdentifier]
-        // The abilities of the character
-        access(all) let abilities: [EntryIdentifier]
-        // The items of the character
-        access(all) let items: [EntryIdentifier]
+
+        access(all) view
+        fun borrowFeatureIdentifiers(): &[EntryIdentifier] {
+            return &self.features
+        }
+    }
+
+    access(all) resource interface CreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, ItemsCarrier, FeaturesCarrier, ShapeOverrides {
         // The shape of the character
         access(all) let shape: EntryIdentifier
-        // The settings of the character
-        access(all) let settings: {CreatureSettings: Int64}
+        // The base attributes of the character
+        access(all) let baseAttributes: Attributes
+        // The base defence of the character
+        access(all) let baseDefence: Defence
+        // The base potentiality of the character
+        access(all) let basePotentiality: Potentiality
 
         access(all) view
         fun borrowShape(): &Shape? {
             return self.shape.borrowShape()
         }
+
+        access(all)
+        fun borrowAttributesElements(): [&Attributes] {
+            let ret: [&Attributes] = [&self.baseAttributes]
+
+            // From Features
+            let features = self.borrowFeatures()
+            for feature in features {
+                if feature.hasAttributes() {
+                    if let attributes = feature.borrowAttributes() {
+                        ret.append(attributes)
+                    }
+                }
+            }
+
+            // From Abilities
+            let abilities = self.borrowAbilities()
+            for ability in abilities {
+                if ability.hasAttributes() {
+                    if let attributes = ability.borrowAttributes() {
+                        ret.append(attributes)
+                    }
+                }
+            }
+
+            // From Items
+            let items = self.borrowItems()
+            for item in items {
+                if item.hasAttributes() {
+                    if let attributes = item.borrowAttributes() {
+                        ret.append(attributes)
+                    }
+                }
+            }
+            return ret
+        }
+
+        access(all)
+        fun borrowDefenceElements(): [&Defence] {
+            let ret: [&Defence] = [&self.baseDefence]
+
+            // From Features
+            let features = self.borrowFeatures()
+            for feature in features {
+                if feature.hasDefence() {
+                    if let defence = feature.borrowDefence() {
+                        ret.append(defence)
+                    }
+                }
+            }
+
+            // From Items
+            let items = self.borrowItems()
+            for item in items {
+                if item.hasDefence() {
+                    if let defence = item.borrowDefence() {
+                        ret.append(defence)
+                    }
+                }
+            }
+            return ret
+        }
+
+        access(all)
+        fun borrowPotentialityElements(): [&Potentiality] {
+            let ret: [&Potentiality] = [&self.basePotentiality]
+
+            // From Features
+            let features = self.borrowFeatures()
+            for feature in features {
+                if feature.hasPotentiality() {
+                    if let potentiality = feature.borrowPotentiality() {
+                        ret.append(potentiality)
+                    }
+                }
+            }
+
+            // From Items
+            let items = self.borrowItems()
+            for item in items {
+                if item.hasPotentiality() {
+                    if let potentiality = item.borrowPotentiality() {
+                        ret.append(potentiality)
+                    }
+                }
+            }
+            return ret
+        }
     }
 
-    access(all) resource Creature: Nameable, CreatureInterface {
+    access(all) resource Creature: Nameable, CreatureInterface, UnitStaticCapabiltiesCarrier {
         access(all) let name: String
-        // Main attributes of the character
-        access(all) let attributes: Attributes
-        // The defence of the character
-        access(all) let defence: Defence
-        // The potentiality of the character
-        access(all) let potentiality: Potentiality
+        access(all) let tags: [String]
         // The features of the character
         access(all) let features: [EntryIdentifier]
         // The abilities of the character
@@ -1179,9 +1377,18 @@ access(all) contract FGameMishal {
         access(all) let shape: EntryIdentifier
         // The settings of the character
         access(all) let settings: {CreatureSettings: Int64}
+        // Main attributes of the character
+        access(all) let baseAttributes: Attributes
+        // The base defence of the character
+        access(all) let baseDefence: Defence
+        // The potentiality of the character
+        access(all) let basePotentiality: Potentiality
+        // The merged status of the character
+        access(all) let status: UnitStatus
 
-        view init(
+        init(
             name: String,
+            tags: [String],
             attributes: Attributes,
             defence: Defence,
             potentiality: Potentiality,
@@ -1192,15 +1399,21 @@ access(all) contract FGameMishal {
             settings: {CreatureSettings: Int64}
         ) {
             self.name = name
-            self.attributes = attributes
-            self.defence = defence
-            self.potentiality = potentiality
+            self.tags = tags
+            self.baseAttributes = attributes
+            self.baseDefence = defence
+            self.basePotentiality = potentiality
             self.features = features
             self.abilities = abilities
             self.items = items
             self.shape = shape
             self.settings = settings
-
+            // Initialize the status
+            self.status = UnitStatus(
+                attributes: self.baseAttributes,
+                defence: self.baseDefence,
+                potentiality: self.basePotentiality
+            )
 
             // check identifiers
             assert(self.shape.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
@@ -1213,6 +1426,9 @@ access(all) contract FGameMishal {
             for itemIdentifier in items {
                 assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
             }
+
+            // apply the status
+            self.applyStatus()
         }
     }
 
@@ -1227,11 +1443,11 @@ access(all) contract FGameMishal {
     // The Pawn resource is refered to as the character in the game.
     access(all) resource Pawn: CreatureInterface {
         // Main attributes of the character
-        access(all) let attributes: Attributes
-        // The defence of the character
-        access(all) let defence: Defence
+        access(all) let baseAttributes: Attributes
+        // The base defence of the character
+        access(all) let baseDefence: Defence
         // The potentiality of the character
-        access(all) let potentiality: Potentiality
+        access(all) let basePotentiality: Potentiality
         // The features of the character
         access(all) let features: [EntryIdentifier]
         // The abilities of the character
