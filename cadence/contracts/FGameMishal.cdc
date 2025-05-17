@@ -21,12 +21,8 @@ access(all) contract FGameMishal {
     // ----- Events -----
 
     access(all) event LibrarySettingChanged(_ library: Address, key: UInt8, value: Int64)
-    access(all) event LibraryObjectAdded(_ library: Address, _ uuid: UInt64, _ name: String)
-    access(all) event LibraryItemAdded(_ library: Address, _ uuid: UInt64, _ name: String)
-    access(all) event LibraryAbilityAdded(_ library: Address, _ uuid: UInt64, _ name: String)
-    access(all) event LibraryShapeAdded(_ library: Address, _ uuid: UInt64, _ name: String)
-    access(all) event LibraryFeatureAdded(_ library: Address, _ uuid: UInt64, _ name: String)
-    access(all) event LibraryCreatureAdded(_ library: Address, _ uuid: UInt64, _ name: String)
+    access(all) event LibraryEntryAdded(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ name: String, _ tags: [String])
+    access(all) event LibraryEntryRemoved(_ library: Address, _ category: UInt8, _ uuid: UInt64)
 
     // ----- Contract Level Variables -----
 
@@ -89,12 +85,8 @@ access(all) contract FGameMishal {
         access(all) let shapes: @{UInt64: Shape}
         access(all) let features: @{UInt64: Feature}
         access(all) let creatures: @{UInt64: Creature}
-        access(self) let objectsNameToUID: {String: UInt64}
-        access(self) let itemsNameToUID: {String: UInt64}
-        access(self) let abilitiesNameToUID: {String: UInt64}
-        access(self) let shapesNameToUID: {String: UInt64}
-        access(self) let featuresNameToUID: {String: UInt64}
-        access(self) let creaturesNameToUID: {String: UInt64}
+        access(self) let nameToUID: {LibraryCategory: {String: UInt64}}
+        access(self) let tagToUIDs: {LibraryCategory: {String: [UInt64]}}
 
         init() {
             self.settings = {
@@ -106,12 +98,23 @@ access(all) contract FGameMishal {
             self.shapes <- {}
             self.features <- {}
             self.creatures <- {}
-            self.objectsNameToUID = {}
-            self.itemsNameToUID = {}
-            self.abilitiesNameToUID = {}
-            self.shapesNameToUID = {}
-            self.featuresNameToUID = {}
-            self.creaturesNameToUID = {}
+            self.nameToUID = {}
+            self.tagToUIDs = {}
+
+            // initialize the nameToUID and tagToUIDs
+            self.nameToUID[LibraryCategory.OBJECT] = {}
+            self.nameToUID[LibraryCategory.ITEM] = {}
+            self.nameToUID[LibraryCategory.ABILITY] = {}
+            self.nameToUID[LibraryCategory.SHAPE] = {}
+            self.nameToUID[LibraryCategory.FEATURE] = {}
+            self.nameToUID[LibraryCategory.CREATURE] = {}
+
+            self.tagToUIDs[LibraryCategory.OBJECT] = {}
+            self.tagToUIDs[LibraryCategory.ITEM] = {}
+            self.tagToUIDs[LibraryCategory.ABILITY] = {}
+            self.tagToUIDs[LibraryCategory.SHAPE] = {}
+            self.tagToUIDs[LibraryCategory.FEATURE] = {}
+            self.tagToUIDs[LibraryCategory.CREATURE] = {}
         }
 
         access(Editor)
@@ -124,85 +127,161 @@ access(all) contract FGameMishal {
         access(Editor)
         fun addObject(object: @Object) {
             pre {
-                self.objectsNameToUID[object.name] == nil:
+                self.borrowNameToUIDDictionary(LibraryCategory.OBJECT)[object.name] == nil:
                     "Object name already exists"
             }
             let uuid = object.uuid
             let name = object.name
-            self.objectsNameToUID[name] = uuid
+            let tags = object.tags
+            self.setNameAndTags(LibraryCategory.OBJECT, uuid, name, tags)
+
             self.objects[uuid] <-! object
 
-            emit LibraryObjectAdded(self.owner?.address ?? panic("Owner not found"), uuid, name)
+            emit LibraryEntryAdded(
+                self.owner?.address ?? panic("Owner not found"),
+                LibraryCategory.OBJECT.rawValue,
+                uuid,
+                name,
+                tags
+            )
         }
 
         access(Editor)
         fun addItem(item: @Item) {
             pre {
-                self.itemsNameToUID[item.name] == nil:
+                self.borrowNameToUIDDictionary(LibraryCategory.ITEM)[item.name] == nil:
                     "Item name already exists"
             }
             let uuid = item.uuid
             let name = item.name
-            self.itemsNameToUID[name] = uuid
+            let tags = item.tags
+            self.setNameAndTags(LibraryCategory.ITEM, uuid, name, tags)
+
             self.items[uuid] <-! item
 
-            emit LibraryItemAdded(self.owner?.address ?? panic("Owner not found"), uuid, name)
+            emit LibraryEntryAdded(
+                self.owner?.address ?? panic("Owner not found"),
+                LibraryCategory.ITEM.rawValue,
+                uuid,
+                name,
+                tags
+            )
         }
 
         access(Editor)
         fun addAbility(ability: @Ability) {
             pre {
-                self.abilitiesNameToUID[ability.name] == nil:
+                self.borrowNameToUIDDictionary(LibraryCategory.ABILITY)[ability.name] == nil:
                     "Ability name already exists"
             }
             let uuid = ability.uuid
             let name = ability.name
-            self.abilitiesNameToUID[name] = uuid
+            let tags = ability.tags
+            self.setNameAndTags(LibraryCategory.ABILITY, uuid, name, tags)
+
             self.abilities[uuid] <-! ability
 
-            emit LibraryAbilityAdded(self.owner?.address ?? panic("Owner not found"), uuid, name)
+            emit LibraryEntryAdded(
+                self.owner?.address ?? panic("Owner not found"),
+                LibraryCategory.ABILITY.rawValue,
+                uuid,
+                name,
+                tags
+            )
         }
 
         access(Editor)
         fun addShape(shape: @Shape) {
             pre {
-                self.shapesNameToUID[shape.name] == nil:
+                self.borrowNameToUIDDictionary(LibraryCategory.SHAPE)[shape.name] == nil:
                     "Shape name already exists"
             }
             let uuid = shape.uuid
             let name = shape.name
-            self.shapesNameToUID[name] = uuid
+            let tags = shape.tags
+            self.setNameAndTags(LibraryCategory.SHAPE, uuid, name, tags)
+
             self.shapes[uuid] <-! shape
 
-            emit LibraryShapeAdded(self.owner?.address ?? panic("Owner not found"), uuid, name)
+            emit LibraryEntryAdded(
+                self.owner?.address ?? panic("Owner not found"),
+                LibraryCategory.SHAPE.rawValue,
+                uuid,
+                name,
+                tags
+            )
         }
 
         access(Editor)
         fun addFeature(feature: @Feature) {
             pre {
-                self.featuresNameToUID[feature.name] == nil:
+                self.borrowNameToUIDDictionary(LibraryCategory.FEATURE)[feature.name] == nil:
                     "Feature name already exists"
             }
             let uuid = feature.uuid
             let name = feature.name
-            self.featuresNameToUID[name] = uuid
+            let tags = feature.tags
+            self.setNameAndTags(LibraryCategory.FEATURE, uuid, name, tags)
+
             self.features[uuid] <-! feature
 
-            emit LibraryFeatureAdded(self.owner?.address ?? panic("Owner not found"), uuid, name)
+            emit LibraryEntryAdded(
+                self.owner?.address ?? panic("Owner not found"),
+                LibraryCategory.FEATURE.rawValue,
+                uuid,
+                name,
+                tags
+            )
         }
 
         access(Editor)
         fun addCreature(creature: @Creature) {
             pre {
-                self.creaturesNameToUID[creature.name] == nil:
+                self.borrowNameToUIDDictionary(LibraryCategory.CREATURE)[creature.name] == nil:
                     "Creature name already exists"
             }
             let uuid = creature.uuid
             let name = creature.name
-            self.creaturesNameToUID[name] = uuid
+            let tags = creature.tags
+            self.setNameAndTags(LibraryCategory.CREATURE, uuid, name, tags)
+
             self.creatures[uuid] <-! creature
 
-            emit LibraryCreatureAdded(self.owner?.address ?? panic("Owner not found"), uuid, name)
+            emit LibraryEntryAdded(
+                self.owner?.address ?? panic("Owner not found"),
+                LibraryCategory.CREATURE.rawValue,
+                uuid,
+                name,
+                tags
+            )
+        }
+
+        access(Editor)
+        fun removeEntry(_ category: LibraryCategory, _ uuid: UInt64) {
+            self.removeNameAndTags(category, uuid)
+
+            switch category {
+                case LibraryCategory.OBJECT:
+                    Burner.burn(<- self.objects.remove(key: uuid))
+                case LibraryCategory.ITEM:
+                    Burner.burn(<- self.items.remove(key: uuid))
+                case LibraryCategory.ABILITY:
+                    Burner.burn(<- self.abilities.remove(key: uuid))
+                case LibraryCategory.SHAPE:
+                    Burner.burn(<- self.shapes.remove(key: uuid))
+                case LibraryCategory.FEATURE:
+                    Burner.burn(<- self.features.remove(key: uuid))
+                case LibraryCategory.CREATURE:
+                    Burner.burn(<- self.creatures.remove(key: uuid))
+                default:
+                    panic("Invalid category")
+            }
+
+            emit LibraryEntryRemoved(
+                self.owner?.address ?? panic("Owner not found"),
+                category.rawValue,
+                uuid
+            )
         }
 
         // -------- Public Functions --------
@@ -214,7 +293,7 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowObjectByName(_ name: String): &Object? {
-            if let uuid = self.objectsNameToUID[name] {
+            if let uuid = self.borrowNameToUIDDictionary(LibraryCategory.OBJECT)[name] {
                 return self.borrowObject(uuid)
             }
             return nil
@@ -227,7 +306,7 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowItemByName(_ name: String): &Item? {
-            if let uuid = self.itemsNameToUID[name] {
+            if let uuid = self.borrowNameToUIDDictionary(LibraryCategory.ITEM)[name] {
                 return self.borrowItem(uuid)
             }
             return nil
@@ -240,7 +319,7 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowAbilityByName(_ name: String): &Ability? {
-            if let uuid = self.abilitiesNameToUID[name] {
+            if let uuid = self.borrowNameToUIDDictionary(LibraryCategory.ABILITY)[name] {
                 return self.borrowAbility(uuid)
             }
             return nil
@@ -253,7 +332,7 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowShapeByName(_ name: String): &Shape? {
-            if let uuid = self.shapesNameToUID[name] {
+            if let uuid = self.borrowNameToUIDDictionary(LibraryCategory.SHAPE)[name] {
                 return self.borrowShape(uuid)
             }
             return nil
@@ -266,7 +345,7 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowFeatureByName(_ name: String): &Feature? {
-            if let uuid = self.featuresNameToUID[name] {
+            if let uuid = self.borrowNameToUIDDictionary(LibraryCategory.FEATURE)[name] {
                 return self.borrowFeature(uuid)
             }
             return nil
@@ -279,10 +358,88 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowCreatureByName(_ name: String): &Creature? {
-            if let uuid = self.creaturesNameToUID[name] {
+            if let uuid = self.borrowNameToUIDDictionary(LibraryCategory.CREATURE)[name] {
                 return self.borrowCreature(uuid)
             }
             return nil
+        }
+
+        access(self) view
+        fun borrowNameToUIDDictionary(_ category: LibraryCategory): auth(Mutate) &{String: UInt64} {
+            return &self.nameToUID[category] as auth(Mutate) &{String: UInt64}?
+                ?? panic("Name to UID dictionary not found")
+        }
+
+        access(self) view
+        fun borrowTagToUIDsDictionary(_ category: LibraryCategory): auth(Mutate) &{String: [UInt64]} {
+            return &self.tagToUIDs[category] as auth(Mutate) &{String: [UInt64]}?
+                ?? panic("Tag to UID dictionary not found")
+        }
+
+        access(self) view
+        fun getTagUIDs(_ category: LibraryCategory, _ tag: String): [UInt64] {
+            let tagToUIDs = self.borrowTagToUIDsDictionary(category)
+            if let uids = tagToUIDs[tag] {
+                return *uids
+            }
+            return []
+        }
+
+        // -------- Private Functions --------
+
+        access(self)
+        fun borrowNamable(_ category: LibraryCategory, _ uuid: UInt64): &{Nameable}? {
+            switch category {
+                case LibraryCategory.OBJECT:
+                    return self.borrowObject(uuid)
+                case LibraryCategory.ITEM:
+                    return self.borrowItem(uuid)
+                case LibraryCategory.ABILITY:
+                    return self.borrowAbility(uuid)
+                case LibraryCategory.SHAPE:
+                    return self.borrowShape(uuid)
+                case LibraryCategory.FEATURE:
+                    return self.borrowFeature(uuid)
+                case LibraryCategory.CREATURE:
+                    return self.borrowCreature(uuid)
+                default:
+                    return nil
+            }
+        }
+
+        access(self)
+        fun setNameAndTags(_ category: LibraryCategory, _ uuid: UInt64, _ name: String, _ tags: [String]) {
+            let nameToUID = self.borrowNameToUIDDictionary(category)
+            let tagToUIDs = self.borrowTagToUIDsDictionary(category)
+
+            // set the name to the uuid
+            nameToUID[name] = uuid
+
+            // set the tags to the uuid
+            for tag in tags {
+                if tagToUIDs[tag] == nil {
+                    tagToUIDs[tag] = [uuid]
+                } else {
+                    tagToUIDs[tag]!.append(uuid)
+                }
+            }
+        }
+
+        access(self)
+        fun removeNameAndTags(_ category: LibraryCategory, _ uuid: UInt64) {
+            let nameToUID = self.borrowNameToUIDDictionary(category)
+            let tagToUIDs = self.borrowTagToUIDsDictionary(category)
+
+            if let namable = self.borrowNamable(category, uuid) {
+                let _ = nameToUID.remove(key: namable.name)
+                for tag in namable.tags {
+                    if let tagArr = tagToUIDs[tag] {
+                        if let idIndex = tagArr.firstIndex(of: uuid) {
+                            let _ = tagArr.remove(at: idIndex)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -412,27 +569,27 @@ access(all) contract FGameMishal {
 
     access(all) resource interface Nameable {
         access(all) let name: String
-    }
+        access(all) let tags: [String]
 
-    // The PotentialityCarrier resource interface is used to get the potentiality of the entry.
-    access(all) resource interface PotentialityCarrier {
-        access(all) view fun getInitialPotentiality(): Int64 {
-            return self.borrowPotentiality()?.initial ?? 0
+        access(all) view
+        fun hasAnyTag(): Bool {
+            return self.tags.length > 0
         }
 
-        access(all) view fun getCurrentPotentiality(): Int64 {
-            return self.borrowPotentiality()?.current ?? 0
+        access(all) view
+        fun withTag(_ tag: String): Bool {
+            return self.tags.contains(tag)
         }
-
-        access(all) view fun getUsedPotentiality(): Int64 {
-            return self.borrowPotentiality()?.used ?? 0
-        }
-
-        access(all) view fun borrowPotentiality(): &Potentiality?
     }
 
     // The AttributeCarrier resource interface is used to get the attributes of the entry.
     access(all) resource interface AttributeCarrier {
+        access(all) view fun borrowAttributes(): &Attributes?
+
+        access(all) view fun hasAttributes(): Bool {
+            return self.borrowAttributes() != nil
+        }
+
         access(all) view fun getAttrStr(): Int64 {
             return self.borrowAttributes()?.strength ?? 0
         }
@@ -444,12 +601,16 @@ access(all) contract FGameMishal {
         access(all) view fun getAttrSpir(): Int64 {
             return self.borrowAttributes()?.spirit ?? 0
         }
-
-        access(all) view fun borrowAttributes(): &Attributes?
     }
 
     // The DefenceCarrier resource interface is used to get the defence of the entry.
     access(all) resource interface DefenceCarrier {
+        access(all) view fun borrowDefence(): &Defence?
+
+        access(all) view fun hasDefence(): Bool {
+            return self.borrowDefence() != nil
+        }
+
         access(all) view fun getDefPhys(): Int64 {
             return self.borrowDefence()?.physical ?? 0
         }
@@ -461,24 +622,39 @@ access(all) contract FGameMishal {
         access(all) view fun getDefRes(): Int64 {
             return self.borrowDefence()?.resistance ?? 0
         }
+    }
 
-        access(all) view fun borrowDefence(): &Defence?
+    // The PotentialityCarrier resource interface is used to get the potentiality of the entry.
+    access(all) resource interface PotentialityCarrier {
+        access(all) view fun borrowPotentiality(): &Potentiality?
+
+        access(all) view fun hasPotentiality(): Bool {
+            return self.borrowPotentiality() != nil
+        }
+
+        access(all) view fun getInitialPotentiality(): Int64 {
+            return self.borrowPotentiality()?.initial ?? 0
+        }
+
+        access(all) view fun getCurrentPotentiality(): Int64 {
+            return self.borrowPotentiality()?.current ?? 0
+        }
+
+        access(all) view fun getUsedPotentiality(): Int64 {
+            return self.borrowPotentiality()?.used ?? 0
+            }
     }
 
     // The StatusCarrier resource interface is used to get the status of the entry.
-    access(all) resource interface StatusCarrier: AttributeCarrier, DefenceCarrier {
-        // Main attributes of the character
+    access(all) resource interface OptionalStatusCarrier: AttributeCarrier, DefenceCarrier, PotentialityCarrier {
+        // TODO
+    }
+
+    access(all) resource interface LiveStatusCarrier: AttributeCarrier, DefenceCarrier, PotentialityCarrier {
+        // TODO
         access(all) let attributes: Attributes
-        // The defence of the character
         access(all) let defence: Defence
-
-        access(all) view fun borrowAttributes(): &Attributes? {
-            return &self.attributes as &Attributes
-        }
-
-        access(all) view fun borrowDefence(): &Defence? {
-            return &self.defence as &Defence
-        }
+        access(all) let potentiality: Potentiality
     }
 
     access(all) resource interface ValueCarrier {
@@ -524,6 +700,7 @@ access(all) contract FGameMishal {
 
     access(all) resource Object: DefenceCarrier, ValueCarrier, Nameable {
         access(all) let name: String
+        access(all) let tags: [String]
         // The defence of the character
         access(all) let defence: Defence
         // The value of the object
@@ -531,10 +708,12 @@ access(all) contract FGameMishal {
 
         view init(
             name: String,
+            tags: [String],
             defence: Defence,
             value: UFix64?
         ) {
             self.name = name
+            self.tags = tags
             self.defence = defence
             self.value = value
         }
@@ -544,31 +723,36 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource Item: StatusCarrier, ValueCarrier, EffectsCarrier, Nameable {
+    access(all) resource Item: OptionalStatusCarrier, ValueCarrier, EffectsCarrier, Nameable {
         access(all) let name: String
+        access(all) let tags: [String]
         // The value of the item
         access(all) var value: UFix64?
         // Main attributes of the character
         access(all) let attributes: Attributes
         // The defence of the character
         access(all) let defence: Defence
+        // The potentiality of the item
+        access(all) let potentiality: Potentiality
         // The effects of the item
         access(all) let effects: [String]
         // The slots occupied by the item
-        access(all) let slotsOccupied: [EquipSlot]
+        access(all) let slotsOccupied: {EquipSlot: UInt8}
         // The slots provided by the item
         access(all) let slotsProvided: {EquipSlot: UInt8}
 
         view init(
             name: String,
+            tags: [String],
             value: UFix64?,
             attributes: Attributes,
             defence: Defence,
             effects: [String],
-            slotsOccupied: [EquipSlot],
+            slotsOccupied: {EquipSlot: UInt8},
             slotsProvided: {EquipSlot: UInt8},
         ) {
             self.name = name
+            self.tags = tags
             self.value = value
             self.attributes = attributes
             self.defence = defence
@@ -950,15 +1134,6 @@ access(all) contract FGameMishal {
         access(all) view
         fun hasFeatures(): Bool {
             return self.features.length > 0
-        }
-    }
-
-    access(all) resource interface LiveStatusCarrier: StatusCarrier, PotentialityCarrier {
-        access(all) let potentiality: Potentiality
-
-        access(all) view
-        fun borrowPotentiality(): &Potentiality? {
-            return &self.potentiality as &Potentiality
         }
     }
 
