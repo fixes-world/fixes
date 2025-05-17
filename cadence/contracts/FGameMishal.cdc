@@ -1345,7 +1345,7 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface UnitCollectionBaseCarrier: AbilitiesCarrier, ItemsCarrier, ShapeCarrier {
-        access(all) view fun borrowCollection(): &EntryCollection
+        access(Manage) view fun borrowCollection(): auth(Manage) &EntryCollection
 
         access(all) view fun getAbilitiesLength(): Int {
             let collection = self.borrowCollection()
@@ -1441,8 +1441,8 @@ access(all) contract FGameMishal {
             }
         }
 
-        access(all) view
-        fun borrowCollection(): &EntryCollection {
+        access(Manage) view
+        fun borrowCollection(): auth(Manage) &EntryCollection {
             return &self.collection
         }
     }
@@ -1612,6 +1612,8 @@ access(all) contract FGameMishal {
         init(
             name: String,
             tags: [String],
+            shape: EntryIdentifier,
+            settings: {CreatureSettings: Int64},
             attributes: Attributes,
             defence: Defence,
             potentiality: Potentiality,
@@ -1619,8 +1621,6 @@ access(all) contract FGameMishal {
             abilities: [EntryIdentifier],
             items: [EntryIdentifier],
             itemAmounts: {String: UFix64},
-            shape: EntryIdentifier,
-            settings: {CreatureSettings: Int64},
             bioPrompts: [String]
         ) {
             self.name = name
@@ -1666,11 +1666,6 @@ access(all) contract FGameMishal {
         }
 
         access(all) view
-        fun borrowCollection(): &EntryCollection {
-            return &self.collection
-        }
-
-        access(all) view
         fun borrowStatus(): &UnitStatus {
             return &self.status
         }
@@ -1688,6 +1683,11 @@ access(all) contract FGameMishal {
         access(all) view
         fun borrowSelfPotentiality(): &Potentiality {
             return &self.basePotentiality
+        }
+
+        access(Manage) view
+        fun borrowCollection(): auth(Manage) &EntryCollection {
+            return &self.collection
         }
     }
 
@@ -1777,6 +1777,8 @@ access(all) contract FGameMishal {
             _ library: Address,
             shape: EntryIdentifier,
             features: [EntryIdentifier],
+            items: [EntryIdentifier],
+            itemAmounts: {String: UFix64},
             bioPrompts: [String]
         ) {
             self.settings = {}
@@ -1789,6 +1791,16 @@ access(all) contract FGameMishal {
             for featureIdentifier in features {
                 assert(featureIdentifier.verify(LibraryCategory.FEATURE), message: "Feature identifier is invalid")
                 self.cultivable.collection.deposit(entry: <-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
+            }
+
+            if items.length > 0 {
+                assert(itemAmounts.length == items.length, message: "Item amounts must be the same length as items")
+                for itemIdentifier in items {
+                    assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
+                    let id = itemIdentifier.getStringID()
+                    let amount = itemAmounts[id] ?? 0.0
+                    self.cultivable.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
+                }
             }
 
             self.applyStatus()
@@ -1814,8 +1826,8 @@ access(all) contract FGameMishal {
             return self.cultivable.borrowStatus()
         }
 
-        access(all) view
-        fun borrowCollection(): &EntryCollection {
+        access(Manage) view
+        fun borrowCollection(): auth(Manage) &EntryCollection {
             return self.cultivable.borrowCollection()
         }
 
