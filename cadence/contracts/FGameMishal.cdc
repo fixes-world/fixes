@@ -608,6 +608,11 @@ access(all) contract FGameMishal {
             self.potentiality = potentiality
         }
 
+        access(contract) view
+        fun borrowWritableSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
+            return &self.slotsOccupied
+        }
+
         access(all) view
         fun borrowAttributes(): &Attributes {
             return &self.attributes
@@ -883,6 +888,16 @@ access(all) contract FGameMishal {
             self.effects = effects
             self.slotsOccupied = slotsOccupied
             self.slotsProvided = slotsProvided
+        }
+
+        access(all) view
+        fun isEquippable(): Bool {
+            return self.slotsOccupied.length > 0
+        }
+
+        access(all) view
+        fun isProvidedSlots(): Bool {
+            return self.slotsProvided.length > 0
         }
     }
 
@@ -1357,8 +1372,22 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface EquippedItemsCarrier: ItemsCarrier {
-        access(all) view fun getSlotsAll(): {EquipSlot: UInt8}
         access(Manage) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]}
+        access(all) fun getSlotsAll(): {EquipSlot: UInt8}
+
+        access(all) view
+        fun hasItemEquipped(_ item: EntryIdentifier): Bool {
+            let slots = self.borrowSlotsOccupied()
+            let id = item.getStringID()
+            for slot in slots.keys {
+                if let occupied = slots[slot] {
+                    if occupied.contains(id) {
+                        return true
+                    }
+                }
+            }
+            return false
+        }
 
         access(all)
         fun borrowEquippedItems(): [&Item] {
@@ -1387,21 +1416,7 @@ access(all) contract FGameMishal {
             return ret
         }
 
-        access(all) view
-        fun hasItemEquipped(_ item: EntryIdentifier): Bool {
-            let slots = self.borrowSlotsOccupied()
-            let id = item.getStringID()
-            for slot in slots.keys {
-                if let occupied = slots[slot] {
-                    if occupied.contains(id) {
-                        return true
-                    }
-                }
-            }
-            return false
-        }
-
-        access(all) view
+        access(all)
         fun isItemEquippable(_ item: EntryIdentifier): Bool {
             if let itemRef = item.borrowItem() {
                 return self._isItemEquippable(itemRef)
@@ -1461,7 +1476,7 @@ access(all) contract FGameMishal {
             }
         }
 
-        access(contract) view
+        access(contract)
         fun _isItemEquippable(_ itemRef: &Item): Bool {
             let allSlots = self.getSlotsAll()
             let occupiedSlots = self.borrowSlotsOccupied()
@@ -1728,6 +1743,37 @@ access(all) contract FGameMishal {
             }
             return ret
         }
+
+        access(all)
+        fun getSlotsAll(): {EquipSlot: UInt8} {
+            let all: {EquipSlot: UInt8} = {}
+
+            // All Slots = Shape Slots + Equipped Items Slots
+            let shape = self.borrowShape() ?? panic("Shape not found")
+            let shapeSlots = shape.slotsAvailable
+
+            // Shape Slots
+            for slot in shapeSlots.keys {
+                all[slot] = shapeSlots[slot]!
+            }
+
+            // Equipped Items Slots
+            let equippedItems = self.borrowEquippedItems()
+            for item in equippedItems {
+                if item.isProvidedSlots() {
+                    let slots = item.slotsProvided
+                    for slot in slots.keys {
+                        if all[slot] == nil {
+                            all[slot] = slots[slot]!
+                        } else {
+                            all[slot] = all[slot]! + slots[slot]!
+                        }
+                    }
+                }
+            }
+
+            return all
+        }
     }
 
     access(all) resource Creature: Nameable, CreatureInterface, UnitCollectionCarrier, BioCarrier {
@@ -1826,6 +1872,11 @@ access(all) contract FGameMishal {
         access(Manage) view
         fun borrowCollection(): auth(Manage) &EntryCollection {
             return &self.collection
+        }
+
+        access(Manage) view
+        fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
+            return self.status.borrowWritableSlotsOccupied()
         }
     }
 
@@ -1967,6 +2018,11 @@ access(all) contract FGameMishal {
         access(Manage) view
         fun borrowCollection(): auth(Manage) &EntryCollection {
             return self.cultivable.borrowCollection()
+        }
+
+        access(Manage) view
+        fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
+            return self.cultivable.borrowStatus().borrowWritableSlotsOccupied()
         }
 
         // ---- Pawn Cultivable Functions ----
