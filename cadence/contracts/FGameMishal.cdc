@@ -40,6 +40,7 @@ access(all) contract FGameMishal {
 
     access(all) event PawnHealthReset(_ owner: Address?, _ strength: Int64, _ vitality: Int64, _ spirit: Int64, uuid: UInt64)
     access(all) event PawnHealthRecovered(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
+    access(all) event PawnHealthDamaged(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
 
     // ----- Contract Level Variables -----
 
@@ -63,12 +64,12 @@ access(all) contract FGameMishal {
         access(all) case SPIRIT
     }
 
-    // access(all) enum AttackType: UInt8 {
-    //     access(all) case PHYSICAL
-    //     access(all) case EROSION
-    //     access(all) case OCCULT
-    //     access(all) case TRUE_DAMAGE
-    // }
+    access(all) enum AttackType: UInt8 {
+        access(all) case PHYSICAL
+        access(all) case EROSION
+        access(all) case OCCULT
+        access(all) case TRUE_DAMAGE
+    }
 
     access(all) enum DefenceType: UInt8 {
         access(all) case PHYSICAL // To defend physical damage
@@ -538,6 +539,7 @@ access(all) contract FGameMishal {
             }
         }
 
+        /// This method will not check if the value is negative
         access(Manage)
         fun setValue(_ type: AttributeType, _ value: Int64) {
             switch type {
@@ -552,15 +554,30 @@ access(all) contract FGameMishal {
             }
         }
 
+        // For this method, the final value cannot be negative
         access(Manage)
         fun addValue(_ type: AttributeType, _ value: Int64) {
+            post {
+                self.strength >= 0: "Strength cannot be negative"
+                self.vitality >= 0: "Vitality cannot be negative"
+                self.spirit >= 0: "Spirit cannot be negative"
+            }
             switch type {
                 case AttributeType.STRENGTH:
                     self.strength = self.strength + value
+                    if self.strength < 0 {
+                        self.strength = 0
+                    }
                 case AttributeType.VITALITY:
                     self.vitality = self.vitality + value
+                    if self.vitality < 0 {
+                        self.vitality = 0
+                    }
                 case AttributeType.SPIRIT:
                     self.spirit = self.spirit + value
+                    if self.spirit < 0 {
+                        self.spirit = 0
+                    }
                 default:
                     panic("Invalid attribute type")
             }
@@ -594,6 +611,23 @@ access(all) contract FGameMishal {
             }
         }
 
+        access(all) view
+        fun getDefenceFrom(_ type: AttackType): Int64 {
+            switch type {
+                case AttackType.PHYSICAL:
+                    return self.physical
+                case AttackType.EROSION:
+                    return self.endurance
+                case AttackType.OCCULT:
+                    return self.resistance
+                case AttackType.TRUE_DAMAGE:
+                    return 0
+                default:
+                    return 0
+            }
+        }
+
+        // This method will not check if the value is negative
         access(Manage)
         fun setValue(_ type: DefenceType, _ value: Int64) {
             switch type {
@@ -603,20 +637,6 @@ access(all) contract FGameMishal {
                     self.endurance = value
                 case DefenceType.RESISTANCE:
                     self.resistance = value
-                default:
-                    panic("Invalid defence type")
-            }
-        }
-
-        access(Manage)
-        fun addValue(_ type: DefenceType, _ value: Int64) {
-            switch type {
-                case DefenceType.PHYSICAL:
-                    self.physical = self.physical + value
-                case DefenceType.ENDURANCE:
-                    self.endurance = self.endurance + value
-                case DefenceType.RESISTANCE:
-                    self.resistance = self.resistance + value
                 default:
                     panic("Invalid defence type")
             }
@@ -842,9 +862,9 @@ access(all) contract FGameMishal {
             let attributes = self.borrowAttributesElements()
             let newAttributes = Attributes(strength: 0, vitality: 0, spirit: 0)
             for attribute in attributes {
-                newAttributes.addValue(AttributeType.STRENGTH, attribute.strength)
-                newAttributes.addValue(AttributeType.VITALITY, attribute.vitality)
-                newAttributes.addValue(AttributeType.SPIRIT, attribute.spirit)
+                newAttributes.setValue(AttributeType.STRENGTH, newAttributes.strength + attribute.strength)
+                newAttributes.setValue(AttributeType.VITALITY, newAttributes.vitality + attribute.vitality)
+                newAttributes.setValue(AttributeType.SPIRIT, newAttributes.spirit + attribute.spirit)
             }
             status.setAttributes(newAttributes)
 
@@ -852,9 +872,9 @@ access(all) contract FGameMishal {
             let defence = self.borrowDefenceElements()
             let newDefence = Defence(physical: 0, endurance: 0, resistance: 0)
             for one in defence {
-                newDefence.addValue(DefenceType.PHYSICAL, one.physical)
-                newDefence.addValue(DefenceType.ENDURANCE, one.endurance)
-                newDefence.addValue(DefenceType.RESISTANCE, one.resistance)
+                newDefence.setValue(DefenceType.PHYSICAL, newDefence.physical + one.physical)
+                newDefence.setValue(DefenceType.ENDURANCE, newDefence.endurance + one.endurance)
+                newDefence.setValue(DefenceType.RESISTANCE, newDefence.resistance + one.resistance)
             }
             status.setDefence(newDefence)
 
@@ -1948,6 +1968,20 @@ access(all) contract FGameMishal {
     access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
         access(Manage) view fun borrowHealth(): auth(Mutate) &Attributes
 
+        // ---- Gameplay Methods, Read ---
+
+        access(all) view
+        fun isStunned(): Bool {
+            let health = self.borrowHealth()
+            return health.strength <= 0 || health.vitality <= 0 || health.spirit <= 0
+        }
+
+        access(all) view
+        fun isDead(): Bool {
+            let health = self.borrowHealth()
+            return health.strength <= 0 && health.vitality <= 0 && health.spirit <= 0
+        }
+
         // ---- Gameplay Methods, Write ---
 
         access(Manage)
@@ -1987,6 +2021,41 @@ access(all) contract FGameMishal {
                 self.owner?.address ?? panic("Owner not found"),
                 type.rawValue,
                 recoverAmount,
+                uuid: self.uuid
+            )
+        }
+
+        access(Manage)
+        fun damageHealth(
+            _ attacks: {AttackType: Int64},
+            _ penetration: Int64,
+            _ type: AttributeType,
+        ) {
+            let health = self.borrowHealth()
+            let status = self.borrowStatus()
+
+            var biggestDamage: Int64 = 0
+            for attackType in attacks.keys {
+                let atk = attacks[attackType] ?? 0
+                var def = status.defence.getDefenceFrom(attackType)
+                if def > penetration {
+                    def = def - penetration
+                } else {
+                    def = 0
+                }
+
+                let damage = atk - def
+                if damage > biggestDamage {
+                    biggestDamage = damage
+                }
+            }
+
+            health.addValue(type, -1 * biggestDamage)
+
+            emit PawnHealthDamaged(
+                self.owner?.address ?? panic("Owner not found"),
+                type.rawValue,
+                biggestDamage,
                 uuid: self.uuid
             )
         }
