@@ -40,13 +40,13 @@ access(all) contract FGameMishal {
     access(all) event CreatureSettingUpdated(_ type: String, _ uuid: UInt64, _ setting: UInt8, _ value: Int64)
 
     access(all) event PawnPotentialityGained(_ owner: Address?, _ amount: UInt64, uuid: UInt64)
+    access(all) event PawnPotentialityConsumed(_ owner: Address?, _ consume: UInt64, _ usable: UInt64, _ used: UInt64, uuid: UInt64)
     access(all) event PawnAttributeUpgraded(_ owner: Address?, _ type: UInt8, _ amount: UInt64, uuid: UInt64)
+    access(all) event PawnAbilityCultivated(_ owner: Address?, _ ability: String, _ consume: UInt64, _ abilityUp: UInt64, uuid: UInt64)
 
     access(all) event PawnHealthReset(_ owner: Address?, _ strength: Int64, _ vitality: Int64, _ spirit: Int64, uuid: UInt64)
     access(all) event PawnHealthRecovered(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
     access(all) event PawnHealthDamaged(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
-
-    access(all) event PawnPotentialityConsumed(_ owner: Address?, _ consume: UInt64, _ usable: UInt64, _ used: UInt64, uuid: UInt64)
 
     // ----- Contract Level Variables -----
 
@@ -864,7 +864,12 @@ access(all) contract FGameMishal {
         access(all) fun borrowPotentialityElements(): [&Potentiality]
 
         access(contract)
-        fun applyStatus() {
+        fun applyStatus(_ isLast: Bool) {
+            // during initializing, we don't need to apply the status if it's not the last one
+            if self.owner == nil && !isLast {
+                return
+            }
+
             let status = self.borrowStatus()
 
             // Calculate the new attributes of the unit
@@ -985,25 +990,28 @@ access(all) contract FGameMishal {
         access(all) let name: String
         access(all) let tags: [String]
         access(all) let level: UInt64
-        access(all) let occupy: Attributes
+        access(all) let occupy: AttributeType?
         access(all) let effects: [String]
+        access(all) let attributes: Attributes?
 
         view init(
             level: UInt64,
             name: String,
             tags: [String],
-            occupy: Attributes,
-            effects: [String]
+            occupy: AttributeType?,
+            effects: [String],
+            attributes: Attributes?,
         ) {
             self.name = name
             self.tags = tags
             self.level = level
             self.occupy = occupy
             self.effects = effects
+            self.attributes = attributes
         }
 
         access(all) view fun borrowAttributes(): &Attributes? {
-            return &self.occupy as &Attributes
+            return &self.attributes
         }
     }
 
@@ -1157,6 +1165,11 @@ access(all) contract FGameMishal {
         access(all) view
         fun getStringID(): String {
             return self.library.toString().concat("-").concat(self.category.rawValue.toString()).concat("-").concat(self.id.toString())
+        }
+
+        access(all) view
+        fun clone(): EntryIdentifier {
+            return self
         }
 
         access(all) view
@@ -1327,7 +1340,7 @@ access(all) contract FGameMishal {
             let keys = category == nil ? self.entries.keys : self.getKeysByCategory(category!)
             for id in keys {
                 if let ref = self.borrowEntryByID(id) {
-                    ret.append(EntryIdentifier(library: ref.identifier.library, category: ref.identifier.category, id: ref.identifier.id))
+                    ret.append(ref.identifier.clone())
                 }
             }
             return ret
@@ -1600,7 +1613,7 @@ access(all) contract FGameMishal {
 
         access(Host)
         fun dropAbility(_ ability: EntryIdentifier): @FungibleEntry {
-            return <- self.withdraw(ability.getStringID(), amount: 1.0)
+            return <- self.withdraw(ability.getStringID(), amount: nil)
         }
     }
 
@@ -1687,6 +1700,15 @@ access(all) contract FGameMishal {
         fun hasFeatures(): Bool {
             return self.getFeaturesLength() > 0
         }
+
+        // ---- Implement Feature Gameplay Methods ----
+
+        access(Host)
+        fun applyFeature(_ feature: @FungibleEntry) {
+            pre {
+                feature.identifier.verify(LibraryCategory.FEATURE): "Feature identifier is invalid"
+            }
+        }
     }
 
     access(all) resource interface UnitCollectionCarrier: UnitCollectionBaseCarrier, FeaturesCarrier {
@@ -1699,6 +1721,31 @@ access(all) contract FGameMishal {
         fun getFeatureIdentifiers(): [EntryIdentifier] {
             let collection = self.borrowReadonlyCollection()
             return collection.getEntryIdentifiers(LibraryCategory.FEATURE)
+        }
+
+        // ---- Implement Feature Gameplay Methods ----
+
+        // This is static, so we don't need to apply it for now
+        access(Host)
+        fun applyFeature(_ feature: @FungibleEntry) {
+            let collection = self.borrowWritableCollection()
+            // borrow the feature
+            let featureRef = feature.identifier.borrowFeature() ?? panic("Not Exists, Feature: ".concat(feature.identifier.getStringID()))
+
+            // generate the abilities and items from the feature
+            let abilitiesFromFeature = featureRef.getAbilityIdentifiers()
+            for abilityIdentifier in abilitiesFromFeature {
+                self.gainAbility(<-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
+            }
+
+            // generate the items from the feature
+            let itemsFromFeature = featureRef.borrowItemEntries()
+            for itemEntry in itemsFromFeature {
+                self.lootItem(<- create FungibleEntry(identifier: itemEntry.identifier.clone(), amount: itemEntry.balance))
+            }
+
+            // apply the feature to the collection
+            collection.deposit(entry: <- feature)
         }
     }
 
@@ -2021,13 +2068,11 @@ access(all) contract FGameMishal {
             self.collection.deposit(entry: <-create FungibleEntry(identifier: shape, amount: 1.0))
 
             for featureIdentifier in features {
-                assert(featureIdentifier.verify(LibraryCategory.FEATURE), message: "Feature identifier is invalid")
-                self.collection.deposit(entry: <-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
+                self.applyFeature(<-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
             }
 
             for abilityIdentifier in abilities {
-                assert(abilityIdentifier.verify(LibraryCategory.ABILITY), message: "Ability identifier is invalid")
-                self.collection.deposit(entry: <-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
+                self.gainAbility(<-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
             }
 
             if items.length > 0 {
@@ -2036,12 +2081,12 @@ access(all) contract FGameMishal {
                     assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
                     let id = itemIdentifier.getStringID()
                     let amount = itemAmounts[id] ?? 0.0
-                    self.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
+                    self.lootItem(<-create FungibleEntry(identifier: itemIdentifier, amount: amount))
                 }
             }
 
             // apply the status
-            self.applyStatus()
+            self.applyStatus(true)
         }
 
         access(all) view
@@ -2068,22 +2113,28 @@ access(all) contract FGameMishal {
         fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
             return self.status.borrowWritableSlotsOccupied()
         }
+
+        // ---- Implement Feature Gameplay Methods ----
+
+        // This is static, so we don't need to apply it for now
+        access(Host)
+        fun applyFeature(_ feature: @FungibleEntry) {
+            self.collection.deposit(entry: <- feature)
+        }
     }
 
-    access(all) resource interface ComposableUnitCollectionCarrier: UnitCollectionCarrier, FeaturesCarrier {
+    access(all) resource interface ComposableUnitCollectionCarrier: UnitCollectionCarrier {
         access(all)
-        fun getFixedAbilities(): [EntryIdentifier] {
-            let ret: [EntryIdentifier] = []
+        fun getFixedAbilities(): {String: Bool} {
+            let ret: {String: Bool} = {}
             let features = self.borrowFeatures()
 
-            let uniqueAbilities: {String: Bool} = {}
             for feature in features {
                 if feature.hasAbilities() {
                     let abilities = feature.getAbilityIdentifiers()
                     for ability in abilities {
-                        if uniqueAbilities[ability.getStringID()] == nil {
-                            uniqueAbilities[ability.getStringID()] = true
-                            ret.append(ability)
+                        if ret[ability.getStringID()] == nil {
+                            ret[ability.getStringID()] = true
                         }
                     }
                 }
@@ -2092,37 +2143,20 @@ access(all) contract FGameMishal {
         }
 
         access(all)
-        fun getFixedItems(): [EntryIdentifier] {
-            let ret: [EntryIdentifier] = []
+        fun getFixedItems(): {String: UFix64} {
+            let ret: {String: UFix64} = {}
             let features = self.borrowFeatures()
 
-            let uniqueItems: {String: Bool} = {}
             for feature in features {
                 if feature.hasItems() {
                     let items = feature.borrowItemEntries()
                     for item in items {
-                        if uniqueItems[item.identifier.getStringID()] == nil {
-                            uniqueItems[item.identifier.getStringID()] = true
-                            ret.append(EntryIdentifier(
-                                library: item.identifier.library,
-                                category: item.identifier.category,
-                                id: item.identifier.id
-                            ))
-                        }
+                        let itemId = item.identifier.getStringID()
+                        ret[itemId] = item.balance + (ret[itemId] ?? 0.0)
                     }
                 }
             }
             return ret
-        }
-
-        access(Host)
-        fun applyFixedAbilities() {
-            // TODO
-        }
-
-        access(Host)
-        fun applyFixedItems() {
-            // TODO
         }
     }
 
@@ -2302,25 +2336,49 @@ access(all) contract FGameMishal {
         access(all)
         fun getAbilitiesOccupiedAttributes(): Attributes {
             let occupied = Attributes(strength: 0, vitality: 0, spirit: 0)
-            let ownedAbilities = self.borrowAbilities()
+            let ownedAbilities = self.getAbilityIdentifiers()
+            let fixedAbilities = self.getFixedAbilities()
 
-            for abilityRef in ownedAbilities {
-                occupied.addValue(AttributeType.STRENGTH, abilityRef.occupy.strength)
-                occupied.addValue(AttributeType.VITALITY, abilityRef.occupy.vitality)
-                occupied.addValue(AttributeType.SPIRIT, abilityRef.occupy.spirit)
+            // fixed abilities are not counted
+            let countableAbilities = ownedAbilities.filter(view fun (ability: EntryIdentifier): Bool {
+                return fixedAbilities[ability.getStringID()] == nil
+            })
+
+            for abilityRef in countableAbilities {
+                let abilityRef = abilityRef.borrowAbility() ?? panic("Not Exists, Ability: ".concat(abilityRef.getStringID()))
+                if let occupy = abilityRef.occupy {
+                    occupied.addValue(occupy, Int64(abilityRef.level))
+                }
             }
-
             return occupied
         }
 
         // --- Cultivable Methods - Ability, Write ---
 
         access(Host)
+        fun cultivateAbility(_ ability: EntryIdentifier, consume: UInt64, abilityUp: UInt64) {
+            let itemId = ability.getStringID()
+            assert(self.borrowEntryByID(itemId) != nil, message: "Ability already exists")
+
+            self.consumePotentiality(consume)
+
+            let cultivation = self.cultivation[ability.getStringID()] ?? 0
+            self.cultivation[ability.getStringID()] = cultivation + abilityUp
+
+            emit PawnAbilityCultivated(
+                self.owner?.address ?? panic("Owner not found"),
+                ability.getStringID(),
+                consume,
+                abilityUp,
+                uuid: self.uuid
+            )
+        }
+
+        access(Host)
         fun gainAbility(_ ability: @FungibleEntry) {
-            pre {
-                ability.identifier.verify(LibraryCategory.ABILITY): "Ability identifier is invalid"
-            }
             let itemId = ability.identifier.getStringID()
+            assert(self.borrowEntryByID(itemId) == nil, message: "Ability already exists")
+
             self.cultivation[itemId] = 0
 
             let abilityRef = ability.identifier.borrowAbility() ?? panic("Not Exists, Ability: ".concat(itemId))
@@ -2328,20 +2386,37 @@ access(all) contract FGameMishal {
             // Consume potentiality = 3 x ability level
             self.consumePotentiality(abilityRef.level * 3)
 
+            let status = self.borrowStatus()
             // Check ability occupied value
-            // TODO
+            if let attributeToOccupy = abilityRef.occupy {
+                let occupied = self.getAbilitiesOccupiedAttributes()
+                let currentAttr = status.attributes.getValue(attributeToOccupy)
+                let occupiedAttr = occupied.getValue(attributeToOccupy)
+                assert(occupiedAttr + Int64(abilityRef.level) <= currentAttr, message: "Attribute is full")
+            }
 
-            self.applyStatus()
+            // Add ability to collection
+            let collection = self.borrowWritableCollection()
+            collection.deposit(entry: <- ability)
+
+            // Apply the ability effects
+            self.applyStatus(false)
         }
 
         access(Host)
         fun dropAbility(_ ability: EntryIdentifier): @FungibleEntry {
-            post {
-                result.identifier.getStringID() == ability.getStringID(): "The ID of the withdrawn token must be the same as the requested ID"
-            }
-            // TODO
+            let itemId = ability.getStringID()
+            assert(self.borrowEntryByID(itemId) != nil, message: "Ability not exists")
 
-            self.applyStatus()
+            // Clear cultivation
+            self.cultivation[itemId] = 0
+
+            let collection = self.borrowWritableCollection()
+            let ret <- collection.withdraw(itemId, amount: nil)
+
+            self.applyStatus(false)
+
+            return <- ret
         }
 
         // ---- Cultivable Item Gameplay Methods ----
@@ -2357,7 +2432,7 @@ access(all) contract FGameMishal {
                 self.equipItem(itemId)
             }
 
-            self.applyStatus()
+            self.applyStatus(false)
         }
 
         access(Host)
@@ -2368,7 +2443,7 @@ access(all) contract FGameMishal {
 
             let ret <- self.withdraw(item.getStringID(), amount: amount)
 
-            self.applyStatus()
+            self.applyStatus(false)
 
             return <- ret
         }
@@ -2470,23 +2545,19 @@ access(all) contract FGameMishal {
             self.collection.deposit(entry: <-create FungibleEntry(identifier: shape, amount: 1.0))
 
             for featureIdentifier in features {
-                assert(featureIdentifier.verify(LibraryCategory.FEATURE), message: "Feature identifier is invalid")
-                self.collection.deposit(entry: <-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
+                self.applyFeature(<-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
             }
 
             if items.length > 0 {
                 assert(itemAmounts.length == items.length, message: "Item amounts must be the same length as items")
                 for itemIdentifier in items {
-                    assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
                     let id = itemIdentifier.getStringID()
                     let amount = itemAmounts[id] ?? 0.0
-                    self.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
+                    self.lootItem(<-create FungibleEntry(identifier: itemIdentifier, amount: amount))
                 }
             }
 
-            self.applyFixedAbilities()
-            self.applyFixedItems()
-            self.applyStatus()
+            self.applyStatus(true)
         }
 
         // ---- Interface Implementation ----
