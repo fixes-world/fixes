@@ -30,8 +30,8 @@ access(all) contract FGameMishal {
     access(all) event EntryDeposited(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ amount: UFix64, _ to: Address?, entryUUID: UInt64, collectionUUID: UInt64)
     access(all) event EntryWithdrawn(_ library: Address, _ category: UInt8, _ uuid: UInt64, _ amount: UFix64, _ from: Address?, entryUUID: UInt64, collectionUUID: UInt64)
 
-    access(all) event CreatureItemEquipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64)
-    access(all) event CreatureItemUnequipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64)
+    access(all) event CreatureItemEquipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64, uuid: UInt64)
+    access(all) event CreatureItemUnequipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64, uuid: UInt64)
 
     access(all) event CreatureSettingUpdated(_ type: String, _ uuid: UInt64, _ setting: UInt8, _ value: Int64)
 
@@ -1273,6 +1273,25 @@ access(all) contract FGameMishal {
     access(all) resource interface EntryContainer {
         access(all) view
         fun borrowEntryByID(_ id: String): &FungibleEntry?
+
+        access(all)
+        fun deposit(entry: @FungibleEntry)
+
+        access(Manage)
+        fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry
+    }
+
+    // Check if the entry is uniqueness
+    access(all) view
+    fun isEntryUniqueness(_ category: LibraryCategory): Bool {
+        switch category {
+            case LibraryCategory.OBJECT:
+                return false
+            case LibraryCategory.ITEM:
+                return false
+            default:
+                return true
+        }
     }
 
     // The EntryCollection resource is used to store the entries.
@@ -1342,7 +1361,7 @@ access(all) contract FGameMishal {
             }
             let uid = entry.identifier.getStringID()
 
-            if self.isNonFungible(entry.identifier.category) {
+            if FGameMishal.isEntryUniqueness(entry.identifier.category) {
                 assert(entry.balance == 1.0 && self.entries[uid] == nil, message: "Non-fungible entry must have a balance of 1.0")
             }
 
@@ -1369,7 +1388,7 @@ access(all) contract FGameMishal {
             }
             let ref = self.borrowEntryByID(id)
                 ?? panic("EntryCollection.withdraw: Could not withdraw an entry with ID ".concat(id).concat(". Check if the entry exists."))
-            if self.isNonFungible(ref.identifier.category) {
+            if FGameMishal.isEntryUniqueness(ref.identifier.category) {
                 assert(amount == nil, message: "Non-fungible entry cannot have an amount")
                 return <- self.entries.remove(key: id)!
             } else {
@@ -1388,18 +1407,6 @@ access(all) contract FGameMishal {
         access(Manage) view
         fun borrowEditableEntry(_ id: String): auth(FungibleToken.Withdraw) &FungibleEntry? {
             return &self.entries[id]
-        }
-
-        access(self) view
-        fun isNonFungible(_ category: LibraryCategory): Bool {
-            switch category {
-                case LibraryCategory.OBJECT:
-                    return false
-                case LibraryCategory.ITEM:
-                    return false
-                default:
-                    return true
-            }
         }
     }
 
@@ -1451,6 +1458,23 @@ access(all) contract FGameMishal {
         access(all) view
         fun hasItems(): Bool {
             return self.getItemsLength() > 0
+        }
+
+        // --- Item Gameplay Methods ---
+
+        access(Manage)
+        fun lootItem(_ entry: @FungibleEntry) {
+            pre {
+                entry.identifier.verify(LibraryCategory.ITEM): "Entry is not an item"
+            }
+        }
+
+        access(Manage)
+        fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
+            post {
+                result.identifier.getStringID() == item.getStringID(): "The ID of the withdrawn token must be the same as the requested ID"
+                result.identifier.verify(LibraryCategory.ITEM): "Entry is not an item"
+            }
         }
     }
 
@@ -1507,6 +1531,28 @@ access(all) contract FGameMishal {
             return false
         }
 
+        // --- Item Gameplay Methods ---
+
+        access(Manage)
+        fun lootItem(_ entry: @FungibleEntry) {
+            let itemId = entry.identifier
+            let itemRef = itemId.borrowItem() ?? panic("Not Exists, Item: ".concat(itemId.getStringID()))
+
+            self.deposit(entry: <-entry)
+
+            if itemRef.isEquippable() && self._isItemEquippable(itemRef) {
+                self.equipItem(itemId)
+            }
+        }
+
+        access(Manage)
+        fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
+            if self.hasItemEquipped(item) {
+                self.unequipItem(item)
+            }
+            return <- self.withdraw(item.getStringID(), amount: amount)
+        }
+
         access(Manage)
         fun equipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
@@ -1534,6 +1580,7 @@ access(all) contract FGameMishal {
                 itemId,
                 self.owner?.address,
                 itemUUID: itemRef.uuid,
+                uuid: self.uuid
             )
         }
 
@@ -1557,6 +1604,14 @@ access(all) contract FGameMishal {
                     slots[slot] = newOccupied
                 }
             }
+
+            emit CreatureItemUnequipped(
+                item.library,
+                itemId,
+                self.owner?.address,
+                itemUUID: itemRef.uuid,
+                uuid: self.uuid
+            )
         }
 
         access(contract)
@@ -1578,10 +1633,24 @@ access(all) contract FGameMishal {
     access(all) resource interface UnitCollectionBaseCarrier: AbilitiesCarrier, ItemsCarrier, ShapeCarrier {
         access(Manage) view fun borrowCollection(): auth(Manage) &EntryCollection
 
+        // --- Implement EntryContainer ---
+
         access(all) view fun borrowEntryByID(_ id: String): &FungibleEntry? {
             let collection = self.borrowCollection()
             return collection.borrowEntryByID(id)
         }
+
+        access(all)
+        fun deposit(entry: @FungibleEntry) {
+            self.borrowCollection().deposit(entry: <-entry)
+        }
+
+        access(Manage)
+        fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry {
+            return <- self.borrowCollection().withdraw(id, amount: amount)
+        }
+
+        // --- Implement AbilitiesCarrier ---
 
         access(all) view fun getAbilitiesLength(): Int {
             let collection = self.borrowCollection()
@@ -1594,6 +1663,8 @@ access(all) contract FGameMishal {
             return collection.getEntryIdentifiers(LibraryCategory.ABILITY)
         }
 
+        // --- Implement ItemsCarrier ---
+
         access(all) view fun getItemsLength(): Int {
             let collection = self.borrowCollection()
             return collection.getLengthByCategory(LibraryCategory.ITEM)
@@ -1604,6 +1675,8 @@ access(all) contract FGameMishal {
             let collection = self.borrowCollection()
             return collection.borrowEntries(LibraryCategory.ITEM)
         }
+
+        // --- Implement ShapeCarrier ---
 
         access(all) view fun borrowShape(): &Shape? {
             let collection = self.borrowCollection()
@@ -1677,9 +1750,23 @@ access(all) contract FGameMishal {
             }
         }
 
+        // ---- Implement UnitCollectionBaseCarrier ----
+
         access(Manage) view
         fun borrowCollection(): auth(Manage) &EntryCollection {
             return &self.collection
+        }
+
+        // ---- Implement Item Gameplay Methods ----
+
+        access(Manage)
+        fun lootItem(_ entry: @FungibleEntry) {
+            self.deposit(entry: <-entry)
+        }
+
+        access(Manage)
+        fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
+            return <- self.withdraw(item.getStringID(), amount: amount)
         }
     }
 
