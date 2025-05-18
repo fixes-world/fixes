@@ -2118,43 +2118,6 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource interface ComposableUnitCollectionCarrier: UnitCollectionCarrier {
-        access(all)
-        fun getFixedAbilities(): {String: Bool} {
-            let ret: {String: Bool} = {}
-            let features = self.borrowFeatures()
-
-            for feature in features {
-                if feature.hasAbilities() {
-                    let abilities = feature.getAbilityIdentifiers()
-                    for ability in abilities {
-                        if ret[ability.getStringID()] == nil {
-                            ret[ability.getStringID()] = true
-                        }
-                    }
-                }
-            }
-            return ret
-        }
-
-        access(all)
-        fun getFixedItems(): {String: UFix64} {
-            let ret: {String: UFix64} = {}
-            let features = self.borrowFeatures()
-
-            for feature in features {
-                if feature.hasItems() {
-                    let items = feature.borrowItemEntries()
-                    for item in items {
-                        let itemId = item.identifier.getStringID()
-                        ret[itemId] = item.balance + (ret[itemId] ?? 0.0)
-                    }
-                }
-            }
-            return ret
-        }
-    }
-
     // ------------ Player ------------
 
     access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
@@ -2253,7 +2216,7 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource interface CultivableUnit: CreatureInterface, ComposableUnitCollectionCarrier {
+    access(all) resource interface CultivableUnit: CreatureInterface, UnitCollectionCarrier {
         // The potentiality used by the character
         access(all) var potentialityUsed: UInt64
         // The potentiality obtained by the character
@@ -2319,6 +2282,43 @@ access(all) contract FGameMishal {
                 amount,
                 uuid: self.uuid
             )
+        }
+
+        // --- Cultivable Methods - Feature, Read ---
+
+        access(all)
+        fun getFixedAbilities(): {String: Bool} {
+            let ret: {String: Bool} = {}
+            let features = self.borrowFeatures()
+
+            for feature in features {
+                if feature.hasAbilities() {
+                    let abilities = feature.getAbilityIdentifiers()
+                    for ability in abilities {
+                        if ret[ability.getStringID()] == nil {
+                            ret[ability.getStringID()] = true
+                        }
+                    }
+                }
+            }
+            return ret
+        }
+
+        access(all)
+        fun getFixedItems(): {String: UFix64} {
+            let ret: {String: UFix64} = {}
+            let features = self.borrowFeatures()
+
+            for feature in features {
+                if feature.hasItems() {
+                    let items = feature.borrowItemEntries()
+                    for item in items {
+                        let itemId = item.identifier.getStringID()
+                        ret[itemId] = item.balance + (ret[itemId] ?? 0.0)
+                    }
+                }
+            }
+            return ret
         }
 
         // --- Cultivable Methods - Ability, Read ---
