@@ -33,6 +33,14 @@ access(all) contract FGameMishal {
     access(all) event CreatureItemEquipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64)
     access(all) event CreatureItemUnequipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64)
 
+    access(all) event CreatureSettingUpdated(_ type: String, _ uuid: UInt64, _ setting: UInt8, _ value: Int64)
+
+    access(all) event PawnPotentialityGained(_ owner: Address?, _ amount: UInt64, uuid: UInt64)
+    access(all) event PawnAttributeUpgraded(_ owner: Address?, _ type: UInt8, _ amount: UInt64, uuid: UInt64)
+
+    access(all) event PawnHealthReset(_ owner: Address?, _ strength: Int64, _ vitality: Int64, _ spirit: Int64, uuid: UInt64)
+    access(all) event PawnHealthRecovered(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
+
     // ----- Contract Level Variables -----
 
     // The counter variable for the library items
@@ -47,6 +55,25 @@ access(all) contract FGameMishal {
         access(all) case INIT_POTENTIALITY
         access(all) case INIT_ATTRIBUTE_VALUE
         access(all) case INIT_DEFENCE_VALUE
+    }
+
+    access(all) enum AttributeType: UInt8 {
+        access(all) case STRENGTH
+        access(all) case VITALITY
+        access(all) case SPIRIT
+    }
+
+    // access(all) enum AttackType: UInt8 {
+    //     access(all) case PHYSICAL
+    //     access(all) case EROSION
+    //     access(all) case OCCULT
+    //     access(all) case TRUE_DAMAGE
+    // }
+
+    access(all) enum DefenceType: UInt8 {
+        access(all) case PHYSICAL // To defend physical damage
+        access(all) case ENDURANCE // To defend erosion damage
+        access(all) case RESISTANCE // To defend occult damage
     }
 
     access(all) enum LibraryCategory: UInt8 {
@@ -497,34 +524,46 @@ access(all) contract FGameMishal {
 
         access(all) fun copy(): {Copyable} { return self }
 
-        access(contract)
-        fun setStrength(_ strength: Int64) {
-            self.strength = strength
+        access(all) view
+        fun getValue(_ type: AttributeType): Int64 {
+            switch type {
+                case AttributeType.STRENGTH:
+                    return self.strength
+                case AttributeType.VITALITY:
+                    return self.vitality
+                case AttributeType.SPIRIT:
+                    return self.spirit
+                default:
+                    return 0
+            }
         }
 
-        access(contract)
-        fun addStrength(_ strength: Int64) {
-            self.strength = self.strength + strength
+        access(Manage)
+        fun setValue(_ type: AttributeType, _ value: Int64) {
+            switch type {
+                case AttributeType.STRENGTH:
+                    self.strength = value
+                case AttributeType.VITALITY:
+                    self.vitality = value
+                case AttributeType.SPIRIT:
+                    self.spirit = value
+                default:
+                    panic("Invalid attribute type")
+            }
         }
 
-        access(contract)
-        fun setVitality(_ vitality: Int64) {
-            self.vitality = vitality
-        }
-
-        access(contract)
-        fun addVitality(_ vitality: Int64) {
-            self.vitality = self.vitality + vitality
-        }
-
-        access(contract)
-        fun setSpirit(_ spirit: Int64) {
-            self.spirit = spirit
-        }
-
-        access(contract)
-        fun addSpirit(_ spirit: Int64) {
-            self.spirit = self.spirit + spirit
+        access(Manage)
+        fun addValue(_ type: AttributeType, _ value: Int64) {
+            switch type {
+                case AttributeType.STRENGTH:
+                    self.strength = self.strength + value
+                case AttributeType.VITALITY:
+                    self.vitality = self.vitality + value
+                case AttributeType.SPIRIT:
+                    self.spirit = self.spirit + value
+                default:
+                    panic("Invalid attribute type")
+            }
         }
     }
 
@@ -541,34 +580,46 @@ access(all) contract FGameMishal {
 
         access(all) fun copy(): {Copyable} { return self }
 
-        access(contract)
-        fun setPhysical(_ physical: Int64) {
-            self.physical = physical
+        access(all) view
+        fun getValue(_ type: DefenceType): Int64 {
+            switch type {
+                case DefenceType.PHYSICAL:
+                    return self.physical
+                case DefenceType.ENDURANCE:
+                    return self.endurance
+                case DefenceType.RESISTANCE:
+                    return self.resistance
+                default:
+                    return 0
+            }
         }
 
-        access(contract)
-        fun addPhysical(_ physical: Int64) {
-            self.physical = self.physical + physical
+        access(Manage)
+        fun setValue(_ type: DefenceType, _ value: Int64) {
+            switch type {
+                case DefenceType.PHYSICAL:
+                    self.physical = value
+                case DefenceType.ENDURANCE:
+                    self.endurance = value
+                case DefenceType.RESISTANCE:
+                    self.resistance = value
+                default:
+                    panic("Invalid defence type")
+            }
         }
 
-        access(contract)
-        fun setEndurance(_ endurance: Int64) {
-            self.endurance = endurance
-        }
-
-        access(contract)
-        fun addEndurance(_ endurance: Int64) {
-            self.endurance = self.endurance + endurance
-        }
-
-        access(contract)
-        fun setResistance(_ resistance: Int64) {
-            self.resistance = resistance
-        }
-
-        access(contract)
-        fun addResistance(_ resistance: Int64) {
-            self.resistance = self.resistance + resistance
+        access(Manage)
+        fun addValue(_ type: DefenceType, _ value: Int64) {
+            switch type {
+                case DefenceType.PHYSICAL:
+                    self.physical = self.physical + value
+                case DefenceType.ENDURANCE:
+                    self.endurance = self.endurance + value
+                case DefenceType.RESISTANCE:
+                    self.resistance = self.resistance + value
+                default:
+                    panic("Invalid defence type")
+            }
         }
     }
 
@@ -791,9 +842,9 @@ access(all) contract FGameMishal {
             let attributes = self.borrowAttributesElements()
             let newAttributes = Attributes(strength: 0, vitality: 0, spirit: 0)
             for attribute in attributes {
-                newAttributes.addStrength(attribute.strength)
-                newAttributes.addVitality(attribute.vitality)
-                newAttributes.addSpirit(attribute.spirit)
+                newAttributes.addValue(AttributeType.STRENGTH, attribute.strength)
+                newAttributes.addValue(AttributeType.VITALITY, attribute.vitality)
+                newAttributes.addValue(AttributeType.SPIRIT, attribute.spirit)
             }
             status.setAttributes(newAttributes)
 
@@ -801,9 +852,9 @@ access(all) contract FGameMishal {
             let defence = self.borrowDefenceElements()
             let newDefence = Defence(physical: 0, endurance: 0, resistance: 0)
             for one in defence {
-                newDefence.addPhysical(one.physical)
-                newDefence.addEndurance(one.endurance)
-                newDefence.addResistance(one.resistance)
+                newDefence.addValue(DefenceType.PHYSICAL, one.physical)
+                newDefence.addValue(DefenceType.ENDURANCE, one.endurance)
+                newDefence.addValue(DefenceType.RESISTANCE, one.resistance)
             }
             status.setDefence(newDefence)
 
@@ -939,6 +990,18 @@ access(all) contract FGameMishal {
         access(all) view
         fun hasSettings(): Bool {
             return self.settings.length > 0
+        }
+
+        access(Manage)
+        fun updateSetting(_ setting: CreatureSettings, _ value: Int64) {
+            self.settings[setting] = value
+
+            emit CreatureSettingUpdated(
+                self.getType().identifier,
+                self.uuid,
+                setting.rawValue,
+                value
+            )
         }
     }
 
@@ -1882,81 +1945,152 @@ access(all) contract FGameMishal {
 
     // ------------ Player ------------
 
-    access(all) resource CultivableProperty {
-        access(contract) let library: Address
+    access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
+        access(Manage) view fun borrowHealth(): auth(Mutate) &Attributes
 
-        // --- Exported Properties ---
+        // ---- Gameplay Methods, Write ---
 
-        access(all) let attributes: Attributes
-        access(all) let defence: Defence
-        access(all) let potentiality: Potentiality
+        access(Manage)
+        fun resetHealth() {
+            let health = self.borrowHealth()
+            let status = self.borrowStatus()
 
-        // The merged status of the character
-        access(all) let status: UnitStatus
+            health.setValue(AttributeType.STRENGTH, status.attributes.strength)
+            health.setValue(AttributeType.VITALITY, status.attributes.vitality)
+            health.setValue(AttributeType.SPIRIT, status.attributes.spirit)
 
-        // --- Cultivable Property ---
+            emit PawnHealthReset(
+                self.owner?.address ?? panic("Owner not found"),
+                health.strength,
+                health.vitality,
+                health.spirit,
+                uuid: self.uuid
+            )
+        }
 
+        access(Manage)
+        fun recoverHealth(_ type: AttributeType, _ amount: Int64) {
+            let health = self.borrowHealth()
+            let status = self.borrowStatus()
+
+            let maxAttr = status.attributes.getValue(type)
+            let currentAttr = health.getValue(type)
+
+            var recoverAmount = amount
+            if currentAttr + amount > maxAttr {
+                recoverAmount = maxAttr - currentAttr
+            }
+
+            health.setValue(type, currentAttr + recoverAmount)
+
+            emit PawnHealthRecovered(
+                self.owner?.address ?? panic("Owner not found"),
+                type.rawValue,
+                recoverAmount,
+                uuid: self.uuid
+            )
+        }
+    }
+
+    access(all) resource interface CultivableUnit: ComposableUnitStatusCarrier, UnitCollectionCarrier {
+        // The potentiality used by the character
         access(all) var potentialityUsed: UInt64
+        // The potentiality obtained by the character
         access(all) var potentialityObtained: UInt64
 
-        // The collection of the character
-        access(all) let collection: @EntryCollection
+        // ---- Interface ----
 
-        view init(
-            _ library: Address
-        ) {
-            self.library = library
-            let lib = FGameMishal.borrowLibrary(library) ?? panic("Library not found")
-            let initPtt = lib.settings[LibrarySettings.INIT_POTENTIALITY] ?? 36
-            let initDef = lib.settings[LibrarySettings.INIT_DEFENCE_VALUE] ?? 0
-            let initAttr = lib.settings[LibrarySettings.INIT_ATTRIBUTE_VALUE] ?? 3
+        access(Manage) view fun borrowCultivableAttributes(): auth(Mutate) &Attributes
 
-            self.attributes = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
-            self.defence = Defence(physical: initDef, endurance: initDef, resistance: initDef)
-            self.potentiality = Potentiality(initial: initPtt)
+        // ---- Cultivable Methods, Read ----
 
-            self.status = UnitStatus(
-                attributes: self.attributes,
-                defence: self.defence,
-                potentiality: self.potentiality
+        access(all) view
+        fun getUsablePotentiality(): UInt64 {
+            let status = self.borrowStatus()
+            return UInt64(status.potentiality.initial) + self.potentialityObtained - self.potentialityUsed
+        }
+
+        // --- Cultivable Methods, Write ---
+
+        access(Manage)
+        fun gainPotentiality(_ amount: UInt64) {
+            self.potentialityObtained = self.potentialityObtained + amount
+
+            emit PawnPotentialityGained(
+                self.owner?.address ?? panic("Owner not found"),
+                amount,
+                uuid: self.uuid
             )
-
-            self.potentialityUsed = 0
-            self.potentialityObtained = 0
-
-            self.collection <- create EntryCollection()
         }
 
         access(all) view
-        fun borrowAttributes(): &Attributes {
-            return &self.attributes
+        fun canUpgradeAttribute(_ type: AttributeType): Bool {
+            // +1 attribute requires unused potentiality = 3 x current attribute value
+            let attributes = self.borrowCultivableAttributes()
+            let currentValue = attributes.getValue(type)
+            let unusedPotentiality = self.getUsablePotentiality()
+            return Int64(unusedPotentiality) >= 3 * currentValue
         }
 
-        access(all) view
-        fun borrowDefence(): &Defence {
-            return &self.defence
-        }
+        access(Manage)
+        fun upgradeAttribute(_ type: AttributeType, _ amount: UInt64) {
+            let attributes = self.borrowCultivableAttributes()
 
-        access(all) view
-        fun borrowPotentiality(): &Potentiality {
-            return &self.potentiality
-        }
+            var toUpgrade = amount
+            while toUpgrade > 0 {
+                assert(self.canUpgradeAttribute(type), message: "Not enough potentiality to upgrade attribute")
+                // consume potentiality = 3 x current attribute value
+                let currentValue = attributes.getValue(type)
+                let consume = currentValue * 3
 
-        access(all) view
-        fun borrowStatus(): &UnitStatus {
-            return &self.status
-        }
+                // consume potentiality
+                self.potentialityUsed = self.potentialityUsed + UInt64(consume)
 
-        access(Manage) view
-        fun borrowCollection(): auth(Manage) &EntryCollection {
-            return &self.collection
+                // upgrade attribute
+                attributes.addValue(type, 1)
+
+                toUpgrade = toUpgrade - 1
+            }
+
+            emit PawnAttributeUpgraded(
+                self.owner?.address ?? panic("Owner not found"),
+                type.rawValue,
+                amount,
+                uuid: self.uuid
+            )
         }
     }
 
     // The Pawn resource is refered to as the character in the game.
-    access(all) resource Pawn: CreatureInterface, UnitCollectionCarrier, BioCarrier {
-        // The cultivable property of the character
-        access(all) let cultivable: @CultivableProperty
+    access(all) resource Pawn: CreatureInterface, BioCarrier, PlayableUnit, CultivableUnit {
+        access(contract) let library: Address
+        // Initial defence(will not be changed after initialization)
+        access(self) let initDefence: Defence
+        // Initial potentiality(will not be changed after initialization)
+        access(self) let initPotentiality: Potentiality
+
+        // --- Status Properties ---
+
+        // The merged status of the character
+        access(all) let status: UnitStatus
+        // The health of the character, can be damaged
+        access(all) var health: Attributes
+
+        // --- Cultivable Property ---
+
+        // The potentiality used by the character
+        access(all) var potentialityUsed: UInt64
+        // The potentiality obtained by the character
+        access(all) var potentialityObtained: UInt64
+
+        // Cultivable attributes, can be upgraded by potentiality
+        access(all) let attributes: Attributes
+
+        // The collection of the character
+        access(all) let collection: @EntryCollection
+
+        // --- Settings ---
+
         // The settings of the character
         access(all) let settings: {CreatureSettings: Int64}
         // The bio prompts of the character
@@ -1970,16 +2104,37 @@ access(all) contract FGameMishal {
             itemAmounts: {String: UFix64},
             bioPrompts: [String]
         ) {
+            self.library = library
             self.settings = {}
             self.bioPrompts = bioPrompts
-            self.cultivable <- create CultivableProperty(library)
+
+            let lib = FGameMishal.borrowLibrary(library) ?? panic("Library not found")
+            let initPtt = lib.settings[LibrarySettings.INIT_POTENTIALITY] ?? 36
+            let initDef = lib.settings[LibrarySettings.INIT_DEFENCE_VALUE] ?? 0
+            let initAttr = lib.settings[LibrarySettings.INIT_ATTRIBUTE_VALUE] ?? 3
+
+            self.initDefence = Defence(physical: initDef, endurance: initDef, resistance: initDef)
+            self.initPotentiality = Potentiality(initial: initPtt)
+            self.attributes = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
+
+            self.status = UnitStatus(
+                attributes: self.attributes,
+                defence: self.initDefence,
+                potentiality: self.initPotentiality
+            )
+            self.health = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
+
+            self.potentialityUsed = 0
+            self.potentialityObtained = 0
+
+            self.collection <- create EntryCollection()
 
             assert(shape.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
-            self.cultivable.collection.deposit(entry: <-create FungibleEntry(identifier: shape, amount: 1.0))
+            self.collection.deposit(entry: <-create FungibleEntry(identifier: shape, amount: 1.0))
 
             for featureIdentifier in features {
                 assert(featureIdentifier.verify(LibraryCategory.FEATURE), message: "Feature identifier is invalid")
-                self.cultivable.collection.deposit(entry: <-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
+                self.collection.deposit(entry: <-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
             }
 
             if items.length > 0 {
@@ -1988,44 +2143,54 @@ access(all) contract FGameMishal {
                     assert(itemIdentifier.verify(LibraryCategory.ITEM), message: "Item identifier is invalid")
                     let id = itemIdentifier.getStringID()
                     let amount = itemAmounts[id] ?? 0.0
-                    self.cultivable.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
+                    self.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
                 }
             }
 
             self.applyStatus()
         }
 
+        // ---- Interface Implementation ----
+
         access(all) view
         fun borrowSelfAttributes(): &Attributes {
-            return self.cultivable.borrowAttributes()
+            return self.borrowCultivableAttributes()
+        }
+
+        access(Manage) view
+        fun borrowCultivableAttributes(): auth(Mutate) &Attributes {
+            return &self.attributes
         }
 
         access(all) view
         fun borrowSelfDefence(): &Defence {
-            return self.cultivable.borrowDefence()
+            return &self.initDefence
         }
 
         access(all) view
         fun borrowSelfPotentiality(): &Potentiality {
-            return self.cultivable.borrowPotentiality()
+            return &self.initPotentiality
         }
 
         access(all) view
         fun borrowStatus(): &UnitStatus {
-            return self.cultivable.borrowStatus()
+            return &self.status
         }
 
         access(Manage) view
         fun borrowCollection(): auth(Manage) &EntryCollection {
-            return self.cultivable.borrowCollection()
+            return &self.collection
         }
 
         access(Manage) view
         fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
-            return self.cultivable.borrowStatus().borrowWritableSlotsOccupied()
+            return self.status.borrowWritableSlotsOccupied()
         }
 
-        // ---- Pawn Cultivable Functions ----
+        access(Manage) view
+        fun borrowHealth(): auth(Mutate) &Attributes {
+            return &self.health
+        }
     }
 
     // ---- Public Functions ----
