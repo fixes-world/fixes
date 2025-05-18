@@ -16,8 +16,12 @@ import "FixesHeartbeat"
 access(all) contract FGameMishal {
     // Entitlements for the Editor role
     access(all) entitlement Editor;
-    // Entitlements for the Manage role (Like the host of the game)
-    access(all) entitlement Manage;
+    // Entitlements for the Creator role (Like the creator of the game)
+    access(all) entitlement Creator;
+    // Entitlements for the Host role (Like the host of the game)
+    access(all) entitlement Host;
+    // Entitlements for the Player role (Like the player of the game)
+    access(all) entitlement Player; // Not used for now
 
     // ----- Events -----
 
@@ -41,6 +45,8 @@ access(all) contract FGameMishal {
     access(all) event PawnHealthReset(_ owner: Address?, _ strength: Int64, _ vitality: Int64, _ spirit: Int64, uuid: UInt64)
     access(all) event PawnHealthRecovered(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
     access(all) event PawnHealthDamaged(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
+
+    access(all) event PawnPotentialityConsumed(_ owner: Address?, _ consume: UInt64, _ usable: UInt64, _ used: UInt64, uuid: UInt64)
 
     // ----- Contract Level Variables -----
 
@@ -540,7 +546,7 @@ access(all) contract FGameMishal {
         }
 
         /// This method will not check if the value is negative
-        access(Manage)
+        access(Host)
         fun setValue(_ type: AttributeType, _ value: Int64) {
             switch type {
                 case AttributeType.STRENGTH:
@@ -555,7 +561,7 @@ access(all) contract FGameMishal {
         }
 
         // For this method, the final value cannot be negative
-        access(Manage)
+        access(Host)
         fun addValue(_ type: AttributeType, _ value: Int64) {
             post {
                 self.strength >= 0: "Strength cannot be negative"
@@ -628,7 +634,7 @@ access(all) contract FGameMishal {
         }
 
         // This method will not check if the value is negative
-        access(Manage)
+        access(Host)
         fun setValue(_ type: DefenceType, _ value: Int64) {
             switch type {
                 case DefenceType.PHYSICAL:
@@ -724,13 +730,16 @@ access(all) contract FGameMishal {
             return self.value != nil
         }
 
-        access(Manage)
+        access(Host)
         fun setValue(value: UFix64) {
             self.value = value
         }
 
-        access(Manage)
+        access(Host)
         fun addValue(value: UFix64) {
+            post {
+                (self.value ?? 0.0) >= 0.0: "Value cannot be negative"
+            }
             self.value = (self.value ?? 0.0) + value
         }
     }
@@ -743,12 +752,12 @@ access(all) contract FGameMishal {
             return self.effects.length > 0
         }
 
-        access(Manage)
+        access(Host)
         fun addEffect(effect: String) {
             self.effects.append(effect)
         }
 
-        access(Manage)
+        access(Host)
         fun removeEffect(effect: String) {
             if let index = self.effects.firstIndex(of: effect) {
                 let _ = self.effects.remove(at: index)
@@ -1012,7 +1021,7 @@ access(all) contract FGameMishal {
             return self.settings.length > 0
         }
 
-        access(Manage)
+        access(Host)
         fun updateSetting(_ setting: CreatureSettings, _ value: Int64) {
             self.settings[setting] = value
 
@@ -1274,10 +1283,10 @@ access(all) contract FGameMishal {
         access(all) view
         fun borrowEntryByID(_ id: String): &FungibleEntry?
 
-        access(all)
+        access(Creator)
         fun deposit(entry: @FungibleEntry)
 
-        access(Manage)
+        access(Creator)
         fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry
     }
 
@@ -1346,7 +1355,7 @@ access(all) contract FGameMishal {
             return &self.entries[id]
         }
 
-        access(all)
+        access(Creator)
         fun deposit(entry: @FungibleEntry) {
             pre {
                 emit EntryDeposited(
@@ -1372,7 +1381,7 @@ access(all) contract FGameMishal {
             }
         }
 
-        access(Manage)
+        access(Creator)
         fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry {
             post {
                 result.identifier.getStringID() == id: "The ID of the withdrawn token must be the same as the requested ID"
@@ -1404,7 +1413,7 @@ access(all) contract FGameMishal {
             }
         }
 
-        access(Manage) view
+        access(Host) view
         fun borrowEditableEntry(_ id: String): auth(FungibleToken.Withdraw) &FungibleEntry? {
             return &self.entries[id]
         }
@@ -1462,14 +1471,14 @@ access(all) contract FGameMishal {
 
         // --- Item Gameplay Methods ---
 
-        access(Manage)
+        access(Host)
         fun lootItem(_ entry: @FungibleEntry) {
             pre {
                 entry.identifier.verify(LibraryCategory.ITEM): "Entry is not an item"
             }
         }
 
-        access(Manage)
+        access(Host)
         fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
             post {
                 result.identifier.getStringID() == item.getStringID(): "The ID of the withdrawn token must be the same as the requested ID"
@@ -1479,7 +1488,7 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface EquippedItemsCarrier: ItemsCarrier {
-        access(Manage) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]}
+        access(Host) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]}
         access(all) fun getSlotsAll(): {EquipSlot: UInt8}
 
         access(all) view
@@ -1533,7 +1542,7 @@ access(all) contract FGameMishal {
 
         // --- Item Gameplay Methods ---
 
-        access(Manage)
+        access(Host)
         fun lootItem(_ entry: @FungibleEntry) {
             let itemId = entry.identifier
             let itemRef = itemId.borrowItem() ?? panic("Not Exists, Item: ".concat(itemId.getStringID()))
@@ -1545,7 +1554,7 @@ access(all) contract FGameMishal {
             }
         }
 
-        access(Manage)
+        access(Host)
         fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
             if self.hasItemEquipped(item) {
                 self.unequipItem(item)
@@ -1553,7 +1562,7 @@ access(all) contract FGameMishal {
             return <- self.withdraw(item.getStringID(), amount: amount)
         }
 
-        access(Manage)
+        access(Host)
         fun equipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
             let itemId = item.getStringID()
@@ -1584,7 +1593,7 @@ access(all) contract FGameMishal {
             )
         }
 
-        access(Manage)
+        access(Host)
         fun unequipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
             let itemId = item.getStringID()
@@ -1631,55 +1640,60 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface UnitCollectionBaseCarrier: AbilitiesCarrier, ItemsCarrier, ShapeCarrier {
-        access(Manage) view fun borrowCollection(): auth(Manage) &EntryCollection
+        access(contract) view fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection
 
         // --- Implement EntryContainer ---
 
+        // Only Creator can borrow the collection
+        access(all) view fun borrowReadonlyCollection(): &EntryCollection {
+            return self.borrowWritableCollection()
+        }
+
         access(all) view fun borrowEntryByID(_ id: String): &FungibleEntry? {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             return collection.borrowEntryByID(id)
         }
 
-        access(all)
+        access(Creator)
         fun deposit(entry: @FungibleEntry) {
-            self.borrowCollection().deposit(entry: <-entry)
+            self.borrowWritableCollection().deposit(entry: <-entry)
         }
 
-        access(Manage)
+        access(Creator)
         fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry {
-            return <- self.borrowCollection().withdraw(id, amount: amount)
+            return <- self.borrowWritableCollection().withdraw(id, amount: amount)
         }
 
         // --- Implement AbilitiesCarrier ---
 
         access(all) view fun getAbilitiesLength(): Int {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             return collection.getLengthByCategory(LibraryCategory.ABILITY)
         }
 
         access(all)
         fun getAbilityIdentifiers(): [EntryIdentifier] {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             return collection.getEntryIdentifiers(LibraryCategory.ABILITY)
         }
 
         // --- Implement ItemsCarrier ---
 
         access(all) view fun getItemsLength(): Int {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             return collection.getLengthByCategory(LibraryCategory.ITEM)
         }
 
         access(all)
         fun borrowItemEntries(): [&FungibleEntry] {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             return collection.borrowEntries(LibraryCategory.ITEM)
         }
 
         // --- Implement ShapeCarrier ---
 
         access(all) view fun borrowShape(): &Shape? {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             let shape = collection.getKeysByCategory(LibraryCategory.SHAPE)
             if shape.length > 0 {
                 if let entry = collection.borrowEntryByID(shape[0]) {
@@ -1752,19 +1766,19 @@ access(all) contract FGameMishal {
 
         // ---- Implement UnitCollectionBaseCarrier ----
 
-        access(Manage) view
-        fun borrowCollection(): auth(Manage) &EntryCollection {
+        access(contract) view
+        fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection {
             return &self.collection
         }
 
         // ---- Implement Item Gameplay Methods ----
 
-        access(Manage)
+        access(Host)
         fun lootItem(_ entry: @FungibleEntry) {
             self.deposit(entry: <-entry)
         }
 
-        access(Manage)
+        access(Host)
         fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
             return <- self.withdraw(item.getStringID(), amount: amount)
         }
@@ -1796,13 +1810,13 @@ access(all) contract FGameMishal {
 
     access(all) resource interface UnitCollectionCarrier: UnitCollectionBaseCarrier, FeaturesCarrier {
         access(all) view fun getFeaturesLength(): Int {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             return collection.getLengthByCategory(LibraryCategory.FEATURE)
         }
 
         access(all)
         fun getFeatureIdentifiers(): [EntryIdentifier] {
-            let collection = self.borrowCollection()
+            let collection = self.borrowReadonlyCollection()
             return collection.getEntryIdentifiers(LibraryCategory.FEATURE)
         }
     }
@@ -1815,7 +1829,7 @@ access(all) contract FGameMishal {
             return &self.bioPrompts
         }
 
-        access(Manage)
+        access(Host)
         fun addBioPrompt(_ prompt: String) {
             self.bioPrompts.append(prompt)
         }
@@ -2039,12 +2053,12 @@ access(all) contract FGameMishal {
             return &self.basePotentiality
         }
 
-        access(Manage) view
-        fun borrowCollection(): auth(Manage) &EntryCollection {
+        access(contract) view
+        fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection {
             return &self.collection
         }
 
-        access(Manage) view
+        access(Host) view
         fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
             return self.status.borrowWritableSlotsOccupied()
         }
@@ -2053,7 +2067,7 @@ access(all) contract FGameMishal {
     // ------------ Player ------------
 
     access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
-        access(Manage) view fun borrowHealth(): auth(Mutate) &Attributes
+        access(Host) view fun borrowHealth(): auth(Mutate) &Attributes
 
         // ---- Gameplay Methods, Read ---
 
@@ -2071,7 +2085,7 @@ access(all) contract FGameMishal {
 
         // ---- Gameplay Methods, Write ---
 
-        access(Manage)
+        access(Host)
         fun resetHealth() {
             let health = self.borrowHealth()
             let status = self.borrowStatus()
@@ -2089,7 +2103,7 @@ access(all) contract FGameMishal {
             )
         }
 
-        access(Manage)
+        access(Host)
         fun recoverHealth(_ type: AttributeType, _ amount: Int64) {
             let health = self.borrowHealth()
             let status = self.borrowStatus()
@@ -2112,7 +2126,7 @@ access(all) contract FGameMishal {
             )
         }
 
-        access(Manage)
+        access(Host)
         fun damageHealth(
             _ attacks: {AttackType: Int64},
             _ penetration: Int64,
@@ -2153,10 +2167,12 @@ access(all) contract FGameMishal {
         access(all) var potentialityUsed: UInt64
         // The potentiality obtained by the character
         access(all) var potentialityObtained: UInt64
+        // The cultivation of the character
+        access(all) var cultivation: {String: UInt64}
 
         // ---- Interface ----
 
-        access(Manage) view fun borrowCultivableAttributes(): auth(Mutate) &Attributes
+        access(Host) view fun borrowCultivableAttributes(): auth(Mutate) &Attributes
 
         // ---- Cultivable Methods, Read ----
 
@@ -2164,19 +2180,6 @@ access(all) contract FGameMishal {
         fun getUsablePotentiality(): UInt64 {
             let status = self.borrowStatus()
             return UInt64(status.potentiality.initial) + self.potentialityObtained - self.potentialityUsed
-        }
-
-        // --- Cultivable Methods, Write ---
-
-        access(Manage)
-        fun gainPotentiality(_ amount: UInt64) {
-            self.potentialityObtained = self.potentialityObtained + amount
-
-            emit PawnPotentialityGained(
-                self.owner?.address ?? panic("Owner not found"),
-                amount,
-                uuid: self.uuid
-            )
         }
 
         access(all) view
@@ -2188,7 +2191,20 @@ access(all) contract FGameMishal {
             return Int64(unusedPotentiality) >= 3 * currentValue
         }
 
-        access(Manage)
+        // --- Cultivable Methods - Attribute, Write ---
+
+        access(Host)
+        fun gainPotentiality(_ amount: UInt64) {
+            self.potentialityObtained = self.potentialityObtained + amount
+
+            emit PawnPotentialityGained(
+                self.owner?.address ?? panic("Owner not found"),
+                amount,
+                uuid: self.uuid
+            )
+        }
+
+        access(Host)
         fun upgradeAttribute(_ type: AttributeType, _ amount: UInt64) {
             let attributes = self.borrowCultivableAttributes()
 
@@ -2197,10 +2213,8 @@ access(all) contract FGameMishal {
                 assert(self.canUpgradeAttribute(type), message: "Not enough potentiality to upgrade attribute")
                 // consume potentiality = 3 x current attribute value
                 let currentValue = attributes.getValue(type)
-                let consume = currentValue * 3
-
                 // consume potentiality
-                self.potentialityUsed = self.potentialityUsed + UInt64(consume)
+                self.consumePotentiality(UInt64(currentValue * 3))
 
                 // upgrade attribute
                 attributes.addValue(type, 1)
@@ -2212,6 +2226,74 @@ access(all) contract FGameMishal {
                 self.owner?.address ?? panic("Owner not found"),
                 type.rawValue,
                 amount,
+                uuid: self.uuid
+            )
+        }
+
+        // --- Cultivable Methods - Ability, Read ---
+
+        access(all) view
+        fun getCultivationLevel(_ ability: EntryIdentifier): UInt64 {
+            return self.cultivation[ability.getStringID()] ?? 0
+        }
+
+        access(all)
+        fun getAbilitiesOccupiedAttributes(): Attributes {
+            let occupied = Attributes(strength: 0, vitality: 0, spirit: 0)
+            let ownedAbilities = self.borrowAbilities()
+
+            for abilityRef in ownedAbilities {
+                occupied.addValue(AttributeType.STRENGTH, abilityRef.occupy.strength)
+                occupied.addValue(AttributeType.VITALITY, abilityRef.occupy.vitality)
+                occupied.addValue(AttributeType.SPIRIT, abilityRef.occupy.spirit)
+            }
+
+            return occupied
+        }
+
+        // --- Cultivable Methods - Ability, Write ---
+
+        access(Host)
+        fun gainAbility(_ ability: @FungibleEntry) {
+            pre {
+                ability.identifier.verify(LibraryCategory.ABILITY): "Ability identifier is invalid"
+            }
+            let itemId = ability.identifier.getStringID()
+            self.cultivation[itemId] = 0
+
+            let abilityRef = ability.identifier.borrowAbility() ?? panic("Not Exists, Ability: ".concat(itemId))
+
+            // Consume potentiality = 3 x ability level
+            self.consumePotentiality(abilityRef.level * 3)
+
+            // Check ability occupied value
+        }
+
+        access(Host)
+        fun dropAbility(_ ability: EntryIdentifier): @FungibleEntry {
+            post {
+                result.identifier.getStringID() == ability.getStringID(): "The ID of the withdrawn token must be the same as the requested ID"
+            }
+            // TODO
+        }
+
+        // --- Cultivable Methods - Potentiality, Write ---
+
+        access(contract)
+        fun consumePotentiality(_ consume: UInt64) {
+            pre {
+                self.getUsablePotentiality() >= consume: "Not enough potentiality to consume, consume: "
+                    .concat(consume.toString())
+                    .concat(", usable: ")
+                    .concat(self.getUsablePotentiality().toString())
+            }
+            self.potentialityUsed = self.potentialityUsed + consume
+
+            emit PawnPotentialityConsumed(
+                self.owner?.address ?? panic("Owner not found"),
+                consume,
+                self.getUsablePotentiality(),
+                self.potentialityUsed,
                 uuid: self.uuid
             )
         }
@@ -2238,6 +2320,8 @@ access(all) contract FGameMishal {
         access(all) var potentialityUsed: UInt64
         // The potentiality obtained by the character
         access(all) var potentialityObtained: UInt64
+        // The cultivation of the character
+        access(all) var cultivation: {String: UInt64}
 
         // Cultivable attributes, can be upgraded by potentiality
         access(all) let attributes: Attributes
@@ -2282,6 +2366,7 @@ access(all) contract FGameMishal {
 
             self.potentialityUsed = 0
             self.potentialityObtained = 0
+            self.cultivation = {}
 
             self.collection <- create EntryCollection()
 
@@ -2313,7 +2398,7 @@ access(all) contract FGameMishal {
             return self.borrowCultivableAttributes()
         }
 
-        access(Manage) view
+        access(Host) view
         fun borrowCultivableAttributes(): auth(Mutate) &Attributes {
             return &self.attributes
         }
@@ -2333,17 +2418,17 @@ access(all) contract FGameMishal {
             return &self.status
         }
 
-        access(Manage) view
-        fun borrowCollection(): auth(Manage) &EntryCollection {
+        access(contract) view
+        fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection {
             return &self.collection
         }
 
-        access(Manage) view
+        access(Host) view
         fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
             return self.status.borrowWritableSlotsOccupied()
         }
 
-        access(Manage) view
+        access(Host) view
         fun borrowHealth(): auth(Mutate) &Attributes {
             return &self.health
         }
