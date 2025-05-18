@@ -1750,16 +1750,14 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface BioCarrier {
-        access(all) let bioPrompts: [String]
+        access(Host) view fun borrowWritableBioPrompts(): auth(Mutate) &[String]
 
-        access(all) view
-        fun borrowBioPrompts(): &[String] {
-            return &self.bioPrompts
-        }
+        access(all) view fun borrowBioPrompts(): &[String] { return self.borrowWritableBioPrompts() }
 
         access(Host)
         fun addBioPrompt(_ prompt: String) {
-            self.bioPrompts.append(prompt)
+            let prompts = self.borrowWritableBioPrompts()
+            prompts.append(prompt)
         }
     }
 
@@ -2018,7 +2016,7 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource Creature: Nameable, CreatureInterface, UnitCollectionCarrier, StaticUnitCollectionCarrier, BioCarrier {
+    access(all) resource Creature: Nameable, BioCarrier, CreatureInterface, UnitCollectionCarrier, StaticUnitCollectionCarrier {
         access(all) let name: String
         access(all) let tags: [String]
         access(all) let collection: @EntryCollection
@@ -2114,12 +2112,9 @@ access(all) contract FGameMishal {
             return self.status.borrowWritableSlotsOccupied()
         }
 
-        // ---- Implement Feature Gameplay Methods ----
-
-        // This is static, so we don't need to apply it for now
-        access(Host)
-        fun applyFeature(_ feature: @FungibleEntry) {
-            self.collection.deposit(entry: <- feature)
+        access(Host) view
+        fun borrowWritableBioPrompts(): auth(Mutate) &[String] {
+            return &self.bioPrompts
         }
     }
 
@@ -2561,6 +2556,11 @@ access(all) contract FGameMishal {
         }
 
         // ---- Interface Implementation ----
+
+        access(Host) view
+        fun borrowWritableBioPrompts(): auth(Mutate) &[String] {
+            return &self.bioPrompts
+        }
 
         access(all) view
         fun borrowSelfAttributes(): &Attributes {
