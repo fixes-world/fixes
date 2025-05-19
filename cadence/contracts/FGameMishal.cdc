@@ -2403,6 +2403,9 @@ access(all) contract FGameMishal {
             // borrow the feature
             let featureRef = feature.identifier.borrowFeature() ?? panic("Not Exists, Feature: ".concat(feature.identifier.getStringID()))
 
+            // apply the feature to the collection
+            self.deposit(entry: <- feature)
+
             // generate the abilities and items from the feature
             let abilitiesFromFeature = featureRef.getAbilityIdentifiers()
             for abilityIdentifier in abilitiesFromFeature {
@@ -2414,9 +2417,6 @@ access(all) contract FGameMishal {
             for itemEntry in itemsFromFeature {
                 self.lootItem(<- create FungibleEntry(identifier: itemEntry.identifier.clone(), amount: itemEntry.balance))
             }
-
-            // apply the feature to the collection
-            self.deposit(entry: <- feature)
         }
 
         // ---- Equipable Item Gameplay Methods ----
@@ -2584,16 +2584,21 @@ access(all) contract FGameMishal {
 
             let abilityRef = ability.identifier.borrowAbility() ?? panic("Not Exists, Ability: ".concat(itemId))
 
-            // Consume potentiality = 3 x ability level
-            self.consumePotentiality(abilityRef.level * 3)
+            // check if the ability is fixed
+            let fixedAbilities = self.getFixedAbilities()
+            // For fixed abilities, we don't consume potentiality
+            if fixedAbilities[itemId] != true {
+                // Consume potentiality = 3 x ability level
+                self.consumePotentiality(abilityRef.level * 3)
 
-            let status = self.borrowStatus()
-            // Check ability occupied value
-            if let attributeToOccupy = abilityRef.occupy {
-                let occupied = self.getAbilitiesOccupiedAttributes()
-                let currentAttr = status.attributes.getValue(attributeToOccupy)
-                let occupiedAttr = occupied.getValue(attributeToOccupy)
-                assert(occupiedAttr + Int64(abilityRef.level) <= currentAttr, message: "Attribute is full")
+                let status = self.borrowStatus()
+                // Check ability occupied value
+                if let attributeToOccupy = abilityRef.occupy {
+                    let occupied = self.getAbilitiesOccupiedAttributes()
+                    let currentAttr = status.attributes.getValue(attributeToOccupy)
+                    let occupiedAttr = occupied.getValue(attributeToOccupy)
+                    assert(occupiedAttr + Int64(abilityRef.level) <= currentAttr, message: "Attribute is full")
+                }
             }
 
             // Add ability to collection
@@ -2688,6 +2693,7 @@ access(all) contract FGameMishal {
             features: [EntryIdentifier],
             items: [EntryIdentifier],
             itemAmounts: {String: UFix64},
+            abilities: [EntryIdentifier],
             bioPrompts: [String]
         ) {
             self.library = library
@@ -2709,6 +2715,12 @@ access(all) contract FGameMishal {
             for item in items {
                 let itemId = item.getStringID()
                 itemAmountsToApply[itemId] = itemAmounts[itemId] ?? 0.0
+            }
+
+            let abilitiesToApply = abilities
+            let abilitiesDict: {String: Bool} = {}
+            for ability in abilities {
+                abilitiesDict[ability.getStringID()] = true
             }
 
             // Apply the template if it exists
@@ -2734,6 +2746,15 @@ access(all) contract FGameMishal {
                     if featuresDict[featureId] == nil {
                         featuresToApply.append(feature)
                         featuresDict[featureId] = true
+                    }
+                }
+
+                // Extract template's Abilities
+                let templateAbilities = creature.getAbilityIdentifiers()
+                for ability in templateAbilities {
+                    let abilityId = ability.getStringID()
+                    if abilitiesDict[abilityId] == nil {
+                        abilitiesToApply.append(ability)
                     }
                 }
 
@@ -2768,7 +2789,6 @@ access(all) contract FGameMishal {
                 self.initDefence = Defence(physical: initDef, endurance: initDef, resistance: initDef)
                 self.initPotentiality = Potentiality(initial: initPtt)
                 self.attributes = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
-
             }
 
             // Initialize the status and health, but it will be reset later
@@ -2792,6 +2812,10 @@ access(all) contract FGameMishal {
 
             for featureIdentifier in featuresToApply {
                 self.applyFeature(<-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
+            }
+
+            for abilityIdentifier in abilitiesToApply {
+                self.gainAbility(<-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
             }
 
             if itemsToApply.length > 0 {
