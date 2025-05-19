@@ -910,243 +910,6 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource Object: DefenceCarrier, ValueCarrier, Nameable {
-        access(all) let name: String
-        access(all) let tags: [String]
-        // The defence of the character
-        access(all) let defence: Defence
-        // The value of the object
-        access(all) var value: UFix64?
-
-        view init(
-            name: String,
-            tags: [String],
-            defence: Defence,
-            value: UFix64?
-        ) {
-            self.name = name
-            self.tags = tags
-            self.defence = defence
-            self.value = value
-        }
-
-        access(all) view fun borrowDefence(): &Defence? {
-            return &self.defence as &Defence
-        }
-    }
-
-    access(all) resource Item: OptionalStatusCarrier, ValueCarrier, EffectsCarrier, Nameable {
-        access(all) let name: String
-        access(all) let tags: [String]
-        // The value of the item
-        access(all) var value: UFix64?
-        // Main attributes of the character
-        access(all) let attributes: Attributes?
-        // The defence of the character
-        access(all) let defence: Defence?
-        // The potentiality of the item
-        access(all) let potentiality: Potentiality?
-        // The effects of the item
-        access(all) let effects: [String]
-        // The slots occupied by the item
-        access(all) let slotsOccupied: {EquipSlot: UInt8}
-        // The slots provided by the item
-        access(all) let slotsProvided: {EquipSlot: UInt8}
-
-        view init(
-            name: String,
-            tags: [String],
-            value: UFix64?,
-            attributes: Attributes?,
-            defence: Defence?,
-            potentiality: Potentiality?,
-            effects: [String],
-            slotsOccupied: {EquipSlot: UInt8},
-            slotsProvided: {EquipSlot: UInt8},
-        ) {
-            self.name = name
-            self.tags = tags
-            self.value = value
-            self.attributes = attributes
-            self.defence = defence
-            self.potentiality = potentiality
-            self.effects = effects
-            self.slotsOccupied = slotsOccupied
-            self.slotsProvided = slotsProvided
-        }
-
-        access(all) view
-        fun isEquippable(): Bool {
-            return self.slotsOccupied.length > 0
-        }
-
-        access(all) view
-        fun isProvidedSlots(): Bool {
-            return self.slotsProvided.length > 0
-        }
-    }
-
-    access(all) resource Ability: AttributeCarrier, EffectsCarrier, Nameable {
-        access(all) let name: String
-        access(all) let tags: [String]
-        access(all) let level: UInt64
-        access(all) let occupy: AttributeType?
-        access(all) let effects: [String]
-        access(all) let attributes: Attributes?
-
-        view init(
-            level: UInt64,
-            name: String,
-            tags: [String],
-            occupy: AttributeType?,
-            effects: [String],
-            attributes: Attributes?,
-        ) {
-            self.name = name
-            self.tags = tags
-            self.level = level
-            self.occupy = occupy
-            self.effects = effects
-            self.attributes = attributes
-        }
-
-        access(all) view fun borrowAttributes(): &Attributes? {
-            return &self.attributes
-        }
-    }
-
-    // The CreatureSettingsCarrier resource interface is used to get the settings of the creature.
-    access(all) resource interface CreatureSettingsCarrier {
-        access(all) let settings: {CreatureSettings: Int64}
-
-        access(all) view
-        fun getSetting(_ setting: CreatureSettings): Int64? {
-            return self.settings[setting]
-        }
-
-        access(all) view
-        fun hasSettings(): Bool {
-            return self.settings.length > 0
-        }
-
-        access(Host)
-        fun updateSetting(_ setting: CreatureSettings, _ value: Int64) {
-            self.settings[setting] = value
-
-            emit CreatureSettingUpdated(
-                self.getType().identifier,
-                self.uuid,
-                setting.rawValue,
-                value
-            )
-        }
-    }
-
-    access(all) resource Shape: CreatureSettingsCarrier, Nameable {
-        access(all) let name: String
-        access(all) let tags: [String]
-        access(all) let settings: {CreatureSettings: Int64}
-        access(all) let slotsAvailable: {EquipSlot: UInt8}
-
-        view init(
-            name: String,
-            tags: [String],
-            bodySize: Int64,
-            occupyRange: Int64,
-            moveSpeed: Int64,
-            perceptionRange: Int64,
-            slotsAvailable: {EquipSlot: UInt8 }
-        ) {
-            self.name = name
-            self.tags = tags
-            self.settings = {}
-            self.slotsAvailable = slotsAvailable
-
-            self.settings[CreatureSettings.SIZE] = bodySize
-            self.settings[CreatureSettings.MOVE_SPEED] = moveSpeed
-            self.settings[CreatureSettings.PERCEPTION_RANGE] = perceptionRange
-            self.settings[CreatureSettings.OCCUPY_RANGE] = occupyRange
-        }
-    }
-
-    // The ShapeCarrier resource interface is used to get the shape of the creature.
-    access(all) resource interface ShapeCarrier: CreatureSettingsCarrier {
-        access(all) let settings: {CreatureSettings: Int64}
-
-        access(all) view fun borrowShape(): &Shape?
-
-        access(all) view
-        fun hasShape(): Bool {
-            return self.borrowShape() != nil
-        }
-
-        access(all) view
-        fun getGender(): Int64? {
-            if let gender = self.settings[CreatureSettings.GENDER] {
-                return gender
-            }
-            if let shape = self.borrowShape() {
-                return shape.getSetting(CreatureSettings.GENDER)
-            }
-            return nil
-        }
-
-        access(all) view
-        fun getForm(): Int64? {
-            if let form = self.settings[CreatureSettings.FORM] {
-                return form
-            }
-            if let shape = self.borrowShape() {
-                return shape.getSetting(CreatureSettings.FORM)
-            }
-            return nil
-        }
-
-        access(all) view
-        fun getSize(): Int64? {
-            if let size = self.settings[CreatureSettings.SIZE] {
-                return size
-            }
-            if let shape = self.borrowShape() {
-                return shape.getSetting(CreatureSettings.SIZE)
-            }
-            return nil
-        }
-
-        access(all) view
-        fun getMoveSpeed(): Int64? {
-            if let moveSpeed = self.settings[CreatureSettings.MOVE_SPEED] {
-                return moveSpeed
-            }
-            if let shape = self.borrowShape() {
-                return shape.getSetting(CreatureSettings.MOVE_SPEED)
-            }
-            return nil
-        }
-
-        access(all) view
-        fun getPerceptionRange(): Int64? {
-            if let perceptionRange = self.settings[CreatureSettings.PERCEPTION_RANGE] {
-                return perceptionRange
-            }
-            if let shape = self.borrowShape() {
-                return shape.getSetting(CreatureSettings.PERCEPTION_RANGE)
-            }
-            return nil
-        }
-
-        access(all) view
-        fun getOccupyRange(): Int64? {
-            if let occupyRange = self.settings[CreatureSettings.OCCUPY_RANGE] {
-                return occupyRange
-            }
-            if let shape = self.borrowShape() {
-                return shape.getSetting(CreatureSettings.OCCUPY_RANGE)
-            }
-            return nil
-        }
-    }
-
     // The EntryIdentifier resource is used to identify the entry.
     access(all) struct EntryIdentifier {
         access(all) let library: Address
@@ -1432,6 +1195,253 @@ access(all) contract FGameMishal {
         }
     }
 
+    // The Object resource represents a static, non-playable object in the game
+    access(all) resource Object: DefenceCarrier, ValueCarrier, Nameable {
+        access(all) let name: String
+        access(all) let tags: [String]
+        // The defence of the character
+        access(all) let defence: Defence
+        // The value of the object
+        access(all) var value: UFix64?
+
+        view init(
+            name: String,
+            tags: [String],
+            defence: Defence,
+            value: UFix64?
+        ) {
+            self.name = name
+            self.tags = tags
+            self.defence = defence
+            self.value = value
+        }
+
+        access(all) view fun borrowDefence(): &Defence? {
+            return &self.defence as &Defence
+        }
+    }
+
+    access(all) resource Item: OptionalStatusCarrier, ValueCarrier, EffectsCarrier, Nameable {
+        access(all) let name: String
+        access(all) let tags: [String]
+        // The value of the item
+        access(all) var value: UFix64?
+        // Main attributes of the character
+        access(all) let attributes: Attributes?
+        // The defence of the character
+        access(all) let defence: Defence?
+        // The potentiality of the item
+        access(all) let potentiality: Potentiality?
+        // The effects of the item
+        access(all) let effects: [String]
+        // The slots occupied by the item
+        access(all) let slotsOccupied: {EquipSlot: UInt8}
+        // The slots provided by the item
+        access(all) let slotsProvided: {EquipSlot: UInt8}
+
+        view init(
+            name: String,
+            tags: [String],
+            value: UFix64?,
+            attributes: Attributes?,
+            defence: Defence?,
+            potentiality: Potentiality?,
+            effects: [String],
+            slotsOccupied: {EquipSlot: UInt8},
+            slotsProvided: {EquipSlot: UInt8},
+        ) {
+            self.name = name
+            self.tags = tags
+            self.value = value
+            self.attributes = attributes
+            self.defence = defence
+            self.potentiality = potentiality
+            self.effects = effects
+            self.slotsOccupied = slotsOccupied
+            self.slotsProvided = slotsProvided
+        }
+
+        access(all) view
+        fun isEquippable(): Bool {
+            return self.slotsOccupied.length > 0
+        }
+
+        access(all) view
+        fun isProvidedSlots(): Bool {
+            return self.slotsProvided.length > 0
+        }
+    }
+
+    access(all) resource Ability: AttributeCarrier, EffectsCarrier, Nameable {
+        access(all) let name: String
+        access(all) let tags: [String]
+        access(all) let level: UInt64
+        access(all) let occupy: AttributeType?
+        access(all) let effects: [String]
+        access(all) let attributes: Attributes?
+
+        view init(
+            level: UInt64,
+            name: String,
+            tags: [String],
+            occupy: AttributeType?,
+            effects: [String],
+            attributes: Attributes?,
+        ) {
+            self.name = name
+            self.tags = tags
+            self.level = level
+            self.occupy = occupy
+            self.effects = effects
+            self.attributes = attributes
+        }
+
+        access(all) view fun borrowAttributes(): &Attributes? {
+            return &self.attributes
+        }
+    }
+
+    // The CreatureSettingsCarrier resource interface is used to get the settings of the creature.
+    access(all) resource interface CreatureSettingsCarrier {
+        access(all) let settings: {CreatureSettings: Int64}
+
+        access(all) view
+        fun getSetting(_ setting: CreatureSettings): Int64? {
+            return self.settings[setting]
+        }
+
+        access(all) view
+        fun hasSettings(): Bool {
+            return self.settings.length > 0
+        }
+
+        access(Host)
+        fun updateSetting(_ setting: CreatureSettings, _ value: Int64) {
+            self.settings[setting] = value
+
+            emit CreatureSettingUpdated(
+                self.getType().identifier,
+                self.uuid,
+                setting.rawValue,
+                value
+            )
+        }
+    }
+
+    access(all) resource Shape: CreatureSettingsCarrier, Nameable {
+        access(all) let name: String
+        access(all) let tags: [String]
+        access(all) let settings: {CreatureSettings: Int64}
+        access(all) let slotsAvailable: {EquipSlot: UInt8}
+
+        view init(
+            name: String,
+            tags: [String],
+            bodySize: Int64,
+            occupyRange: Int64,
+            moveSpeed: Int64,
+            perceptionRange: Int64,
+            slotsAvailable: {EquipSlot: UInt8 }
+        ) {
+            self.name = name
+            self.tags = tags
+            self.settings = {}
+            self.slotsAvailable = slotsAvailable
+
+            self.settings[CreatureSettings.SIZE] = bodySize
+            self.settings[CreatureSettings.MOVE_SPEED] = moveSpeed
+            self.settings[CreatureSettings.PERCEPTION_RANGE] = perceptionRange
+            self.settings[CreatureSettings.OCCUPY_RANGE] = occupyRange
+        }
+    }
+
+    // The ShapeCarrier resource interface is used to get the shape of the creature.
+    access(all) resource interface ShapeCarrier: CreatureSettingsCarrier, EntryContainer {
+        access(all) let settings: {CreatureSettings: Int64}
+
+        access(all) view fun borrowShape(): &Shape?
+
+        access(all) view
+        fun hasShape(): Bool {
+            return self.borrowShape() != nil
+        }
+
+        access(all) view
+        fun getGender(): Int64? {
+            if let gender = self.settings[CreatureSettings.GENDER] {
+                return gender
+            }
+            if let shape = self.borrowShape() {
+                return shape.getSetting(CreatureSettings.GENDER)
+            }
+            return nil
+        }
+
+        access(all) view
+        fun getForm(): Int64? {
+            if let form = self.settings[CreatureSettings.FORM] {
+                return form
+            }
+            if let shape = self.borrowShape() {
+                return shape.getSetting(CreatureSettings.FORM)
+            }
+            return nil
+        }
+
+        access(all) view
+        fun getSize(): Int64? {
+            if let size = self.settings[CreatureSettings.SIZE] {
+                return size
+            }
+            if let shape = self.borrowShape() {
+                return shape.getSetting(CreatureSettings.SIZE)
+            }
+            return nil
+        }
+
+        access(all) view
+        fun getMoveSpeed(): Int64? {
+            if let moveSpeed = self.settings[CreatureSettings.MOVE_SPEED] {
+                return moveSpeed
+            }
+            if let shape = self.borrowShape() {
+                return shape.getSetting(CreatureSettings.MOVE_SPEED)
+            }
+            return nil
+        }
+
+        access(all) view
+        fun getPerceptionRange(): Int64? {
+            if let perceptionRange = self.settings[CreatureSettings.PERCEPTION_RANGE] {
+                return perceptionRange
+            }
+            if let shape = self.borrowShape() {
+                return shape.getSetting(CreatureSettings.PERCEPTION_RANGE)
+            }
+            return nil
+        }
+
+        access(all) view
+        fun getOccupyRange(): Int64? {
+            if let occupyRange = self.settings[CreatureSettings.OCCUPY_RANGE] {
+                return occupyRange
+            }
+            if let shape = self.borrowShape() {
+                return shape.getSetting(CreatureSettings.OCCUPY_RANGE)
+            }
+            return nil
+        }
+
+        // --- Gameplay Methods ---
+
+        access(Host)
+        fun applyShape(_ shape: @FungibleEntry) {
+            pre {
+                shape.identifier.verify(LibraryCategory.SHAPE): "Shape identifier is invalid"
+            }
+        }
+    }
+
     access(all) resource interface AbilitiesCarrier: EntryContainer {
         access(all) view fun getAbilitiesLength(): Int
         access(all) fun getAbilityIdentifiers(): [EntryIdentifier]
@@ -1517,15 +1527,20 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource interface UnitCollectionBaseCarrier: AbilitiesCarrier, ItemsCarrier, ShapeCarrier {
-        access(contract) view fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection
+    // This is a resource that can borrow a writable collection
+    access(all) resource interface CollectionContainer {
+        access(contract)
+        view fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection
 
-        // --- Implement EntryContainer ---
-
-        // Only Creator can borrow the collection
-        access(all) view fun borrowReadonlyCollection(): &EntryCollection {
+        access(all) view
+        fun borrowReadonlyCollection(): &EntryCollection {
             return self.borrowWritableCollection()
         }
+    }
+
+    access(all) resource interface UnitCollectionBaseCarrier: AbilitiesCarrier, ItemsCarrier, ShapeCarrier, CollectionContainer {
+
+        // --- Implement EntryContainer ---
 
         access(all) view fun borrowEntryByID(_ id: String): &FungibleEntry? {
             let collection = self.borrowReadonlyCollection()
@@ -1570,6 +1585,7 @@ access(all) contract FGameMishal {
 
         // --- Implement ShapeCarrier ---
 
+        // Borrow the shape of the unit
         access(all) view fun borrowShape(): &Shape? {
             let collection = self.borrowReadonlyCollection()
             let shape = collection.getKeysByCategory(LibraryCategory.SHAPE)
@@ -1580,9 +1596,27 @@ access(all) contract FGameMishal {
             }
             return nil
         }
+
+        // Apply a shape to the unit
+        access(Host)
+        fun applyShape(_ shape: @FungibleEntry) {
+            let collection = self.borrowReadonlyCollection()
+            let shapes = collection.getKeysByCategory(LibraryCategory.SHAPE)
+
+            // if the shape exists, remove it
+            if shapes.length > 0 {
+                for key in shapes {
+                    Burner.burn(<-self.withdraw(key, amount: nil))
+                }
+            }
+
+            // deposit the new shape
+            self.deposit(entry: <-shape)
+        }
     }
 
-    access(all) resource interface StaticCollectionUnit: UnitCollectionBaseCarrier {
+    // This is a resource inteface with a collection resource stored in it
+    access(all) resource interface CollectionContainerUnit: CollectionContainer {
         access(all) let collection: @EntryCollection
 
         // ---- Implement UnitCollectionBaseCarrier ----
@@ -1591,7 +1625,10 @@ access(all) contract FGameMishal {
         fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection {
             return &self.collection
         }
+    }
 
+    // This is a static collection unit that all resource are directly stored in it
+    access(all) resource interface StaticCollectionUnit: UnitCollectionBaseCarrier, CollectionContainerUnit {
         // ---- Implement Item Gameplay Methods ----
 
         access(Host)
@@ -1657,28 +1694,25 @@ access(all) contract FGameMishal {
             self.settings = settings
             self.collection <- create EntryCollection()
 
-            // Set the entries
-
-            // check identifiers
+            // Set the entries for shape, abilities, items
             if shape != nil {
-                assert(shape!.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
-                self.collection.deposit(entry: <-create FungibleEntry(identifier: shape!, amount: 1.0))
+                self.applyShape(<-create FungibleEntry(identifier: shape!, amount: 1.0))
             }
             for abilityIdentifier in abilities {
-                self.collection.deposit(entry: <-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
+                self.gainAbility(<-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
             }
             if items.length > 0 {
                 assert(itemAmounts.length == items.length, message: "Item amounts must be the same length as items")
                 for itemIdentifier in items {
                     let id = itemIdentifier.getStringID()
                     let amount = itemAmounts[id] ?? 0.0
-                    self.collection.deposit(entry: <-create FungibleEntry(identifier: itemIdentifier, amount: amount))
+                    self.lootItem(<-create FungibleEntry(identifier: itemIdentifier, amount: amount))
                 }
             }
         }
     }
 
-    access(all) resource interface FeaturesCarrier {
+    access(all) resource interface FeaturesCarrier: EntryContainer {
         access(all) view fun getFeaturesLength(): Int
         access(all) fun getFeatureIdentifiers(): [EntryIdentifier]
 
@@ -1750,10 +1784,6 @@ access(all) contract FGameMishal {
         ///
         /// @return Reference to the base Potentiality struct.
         access(all) view fun borrowSelfPotentiality(): &Potentiality
-        /// Returns a mutable reference to the slots occupied by equipped items.
-        ///
-        /// @return Mutable reference to the EquipSlot mapping.
-        access(Host) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]}
 
         // ---- Implement ComposableUnitStatusCarrier ----
 
@@ -1888,6 +1918,14 @@ access(all) contract FGameMishal {
             }
 
             return all
+        }
+
+        /// Returns a mutable reference to the slots occupied by equipped items.
+        ///
+        /// @return Mutable reference to the EquipSlot mapping.
+        access(Host) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
+            let status = self.borrowStatus()
+            return status.borrowWritableSlotsOccupied()
         }
 
         /// Checks if a specific item is currently equipped.
@@ -2084,8 +2122,31 @@ access(all) contract FGameMishal {
         }
     }
 
+    // This is a resource that can store bio prompts
+    access(all) resource interface BioPromptsUnit {
+        access(all) let bioPrompts: [String]
+
+        access(Host) view
+        fun borrowWritableBioPrompts(): auth(Mutate) &[String] {
+            return &self.bioPrompts
+        }
+    }
+
+    // This is a resource that can store a merged status
+    access(all) resource interface MergableStatusUnit {
+        access(all) let status: UnitStatus
+
+        /// Returns a reference to the merged status of the creature.
+        ///
+        /// @return Reference to the UnitStatus struct.
+        access(all) view
+        fun borrowStatus(): &UnitStatus {
+            return &self.status
+        }
+    }
+
     /// The Creature resource represents a static, character template with fixed attributes, defence, potentiality, and inventory.
-    access(all) resource Creature: Nameable, BioCarrier, EquipableCreatureInterface, UnitCollectionCarrier, StaticCollectionWithFeatures {
+    access(all) resource Creature: Nameable, BioPromptsUnit, MergableStatusUnit, EquipableCreatureInterface, UnitCollectionCarrier, StaticCollectionWithFeatures {
         /// The name of the creature.
         access(all) let name: String
         /// The tags associated with the creature.
@@ -2148,8 +2209,8 @@ access(all) contract FGameMishal {
             )
             self.collection <- create EntryCollection()
 
-            assert(shape.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
-            self.collection.deposit(entry: <-create FungibleEntry(identifier: shape, amount: 1.0))
+            // Set the entries for shape, abilities, items
+            self.applyShape(<-create FungibleEntry(identifier: shape, amount: 1.0))
 
             for featureIdentifier in features {
                 self.applyFeature(<-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
@@ -2171,14 +2232,6 @@ access(all) contract FGameMishal {
 
             // apply the status
             self.applyStatus(true)
-        }
-
-        /// Returns a reference to the merged status of the creature.
-        ///
-        /// @return Reference to the UnitStatus struct.
-        access(all) view
-        fun borrowStatus(): &UnitStatus {
-            return &self.status
         }
 
         /// Returns a reference to the base attributes of the creature.
@@ -2203,22 +2256,6 @@ access(all) contract FGameMishal {
         access(all) view
         fun borrowSelfPotentiality(): &Potentiality {
             return &self.basePotentiality
-        }
-
-        /// Returns a mutable reference to the slots occupied by equipped items.
-        ///
-        /// @return Mutable reference to the EquipSlot mapping.
-        access(Host) view
-        fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
-            return self.status.borrowWritableSlotsOccupied()
-        }
-
-        /// Returns a mutable reference to the bio prompts array.
-        ///
-        /// @return Mutable reference to the bioPrompts array.
-        access(Host) view
-        fun borrowWritableBioPrompts(): auth(Mutate) &[String] {
-            return &self.bioPrompts
         }
     }
 
@@ -2534,8 +2571,7 @@ access(all) contract FGameMishal {
             }
 
             // Add ability to collection
-            let collection = self.borrowWritableCollection()
-            collection.deposit(entry: <- ability)
+            self.deposit(entry: <- ability)
 
             // Apply the ability effects
             self.applyStatus(false)
@@ -2550,8 +2586,7 @@ access(all) contract FGameMishal {
             // Clear cultivation
             self.cultivation[itemId] = 0
 
-            let collection = self.borrowWritableCollection()
-            let ret <- collection.withdraw(itemId, amount: nil)
+            let ret <- self.withdraw(itemId, amount: nil)
 
             self.applyStatus(false)
 
@@ -2582,7 +2617,7 @@ access(all) contract FGameMishal {
     }
 
     // Pawn resource represents a playable and cultivable character in the game
-    access(all) resource Pawn: CultivableUnit, PlayableUnit, BioCarrier {
+    access(all) resource Pawn: PlayableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit {
         // The address of the library this pawn belongs to
         access(contract) let library: Address
         // Initial defence (will not be changed after initialization)
@@ -2654,8 +2689,8 @@ access(all) contract FGameMishal {
 
             self.collection <- create EntryCollection()
 
-            assert(shape.verify(LibraryCategory.SHAPE), message: "Shape identifier is invalid")
-            self.collection.deposit(entry: <-create FungibleEntry(identifier: shape, amount: 1.0))
+            // Set the entries for shape, abilities, items
+            self.applyShape(<-create FungibleEntry(identifier: shape, amount: 1.0))
 
             for featureIdentifier in features {
                 self.applyFeature(<-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
@@ -2675,22 +2710,10 @@ access(all) contract FGameMishal {
 
         // ---- Interface Implementation ----
 
-        // Returns a mutable reference to the bio prompts array
-        access(Host) view
-        fun borrowWritableBioPrompts(): auth(Mutate) &[String] {
-            return &self.bioPrompts
-        }
-
         // Returns a reference to the pawn's cultivable attributes
         access(all) view
         fun borrowSelfAttributes(): &Attributes {
             return self.borrowCultivableAttributes()
-        }
-
-        // Returns a mutable reference to the pawn's cultivable attributes
-        access(Host) view
-        fun borrowCultivableAttributes(): auth(Mutate) &Attributes {
-            return &self.attributes
         }
 
         // Returns a reference to the pawn's initial defence
@@ -2705,22 +2728,10 @@ access(all) contract FGameMishal {
             return &self.initPotentiality
         }
 
-        // Returns a reference to the pawn's status
-        access(all) view
-        fun borrowStatus(): &UnitStatus {
-            return &self.status
-        }
-
-        // Returns a mutable reference to the pawn's collection
-        access(contract) view
-        fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection {
-            return &self.collection
-        }
-
-        // Returns a mutable reference to the slots occupied by equipped items
+        // Returns a mutable reference to the pawn's cultivable attributes
         access(Host) view
-        fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
-            return self.status.borrowWritableSlotsOccupied()
+        fun borrowCultivableAttributes(): auth(Mutate) &Attributes {
+            return &self.attributes
         }
 
         // Returns a mutable reference to the pawn's health attributes
