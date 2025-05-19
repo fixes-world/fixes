@@ -38,6 +38,7 @@ access(all) contract FGameMishal {
     access(all) event CreatureItemUnequipped(_ library: Address, _ item: String, _ owner: Address?, itemUUID: UInt64, uuid: UInt64)
 
     access(all) event CreatureSettingUpdated(_ type: String, _ uuid: UInt64, _ setting: UInt8, _ value: Int64)
+    access(all) event CreatureBioPromptAdded(_ owner: Address?, uuid: UInt64, _ prompt: String)
 
     access(all) event PawnPotentialityGained(_ owner: Address?, _ amount: UInt64, uuid: UInt64)
     access(all) event PawnPotentialityConsumed(_ owner: Address?, _ consume: UInt64, _ usable: UInt64, _ used: UInt64, uuid: UInt64)
@@ -1793,6 +1794,12 @@ access(all) contract FGameMishal {
         fun addBioPrompt(_ prompt: String) {
             let prompts = self.borrowWritableBioPrompts()
             prompts.append(prompt)
+
+            emit CreatureBioPromptAdded(
+                self.owner?.address,
+                uuid: self.uuid,
+                prompt
+            )
         }
     }
 
