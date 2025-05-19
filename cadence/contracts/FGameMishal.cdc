@@ -1761,14 +1761,30 @@ access(all) contract FGameMishal {
         }
     }
 
+    /// The CreatureInterface defines the core interface for a game creature, including status, equipment, and inventory logic.
     access(all) resource interface CreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, ItemsCarrier, FeaturesCarrier, ShapeCarrier {
+        /// Returns a reference to the creature's own base attributes.
+        ///
+        /// @return Reference to the base Attributes struct.
         access(all) view fun borrowSelfAttributes(): &Attributes
+        /// Returns a reference to the creature's own base defence.
+        ///
+        /// @return Reference to the base Defence struct.
         access(all) view fun borrowSelfDefence(): &Defence
+        /// Returns a reference to the creature's own base potentiality.
+        ///
+        /// @return Reference to the base Potentiality struct.
         access(all) view fun borrowSelfPotentiality(): &Potentiality
+        /// Returns a mutable reference to the slots occupied by equipped items.
+        ///
+        /// @return Mutable reference to the EquipSlot mapping.
         access(Host) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]}
 
         // ---- Implement ComposableUnitStatusCarrier ----
 
+        /// Collects all attribute sources (self, features, abilities, equipped items) for status calculation.
+        ///
+        /// @return Array of references to all Attributes affecting the creature.
         access(all)
         fun borrowAttributesElements(): [&Attributes] {
             let ret: [&Attributes] = [self.borrowSelfAttributes()]
@@ -1805,6 +1821,9 @@ access(all) contract FGameMishal {
             return ret
         }
 
+        /// Collects all defence sources (self, features, equipped items) for status calculation.
+        ///
+        /// @return Array of references to all Defence affecting the creature.
         access(all)
         fun borrowDefenceElements(): [&Defence] {
             let ret: [&Defence] = [self.borrowSelfDefence()]
@@ -1831,6 +1850,9 @@ access(all) contract FGameMishal {
             return ret
         }
 
+        /// Collects all potentiality sources (self, features, equipped items) for status calculation.
+        ///
+        /// @return Array of references to all Potentiality affecting the creature.
         access(all)
         fun borrowPotentialityElements(): [&Potentiality] {
             let ret: [&Potentiality] = [self.borrowSelfPotentiality()]
@@ -1859,6 +1881,9 @@ access(all) contract FGameMishal {
 
         // ---- Implement Item equipment info ----
 
+        /// Returns all available equipment slots, including those from shape and equipped items.
+        ///
+        /// @return Dictionary of EquipSlot to available count.
         access(all)
         fun getSlotsAll(): {EquipSlot: UInt8} {
             let all: {EquipSlot: UInt8} = {}
@@ -1890,6 +1915,10 @@ access(all) contract FGameMishal {
             return all
         }
 
+        /// Checks if a specific item is currently equipped.
+        ///
+        /// @param item The EntryIdentifier of the item to check.
+        /// @return True if the item is equipped, false otherwise.
         access(all) view
         fun hasItemEquipped(_ item: EntryIdentifier): Bool {
             let slots = self.borrowSlotsOccupied()
@@ -1904,6 +1933,9 @@ access(all) contract FGameMishal {
             return false
         }
 
+        /// Returns all currently equipped items as references.
+        ///
+        /// @return Array of references to equipped Item resources.
         access(all)
         fun borrowEquippedItems(): [&Item] {
             let ret: [&Item] = []
@@ -1931,6 +1963,10 @@ access(all) contract FGameMishal {
             return ret
         }
 
+        /// Checks if an item can be equipped by the creature.
+        ///
+        /// @param item The EntryIdentifier of the item to check.
+        /// @return True if the item can be equipped, false otherwise.
         access(all)
         fun isItemEquippable(_ item: EntryIdentifier): Bool {
             if let itemRef = item.borrowItem() {
@@ -1939,6 +1975,9 @@ access(all) contract FGameMishal {
             return false
         }
 
+        /// Equips an item to the creature, updating occupied slots and emitting an event.
+        ///
+        /// @param item The EntryIdentifier of the item to equip.
         access(Host)
         fun equipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
@@ -1970,6 +2009,9 @@ access(all) contract FGameMishal {
             )
         }
 
+        /// Unequips an item from the creature, updating occupied slots and emitting an event.
+        ///
+        /// @param item The EntryIdentifier of the item to unequip.
         access(Host)
         fun unequipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
@@ -2000,6 +2042,10 @@ access(all) contract FGameMishal {
             )
         }
 
+        /// Internal: Checks if an item reference can be equipped based on slot availability.
+        ///
+        /// @param itemRef Reference to the Item resource.
+        /// @return True if the item can be equipped, false otherwise.
         access(contract)
         fun _isItemEquippable(_ itemRef: &Item): Bool {
             let allSlots = self.getSlotsAll()
@@ -2016,23 +2062,41 @@ access(all) contract FGameMishal {
         }
     }
 
+    /// The Creature resource represents a static, non-cultivable game character with fixed attributes, defence, potentiality, and inventory.
     access(all) resource Creature: Nameable, BioCarrier, CreatureInterface, UnitCollectionCarrier, StaticUnitCollectionCarrier {
+        /// The name of the creature.
         access(all) let name: String
+        /// The tags associated with the creature.
         access(all) let tags: [String]
+        /// The collection of entries (items, abilities, etc.) owned by the creature.
         access(all) let collection: @EntryCollection
-        // The settings of the character
+        /// The settings of the creature (e.g., gender, size, etc.).
         access(all) let settings: {CreatureSettings: Int64}
-        // Main attributes of the character
+        /// The base attributes of the creature.
         access(all) let baseAttributes: Attributes
-        // The base defence of the character
+        /// The base defence of the creature.
         access(all) let baseDefence: Defence
-        // The potentiality of the character
+        /// The base potentiality of the creature.
         access(all) let basePotentiality: Potentiality
-        // The merged status of the character
+        /// The merged status of the creature (after applying features, items, etc.).
         access(all) let status: UnitStatus
-        // The bio prompts of the character
+        /// The bio prompts of the creature.
         access(all) let bioPrompts: [String]
 
+        /// Initializes a new Creature resource.
+        ///
+        /// @param name The name of the creature.
+        /// @param tags The tags associated with the creature.
+        /// @param shape The EntryIdentifier for the creature's shape.
+        /// @param settings The settings for the creature.
+        /// @param attributes The base attributes.
+        /// @param defence The base defence.
+        /// @param potentiality The base potentiality.
+        /// @param features The EntryIdentifiers for features to apply.
+        /// @param abilities The EntryIdentifiers for abilities to add.
+        /// @param items The EntryIdentifiers for items to add.
+        /// @param itemAmounts The mapping of item IDs to their amounts.
+        /// @param bioPrompts The bio prompts for the creature.
         init(
             name: String,
             tags: [String],
@@ -2087,31 +2151,49 @@ access(all) contract FGameMishal {
             self.applyStatus(true)
         }
 
+        /// Returns a reference to the merged status of the creature.
+        ///
+        /// @return Reference to the UnitStatus struct.
         access(all) view
         fun borrowStatus(): &UnitStatus {
             return &self.status
         }
 
+        /// Returns a reference to the base attributes of the creature.
+        ///
+        /// @return Reference to the base Attributes struct.
         access(all) view
         fun borrowSelfAttributes(): &Attributes {
             return &self.baseAttributes
         }
 
+        /// Returns a reference to the base defence of the creature.
+        ///
+        /// @return Reference to the base Defence struct.
         access(all) view
         fun borrowSelfDefence(): &Defence {
             return &self.baseDefence
         }
 
+        /// Returns a reference to the base potentiality of the creature.
+        ///
+        /// @return Reference to the base Potentiality struct.
         access(all) view
         fun borrowSelfPotentiality(): &Potentiality {
             return &self.basePotentiality
         }
 
+        /// Returns a mutable reference to the slots occupied by equipped items.
+        ///
+        /// @return Mutable reference to the EquipSlot mapping.
         access(Host) view
         fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
             return self.status.borrowWritableSlotsOccupied()
         }
 
+        /// Returns a mutable reference to the bio prompts array.
+        ///
+        /// @return Mutable reference to the bioPrompts array.
         access(Host) view
         fun borrowWritableBioPrompts(): auth(Mutate) &[String] {
             return &self.bioPrompts
