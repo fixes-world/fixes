@@ -2120,17 +2120,21 @@ access(all) contract FGameMishal {
 
     // ------------ Player ------------
 
+    // PlayableUnit interface represents a unit that can participate in gameplay and have health-related actions
     access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
+        // Returns a mutable reference to the unit's health attributes
         access(Host) view fun borrowHealth(): auth(Mutate) &Attributes
 
         // ---- Gameplay Methods, Read ---
 
+        // Returns true if any of the health attributes are zero or below, indicating the unit is stunned
         access(all) view
         fun isStunned(): Bool {
             let health = self.borrowHealth()
             return health.strength <= 0 || health.vitality <= 0 || health.spirit <= 0
         }
 
+        // Returns true if all health attributes are zero or below, indicating the unit is dead
         access(all) view
         fun isDead(): Bool {
             let health = self.borrowHealth()
@@ -2139,6 +2143,7 @@ access(all) contract FGameMishal {
 
         // ---- Gameplay Methods, Write ---
 
+        // Resets the unit's health to match its current status attributes
         access(Host)
         fun resetHealth() {
             let health = self.borrowHealth()
@@ -2157,6 +2162,7 @@ access(all) contract FGameMishal {
             )
         }
 
+        // Recovers a specific attribute of health by a given amount, not exceeding the max value
         access(Host)
         fun recoverHealth(_ type: AttributeType, _ amount: Int64) {
             let health = self.borrowHealth()
@@ -2180,6 +2186,7 @@ access(all) contract FGameMishal {
             )
         }
 
+        // Applies damage to a specific health attribute based on attack and defense values
         access(Host)
         fun damageHealth(
             _ attacks: {AttackType: Int64},
@@ -2216,26 +2223,28 @@ access(all) contract FGameMishal {
         }
     }
 
+    // CultivableUnit interface represents a unit that can be cultivated (upgraded) by using potentiality
     access(all) resource interface CultivableUnit: CreatureInterface, UnitCollectionCarrier {
         // The potentiality used by the character
         access(all) var potentialityUsed: UInt64
         // The potentiality obtained by the character
         access(all) var potentialityObtained: UInt64
-        // The cultivation of the character
+        // The cultivation progress for each ability (by string ID)
         access(all) var cultivation: {String: UInt64}
 
-        // ---- Interface ----
-
+        // Returns a mutable reference to the unit's cultivable attributes
         access(Host) view fun borrowCultivableAttributes(): auth(Mutate) &Attributes
 
         // ---- Cultivable Methods, Read ----
 
+        // Returns the amount of potentiality available for upgrades
         access(all) view
         fun getUsablePotentiality(): UInt64 {
             let status = self.borrowStatus()
             return UInt64(status.potentiality.initial) + self.potentialityObtained - self.potentialityUsed
         }
 
+        // Checks if the unit can upgrade a specific attribute based on available potentiality
         access(all) view
         fun canUpgradeAttribute(_ type: AttributeType): Bool {
             // +1 attribute requires unused potentiality = 3 x current attribute value
@@ -2247,6 +2256,7 @@ access(all) contract FGameMishal {
 
         // --- Cultivable Methods - Attribute, Write ---
 
+        // Increases the amount of potentiality obtained
         access(Host)
         fun gainPotentiality(_ amount: UInt64) {
             self.potentialityObtained = self.potentialityObtained + amount
@@ -2258,6 +2268,7 @@ access(all) contract FGameMishal {
             )
         }
 
+        // Upgrades a specific attribute by consuming potentiality
         access(Host)
         fun upgradeAttribute(_ type: AttributeType, _ amount: UInt64) {
             let attributes = self.borrowCultivableAttributes()
@@ -2286,6 +2297,7 @@ access(all) contract FGameMishal {
 
         // --- Cultivable Methods - Feature, Read ---
 
+        // Returns a map of fixed abilities (from features) by their string ID
         access(all)
         fun getFixedAbilities(): {String: Bool} {
             let ret: {String: Bool} = {}
@@ -2304,6 +2316,7 @@ access(all) contract FGameMishal {
             return ret
         }
 
+        // Returns a map of fixed items (from features) and their amounts
         access(all)
         fun getFixedItems(): {String: UFix64} {
             let ret: {String: UFix64} = {}
@@ -2323,11 +2336,13 @@ access(all) contract FGameMishal {
 
         // --- Cultivable Methods - Ability, Read ---
 
+        // Returns the cultivation level for a specific ability
         access(all) view
         fun getCultivationLevel(_ ability: EntryIdentifier): UInt64 {
             return self.cultivation[ability.getStringID()] ?? 0
         }
 
+        // Returns the total attributes occupied by all countable abilities
         access(all)
         fun getAbilitiesOccupiedAttributes(): Attributes {
             let occupied = Attributes(strength: 0, vitality: 0, spirit: 0)
@@ -2350,6 +2365,7 @@ access(all) contract FGameMishal {
 
         // --- Cultivable Methods - Ability, Write ---
 
+        // Increases the cultivation level of an ability by consuming potentiality
         access(Host)
         fun cultivateAbility(_ ability: EntryIdentifier, consume: UInt64, abilityUp: UInt64) {
             let itemId = ability.getStringID()
@@ -2369,6 +2385,7 @@ access(all) contract FGameMishal {
             )
         }
 
+        // Adds a new ability to the unit, consuming potentiality and updating status
         access(Host)
         fun gainAbility(_ ability: @FungibleEntry) {
             let itemId = ability.identifier.getStringID()
@@ -2398,6 +2415,7 @@ access(all) contract FGameMishal {
             self.applyStatus(false)
         }
 
+        // Removes an ability from the unit and resets its cultivation
         access(Host)
         fun dropAbility(_ ability: EntryIdentifier): @FungibleEntry {
             let itemId = ability.getStringID()
@@ -2416,6 +2434,7 @@ access(all) contract FGameMishal {
 
         // ---- Cultivable Item Gameplay Methods ----
 
+        // Adds an item to the unit's collection and equips it if possible
         access(Host)
         fun lootItem(_ entry: @FungibleEntry) {
             let itemId = entry.identifier
@@ -2430,6 +2449,7 @@ access(all) contract FGameMishal {
             self.applyStatus(false)
         }
 
+        // Removes an item from the unit's collection, unequipping it if necessary
         access(Host)
         fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
             if self.hasItemEquipped(item) {
@@ -2445,6 +2465,7 @@ access(all) contract FGameMishal {
 
         // --- Cultivable Methods - Potentiality, Write ---
 
+        // Consumes a specified amount of potentiality for upgrades or actions
         access(contract)
         fun consumePotentiality(_ consume: UInt64) {
             pre {
@@ -2465,12 +2486,13 @@ access(all) contract FGameMishal {
         }
     }
 
-    // The Pawn resource is refered to as the character in the game.
+    // Pawn resource represents a playable and cultivable character in the game
     access(all) resource Pawn: CultivableUnit, PlayableUnit, BioCarrier {
+        // The address of the library this pawn belongs to
         access(contract) let library: Address
-        // Initial defence(will not be changed after initialization)
+        // Initial defence (will not be changed after initialization)
         access(self) let initDefence: Defence
-        // Initial potentiality(will not be changed after initialization)
+        // Initial potentiality (will not be changed after initialization)
         access(self) let initPotentiality: Potentiality
 
         // --- Status Properties ---
@@ -2492,7 +2514,7 @@ access(all) contract FGameMishal {
         // Cultivable attributes, can be upgraded by potentiality
         access(all) let attributes: Attributes
 
-        // The collection of the character
+        // The collection of the character (items, abilities, etc.)
         access(all) let collection: @EntryCollection
 
         // --- Settings ---
@@ -2502,6 +2524,7 @@ access(all) contract FGameMishal {
         // The bio prompts of the character
         access(all) let bioPrompts: [String]
 
+        // Initializes a new Pawn with the given parameters
         init(
             _ library: Address,
             shape: EntryIdentifier,
@@ -2557,46 +2580,55 @@ access(all) contract FGameMishal {
 
         // ---- Interface Implementation ----
 
+        // Returns a mutable reference to the bio prompts array
         access(Host) view
         fun borrowWritableBioPrompts(): auth(Mutate) &[String] {
             return &self.bioPrompts
         }
 
+        // Returns a reference to the pawn's cultivable attributes
         access(all) view
         fun borrowSelfAttributes(): &Attributes {
             return self.borrowCultivableAttributes()
         }
 
+        // Returns a mutable reference to the pawn's cultivable attributes
         access(Host) view
         fun borrowCultivableAttributes(): auth(Mutate) &Attributes {
             return &self.attributes
         }
 
+        // Returns a reference to the pawn's initial defence
         access(all) view
         fun borrowSelfDefence(): &Defence {
             return &self.initDefence
         }
 
+        // Returns a reference to the pawn's initial potentiality
         access(all) view
         fun borrowSelfPotentiality(): &Potentiality {
             return &self.initPotentiality
         }
 
+        // Returns a reference to the pawn's status
         access(all) view
         fun borrowStatus(): &UnitStatus {
             return &self.status
         }
 
+        // Returns a mutable reference to the pawn's collection
         access(contract) view
         fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection {
             return &self.collection
         }
 
+        // Returns a mutable reference to the slots occupied by equipped items
         access(Host) view
         fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
             return self.status.borrowWritableSlotsOccupied()
         }
 
+        // Returns a mutable reference to the pawn's health attributes
         access(Host) view
         fun borrowHealth(): auth(Mutate) &Attributes {
             return &self.health
