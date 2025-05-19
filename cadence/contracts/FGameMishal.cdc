@@ -1761,8 +1761,8 @@ access(all) contract FGameMishal {
         }
     }
 
-    /// The CreatureInterface defines the core interface for a game creature, including status, equipment, and inventory logic.
-    access(all) resource interface CreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, ItemsCarrier, FeaturesCarrier, ShapeCarrier {
+    /// The EquipableUnit defines the core interface for a game unit, including status, equipment, and inventory logic.
+    access(all) resource interface EquipableCreatureInterface: ComposableUnitStatusCarrier, AbilitiesCarrier, ItemsCarrier, FeaturesCarrier, ShapeCarrier {
         /// Returns a reference to the creature's own base attributes.
         ///
         /// @return Reference to the base Attributes struct.
@@ -2060,10 +2060,49 @@ access(all) contract FGameMishal {
             }
             return true
         }
+
+        // --- Equipable Methods - Feature, Read ---
+
+        // Returns a map of fixed abilities (from features) by their string ID
+        access(all)
+        fun getFixedAbilities(): {String: Bool} {
+            let ret: {String: Bool} = {}
+            let features = self.borrowFeatures()
+
+            for feature in features {
+                if feature.hasAbilities() {
+                    let abilities = feature.getAbilityIdentifiers()
+                    for ability in abilities {
+                        if ret[ability.getStringID()] == nil {
+                            ret[ability.getStringID()] = true
+                        }
+                    }
+                }
+            }
+            return ret
+        }
+
+        // Returns a map of fixed items (from features) and their amounts
+        access(all)
+        fun getFixedItems(): {String: UFix64} {
+            let ret: {String: UFix64} = {}
+            let features = self.borrowFeatures()
+
+            for feature in features {
+                if feature.hasItems() {
+                    let items = feature.borrowItemEntries()
+                    for item in items {
+                        let itemId = item.identifier.getStringID()
+                        ret[itemId] = item.balance + (ret[itemId] ?? 0.0)
+                    }
+                }
+            }
+            return ret
+        }
     }
 
     /// The Creature resource represents a static, non-cultivable game character with fixed attributes, defence, potentiality, and inventory.
-    access(all) resource Creature: Nameable, BioCarrier, CreatureInterface, UnitCollectionCarrier, StaticUnitCollectionCarrier {
+    access(all) resource Creature: Nameable, BioCarrier, EquipableCreatureInterface, UnitCollectionCarrier, StaticUnitCollectionCarrier {
         /// The name of the creature.
         access(all) let name: String
         /// The tags associated with the creature.
@@ -2200,7 +2239,7 @@ access(all) contract FGameMishal {
         }
     }
 
-    // ------------ Player ------------
+    // ------------ Playable Unit ------------
 
     // PlayableUnit interface represents a unit that can participate in gameplay and have health-related actions
     access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
@@ -2274,6 +2313,7 @@ access(all) contract FGameMishal {
             _ attacks: {AttackType: Int64},
             _ penetration: Int64,
             _ type: AttributeType,
+            _ extraDefence: Defence?
         ) {
             let health = self.borrowHealth()
             let status = self.borrowStatus()
@@ -2282,6 +2322,9 @@ access(all) contract FGameMishal {
             for attackType in attacks.keys {
                 let atk = attacks[attackType] ?? 0
                 var def = status.defence.getDefenceFrom(attackType)
+                if extraDefence != nil {
+                    def = def + extraDefence!.getDefenceFrom(attackType)
+                }
                 if def > penetration {
                     def = def - penetration
                 } else {
@@ -2305,8 +2348,41 @@ access(all) contract FGameMishal {
         }
     }
 
+    access(all) resource interface EquipableUnit: EquipableCreatureInterface {
+        // ---- Equipable Item Gameplay Methods ----
+
+        // Adds an item to the unit's collection and equips it if possible
+        access(Host)
+        fun lootItem(_ entry: @FungibleEntry) {
+            let itemId = entry.identifier
+            let itemRef = itemId.borrowItem() ?? panic("Not Exists, Item: ".concat(itemId.getStringID()))
+
+            self.deposit(entry: <-entry)
+
+            if itemRef.isEquippable() && self._isItemEquippable(itemRef) {
+                self.equipItem(itemId)
+            }
+
+            self.applyStatus(false)
+        }
+
+        // Removes an item from the unit's collection, unequipping it if necessary
+        access(Host)
+        fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
+            if self.hasItemEquipped(item) {
+                self.unequipItem(item)
+            }
+
+            let ret <- self.withdraw(item.getStringID(), amount: amount)
+
+            self.applyStatus(false)
+
+            return <- ret
+        }
+    }
+
     // CultivableUnit interface represents a unit that can be cultivated (upgraded) by using potentiality
-    access(all) resource interface CultivableUnit: CreatureInterface, UnitCollectionCarrier {
+    access(all) resource interface CultivableUnit: EquipableUnit, UnitCollectionCarrier {
         // The potentiality used by the character
         access(all) var potentialityUsed: UInt64
         // The potentiality obtained by the character
@@ -2375,45 +2451,6 @@ access(all) contract FGameMishal {
                 amount,
                 uuid: self.uuid
             )
-        }
-
-        // --- Cultivable Methods - Feature, Read ---
-
-        // Returns a map of fixed abilities (from features) by their string ID
-        access(all)
-        fun getFixedAbilities(): {String: Bool} {
-            let ret: {String: Bool} = {}
-            let features = self.borrowFeatures()
-
-            for feature in features {
-                if feature.hasAbilities() {
-                    let abilities = feature.getAbilityIdentifiers()
-                    for ability in abilities {
-                        if ret[ability.getStringID()] == nil {
-                            ret[ability.getStringID()] = true
-                        }
-                    }
-                }
-            }
-            return ret
-        }
-
-        // Returns a map of fixed items (from features) and their amounts
-        access(all)
-        fun getFixedItems(): {String: UFix64} {
-            let ret: {String: UFix64} = {}
-            let features = self.borrowFeatures()
-
-            for feature in features {
-                if feature.hasItems() {
-                    let items = feature.borrowItemEntries()
-                    for item in items {
-                        let itemId = item.identifier.getStringID()
-                        ret[itemId] = item.balance + (ret[itemId] ?? 0.0)
-                    }
-                }
-            }
-            return ret
         }
 
         // --- Cultivable Methods - Ability, Read ---
@@ -2514,37 +2551,6 @@ access(all) contract FGameMishal {
             return <- ret
         }
 
-        // ---- Cultivable Item Gameplay Methods ----
-
-        // Adds an item to the unit's collection and equips it if possible
-        access(Host)
-        fun lootItem(_ entry: @FungibleEntry) {
-            let itemId = entry.identifier
-            let itemRef = itemId.borrowItem() ?? panic("Not Exists, Item: ".concat(itemId.getStringID()))
-
-            self.deposit(entry: <-entry)
-
-            if itemRef.isEquippable() && self._isItemEquippable(itemRef) {
-                self.equipItem(itemId)
-            }
-
-            self.applyStatus(false)
-        }
-
-        // Removes an item from the unit's collection, unequipping it if necessary
-        access(Host)
-        fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
-            if self.hasItemEquipped(item) {
-                self.unequipItem(item)
-            }
-
-            let ret <- self.withdraw(item.getStringID(), amount: amount)
-
-            self.applyStatus(false)
-
-            return <- ret
-        }
-
         // --- Cultivable Methods - Potentiality, Write ---
 
         // Consumes a specified amount of potentiality for upgrades or actions
@@ -2567,6 +2573,34 @@ access(all) contract FGameMishal {
             )
         }
     }
+
+    // CreaturePawn resource represents a playable and cultivable NPC in the game
+    // access(all) resource CreaturePawn: CreatureInterface, UnitCollectionCarrier, PlayableUnit, BioCarrier {
+    //     // The address of the library this pawn belongs to
+    //     access(contract) let library: Address
+
+    //     // --- Status Properties ---
+
+    //     // The merged status of the character
+    //     access(all) let status: UnitStatus
+    //     // The health of the character, can be damaged
+    //     access(all) var health: Attributes
+
+    //     // --- Cultivable Property ---
+
+    //     // The potentiality used by the character
+    //     access(all) var potentialityUsed: UInt64
+    //     // The potentiality obtained by the character
+    //     access(all) var potentialityObtained: UInt64
+    //     // The cultivation of the character
+    //     access(all) var cultivation: {String: UInt64}
+
+    //     // Cultivable attributes, can be upgraded by potentiality
+    //     access(all) let attributes: Attributes
+
+    //     // The collection of the character (items, abilities, etc.)
+    //     access(all) let collection: @EntryCollection
+    // }
 
     // Pawn resource represents a playable and cultivable character in the game
     access(all) resource Pawn: CultivableUnit, PlayableUnit, BioCarrier {
