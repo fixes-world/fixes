@@ -1582,7 +1582,7 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource interface StaticUnitCollectionCarrier: UnitCollectionBaseCarrier {
+    access(all) resource interface StaticCollectionUnit: UnitCollectionBaseCarrier {
         access(all) let collection: @EntryCollection
 
         // ---- Implement UnitCollectionBaseCarrier ----
@@ -1618,7 +1618,7 @@ access(all) contract FGameMishal {
     }
 
     // The Feature resource is used to define the features of the entry.
-    access(all) resource Feature: Nameable, OptionalStatusCarrier, StaticUnitCollectionCarrier, EffectsCarrier {
+    access(all) resource Feature: Nameable, OptionalStatusCarrier, StaticCollectionUnit, EffectsCarrier {
         access(all) let name: String
         access(all) let tags: [String]
         access(all) let attributes: Attributes?
@@ -1721,31 +1721,6 @@ access(all) contract FGameMishal {
         fun getFeatureIdentifiers(): [EntryIdentifier] {
             let collection = self.borrowReadonlyCollection()
             return collection.getEntryIdentifiers(LibraryCategory.FEATURE)
-        }
-
-        // ---- Implement Feature Gameplay Methods ----
-
-        // This is static, so we don't need to apply it for now
-        access(Host)
-        fun applyFeature(_ feature: @FungibleEntry) {
-            let collection = self.borrowWritableCollection()
-            // borrow the feature
-            let featureRef = feature.identifier.borrowFeature() ?? panic("Not Exists, Feature: ".concat(feature.identifier.getStringID()))
-
-            // generate the abilities and items from the feature
-            let abilitiesFromFeature = featureRef.getAbilityIdentifiers()
-            for abilityIdentifier in abilitiesFromFeature {
-                self.gainAbility(<-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
-            }
-
-            // generate the items from the feature
-            let itemsFromFeature = featureRef.borrowItemEntries()
-            for itemEntry in itemsFromFeature {
-                self.lootItem(<- create FungibleEntry(identifier: itemEntry.identifier.clone(), amount: itemEntry.balance))
-            }
-
-            // apply the feature to the collection
-            collection.deposit(entry: <- feature)
         }
     }
 
@@ -2101,8 +2076,16 @@ access(all) contract FGameMishal {
         }
     }
 
-    /// The Creature resource represents a static, non-cultivable game character with fixed attributes, defence, potentiality, and inventory.
-    access(all) resource Creature: Nameable, BioCarrier, EquipableCreatureInterface, UnitCollectionCarrier, StaticUnitCollectionCarrier {
+    // This is a resource that can apply features to itself
+    access(all) resource interface StaticCollectionWithFeatures: StaticCollectionUnit {
+        access(all)
+        fun applyFeature(_ feature: @FungibleEntry) {
+            self.deposit(entry: <- feature)
+        }
+    }
+
+    /// The Creature resource represents a static, character template with fixed attributes, defence, potentiality, and inventory.
+    access(all) resource Creature: Nameable, BioCarrier, EquipableCreatureInterface, UnitCollectionCarrier, StaticCollectionWithFeatures {
         /// The name of the creature.
         access(all) let name: String
         /// The tags associated with the creature.
@@ -2349,6 +2332,30 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface EquipableUnit: EquipableCreatureInterface {
+        // ---- Implement Feature Gameplay Methods ----
+
+        // This is static, so we don't need to apply it for now
+        access(Host)
+        fun applyFeature(_ feature: @FungibleEntry) {
+            // borrow the feature
+            let featureRef = feature.identifier.borrowFeature() ?? panic("Not Exists, Feature: ".concat(feature.identifier.getStringID()))
+
+            // generate the abilities and items from the feature
+            let abilitiesFromFeature = featureRef.getAbilityIdentifiers()
+            for abilityIdentifier in abilitiesFromFeature {
+                self.gainAbility(<-create FungibleEntry(identifier: abilityIdentifier, amount: 1.0))
+            }
+
+            // generate the items from the feature
+            let itemsFromFeature = featureRef.borrowItemEntries()
+            for itemEntry in itemsFromFeature {
+                self.lootItem(<- create FungibleEntry(identifier: itemEntry.identifier.clone(), amount: itemEntry.balance))
+            }
+
+            // apply the feature to the collection
+            self.deposit(entry: <- feature)
+        }
+
         // ---- Equipable Item Gameplay Methods ----
 
         // Adds an item to the unit's collection and equips it if possible
@@ -2573,34 +2580,6 @@ access(all) contract FGameMishal {
             )
         }
     }
-
-    // CreaturePawn resource represents a playable and cultivable NPC in the game
-    // access(all) resource CreaturePawn: CreatureInterface, UnitCollectionCarrier, PlayableUnit, BioCarrier {
-    //     // The address of the library this pawn belongs to
-    //     access(contract) let library: Address
-
-    //     // --- Status Properties ---
-
-    //     // The merged status of the character
-    //     access(all) let status: UnitStatus
-    //     // The health of the character, can be damaged
-    //     access(all) var health: Attributes
-
-    //     // --- Cultivable Property ---
-
-    //     // The potentiality used by the character
-    //     access(all) var potentialityUsed: UInt64
-    //     // The potentiality obtained by the character
-    //     access(all) var potentialityObtained: UInt64
-    //     // The cultivation of the character
-    //     access(all) var cultivation: {String: UInt64}
-
-    //     // Cultivable attributes, can be upgraded by potentiality
-    //     access(all) let attributes: Attributes
-
-    //     // The collection of the character (items, abilities, etc.)
-    //     access(all) let collection: @EntryCollection
-    // }
 
     // Pawn resource represents a playable and cultivable character in the game
     access(all) resource Pawn: CultivableUnit, PlayableUnit, BioCarrier {
