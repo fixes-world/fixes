@@ -1303,21 +1303,25 @@ access(all) contract FGameMishal {
 
     // The CreatureSettingsCarrier resource interface is used to get the settings of the creature.
     access(all) resource interface CreatureSettingsCarrier {
-        access(all) let settings: {CreatureSettings: Int64}
+        access(contract) view
+        fun borrowWritableSettings(): auth(Mutate) &{CreatureSettings: Int64}
 
         access(all) view
         fun getSetting(_ setting: CreatureSettings): Int64? {
-            return self.settings[setting]
+            let settings = self.borrowWritableSettings()
+            return settings[setting]
         }
 
         access(all) view
         fun hasSettings(): Bool {
-            return self.settings.length > 0
+            let settings = self.borrowWritableSettings()
+            return settings.length > 0
         }
 
         access(Host)
         fun updateSetting(_ setting: CreatureSettings, _ value: Int64) {
-            self.settings[setting] = value
+            let settings = self.borrowWritableSettings()
+            settings[setting] = value
 
             emit CreatureSettingUpdated(
                 self.getType().identifier,
@@ -1328,7 +1332,16 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource Shape: CreatureSettingsCarrier, Nameable {
+    access(all) resource interface SettingsUnit: CreatureSettingsCarrier {
+        access(all) let settings: {CreatureSettings: Int64}
+
+        access(contract) view
+        fun borrowWritableSettings(): auth(Mutate) &{CreatureSettings: Int64} {
+            return &self.settings
+        }
+    }
+
+    access(all) resource Shape: SettingsUnit, Nameable {
         access(all) let name: String
         access(all) let tags: [String]
         access(all) let settings: {CreatureSettings: Int64}
@@ -1357,18 +1370,25 @@ access(all) contract FGameMishal {
 
     // The ShapeCarrier resource interface is used to get the shape of the creature.
     access(all) resource interface ShapeCarrier: CreatureSettingsCarrier, EntryContainer {
-        access(all) let settings: {CreatureSettings: Int64}
+        access(all) view fun getShapeIdentifier(): EntryIdentifier?
 
-        access(all) view fun borrowShape(): &Shape?
+        access(all) view
+        fun borrowShape(): &Shape? {
+            if let shape = self.getShapeIdentifier() {
+                return shape.borrowShape()
+            }
+            return nil
+        }
 
         access(all) view
         fun hasShape(): Bool {
-            return self.borrowShape() != nil
+            return self.getShapeIdentifier() != nil
         }
 
         access(all) view
         fun getGender(): Int64? {
-            if let gender = self.settings[CreatureSettings.GENDER] {
+            let settings = self.borrowWritableSettings()
+            if let gender = settings[CreatureSettings.GENDER] {
                 return gender
             }
             if let shape = self.borrowShape() {
@@ -1379,7 +1399,8 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun getForm(): Int64? {
-            if let form = self.settings[CreatureSettings.FORM] {
+            let settings = self.borrowWritableSettings()
+            if let form = settings[CreatureSettings.FORM] {
                 return form
             }
             if let shape = self.borrowShape() {
@@ -1390,7 +1411,8 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun getSize(): Int64? {
-            if let size = self.settings[CreatureSettings.SIZE] {
+            let settings = self.borrowWritableSettings()
+            if let size = settings[CreatureSettings.SIZE] {
                 return size
             }
             if let shape = self.borrowShape() {
@@ -1401,7 +1423,8 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun getMoveSpeed(): Int64? {
-            if let moveSpeed = self.settings[CreatureSettings.MOVE_SPEED] {
+            let settings = self.borrowWritableSettings()
+            if let moveSpeed = settings[CreatureSettings.MOVE_SPEED] {
                 return moveSpeed
             }
             if let shape = self.borrowShape() {
@@ -1412,7 +1435,8 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun getPerceptionRange(): Int64? {
-            if let perceptionRange = self.settings[CreatureSettings.PERCEPTION_RANGE] {
+            let settings = self.borrowWritableSettings()
+            if let perceptionRange = settings[CreatureSettings.PERCEPTION_RANGE] {
                 return perceptionRange
             }
             if let shape = self.borrowShape() {
@@ -1423,7 +1447,8 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun getOccupyRange(): Int64? {
-            if let occupyRange = self.settings[CreatureSettings.OCCUPY_RANGE] {
+            let settings = self.borrowWritableSettings()
+            if let occupyRange = settings[CreatureSettings.OCCUPY_RANGE] {
                 return occupyRange
             }
             if let shape = self.borrowShape() {
@@ -1586,12 +1611,13 @@ access(all) contract FGameMishal {
         // --- Implement ShapeCarrier ---
 
         // Borrow the shape of the unit
-        access(all) view fun borrowShape(): &Shape? {
+        access(all) view
+        fun getShapeIdentifier(): EntryIdentifier? {
             let collection = self.borrowReadonlyCollection()
             let shape = collection.getKeysByCategory(LibraryCategory.SHAPE)
             if shape.length > 0 {
                 if let entry = collection.borrowEntryByID(shape[0]) {
-                    return entry.identifier.borrowShape()
+                    return entry.identifier.clone()
                 }
             }
             return nil
@@ -1655,7 +1681,7 @@ access(all) contract FGameMishal {
     }
 
     // The Feature resource is used to define the features of the entry.
-    access(all) resource Feature: Nameable, OptionalStatusCarrier, StaticCollectionUnit, EffectsCarrier {
+    access(all) resource Feature: Nameable, OptionalStatusCarrier, StaticCollectionUnit, EffectsCarrier, SettingsUnit {
         access(all) let name: String
         access(all) let tags: [String]
         access(all) let attributes: Attributes?
@@ -2146,7 +2172,7 @@ access(all) contract FGameMishal {
     }
 
     /// The Creature resource represents a static, character template with fixed attributes, defence, potentiality, and inventory.
-    access(all) resource Creature: Nameable, BioPromptsUnit, MergableStatusUnit, EquipableCreatureInterface, UnitCollectionCarrier, StaticCollectionWithFeatures {
+    access(all) resource Creature: Nameable, BioPromptsUnit, MergableStatusUnit, EquipableCreatureInterface, UnitCollectionCarrier, SettingsUnit, StaticCollectionWithFeatures {
         /// The name of the creature.
         access(all) let name: String
         /// The tags associated with the creature.
@@ -2617,7 +2643,7 @@ access(all) contract FGameMishal {
     }
 
     // Pawn resource represents a playable and cultivable character in the game
-    access(all) resource Pawn: PlayableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit {
+    access(all) resource Pawn: PlayableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit, SettingsUnit {
         // The address of the library this pawn belongs to
         access(contract) let library: Address
         // Initial defence (will not be changed after initialization)
@@ -2657,55 +2683,129 @@ access(all) contract FGameMishal {
         // Initializes a new Pawn with the given parameters
         init(
             _ library: Address,
-            shape: EntryIdentifier,
+            template: EntryIdentifier?,
+            shape: EntryIdentifier?,
             features: [EntryIdentifier],
             items: [EntryIdentifier],
             itemAmounts: {String: UFix64},
             bioPrompts: [String]
         ) {
             self.library = library
+
             self.settings = {}
             self.bioPrompts = bioPrompts
 
-            let lib = FGameMishal.borrowLibrary(library) ?? panic("Library not found")
-            let initPtt = lib.settings[LibrarySettings.INIT_POTENTIALITY] ?? 36
-            let initDef = lib.settings[LibrarySettings.INIT_DEFENCE_VALUE] ?? 0
-            let initAttr = lib.settings[LibrarySettings.INIT_ATTRIBUTE_VALUE] ?? 3
+            // Clone the parameters
+            var shapeToApply = shape
 
-            self.initDefence = Defence(physical: initDef, endurance: initDef, resistance: initDef)
-            self.initPotentiality = Potentiality(initial: initPtt)
-            self.attributes = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
+            let featuresToApply = features
+            let featuresDict: {String: Bool} = {}
+            for feature in features {
+                featuresDict[feature.getStringID()] = true
+            }
 
+            let itemsToApply = items
+            let itemAmountsToApply = itemAmounts
+            for item in items {
+                let itemId = item.getStringID()
+                itemAmountsToApply[itemId] = itemAmounts[itemId] ?? 0.0
+            }
+
+            // Apply the template if it exists
+            if template != nil {
+                let creature = template!.borrowCreature() ?? panic("Not Exists, Creature: ".concat(template!.getStringID()))
+
+                // Extract template's Abilities, Defence, Potentiality
+                self.initDefence = creature.borrowSelfDefence().copy() as! Defence
+                self.initPotentiality = creature.borrowSelfPotentiality().copy() as! Potentiality
+                self.attributes = creature.borrowSelfAttributes().copy() as! Attributes
+
+                // If the shape is not provided, use the template's shape
+                if shapeToApply == nil {
+                    // A creature must have a shape
+                    let templateShapeIdentifier = creature.getShapeIdentifier() ?? panic("Shape not exists for Creature: ".concat(template!.getStringID()))
+                    shapeToApply = templateShapeIdentifier
+                }
+
+                // Extract template's Features
+                let templateFeatures = creature.getFeatureIdentifiers()
+                for feature in templateFeatures {
+                    let featureId = feature.getStringID()
+                    if featuresDict[featureId] == nil {
+                        featuresToApply.append(feature)
+                        featuresDict[featureId] = true
+                    }
+                }
+
+                // Extract template's Items
+                let templateItems = creature.borrowItemEntries()
+                for item in templateItems {
+                    let itemId = item.identifier.getStringID()
+                    itemAmountsToApply[itemId] = (itemAmountsToApply[itemId] ?? 0.0) + item.balance
+                }
+
+                // Apply the template's settings
+                if creature.hasSettings() {
+                    let templateSettings = creature.borrowWritableSettings()
+                    for key in templateSettings.keys {
+                        self.settings[key] = templateSettings[key]!
+                    }
+                }
+
+                // Apply the template's bio prompts
+                let templateBioPrompts = creature.borrowWritableBioPrompts()
+                for prompt in templateBioPrompts {
+                    self.bioPrompts.append(prompt)
+                }
+            } else {
+                // If the template is not provided, that is a player, so we need to use the library's settings
+
+                let lib = FGameMishal.borrowLibrary(library) ?? panic("Library not found")
+                let initPtt = lib.settings[LibrarySettings.INIT_POTENTIALITY] ?? 36
+                let initDef = lib.settings[LibrarySettings.INIT_DEFENCE_VALUE] ?? 0
+                let initAttr = lib.settings[LibrarySettings.INIT_ATTRIBUTE_VALUE] ?? 3
+
+                self.initDefence = Defence(physical: initDef, endurance: initDef, resistance: initDef)
+                self.initPotentiality = Potentiality(initial: initPtt)
+                self.attributes = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
+
+            }
+
+            // Initialize the status and health, but it will be reset later
             self.status = UnitStatus(
                 attributes: self.attributes,
                 defence: self.initDefence,
                 potentiality: self.initPotentiality
             )
-            self.health = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
+            self.health = Attributes(strength: 0, vitality: 0, spirit: 0)
 
+            // Initialize the cultivable properties
             self.potentialityUsed = 0
             self.potentialityObtained = 0
             self.cultivation = {}
 
+            // Initialize the collection
             self.collection <- create EntryCollection()
 
             // Set the entries for shape, abilities, items
-            self.applyShape(<-create FungibleEntry(identifier: shape, amount: 1.0))
+            self.applyShape(<-create FungibleEntry(identifier: shapeToApply!, amount: 1.0))
 
-            for featureIdentifier in features {
+            for featureIdentifier in featuresToApply {
                 self.applyFeature(<-create FungibleEntry(identifier: featureIdentifier, amount: 1.0))
             }
 
-            if items.length > 0 {
-                assert(itemAmounts.length == items.length, message: "Item amounts must be the same length as items")
-                for itemIdentifier in items {
+            if itemsToApply.length > 0 {
+                assert(itemAmountsToApply.length == itemsToApply.length, message: "Item amounts must be the same length as items")
+                for itemIdentifier in itemsToApply {
                     let id = itemIdentifier.getStringID()
-                    let amount = itemAmounts[id] ?? 0.0
+                    let amount = itemAmountsToApply[id] ?? 0.0
                     self.lootItem(<-create FungibleEntry(identifier: itemIdentifier, amount: amount))
                 }
             }
 
+            // Apply the status and reset the health
             self.applyStatus(true)
+            self.resetHealth()
         }
 
         // ---- Interface Implementation ----
