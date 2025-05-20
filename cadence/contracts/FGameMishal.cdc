@@ -60,9 +60,8 @@ access(all) contract FGameMishal {
     // ----- Resources -----
 
     access(all) enum LibrarySettings: UInt8 {
-        access(all) case INIT_POTENTIALITY
-        access(all) case INIT_ATTRIBUTE_VALUE
-        access(all) case INIT_DEFENCE_VALUE
+        access(all) case DEFAULT_POTENTIALITY
+        access(all) case DEFAULT_ATTRIBUTE_VALUE
     }
 
     access(all) enum AttributeType: UInt8 {
@@ -137,9 +136,8 @@ access(all) contract FGameMishal {
 
         init() {
             self.settings = {
-                LibrarySettings.INIT_POTENTIALITY: 36,
-                LibrarySettings.INIT_ATTRIBUTE_VALUE: 3,
-                LibrarySettings.INIT_DEFENCE_VALUE: 0
+                LibrarySettings.DEFAULT_POTENTIALITY: 36,
+                LibrarySettings.DEFAULT_ATTRIBUTE_VALUE: 3
             }
             self.objects <- {}
             self.items <- {}
@@ -1273,13 +1271,14 @@ access(all) contract FGameMishal {
         }
     }
 
-    access(all) resource Ability: AttributeCarrier, EffectsCarrier, Nameable {
+    access(all) resource Ability: AttributeCarrier, DefenceCarrier, EffectsCarrier, Nameable {
         access(all) let name: String
         access(all) let tags: [String]
         access(all) let level: UInt64
         access(all) let occupy: AttributeType?
         access(all) let effects: [String]
         access(all) let attributes: Attributes?
+        access(all) let defence: Defence?
 
         view init(
             level: UInt64,
@@ -1288,6 +1287,7 @@ access(all) contract FGameMishal {
             occupy: AttributeType?,
             effects: [String],
             attributes: Attributes?,
+            defence: Defence?
         ) {
             self.name = name
             self.tags = tags
@@ -1295,10 +1295,15 @@ access(all) contract FGameMishal {
             self.occupy = occupy
             self.effects = effects
             self.attributes = attributes
+            self.defence = defence
         }
 
         access(all) view fun borrowAttributes(): &Attributes? {
             return &self.attributes
+        }
+
+        access(all) view fun borrowDefence(): &Defence? {
+            return &self.defence
         }
     }
 
@@ -1809,14 +1814,13 @@ access(all) contract FGameMishal {
         ///
         /// @return Reference to the base Attributes struct.
         access(all) view fun borrowSelfAttributes(): &Attributes
-        /// Returns a reference to the creature's own base defence.
-        ///
-        /// @return Reference to the base Defence struct.
-        access(all) view fun borrowSelfDefence(): &Defence
+
         /// Returns a reference to the creature's own base potentiality.
         ///
         /// @return Reference to the base Potentiality struct.
-        access(all) view fun borrowSelfPotentiality(): &Potentiality
+        access(all) view fun borrowSelfPotentiality(): &Potentiality? {
+            return nil
+        }
 
         // ---- Implement ComposableUnitStatusCarrier ----
 
@@ -1864,7 +1868,7 @@ access(all) contract FGameMishal {
         /// @return Array of references to all Defence affecting the creature.
         access(all)
         fun borrowDefenceElements(): [&Defence] {
-            let ret: [&Defence] = [self.borrowSelfDefence()]
+            let ret: [&Defence] = []
 
             // From Features
             let features = self.borrowFeatures()
@@ -1876,6 +1880,15 @@ access(all) contract FGameMishal {
                 }
             }
 
+            // From Abilities
+            let abilities = self.borrowAbilities()
+            for ability in abilities {
+                if ability.hasDefence() {
+                    if let defence = ability.borrowDefence() {
+                        ret.append(defence)
+                    }
+                }
+            }
             // From Items
             let items = self.borrowEquippedItems()
             for item in items {
@@ -1893,7 +1906,11 @@ access(all) contract FGameMishal {
         /// @return Array of references to all Potentiality affecting the creature.
         access(all)
         fun borrowPotentialityElements(): [&Potentiality] {
-            let ret: [&Potentiality] = [self.borrowSelfPotentiality()]
+            let ret: [&Potentiality] = []
+
+            if let selfPotentiality = self.borrowSelfPotentiality() {
+                ret.append(selfPotentiality)
+            }
 
             // From Features
             let features = self.borrowFeatures()
@@ -2190,10 +2207,6 @@ access(all) contract FGameMishal {
         access(all) let settings: {CreatureSettings: Int64}
         /// The base attributes of the creature.
         access(all) let baseAttributes: Attributes
-        /// The base defence of the creature.
-        access(all) let baseDefence: Defence
-        /// The base potentiality of the creature.
-        access(all) let basePotentiality: Potentiality
         /// The merged status of the creature (after applying features, items, etc.).
         access(all) let status: UnitStatus
         /// The bio prompts of the creature.
@@ -2219,8 +2232,6 @@ access(all) contract FGameMishal {
             shape: EntryIdentifier,
             settings: {CreatureSettings: Int64},
             attributes: Attributes,
-            defence: Defence,
-            potentiality: Potentiality,
             features: [EntryIdentifier],
             abilities: [EntryIdentifier],
             items: [EntryIdentifier],
@@ -2232,13 +2243,11 @@ access(all) contract FGameMishal {
             self.settings = settings
             self.bioPrompts = bioPrompts
             self.baseAttributes = attributes
-            self.baseDefence = defence
-            self.basePotentiality = potentiality
             // Initialize the status
             self.status = UnitStatus(
                 attributes: self.baseAttributes,
-                defence: self.baseDefence,
-                potentiality: self.basePotentiality
+                defence: Defence(physical: 0,endurance: 0,resistance: 0),
+                potentiality: Potentiality(initial: 0)
             )
             self.collection <- create EntryCollection()
 
@@ -2273,22 +2282,6 @@ access(all) contract FGameMishal {
         access(all) view
         fun borrowSelfAttributes(): &Attributes {
             return &self.baseAttributes
-        }
-
-        /// Returns a reference to the base defence of the creature.
-        ///
-        /// @return Reference to the base Defence struct.
-        access(all) view
-        fun borrowSelfDefence(): &Defence {
-            return &self.baseDefence
-        }
-
-        /// Returns a reference to the base potentiality of the creature.
-        ///
-        /// @return Reference to the base Potentiality struct.
-        access(all) view
-        fun borrowSelfPotentiality(): &Potentiality {
-            return &self.basePotentiality
         }
     }
 
@@ -2658,8 +2651,6 @@ access(all) contract FGameMishal {
     access(all) resource Pawn: PlayableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit, SettingsUnit {
         // The address of the library this pawn belongs to
         access(contract) let library: Address
-        // Initial defence (will not be changed after initialization)
-        access(self) let initDefence: Defence
         // Initial potentiality (will not be changed after initialization)
         access(self) let initPotentiality: Potentiality
 
@@ -2734,10 +2725,9 @@ access(all) contract FGameMishal {
             if template != nil {
                 let creature = template!.borrowCreature() ?? panic("Not Exists, Creature: ".concat(template!.getStringID()))
 
-                // Extract template's Abilities, Defence, Potentiality
-                self.initDefence = creature.borrowSelfDefence().copy() as! Defence
-                self.initPotentiality = creature.borrowSelfPotentiality().copy() as! Potentiality
+                // Extract template's Abilities, Potentiality
                 self.attributes = creature.borrowSelfAttributes().copy() as! Attributes
+                self.initPotentiality = Potentiality(initial: 0)
 
                 // If the shape is not provided, use the template's shape
                 if shapeToApply == nil {
@@ -2789,11 +2779,9 @@ access(all) contract FGameMishal {
                 // If the template is not provided, that is a player, so we need to use the library's settings
 
                 let lib = FGameMishal.borrowLibrary(library) ?? panic("Library not found")
-                let initPtt = lib.settings[LibrarySettings.INIT_POTENTIALITY] ?? 36
-                let initDef = lib.settings[LibrarySettings.INIT_DEFENCE_VALUE] ?? 0
-                let initAttr = lib.settings[LibrarySettings.INIT_ATTRIBUTE_VALUE] ?? 3
+                let initPtt = lib.settings[LibrarySettings.DEFAULT_POTENTIALITY] ?? 36
+                let initAttr = lib.settings[LibrarySettings.DEFAULT_ATTRIBUTE_VALUE] ?? 3
 
-                self.initDefence = Defence(physical: initDef, endurance: initDef, resistance: initDef)
                 self.initPotentiality = Potentiality(initial: initPtt)
                 self.attributes = Attributes(strength: initAttr, vitality: initAttr, spirit: initAttr)
             }
@@ -2801,7 +2789,7 @@ access(all) contract FGameMishal {
             // Initialize the status and health, but it will be reset later
             self.status = UnitStatus(
                 attributes: self.attributes,
-                defence: self.initDefence,
+                defence: Defence(physical: 0,endurance: 0,resistance: 0),
                 potentiality: self.initPotentiality
             )
             self.health = Attributes(strength: 0, vitality: 0, spirit: 0)
@@ -2845,12 +2833,6 @@ access(all) contract FGameMishal {
         access(all) view
         fun borrowSelfAttributes(): &Attributes {
             return self.borrowCultivableAttributes()
-        }
-
-        // Returns a reference to the pawn's initial defence
-        access(all) view
-        fun borrowSelfDefence(): &Defence {
-            return &self.initDefence
         }
 
         // Returns a reference to the pawn's initial potentiality
