@@ -16,8 +16,6 @@ import "FixesHeartbeat"
 access(all) contract FGameMishal {
     // Entitlements for the Editor role
     access(all) entitlement Editor;
-    // Entitlements for the Creator role (Like the creator of the game)
-    access(all) entitlement Creator;
     // Entitlements for the Host role (Like the host of the game)
     access(all) entitlement Host;
     // Entitlements for the Player role (Like the player of the game)
@@ -411,6 +409,8 @@ access(all) contract FGameMishal {
             return nil
         }
 
+        // -------- Private Functions --------
+
         access(self) view
         fun borrowNameToUIDDictionary(_ category: LibraryCategory): auth(Mutate) &{String: UInt64} {
             return &self.nameToUID[category] as auth(Mutate) &{String: UInt64}?
@@ -431,8 +431,6 @@ access(all) contract FGameMishal {
             }
             return []
         }
-
-        // -------- Private Functions --------
 
         access(self)
         fun borrowNamable(_ category: LibraryCategory, _ uuid: UInt64): &{Nameable}? {
@@ -488,6 +486,12 @@ access(all) contract FGameMishal {
                 }
             }
         }
+    }
+
+    // ------------ Host Resources ------------
+
+    access(all) resource HostOperator {
+        // TODO: Implement the HostOperator resource
     }
 
     // ------------ Library Entities ------------
@@ -1058,10 +1062,10 @@ access(all) contract FGameMishal {
         access(all) view
         fun borrowEntryByID(_ id: String): &FungibleEntry?
 
-        access(Creator)
+        access(contract)
         fun deposit(entry: @FungibleEntry)
 
-        access(Creator)
+        access(contract)
         fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry
     }
 
@@ -1130,7 +1134,7 @@ access(all) contract FGameMishal {
             return &self.entries[id]
         }
 
-        access(Creator)
+        access(contract)
         fun deposit(entry: @FungibleEntry) {
             pre {
                 emit EntryDeposited(
@@ -1156,7 +1160,7 @@ access(all) contract FGameMishal {
             }
         }
 
-        access(Creator)
+        access(contract)
         fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry {
             post {
                 result.identifier.getStringID() == id: "The ID of the withdrawn token must be the same as the requested ID"
@@ -1220,6 +1224,17 @@ access(all) contract FGameMishal {
         }
     }
 
+    // Method to create an object
+    access(all) view
+    fun createObject(
+        name: String,
+        tags: [String],
+        defence: Defence,
+        value: UFix64?
+    ): @Object {
+        return <-create Object(name: name, tags: tags, defence: defence, value: value)
+    }
+
     access(all) resource Item: OptionalStatusCarrier, ValueCarrier, EffectsCarrier, Nameable {
         access(all) let name: String
         access(all) let tags: [String]
@@ -1271,6 +1286,22 @@ access(all) contract FGameMishal {
         }
     }
 
+    // Method to create an item
+    access(all) view
+    fun createItem(
+        name: String,
+        tags: [String],
+        value: UFix64?,
+        attributes: Attributes?,
+        defence: Defence?,
+        potentiality: Potentiality?,
+        effects: [String],
+        slotsOccupied: {EquipSlot: UInt8},
+        slotsProvided: {EquipSlot: UInt8},
+    ): @Item {
+        return <-create Item(name: name, tags: tags, value: value, attributes: attributes, defence: defence, potentiality: potentiality, effects: effects, slotsOccupied: slotsOccupied, slotsProvided: slotsProvided)
+    }
+
     access(all) resource Ability: AttributeCarrier, DefenceCarrier, EffectsCarrier, Nameable {
         access(all) let name: String
         access(all) let tags: [String]
@@ -1305,6 +1336,20 @@ access(all) contract FGameMishal {
         access(all) view fun borrowDefence(): &Defence? {
             return &self.defence
         }
+    }
+
+    // Method to create an ability
+    access(all) view
+    fun createAbility(
+        name: String,
+        tags: [String],
+        level: UInt64,
+        occupy: AttributeType?,
+        effects: [String],
+        attributes: Attributes?,
+        defence: Defence?
+    ): @Ability {
+        return <-create Ability(level: level, name: name, tags: tags, occupy: occupy, effects: effects, attributes: attributes, defence: defence)
     }
 
     // The CreatureSettingsCarrier resource interface is used to get the settings of the creature.
@@ -1372,6 +1417,20 @@ access(all) contract FGameMishal {
             self.settings[CreatureSettings.PERCEPTION_RANGE] = perceptionRange
             self.settings[CreatureSettings.OCCUPY_RANGE] = occupyRange
         }
+    }
+
+    // Method to create a shape
+    access(all) view
+    fun createShape(
+        name: String,
+        tags: [String],
+        bodySize: Int64,
+        occupyRange: Int64,
+        moveSpeed: Int64,
+        perceptionRange: Int64,
+        slotsAvailable: {EquipSlot: UInt8}
+    ): @Shape {
+        return <-create Shape(name: name, tags: tags, bodySize: bodySize, occupyRange: occupyRange, moveSpeed: moveSpeed, perceptionRange: perceptionRange, slotsAvailable: slotsAvailable)
     }
 
     // The ShapeCarrier resource interface is used to get the shape of the creature.
@@ -1561,7 +1620,7 @@ access(all) contract FGameMishal {
     // This is a resource that can borrow a writable collection
     access(all) resource interface CollectionContainer {
         access(contract)
-        view fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection
+        view fun borrowWritableCollection(): auth(Host) &EntryCollection
 
         access(all) view
         fun borrowReadonlyCollection(): &EntryCollection {
@@ -1578,12 +1637,12 @@ access(all) contract FGameMishal {
             return collection.borrowEntryByID(id)
         }
 
-        access(Creator)
+        access(contract)
         fun deposit(entry: @FungibleEntry) {
             self.borrowWritableCollection().deposit(entry: <-entry)
         }
 
-        access(Creator)
+        access(contract)
         fun withdraw(_ id: String, amount: UFix64?): @FungibleEntry {
             return <- self.borrowWritableCollection().withdraw(id, amount: amount)
         }
@@ -1654,7 +1713,7 @@ access(all) contract FGameMishal {
         // ---- Implement UnitCollectionBaseCarrier ----
 
         access(contract) view
-        fun borrowWritableCollection(): auth(Creator, Host) &EntryCollection {
+        fun borrowWritableCollection(): auth(Host) &EntryCollection {
             return &self.collection
         }
     }
@@ -1744,6 +1803,25 @@ access(all) contract FGameMishal {
         }
     }
 
+    // Method to create a feature
+    access(all)
+    fun createFeature(
+        name: String,
+        tags: [String],
+        attributes: Attributes?,
+        defence: Defence?,
+        potentiality: Potentiality?,
+        shape: EntryIdentifier?,
+        abilities: [EntryIdentifier],
+        items: [EntryIdentifier],
+        itemAmounts: {String: UFix64},
+        effects: [String],
+        settings: {CreatureSettings: Int64}
+    ): @Feature {
+        return <-create Feature(name: name, tags: tags, attributes: attributes, defence: defence, potentiality: potentiality, shape: shape, abilities: abilities, items: items, itemAmounts: itemAmounts, effects: effects, settings: settings)
+    }
+
+    // The FeaturesCarrier resource interface is used to get the features of the creature.
     access(all) resource interface FeaturesCarrier: EntryContainer {
         access(all) view fun getFeaturesLength(): Int
         access(all) fun getFeatureIdentifiers(): [EntryIdentifier]
@@ -2283,6 +2361,23 @@ access(all) contract FGameMishal {
         fun borrowSelfAttributes(): &Attributes {
             return &self.baseAttributes
         }
+    }
+
+    // Method to create a creature template
+    access(all)
+    fun createCreatureTemplate(
+        name: String,
+        tags: [String],
+        shape: EntryIdentifier,
+        settings: {CreatureSettings: Int64},
+        attributes: Attributes,
+        features: [EntryIdentifier],
+        abilities: [EntryIdentifier],
+        items: [EntryIdentifier],
+        itemAmounts: {String: UFix64},
+        bioPrompts: [String]
+    ): @Creature {
+        return <-create Creature(name: name, tags: tags, shape: shape, settings: settings, attributes: attributes, features: features, abilities: abilities, items: items, itemAmounts: itemAmounts, bioPrompts: bioPrompts)
     }
 
     // ------------ Playable Unit ------------
