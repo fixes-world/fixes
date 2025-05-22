@@ -331,6 +331,58 @@ access(all) contract FGameMishal {
 
         // -------- Public Functions --------
 
+        // Get the uids of the entries in the library
+        access(all) view
+        fun getTagUIDs(_ category: LibraryCategory, _ tag: String): [UInt64] {
+            let tagToUIDs = self.borrowTagToUIDsDictionary(category)
+            if let uids = tagToUIDs[tag] {
+                return *uids
+            }
+            return []
+        }
+
+        // Get the length of the entries in the library
+        access(all) view
+        fun getEntryLength(_ category: LibraryCategory): Int {
+            switch category {
+                case LibraryCategory.OBJECT:
+                    return self.objects.length
+                case LibraryCategory.ITEM:
+                    return self.items.length
+                case LibraryCategory.ABILITY:
+                    return self.abilities.length
+                case LibraryCategory.SHAPE:
+                    return self.shapes.length
+                case LibraryCategory.FEATURE:
+                    return self.features.length
+                case LibraryCategory.CREATURE:
+                    return self.creatures.length
+                default:
+                    panic("Invalid category")
+            }
+        }
+
+        access(all) view
+        fun getAllEntryUIDs(_ category: LibraryCategory): [UInt64] {
+            switch category {
+                case LibraryCategory.OBJECT:
+                    return self.objects.keys
+                case LibraryCategory.ITEM:
+                    return self.items.keys
+                case LibraryCategory.ABILITY:
+                    return self.abilities.keys
+                case LibraryCategory.SHAPE:
+                    return self.shapes.keys
+                case LibraryCategory.FEATURE:
+                    return self.features.keys
+                case LibraryCategory.CREATURE:
+                    return self.creatures.keys
+                default:
+                    panic("Invalid category")
+            }
+        }
+
+        // Get the entry by uuid
         access(all) view
         fun borrowObject(_ uuid: UInt64): &Object? {
             return &self.objects[uuid]
@@ -409,6 +461,8 @@ access(all) contract FGameMishal {
             return nil
         }
 
+        // -------- Restricted Functions --------
+
         // -------- Private Functions --------
 
         access(self) view
@@ -421,15 +475,6 @@ access(all) contract FGameMishal {
         fun borrowTagToUIDsDictionary(_ category: LibraryCategory): auth(Mutate) &{String: [UInt64]} {
             return &self.tagToUIDs[category] as auth(Mutate) &{String: [UInt64]}?
                 ?? panic("Tag to UID dictionary not found")
-        }
-
-        access(self) view
-        fun getTagUIDs(_ category: LibraryCategory, _ tag: String): [UInt64] {
-            let tagToUIDs = self.borrowTagToUIDsDictionary(category)
-            if let uids = tagToUIDs[tag] {
-                return *uids
-            }
-            return []
         }
 
         access(self)
