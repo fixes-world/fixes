@@ -18,8 +18,6 @@ access(all) contract FGameMishal {
     access(all) entitlement Editor;
     // Entitlements for the Host role (Like the host of the game)
     access(all) entitlement Host;
-    // Entitlements for the Player role (Like the player of the game)
-    access(all) entitlement Player; // Not used for now
 
     // ----- Events -----
 
@@ -38,6 +36,10 @@ access(all) contract FGameMishal {
     access(all) event CreatureSettingUpdated(_ type: String, _ uuid: UInt64, _ setting: UInt8, _ value: Int64)
     access(all) event CreatureBioPromptAdded(_ owner: Address?, uuid: UInt64, _ prompt: String)
 
+    access(all) event PawnAddedToPocket(_ library: Address, _ owner: Address?, _ template: String?, _ uuid: UInt64)
+    access(all) event PawnDeployed(_ library: Address, _ owner: Address, _ pawnUuid: UInt64, _ host: Address, _ boardUuid: UInt64)
+    access(all) event PawnRemoved(_ library: Address, _ owner: Address, _ pawnUuid: UInt64, _ host: Address, _ boardUuid: UInt64)
+
     access(all) event PawnPotentialityGained(_ owner: Address?, _ amount: UInt64, uuid: UInt64)
     access(all) event PawnPotentialityConsumed(_ owner: Address?, _ consume: UInt64, _ usable: UInt64, _ used: UInt64, uuid: UInt64)
     access(all) event PawnAttributeUpgraded(_ owner: Address?, _ type: UInt8, _ amount: UInt64, uuid: UInt64)
@@ -54,6 +56,12 @@ access(all) contract FGameMishal {
 
     access(all) let libraryStoragePath: StoragePath
     access(all) let libraryPublicPath: PublicPath
+
+    access(all) let pocketStoragePath: StoragePath
+    access(all) let pocketPublicPath: PublicPath
+
+    access(all) let hostOperatorStoragePath: StoragePath
+    access(all) let hostOperatorPublicPath: PublicPath
 
     // ----- Resources -----
 
@@ -2824,6 +2832,8 @@ access(all) contract FGameMishal {
     access(all) resource Pawn: PlayableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit, SettingsUnit {
         // The address of the library this pawn belongs to
         access(contract) let library: Address
+        access(contract) let template: EntryIdentifier?
+
         // Initial potentiality (will not be changed after initialization)
         access(self) let initPotentiality: Potentiality
 
@@ -2893,6 +2903,9 @@ access(all) contract FGameMishal {
             for ability in abilities {
                 abilitiesDict[ability.getStringID()] = true
             }
+
+            // set the template
+            self.template = template
 
             // Apply the template if it exists
             if template != nil {
@@ -3027,19 +3040,338 @@ access(all) contract FGameMishal {
         }
     }
 
-    // ------------ Host Resources ------------
+    // ------------ Host and Player Resources ------------
 
+    access(all) resource interface PawnSpawner {
+        access(Host)
+        fun createPawn(
+            _ library: Address,
+            template: EntryIdentifier?,
+            shape: EntryIdentifier?,
+            features: [EntryIdentifier],
+            items: [EntryIdentifier],
+            itemAmounts: {String: UFix64},
+            abilities: [EntryIdentifier],
+            bioPrompts: [String]
+        ): @Pawn {
+            return <- create Pawn(
+                library,
+                template: template,
+                shape: shape,
+                features: features,
+                items: items,
+                itemAmounts: itemAmounts,
+                abilities: abilities,
+                bioPrompts: bioPrompts
+            )
+        }
+    }
+
+    // The PlayerPocket resource is used to store the pawns of the player
+    // This resource is stored in the player's account
+    access(all) resource PlayerPocket {
+        // UserId => Pawn
+        access(contract)
+        let owned: @{UInt64: Pawn}
+
+        view init() {
+            self.owned <- {}
+        }
+
+        // Returns the number of pawns owned by the player
+        access(all) view
+        fun getOwnedLength(): Int {
+            return self.owned.length
+        }
+
+        // Returns the IDs of the pawns owned by the player
+        access(all) view
+        fun getOwnedIDs(): [UInt64] {
+            return self.owned.keys
+        }
+
+        // Returns a reference to the pawn with the given ID
+        access(all) view
+        fun borrowPawn(_ id: UInt64): &Pawn? {
+            return self.borrowWritablePawn(id)
+        }
+
+        // Deploys a pawn to the player's pocket
+        access(contract)
+        fun addPawn(_ pawn: @Pawn) {
+            let library = pawn.library
+            let template = pawn.template?.getStringID()
+            let uuid = pawn.uuid
+            self.owned[pawn.uuid] <-! pawn
+
+            emit PawnAddedToPocket(
+                library,
+                self.owner?.address,
+                template,
+                uuid,
+            )
+        }
+
+        // Returns a mutable reference to the pawn with the given ID
+        access(contract) view
+        fun borrowWritablePawn(_ id: UInt64): auth(Host) &Pawn? {
+            return &self.owned[id]
+        }
+    }
+
+    // Creates a new player pocket
+    access(all) view
+    fun createPlayerPocket(): @PlayerPocket {
+        return <- create PlayerPocket()
+    }
+
+    // Returns a reference to the player's pocket
+    access(all) view
+    fun borrowPlayerPocket(_ address: Address): &PlayerPocket? {
+        return getAccount(address)
+            .capabilities
+            .get<&PlayerPocket>(self.pocketPublicPath)
+            .borrow()
+    }
+
+    // A struct to identify a pawn
+    access(all) struct PawnIdentifier {
+        let owner: Address
+        let id: UInt64
+
+        init(_ owner: Address, _ id: UInt64) {
+            self.owner = owner
+            self.id = id
+        }
+
+        // Returns a reference to the pawn
+        access(all) view
+        fun borrowPawn(): &Pawn? {
+            if let pocketRef = FGameMishal.borrowPlayerPocket(self.owner) {
+                return pocketRef.borrowPawn(self.id)
+            }
+            return nil
+        }
+
+        // Returns a mutable reference to the pawn
+        access(contract) view
+        fun borrowWritablePawn(): auth(Host) &Pawn? {
+            if let pocketRef = FGameMishal.borrowPlayerPocket(self.owner) {
+                return pocketRef.borrowWritablePawn(self.id)
+            }
+            return nil
+        }
+    }
+
+    // The HostBoard resource is used to store the pawns for some game
+    // This resource is stored in the host's account
+    access(all) resource HostBoard {
+        access(all)
+        let deadUnits: [PawnIdentifier]
+        access(all)
+        let leftUnits: [PawnIdentifier]
+        access(contract)
+        let participants: {Address: [UInt64]}
+
+        init() {
+            self.participants = {}
+            self.deadUnits = []
+            self.leftUnits = []
+        }
+
+        access(all) view
+        fun isActive(): Bool {
+            for participant in self.participants.keys {
+                if let pawns = self.participants[participant] {
+                    if pawns.length > 0 {
+                        return true
+                    }
+                }
+            }
+            return false
+        }
+
+        // Returns the number of participants in the board
+        access(all) view
+        fun getParticipantsLength(): Int {
+            return self.participants.length
+        }
+
+        // Returns the addresses of the participants in the board
+        access(all) view
+        fun getParticipants(): [Address] {
+            return self.participants.keys
+        }
+
+        // Returns the IDs of the pawns of the participant
+        access(all) view
+        fun getParticipantsPawnIDs(_ address: Address): [UInt64] {
+            return self.participants[address] ?? []
+        }
+
+        // Returns a mutable reference to the pawns of the participant
+        access(all)
+        fun borrowParticipantPawns(_ address: Address): [&Pawn] {
+            if let pocketRef = FGameMishal.borrowPlayerPocket(address) {
+                let ids = self.getParticipantsPawnIDs(address)
+                let pawns: [&Pawn] = []
+                for id in ids {
+                    if let pawn = pocketRef.borrowPawn(id) {
+                        pawns.append(pawn)
+                    }
+                }
+                return pawns
+            }
+            return []
+        }
+
+        // Returns a mutable reference to the pawn of the participant
+        access(Host) view
+        fun borrowWritableParticipantPawn(_ address: Address, _ id: UInt64): auth(Host) &Pawn? {
+            if let pocketRef = FGameMishal.borrowPlayerPocket(address) {
+                return pocketRef.borrowWritablePawn(id)
+            }
+            return nil
+        }
+
+        // Inserts a pawn to the participant's pocket
+        access(Host)
+        fun insertPawn(_ address: Address, pawn: @Pawn) {
+            let pocketRef = FGameMishal.borrowPlayerPocket(address)
+                ?? panic("Player pocket not found")
+            let pawnId = pawn.uuid
+            let library = pawn.library
+
+            let participants = self.borrowAndEnsureParticipants(address)
+            assert(!participants.contains(pawnId), message: "Pawn already exists")
+
+            participants.append(pawnId)
+            pocketRef.addPawn(<- pawn)
+
+            emit PawnDeployed(
+                library,
+                address,
+                pawnId,
+                self.owner?.address ?? panic("Host not exists"),
+                self.uuid,
+            )
+        }
+
+        // Removes a dead pawn from the host board
+        access(Host)
+        fun removeDeadPawn(_ address: Address, _ id: UInt64) {
+            if let pawn = PawnIdentifier(address, id).borrowWritablePawn() {
+                // ensure pawn is dead
+                assert(pawn.isDead(), message: "Pawn is not dead")
+
+                self.removePawn(pawn)
+                return
+            }
+            panic("Pawn not found")
+        }
+
+        // Removes an alive pawn from the host board
+        access(Host)
+        fun removeAlivePawn(_ address: Address, _ id: UInt64) {
+            if let pawn = PawnIdentifier(address, id).borrowWritablePawn() {
+                // ensure pawn is alive
+                assert(!pawn.isDead(), message: "Pawn should be alive")
+
+                self.removePawn(pawn)
+                return
+            }
+            panic("Pawn not found")
+        }
+
+        // ---- Private Functions ----
+
+        access(self)
+        fun removePawn(_ pawn: &Pawn) {
+            let pawnOwner = pawn.owner?.address ?? panic("Pawn owner not found")
+            let pawnId = pawn.uuid
+            let participants = self.borrowAndEnsureParticipants(pawnOwner)
+            if let index = participants.firstIndex(of: pawnId) {
+                let _ = participants.remove(at: index)
+
+                if pawn.isDead() {
+                    self.deadUnits.append(PawnIdentifier(pawnOwner, pawnId))
+                } else {
+                    self.leftUnits.append(PawnIdentifier(pawnOwner, pawnId))
+                }
+
+                emit PawnRemoved(
+                    pawn.library,
+                    pawnOwner,
+                    pawn.uuid,
+                    self.owner?.address ?? panic("Host not exists"),
+                    self.uuid,
+                )
+            }
+        }
+
+        access(self)
+        fun borrowAndEnsureParticipants(_ address: Address): auth(Mutate) &[UInt64] {
+            if let participants = &self.participants[address] as auth(Mutate) &[UInt64]? {
+                return participants
+            } else {
+                self.participants[address] = []
+                return &self.participants[address]!
+            }
+        }
+    }
+
+    // Creates a new host board
+    access(all)
+    fun createBoard(): @HostBoard {
+        return <- create HostBoard()
+    }
+
+    // The HostOperator resource is used to manage the active containers of the host
+    // This resource is stored in the host's account
     access(all) resource HostOperator {
-        // TODO: Implement the HostOperator resource
+        access(contract)
+        let boards: {UInt64: Capability<auth(Host) &HostBoard>}
+        access(contract)
+        let activeBoards: [UInt64]
+
+        view init() {
+            self.boards = {}
+            self.activeBoards = []
+        }
+
+        access(all) view
+        fun getActiveBoardsLength(): Int {
+            return self.activeBoards.length
+        }
+
+        // access(Host)
+        // fun openBoard()
+    }
+
+    // Creates a new host operator
+    access(all) view
+    fun createHostOperator(): @HostOperator {
+        return <- create HostOperator()
+    }
+
+    // Returns a reference to the host's operator
+    access(all) view
+    fun borrowHostOperator(_ host: Address): &HostOperator? {
+        return getAccount(host)
+            .capabilities
+            .get<&HostOperator>(self.hostOperatorPublicPath)
+            .borrow()
     }
 
     // ---- Public Functions ----
 
+    // Creates a new library
     access(all)
     fun createLibrary(): @Library {
         return <- create Library()
     }
 
+    // Returns a reference to the library with the given address
     access(all) view
     fun borrowLibrary(_ address: Address): &Library? {
         return getAccount(address).capabilities
@@ -3047,6 +3379,7 @@ access(all) contract FGameMishal {
             .borrow()
     }
 
+    // Returns a reference to the most popular library
     access(all) view
     fun borrowPopularLibrary(): &Library? {
         // Borrow the libraray with the highest item count
@@ -3071,5 +3404,11 @@ access(all) contract FGameMishal {
         let identifier = "FGameMishal_".concat(self.account.address.toString())
         self.libraryStoragePath = StoragePath(identifier: identifier.concat("_Library"))!
         self.libraryPublicPath = PublicPath(identifier: identifier.concat("_Library"))!
+
+        self.pocketStoragePath = StoragePath(identifier: identifier.concat("_PlayerPocket"))!
+        self.pocketPublicPath = PublicPath(identifier: identifier.concat("_PlayerPocket"))!
+
+        self.hostOperatorStoragePath = StoragePath(identifier: identifier.concat("_HostOperator"))!
+        self.hostOperatorPublicPath = PublicPath(identifier: identifier.concat("_HostOperator"))!
     }
 }
