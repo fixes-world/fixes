@@ -3263,6 +3263,8 @@ access(all) contract FGameMishal {
 
             let participants = self.borrowAndEnsureParticipants(address)
             assert(!participants.contains(uuid), message: "Pawn already exists")
+            // ensure pawn is alive
+            assert(!pawn.isStunned(), message: "Pawn should not be stunned")
 
             participants.append(uuid)
 
