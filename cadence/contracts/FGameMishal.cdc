@@ -18,6 +18,8 @@ access(all) contract FGameMishal {
     access(all) entitlement Editor;
     // Entitlements for the Host role (Like the host of the game)
     access(all) entitlement Host;
+    // Entitlements for the Player role (Like the player of the game)
+    access(all) entitlement Player;
 
     // ----- Events -----
 
@@ -2681,7 +2683,7 @@ access(all) contract FGameMishal {
         }
 
         // Upgrades a specific attribute by consuming potentiality
-        access(Host)
+        access(Host | Player)
         fun upgradeAttribute(_ type: AttributeType, _ amount: UInt64) {
             let attributes = self.borrowCultivableAttributes()
 
@@ -2739,7 +2741,7 @@ access(all) contract FGameMishal {
         // --- Cultivable Methods - Ability, Write ---
 
         // Increases the cultivation level of an ability by consuming potentiality
-        access(Host)
+        access(Host | Player)
         fun cultivateAbility(_ ability: EntryIdentifier, consume: UInt64, abilityUp: UInt64) {
             let itemId = ability.getStringID()
             assert(self.borrowEntryByID(itemId) != nil, message: "Ability already exists")
@@ -3099,6 +3101,11 @@ access(all) contract FGameMishal {
             return self.borrowWritablePawn(id)
         }
 
+        access(Player) view
+        fun borrowEditablePawn(_ id: UInt64): auth(Player) &Pawn? {
+            return self.borrowWritablePawn(id)
+        }
+
         // Deploys a pawn to the player's pocket
         access(contract)
         fun addPawn(_ pawn: @Pawn) {
@@ -3117,7 +3124,7 @@ access(all) contract FGameMishal {
 
         // Returns a mutable reference to the pawn with the given ID
         access(contract) view
-        fun borrowWritablePawn(_ id: UInt64): auth(Host) &Pawn? {
+        fun borrowWritablePawn(_ id: UInt64): auth(Host, Player) &Pawn? {
             return &self.owned[id]
         }
     }
