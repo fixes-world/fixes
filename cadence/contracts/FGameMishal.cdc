@@ -463,6 +463,42 @@ access(all) contract FGameMishal {
 
         // -------- Restricted Functions --------
 
+        // Borrow a writable object by uuid
+        access(contract) view
+        fun borrowWritableObject(_ uuid: UInt64): auth(Mutate) &Object? {
+            return &self.objects[uuid]
+        }
+
+        // Borrow a writable item by uuid
+        access(contract) view
+        fun borrowWritableItem(_ uuid: UInt64): auth(Mutate) &Item? {
+            return &self.items[uuid]
+        }
+
+        // Borrow a writable ability by uuid
+        access(contract) view
+        fun borrowWritableAbility(_ uuid: UInt64): auth(Mutate) &Ability? {
+            return &self.abilities[uuid]
+        }
+
+        // Borrow a writable shape by uuid
+        access(contract) view
+        fun borrowWritableShape(_ uuid: UInt64): auth(Mutate) &Shape? {
+            return &self.shapes[uuid]
+        }
+
+        // Borrow a writable feature by uuid
+        access(contract) view
+        fun borrowWritableFeature(_ uuid: UInt64): auth(Mutate) &Feature? {
+            return &self.features[uuid]
+        }
+
+        // Borrow a writable creature by uuid
+        access(contract) view
+        fun borrowWritableCreature(_ uuid: UInt64): auth(Mutate) &Creature? {
+            return &self.creatures[uuid]
+        }
+
         // -------- Private Functions --------
 
         access(self) view
