@@ -3048,6 +3048,7 @@ access(all) contract FGameMishal {
     // ------------ Host and Player Resources ------------
 
     access(all) resource interface PawnSpawner {
+        // Creates a new pawn
         access(Host)
         fun createPawn(
             _ library: Address,
@@ -3069,6 +3070,14 @@ access(all) contract FGameMishal {
                 abilities: abilities,
                 bioPrompts: bioPrompts
             )
+        }
+
+        // Stores a pawn in the player's pocket
+        access(Host)
+        fun storePawn(_ player: Address, _ pawn: @Pawn) {
+            let pocketRef = FGameMishal.borrowPlayerPocket(player)
+                ?? panic("Player pocket not found")
+            pocketRef.addPawn(<- pawn)
         }
     }
 
@@ -3246,22 +3255,21 @@ access(all) contract FGameMishal {
 
         // Inserts a pawn to the participant's pocket
         access(Host)
-        fun insertPawn(_ address: Address, pawn: @Pawn) {
+        fun insertPawn(_ address: Address, _ uuid: UInt64) {
             let pocketRef = FGameMishal.borrowPlayerPocket(address)
                 ?? panic("Player pocket not found")
-            let pawnId = pawn.uuid
-            let library = pawn.library
+            let pawn = pocketRef.borrowWritablePawn(uuid)
+                ?? panic("Pawn not found")
 
             let participants = self.borrowAndEnsureParticipants(address)
-            assert(!participants.contains(pawnId), message: "Pawn already exists")
+            assert(!participants.contains(uuid), message: "Pawn already exists")
 
-            participants.append(pawnId)
-            pocketRef.addPawn(<- pawn)
+            participants.append(uuid)
 
             emit PawnDeployed(
-                library,
+                pawn.library,
                 address,
-                pawnId,
+                uuid,
                 self.owner?.address ?? panic("Host not exists"),
                 self.uuid,
             )
