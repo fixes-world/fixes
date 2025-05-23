@@ -465,37 +465,37 @@ access(all) contract FGameMishal {
 
         // Borrow a writable object by uuid
         access(contract) view
-        fun borrowWritableObject(_ uuid: UInt64): auth(Mutate) &Object? {
+        fun borrowWritableObject(_ uuid: UInt64): auth(Editor) &Object? {
             return &self.objects[uuid]
         }
 
         // Borrow a writable item by uuid
         access(contract) view
-        fun borrowWritableItem(_ uuid: UInt64): auth(Mutate) &Item? {
+        fun borrowWritableItem(_ uuid: UInt64): auth(Editor) &Item? {
             return &self.items[uuid]
         }
 
         // Borrow a writable ability by uuid
         access(contract) view
-        fun borrowWritableAbility(_ uuid: UInt64): auth(Mutate) &Ability? {
+        fun borrowWritableAbility(_ uuid: UInt64): auth(Editor) &Ability? {
             return &self.abilities[uuid]
         }
 
         // Borrow a writable shape by uuid
         access(contract) view
-        fun borrowWritableShape(_ uuid: UInt64): auth(Mutate) &Shape? {
+        fun borrowWritableShape(_ uuid: UInt64): auth(Editor) &Shape? {
             return &self.shapes[uuid]
         }
 
         // Borrow a writable feature by uuid
         access(contract) view
-        fun borrowWritableFeature(_ uuid: UInt64): auth(Mutate) &Feature? {
+        fun borrowWritableFeature(_ uuid: UInt64): auth(Editor) &Feature? {
             return &self.features[uuid]
         }
 
         // Borrow a writable creature by uuid
         access(contract) view
-        fun borrowWritableCreature(_ uuid: UInt64): auth(Mutate) &Creature? {
+        fun borrowWritableCreature(_ uuid: UInt64): auth(Editor) &Creature? {
             return &self.creatures[uuid]
         }
 
@@ -569,12 +569,6 @@ access(all) contract FGameMishal {
         }
     }
 
-    // ------------ Host Resources ------------
-
-    access(all) resource HostOperator {
-        // TODO: Implement the HostOperator resource
-    }
-
     // ------------ Library Entities ------------
 
     access(all) struct interface Copyable {
@@ -630,7 +624,7 @@ access(all) contract FGameMishal {
         }
 
         /// This method will not check if the value is negative
-        access(Host)
+        access(contract)
         fun setValue(_ type: AttributeType, _ value: Int64) {
             switch type {
                 case AttributeType.STRENGTH:
@@ -645,7 +639,7 @@ access(all) contract FGameMishal {
         }
 
         // For this method, the final value cannot be negative
-        access(Host)
+        access(contract)
         fun addValue(_ type: AttributeType, _ value: Int64) {
             post {
                 self.strength >= 0: "Strength cannot be negative"
@@ -718,7 +712,7 @@ access(all) contract FGameMishal {
         }
 
         // This method will not check if the value is negative
-        access(Host)
+        access(contract)
         fun setValue(_ type: DefenceType, _ value: Int64) {
             switch type {
                 case DefenceType.PHYSICAL:
@@ -814,12 +808,12 @@ access(all) contract FGameMishal {
             return self.value != nil
         }
 
-        access(Host)
+        access(Editor)
         fun setValue(value: UFix64) {
             self.value = value
         }
 
-        access(Host)
+        access(Editor)
         fun addValue(value: UFix64) {
             post {
                 (self.value ?? 0.0) >= 0.0: "Value cannot be negative"
@@ -836,12 +830,12 @@ access(all) contract FGameMishal {
             return self.effects.length > 0
         }
 
-        access(Host)
+        access(Editor)
         fun addEffect(effect: String) {
             self.effects.append(effect)
         }
 
-        access(Host)
+        access(Editor)
         fun removeEffect(effect: String) {
             if let index = self.effects.firstIndex(of: effect) {
                 let _ = self.effects.remove(at: index)
@@ -1273,7 +1267,7 @@ access(all) contract FGameMishal {
             }
         }
 
-        access(Host) view
+        access(Host | Editor) view
         fun borrowEditableEntry(_ id: String): auth(FungibleToken.Withdraw) &FungibleEntry? {
             return &self.entries[id]
         }
@@ -1450,7 +1444,7 @@ access(all) contract FGameMishal {
             return settings.length > 0
         }
 
-        access(Host)
+        access(Host | Editor)
         fun updateSetting(_ setting: CreatureSettings, _ value: Int64) {
             let settings = self.borrowWritableSettings()
             settings[setting] = value
@@ -1605,7 +1599,7 @@ access(all) contract FGameMishal {
 
         // --- Gameplay Methods ---
 
-        access(Host)
+        access(Host | Editor)
         fun applyShape(_ shape: @FungibleEntry) {
             pre {
                 shape.identifier.verify(LibraryCategory.SHAPE): "Shape identifier is invalid"
@@ -1638,14 +1632,14 @@ access(all) contract FGameMishal {
 
         // --- Gameplay Methods ---
 
-        access(Host)
+        access(Host | Editor)
         fun gainAbility(_ ability: @FungibleEntry) {
             pre {
                 ability.identifier.verify(LibraryCategory.ABILITY): "Ability identifier is invalid"
             }
         }
 
-        access(Host)
+        access(Host | Editor)
         fun dropAbility(_ ability: EntryIdentifier): @FungibleEntry {
             post {
                 result.identifier.getStringID() == ability.getStringID(): "The ID of the withdrawn token must be the same as the requested ID"
@@ -1682,14 +1676,14 @@ access(all) contract FGameMishal {
 
         // --- Item Gameplay Methods ---
 
-        access(Host)
+        access(Host | Editor)
         fun lootItem(_ entry: @FungibleEntry) {
             pre {
                 entry.identifier.verify(LibraryCategory.ITEM): "Entry is not an item"
             }
         }
 
-        access(Host)
+        access(Host | Editor)
         fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
             post {
                 result.identifier.getStringID() == item.getStringID(): "The ID of the withdrawn token must be the same as the requested ID"
@@ -1770,7 +1764,7 @@ access(all) contract FGameMishal {
         }
 
         // Apply a shape to the unit
-        access(Host)
+        access(Host | Editor)
         fun applyShape(_ shape: @FungibleEntry) {
             let collection = self.borrowReadonlyCollection()
             let shapes = collection.getKeysByCategory(LibraryCategory.SHAPE)
@@ -1803,24 +1797,24 @@ access(all) contract FGameMishal {
     access(all) resource interface StaticCollectionUnit: UnitCollectionBaseCarrier, CollectionContainerUnit {
         // ---- Implement Item Gameplay Methods ----
 
-        access(Host)
+        access(Host | Editor)
         fun lootItem(_ entry: @FungibleEntry) {
             self.deposit(entry: <-entry)
         }
 
-        access(Host)
+        access(Host | Editor)
         fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
             return <- self.withdraw(item.getStringID(), amount: amount)
         }
 
         // ---- Implement Ability Gameplay Methods ----
 
-        access(Host)
+        access(Host | Editor)
         fun gainAbility(_ ability: @FungibleEntry) {
             self.deposit(entry: <-ability)
         }
 
-        access(Host)
+        access(Host | Editor)
         fun dropAbility(_ ability: EntryIdentifier): @FungibleEntry {
             return <- self.withdraw(ability.getStringID(), amount: nil)
         }
@@ -1928,7 +1922,7 @@ access(all) contract FGameMishal {
 
         // ---- Implement Feature Gameplay Methods ----
 
-        access(Host)
+        access(Host | Editor)
         fun applyFeature(_ feature: @FungibleEntry) {
             pre {
                 feature.identifier.verify(LibraryCategory.FEATURE): "Feature identifier is invalid"
@@ -1950,11 +1944,12 @@ access(all) contract FGameMishal {
     }
 
     access(all) resource interface BioCarrier {
-        access(Host) view fun borrowWritableBioPrompts(): auth(Mutate) &[String]
+        access(Host | Editor) view
+        fun borrowWritableBioPrompts(): auth(Mutate) &[String]
 
         access(all) view fun borrowBioPrompts(): &[String] { return self.borrowWritableBioPrompts() }
 
-        access(Host)
+        access(Host | Editor)
         fun addBioPrompt(_ prompt: String) {
             let prompts = self.borrowWritableBioPrompts()
             prompts.append(prompt)
@@ -2132,7 +2127,8 @@ access(all) contract FGameMishal {
         /// Returns a mutable reference to the slots occupied by equipped items.
         ///
         /// @return Mutable reference to the EquipSlot mapping.
-        access(Host) view fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
+        access(Host | Editor) view
+        fun borrowSlotsOccupied(): auth(Mutate) &{EquipSlot: [String]} {
             let status = self.borrowStatus()
             return status.borrowWritableSlotsOccupied()
         }
@@ -2200,7 +2196,7 @@ access(all) contract FGameMishal {
         /// Equips an item to the creature, updating occupied slots and emitting an event.
         ///
         /// @param item The EntryIdentifier of the item to equip.
-        access(Host)
+        access(Host | Editor)
         fun equipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
             let itemId = item.getStringID()
@@ -2234,7 +2230,7 @@ access(all) contract FGameMishal {
         /// Unequips an item from the creature, updating occupied slots and emitting an event.
         ///
         /// @param item The EntryIdentifier of the item to unequip.
-        access(Host)
+        access(Host | Editor)
         fun unequipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
             let itemId = item.getStringID()
@@ -2466,7 +2462,8 @@ access(all) contract FGameMishal {
     // PlayableUnit interface represents a unit that can participate in gameplay and have health-related actions
     access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
         // Returns a mutable reference to the unit's health attributes
-        access(Host) view fun borrowHealth(): auth(Mutate) &Attributes
+        access(Host) view
+        fun borrowHealth(): auth(Mutate) &Attributes
 
         // ---- Gameplay Methods, Read ---
 
@@ -2574,7 +2571,7 @@ access(all) contract FGameMishal {
         // ---- Implement Feature Gameplay Methods ----
 
         // This is static, so we don't need to apply it for now
-        access(Host)
+        access(Host | Editor)
         fun applyFeature(_ feature: @FungibleEntry) {
             // borrow the feature
             let featureRef = feature.identifier.borrowFeature() ?? panic("Not Exists, Feature: ".concat(feature.identifier.getStringID()))
@@ -2598,7 +2595,7 @@ access(all) contract FGameMishal {
         // ---- Equipable Item Gameplay Methods ----
 
         // Adds an item to the unit's collection and equips it if possible
-        access(Host)
+        access(Host | Editor)
         fun lootItem(_ entry: @FungibleEntry) {
             let itemId = entry.identifier
             let itemRef = itemId.borrowItem() ?? panic("Not Exists, Item: ".concat(itemId.getStringID()))
@@ -2613,7 +2610,7 @@ access(all) contract FGameMishal {
         }
 
         // Removes an item from the unit's collection, unequipping it if necessary
-        access(Host)
+        access(Host | Editor)
         fun dropItem(_ item: EntryIdentifier, _ amount: UFix64?): @FungibleEntry {
             if self.hasItemEquipped(item) {
                 self.unequipItem(item)
@@ -2751,7 +2748,7 @@ access(all) contract FGameMishal {
         }
 
         // Adds a new ability to the unit, consuming potentiality and updating status
-        access(Host)
+        access(Host | Editor)
         fun gainAbility(_ ability: @FungibleEntry) {
             let itemId = ability.identifier.getStringID()
             assert(self.borrowEntryByID(itemId) == nil, message: "Ability already exists")
@@ -2785,7 +2782,7 @@ access(all) contract FGameMishal {
         }
 
         // Removes an ability from the unit and resets its cultivation
-        access(Host)
+        access(Host | Editor)
         fun dropAbility(_ ability: EntryIdentifier): @FungibleEntry {
             let itemId = ability.getStringID()
             assert(self.borrowEntryByID(itemId) != nil, message: "Ability not exists")
@@ -3028,6 +3025,12 @@ access(all) contract FGameMishal {
         fun borrowHealth(): auth(Mutate) &Attributes {
             return &self.health
         }
+    }
+
+    // ------------ Host Resources ------------
+
+    access(all) resource HostOperator {
+        // TODO: Implement the HostOperator resource
     }
 
     // ---- Public Functions ----
