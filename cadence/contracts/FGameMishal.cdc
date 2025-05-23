@@ -49,6 +49,9 @@ access(all) contract FGameMishal {
     access(all) event PawnHealthRecovered(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
     access(all) event PawnHealthDamaged(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
 
+    access(all) event HostBoardOpened(_ host: Address, _ uuid: UInt64)
+    access(all) event HostBoardClosed(_ host: Address, _ uuid: UInt64)
+
     // ----- Contract Level Variables -----
 
     // The counter variable for the library items
@@ -3328,7 +3331,7 @@ access(all) contract FGameMishal {
 
     // The HostOperator resource is used to manage the active containers of the host
     // This resource is stored in the host's account
-    access(all) resource HostOperator {
+    access(all) resource HostOperator: PawnSpawner {
         access(contract)
         let boards: {UInt64: Capability<auth(Host) &HostBoard>}
         access(contract)
@@ -3344,8 +3347,58 @@ access(all) contract FGameMishal {
             return self.activeBoards.length
         }
 
-        // access(Host)
-        // fun openBoard()
+        access(all) view
+        fun getActiveBoardIDs(): [UInt64] {
+            return self.activeBoards
+        }
+
+        access(all) view
+        fun borrowBoard(_ uuid: UInt64): &HostBoard? {
+            return self.borrowWritableBoard(uuid)
+        }
+
+        access(Host) view
+        fun borrowWritableBoard(_ uuid: UInt64): auth(Host) &HostBoard? {
+            if let cap = self.boards[uuid] {
+                return cap.borrow()
+            }
+            return nil
+        }
+
+        access(Host)
+        fun openBoard(_ cap: Capability<auth(Host) &HostBoard>) {
+            pre {
+                cap.borrow() != nil: "Board's capability is not valid"
+            }
+            let board = cap.borrow()!
+            let uuid = board.uuid
+
+            assert(self.boards[uuid] == nil, message: "Board has already added")
+            assert(self.activeBoards.contains(uuid), message: "Board is not active")
+
+            self.boards[uuid] = cap
+            self.activeBoards.append(uuid)
+
+            emit HostBoardOpened(self.owner?.address ?? panic("Host not exists"), uuid)
+        }
+
+        access(Host)
+        fun closeBoard(_ uuid: UInt64) {
+            pre {
+                self.activeBoards.contains(uuid): "Board is not active"
+                self.boards[uuid] == nil: "Board has already added"
+            }
+            assert(self.boards[uuid] != nil, message: "Board not found")
+            let board = self.boards[uuid]!.borrow()
+                ?? panic("Board not found")
+
+            assert(!board.isActive(), message: "Board should be inactive")
+
+            let _cap = self.boards.remove(key: uuid)
+            let _ = self.activeBoards.remove(at: self.activeBoards.firstIndex(of: uuid)!)
+
+            emit HostBoardClosed(self.owner?.address ?? panic("Host not exists"), uuid)
+        }
     }
 
     // Creates a new host operator
