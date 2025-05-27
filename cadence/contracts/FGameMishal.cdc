@@ -2209,7 +2209,7 @@ access(all) contract FGameMishal {
         /// Equips an item to the creature, updating occupied slots and emitting an event.
         ///
         /// @param item The EntryIdentifier of the item to equip.
-        access(Host | Editor)
+        access(Editor | Host | Player)
         fun equipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
             let itemId = item.getStringID()
@@ -2243,7 +2243,7 @@ access(all) contract FGameMishal {
         /// Unequips an item from the creature, updating occupied slots and emitting an event.
         ///
         /// @param item The EntryIdentifier of the item to unequip.
-        access(Host | Editor)
+        access(Editor | Host | Player)
         fun unequipItem(_ item: EntryIdentifier) {
             let itemRef = item.borrowItem() ?? panic("Not Exists, Item: ".concat(item.getStringID()))
             let itemId = item.getStringID()
@@ -3107,12 +3107,12 @@ access(all) contract FGameMishal {
         // Returns a reference to the pawn with the given ID
         access(all) view
         fun borrowPawn(_ id: UInt64): &Pawn? {
-            return self.borrowWritablePawn(id)
+            return self.borrowFullWritablePawn(id)
         }
 
         access(Player) view
         fun borrowEditablePawn(_ id: UInt64): auth(Player) &Pawn? {
-            return self.borrowWritablePawn(id)
+            return self.borrowFullWritablePawn(id)
         }
 
         // Deploys a pawn to the player's pocket
@@ -3133,7 +3133,7 @@ access(all) contract FGameMishal {
 
         // Returns a mutable reference to the pawn with the given ID
         access(contract) view
-        fun borrowWritablePawn(_ id: UInt64): auth(Host, Player) &Pawn? {
+        fun borrowFullWritablePawn(_ id: UInt64): auth(Host, Player) &Pawn? {
             return &self.owned[id]
         }
     }
@@ -3174,9 +3174,9 @@ access(all) contract FGameMishal {
 
         // Returns a mutable reference to the pawn
         access(contract) view
-        fun borrowWritablePawn(): auth(Host) &Pawn? {
+        fun borrowFullWritablePawn(): auth(Host) &Pawn? {
             if let pocketRef = FGameMishal.borrowPlayerPocket(self.owner) {
-                return pocketRef.borrowWritablePawn(self.id)
+                return pocketRef.borrowFullWritablePawn(self.id)
             }
             return nil
         }
@@ -3248,7 +3248,7 @@ access(all) contract FGameMishal {
         access(Host) view
         fun borrowWritableParticipantPawn(_ address: Address, _ id: UInt64): auth(Host) &Pawn? {
             if let pocketRef = FGameMishal.borrowPlayerPocket(address) {
-                return pocketRef.borrowWritablePawn(id)
+                return pocketRef.borrowFullWritablePawn(id)
             }
             return nil
         }
@@ -3258,7 +3258,7 @@ access(all) contract FGameMishal {
         fun insertPawn(_ address: Address, _ uuid: UInt64) {
             let pocketRef = FGameMishal.borrowPlayerPocket(address)
                 ?? panic("Player pocket not found")
-            let pawn = pocketRef.borrowWritablePawn(uuid)
+            let pawn = pocketRef.borrowFullWritablePawn(uuid)
                 ?? panic("Pawn not found")
 
             let participants = self.borrowAndEnsureParticipants(address)
@@ -3280,7 +3280,7 @@ access(all) contract FGameMishal {
         // Removes a dead pawn from the host board
         access(Host)
         fun removeDeadPawn(_ address: Address, _ id: UInt64) {
-            if let pawn = PawnIdentifier(address, id).borrowWritablePawn() {
+            if let pawn = PawnIdentifier(address, id).borrowFullWritablePawn() {
                 // ensure pawn is dead
                 assert(pawn.isDead(), message: "Pawn is not dead")
 
@@ -3293,7 +3293,7 @@ access(all) contract FGameMishal {
         // Removes an alive pawn from the host board
         access(Host)
         fun removeAlivePawn(_ address: Address, _ id: UInt64) {
-            if let pawn = PawnIdentifier(address, id).borrowWritablePawn() {
+            if let pawn = PawnIdentifier(address, id).borrowFullWritablePawn() {
                 // ensure pawn is alive
                 assert(!pawn.isDead(), message: "Pawn should be alive")
 
