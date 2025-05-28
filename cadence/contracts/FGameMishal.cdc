@@ -56,7 +56,9 @@ access(all) contract FGameMishal {
     access(all) event HostBoardCreated(_ container: Address, _ uuid: UInt64)
     access(all) event HostBoardOpened(_ host: Address, _ container: Address, _ id: UInt64)
     access(all) event HostBoardClosed(_ host: Address, _ container: Address, _ id: UInt64)
+
     access(all) event HostOperatorSpawnerUpdated(_ host: Address, _ uuid: UInt64, _ pawnSpawner: Address, _ pawnSpawnerUuid: UInt64)
+    access(all) event HostOperatorBoardContainerAdded(_ host: Address, _ uuid: UInt64, _ container: Address)
 
     // ----- Contract Level Variables -----
 
@@ -3606,6 +3608,9 @@ access(all) contract FGameMishal {
             return self.borrowWritableBoard(uuid)
         }
 
+        access(all) view
+        fun getBoardIds(): [UInt64]
+
         // Returns a mutable reference to the board with the given UUID
         access(Host) view
         fun borrowWritableBoard(_ uuid: UInt64): auth(Host) &HostBoard?
@@ -3656,15 +3661,8 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowBoard(): &HostBoard? {
-            return self.borrowWritableBoard()
-        }
-
-        access(contract) view
-        fun borrowWritableBoard(): auth(Host) &HostBoard? {
             if let container = self.borrowBoardContainer() {
-                if let board = container.borrowBoard(self.id) {
-                    return board.borrowInternalWritableBoard()
-                }
+                return container.borrowBoard(self.id)
             }
             return nil
         }
@@ -3679,11 +3677,14 @@ access(all) contract FGameMishal {
         let activeBoards: [BoardIdentifier]
         access(contract)
         var pawnSpawner: Capability<auth(Host) &{PawnSpawner}>?
+        access(contract)
+        let boardContainers: {Address: Capability<auth(Host) &{HostBoardContainer}>}
 
         view init() {
             self.boards = {}
             self.activeBoards = []
             self.pawnSpawner = nil
+            self.boardContainers = {}
         }
 
         access(all) view
@@ -3712,6 +3713,23 @@ access(all) contract FGameMishal {
             )
         }
 
+        access(Host)
+        fun addBoardContainer(_ cap: Capability<auth(Host) &{HostBoardContainer}>) {
+            pre {
+                cap.borrow() != nil: "Board container is not valid"
+                self.boardContainers[cap.address] == nil: "Board container already exists"
+            }
+
+            let addr = cap.address
+            self.boardContainers[addr] = cap
+
+            emit HostOperatorBoardContainerAdded(
+                self.owner?.address ?? panic("Host not exists"),
+                self.uuid,
+                addr,
+            )
+        }
+
         // Returns a mutable reference to the pawn spawner
         access(Host) view
         fun borrowPawnSpawner(): auth(Host) &{PawnSpawner}? {
@@ -3730,8 +3748,9 @@ access(all) contract FGameMishal {
         // Opens a board
         access(Host)
         fun openBoard(_ container: Address, _ id: UInt64) {
-            let boardIdentifier = BoardIdentifier(container, id)
-            let board = boardIdentifier.borrowWritableBoard()
+            let containerRef = self.borrowBoardContainer(container)
+                ?? panic("Board container not found")
+            let board = containerRef.borrowWritableBoard(id)
                 ?? panic("Board not found")
 
             if self.boards[container] == nil {
@@ -3742,7 +3761,7 @@ access(all) contract FGameMishal {
             assert(!ids.contains(id), message: "Board has already added")
 
             ids.append(id)
-            self.activeBoards.append(boardIdentifier)
+            self.activeBoards.append(BoardIdentifier(container, id))
 
             // open the board
             board.onOpening()
@@ -3753,8 +3772,7 @@ access(all) contract FGameMishal {
         // Closes a board
         access(Host)
         fun closeBoard(_ container: Address, _ id: UInt64) {
-            let boardIdentifier = BoardIdentifier(container, id)
-            let board = boardIdentifier.borrowWritableBoard()
+            let board = self.borrowInternalWritableBoard(container, id)
                 ?? panic("Board not found")
 
             assert(board.isActive() == false, message: "Board should be inactive")
@@ -3785,12 +3803,23 @@ access(all) contract FGameMishal {
             emit HostBoardClosed(self.owner?.address ?? panic("Host not exists"), container, id)
         }
 
+        // Returns a mutable reference to the board container with the given address
+        access(self) view
+        fun borrowBoardContainer(_ container: Address): auth(Host) &{HostBoardContainer}? {
+            if let cap = self.boardContainers[container] {
+                return cap.borrow()
+            }
+            return nil
+        }
+
         // Returns a mutable reference to the board with the given container and id
         access(self) view
         fun borrowInternalWritableBoard(_ container: Address, _ id: UInt64): auth(Host) &HostBoard? {
             if let ids = self.borrowBoardContainerIds(container) {
                 if ids.contains(id) {
-                    return BoardIdentifier(container, id).borrowWritableBoard()
+                    if let container = self.borrowBoardContainer(container) {
+                        return container.borrowWritableBoard(id)
+                    }
                 }
             }
             return nil
