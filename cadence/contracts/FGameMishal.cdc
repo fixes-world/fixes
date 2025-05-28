@@ -39,8 +39,8 @@ access(all) contract FGameMishal {
     access(all) event CreatureBioPromptAdded(_ owner: Address?, uuid: UInt64, _ prompt: String)
 
     access(all) event PawnAddedToPocket(_ library: Address, _ owner: Address?, _ template: String?, _ uuid: UInt64)
-    access(all) event PawnDeployed(_ library: Address, _ owner: Address, _ pawnUuid: UInt64, _ host: Address, _ boardUuid: UInt64)
-    access(all) event PawnRemoved(_ library: Address, _ owner: Address, _ pawnUuid: UInt64, _ host: Address, _ boardUuid: UInt64)
+    access(all) event PawnAttachedToBoard(_ library: Address, _ owner: Address, _ pawnUuid: UInt64, _ board: Address, _ boardUuid: UInt64)
+    access(all) event PawnDetachedFromBoard(_ library: Address, _ owner: Address, _ pawnUuid: UInt64, _ board: Address, _ boardUuid: UInt64)
 
     access(all) event PawnPotentialityGained(_ owner: Address?, _ amount: UInt64, uuid: UInt64)
     access(all) event PawnPotentialityConsumed(_ owner: Address?, _ consume: UInt64, _ usable: UInt64, _ used: UInt64, uuid: UInt64)
@@ -53,10 +53,10 @@ access(all) contract FGameMishal {
 
     access(all) event PawnPositionUpdated(_ board: Address, _ boardUuid: UInt64, unit: UInt64, x: Int32, y: Int32)
 
-    access(all) event HostBoardCreated(_ host: Address, _ uuid: UInt64)
+    access(all) event HostBoardCreated(_ container: Address, _ uuid: UInt64)
+    access(all) event HostBoardOpened(_ host: Address, _ container: Address, _ id: UInt64)
+    access(all) event HostBoardClosed(_ host: Address, _ container: Address, _ id: UInt64)
     access(all) event HostOperatorSpawnerUpdated(_ host: Address, _ uuid: UInt64, _ pawnSpawner: Address, _ pawnSpawnerUuid: UInt64)
-    access(all) event HostBoardOpened(_ host: Address, _ uuid: UInt64)
-    access(all) event HostBoardClosed(_ host: Address, _ uuid: UInt64)
 
     // ----- Contract Level Variables -----
 
@@ -960,7 +960,7 @@ access(all) contract FGameMishal {
         access(all) fun borrowDefenceElements(): [&Defence]
         access(all) fun borrowPotentialityElements(): [&Potentiality]
 
-        access(contract)
+        access(Host)
         fun applyStatus(_ isLast: Bool) {
             // during initializing, we don't need to apply the status if it's not the last one
             if self.owner == nil && !isLast {
@@ -2478,26 +2478,30 @@ access(all) contract FGameMishal {
 
     // ------------ Playable Unit ------------
 
-    // PlayableUnit interface represents a unit that can participate in gameplay and have health-related actions
-    access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
-        // Returns a mutable reference to the unit's health attributes
-        access(Host) view
-        fun borrowHealth(): auth(Mutate) &Attributes
+    access(all) attachment Health for ComposableUnitStatusCarrier {
+        access(all) let info: Attributes
+
+        view init() {
+            let status = base.borrowStatus()
+            self.info = Attributes(
+                strength: status.attributes.strength,
+                vitality: status.attributes.vitality,
+                spirit: status.attributes.spirit
+            )
+        }
 
         // ---- Gameplay Methods, Read ---
 
         // Returns true if any of the health attributes are zero or below, indicating the unit is stunned
         access(all) view
         fun isStunned(): Bool {
-            let health = self.borrowHealth()
-            return health.strength <= 0 || health.vitality <= 0 || health.spirit <= 0
+            return self.info.strength <= 0 || self.info.vitality <= 0 || self.info.spirit <= 0
         }
 
         // Returns true if all health attributes are zero or below, indicating the unit is dead
         access(all) view
         fun isDead(): Bool {
-            let health = self.borrowHealth()
-            return health.strength <= 0 && health.vitality <= 0 && health.spirit <= 0
+            return self.info.strength <= 0 && self.info.vitality <= 0 && self.info.spirit <= 0
         }
 
         // ---- Gameplay Methods, Write ---
@@ -2505,43 +2509,41 @@ access(all) contract FGameMishal {
         // Resets the unit's health to match its current status attributes
         access(Host)
         fun resetHealth() {
-            let health = self.borrowHealth()
-            let status = self.borrowStatus()
+            let status = base.borrowStatus()
 
-            health.setValue(AttributeType.STRENGTH, status.attributes.strength)
-            health.setValue(AttributeType.VITALITY, status.attributes.vitality)
-            health.setValue(AttributeType.SPIRIT, status.attributes.spirit)
+            self.info.setValue(AttributeType.STRENGTH, status.attributes.strength)
+            self.info.setValue(AttributeType.VITALITY, status.attributes.vitality)
+            self.info.setValue(AttributeType.SPIRIT, status.attributes.spirit)
 
             emit PawnHealthReset(
-                self.owner?.address ?? panic("Owner not found"),
-                health.strength,
-                health.vitality,
-                health.spirit,
-                uuid: self.uuid
+                base.owner?.address ?? panic("Owner not found"),
+                self.info.strength,
+                self.info.vitality,
+                self.info.spirit,
+                uuid: base.uuid
             )
         }
 
         // Recovers a specific attribute of health by a given amount, not exceeding the max value
         access(Host)
         fun recoverHealth(_ type: AttributeType, _ amount: Int64) {
-            let health = self.borrowHealth()
-            let status = self.borrowStatus()
+            let status = base.borrowStatus()
 
             let maxAttr = status.attributes.getValue(type)
-            let currentAttr = health.getValue(type)
+            let currentAttr = self.info.getValue(type)
 
             var recoverAmount = amount
             if currentAttr + amount > maxAttr {
                 recoverAmount = maxAttr - currentAttr
             }
 
-            health.setValue(type, currentAttr + recoverAmount)
+            self.info.setValue(type, currentAttr + recoverAmount)
 
             emit PawnHealthRecovered(
-                self.owner?.address ?? panic("Owner not found"),
+                base.owner?.address ?? panic("Owner not found"),
                 type.rawValue,
                 recoverAmount,
-                uuid: self.uuid
+                uuid: base.uuid
             )
         }
 
@@ -2553,8 +2555,7 @@ access(all) contract FGameMishal {
             _ type: AttributeType,
             _ extraDefence: Defence?
         ) {
-            let health = self.borrowHealth()
-            let status = self.borrowStatus()
+            let status = base.borrowStatus()
 
             var biggestDamage: Int64 = 0
             for attackType in attacks.keys {
@@ -2575,14 +2576,30 @@ access(all) contract FGameMishal {
                 }
             }
 
-            health.addValue(type, -1 * biggestDamage)
+            self.info.addValue(type, -1 * biggestDamage)
 
             emit PawnHealthDamaged(
-                self.owner?.address ?? panic("Owner not found"),
+                base.owner?.address ?? panic("Owner not found"),
                 type.rawValue,
                 biggestDamage,
-                uuid: self.uuid
+                uuid: base.uuid
             )
+        }
+    }
+
+    // PlayableUnit interface represents a unit that can participate in gameplay and have health-related actions
+    access(all) resource interface PlayableUnit: ComposableUnitStatusCarrier {
+        // Returns a reference to the unit's health
+        access(all) view
+        fun borrowHealth(): &Health? {
+            return self.borrowWritableHealth()
+        }
+
+        // Returns a mutable reference to the unit's health
+        access(Host) view
+        fun borrowWritableHealth(): auth(Host) &Health? {
+            let selfRef = &self as auth(Host) &{ComposableUnitStatusCarrier}
+            return selfRef[Health]
         }
     }
 
@@ -2653,7 +2670,7 @@ access(all) contract FGameMishal {
         access(all) var cultivation: {String: UInt64}
 
         // Returns a mutable reference to the unit's cultivable attributes
-        access(Host) view fun borrowCultivableAttributes(): auth(Mutate) &Attributes
+        access(Host) view fun borrowCultivableAttributes(): &Attributes
 
         // ---- Cultivable Methods, Read ----
 
@@ -2839,50 +2856,111 @@ access(all) contract FGameMishal {
         }
     }
 
-    // The Positino attachment for PlayableUnit, it is used to store the position of the unit for game board
-    // Only when the unit is stored in the board, the attachment will be initialized
-    access(all)
-    attachment PositionXY for PlayableUnit {
-        // Board Information
-        // The board that the unit is stored in
-        access(all) var board: Address
-        // The uuid of the board that the unit is stored in
-        access(all) var boardUuid: UInt64
-
-        // The x coordinate of the unit
+    // The PointXY struct is used to store the position of a point in the game board
+    access(all) struct PointXY {
+        // The x coordinate of the point
         access(all) var x: Int32
-        // The y coordinate of the unit
+        // The y coordinate of the point
         access(all) var y: Int32
 
-        init(_ board: Address, _ boardUuid: UInt64) {
-            self.board = board
-            self.boardUuid = boardUuid
+        init(_ x: Int32, _ y: Int32) {
+            self.x = x
+            self.y = y
+        }
 
-            self.x = 0
-            self.y = 0
+        access(all)
+        fun set(_ x: Int32, _ y: Int32) {
+            self.x = x
+            self.y = y
+        }
+
+        access(all)
+        fun setX(_ x: Int32) {
+            self.x = x
+        }
+
+        access(all)
+        fun setY(_ y: Int32) {
+            self.y = y
+        }
+
+        access(all)
+        fun addX(_ x: Int32) {
+            self.x = self.x + x
+        }
+
+        access(all)
+        fun addY(_ y: Int32) {
+            self.y = self.y + y
+        }
+    }
+
+    // The Position attachment for ComposableUnitStatusCarrier, it is used to store the position of the unit for game board
+    // Only when the unit is stored in the board, the attachment will be initialized
+    access(all)
+    attachment PositionXY for ComposableUnitStatusCarrier {
+        // Board Information
+        access(all) let board: BoardIdentifier
+        // The position of the unit
+        access(all) let point: PointXY
+
+        init(_ board: Address, _ boardUuid: UInt64) {
+            self.board = BoardIdentifier(board, boardUuid)
+
+            self.point = PointXY(0, 0)
         }
 
         // Sets the position of the unit
         access(Host)
         fun setPosition(_ x: Int32, _ y: Int32) {
-            self.x = x
-            self.y = y
+            self.point.set(x, y)
 
             emit PawnPositionUpdated(
-                self.board,
-                self.boardUuid,
+                self.board.container,
+                self.board.id,
                 unit: base.uuid,
-                x: self.x,
-                y: self.y,
+                x: self.point.x,
+                y: self.point.y,
             )
+        }
+
+        // Returns the x coordinate of the unit
+        access(all) view
+        fun getX(): Int32 {
+            return self.point.x
+        }
+
+        // Returns the y coordinate of the unit
+        access(all) view
+        fun getY(): Int32 {
+            return self.point.y
         }
     }
 
-    access(all) resource interface PositionableUnit {
+    // The PositionableUnit interface represents a unit that can be positioned on the game board
+    access(all) resource interface PositionableUnit: ComposableUnitStatusCarrier {
+        // Returns whether the unit is on the board
+        access(all) view
+        fun isOnBoard(): Bool {
+            return self.borrowPosition() != nil
+        }
+
+        // The position of the unit
+        access(all) view
+        fun borrowPosition(): &PositionXY? {
+            return self.borrowWritablePosition()
+        }
+
+        // Returns a mutable reference to the position of the unit
+        access(Host) view
+        fun borrowWritablePosition(): auth(Host) &PositionXY? {
+            let selfRef = &self as auth(Host) &{ComposableUnitStatusCarrier}
+            return selfRef[PositionXY]
+        }
     }
 
     // Pawn resource represents a playable and cultivable character in the game
-    access(all) resource Pawn: PlayableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit, SettingsUnit {
+    access(all) resource Pawn: PlayableUnit, PositionableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit, SettingsUnit {
         // The address of the library this pawn belongs to
         access(contract) let library: Address
         access(contract) let template: EntryIdentifier?
@@ -2894,8 +2972,6 @@ access(all) contract FGameMishal {
 
         // The merged status of the character
         access(all) let status: UnitStatus
-        // The health of the character, can be damaged
-        access(all) var health: Attributes
 
         // --- Cultivable Property ---
 
@@ -3031,7 +3107,6 @@ access(all) contract FGameMishal {
                 defence: Defence(physical: 0,endurance: 0,resistance: 0),
                 potentiality: self.initPotentiality
             )
-            self.health = Attributes(strength: 0, vitality: 0, spirit: 0)
 
             // Initialize the cultivable properties
             self.potentialityUsed = 0
@@ -3063,7 +3138,6 @@ access(all) contract FGameMishal {
 
             // Apply the status and reset the health
             self.applyStatus(true)
-            self.resetHealth()
         }
 
         // ---- Interface Implementation ----
@@ -3084,12 +3158,6 @@ access(all) contract FGameMishal {
         access(Host) view
         fun borrowCultivableAttributes(): auth(Mutate) &Attributes {
             return &self.attributes
-        }
-
-        // Returns a mutable reference to the pawn's health attributes
-        access(Host) view
-        fun borrowHealth(): auth(Mutate) &Attributes {
-            return &self.health
         }
     }
 
@@ -3159,6 +3227,13 @@ access(all) contract FGameMishal {
             return self.owned.keys
         }
 
+        access(all) view
+        fun isPawnOnBoard(_ id: UInt64): Bool {
+            let pawnRef = self.borrowFullWritablePawn(id)
+                ?? panic("Pawn not found")
+            return pawnRef.isOnBoard()
+        }
+
         // Returns a reference to the pawn with the given ID
         access(all) view
         fun borrowPawn(_ id: UInt64): &Pawn? {
@@ -3183,6 +3258,60 @@ access(all) contract FGameMishal {
                 self.owner?.address,
                 template,
                 uuid,
+            )
+        }
+
+        // Attaches a pawn to the board
+        access(contract)
+        fun attachToBoard(_ id: UInt64, _ board: Address, _ boardUuid: UInt64) {
+            let pawnRef = self.borrowFullWritablePawn(id)
+                ?? panic("Pawn not found")
+            assert(!pawnRef.isOnBoard(), message: "Pawn should not be on the board")
+            let library = pawnRef.library
+            let uuid = pawnRef.uuid
+
+            let pawn <- self.owned.remove(key: id) ?? panic("Pawn not found")
+            // Attach position to the pawn
+            let pawnWithPos <- attach PositionXY(board, boardUuid) to <- pawn
+            // Attach health to the pawn
+            let pawnWithHealth <- attach Health() to <- pawnWithPos
+
+            // Store the pawn with the position and health
+            self.owned[uuid] <-! pawnWithHealth
+
+            emit PawnAttachedToBoard(
+                library,
+                self.owner?.address ?? panic("Player not exists"),
+                uuid,
+                board,
+                boardUuid,
+            )
+        }
+
+        // Detaches a pawn from the board
+        access(contract)
+        fun detachFromBoard(_ id: UInt64, _ board: Address, _ boardUuid: UInt64) {
+            let pawnRef = self.borrowFullWritablePawn(id)
+                ?? panic("Pawn not found")
+            assert(pawnRef.isOnBoard(), message: "Pawn should be on the board")
+            let position = pawnRef.borrowPosition() ?? panic("Pawn position not found")
+            assert(position.board.container == board, message: "Pawn should be on the board")
+            assert(position.board.id == boardUuid, message: "Pawn should be on the board")
+
+            let pawn <- self.owned.remove(key: id) ?? panic("Pawn not found")
+            let library = pawnRef.library
+            let uuid = pawnRef.uuid
+
+            remove PositionXY from pawn
+            remove Health from pawn
+            self.owned[uuid] <-! pawn
+
+            emit PawnDetachedFromBoard(
+                library,
+                self.owner?.address ?? panic("Player not exists"),
+                uuid,
+                board,
+                boardUuid,
             )
         }
 
@@ -3246,11 +3375,15 @@ access(all) contract FGameMishal {
         let leftUnits: [PawnIdentifier]
         access(contract)
         let participants: {Address: [UInt64]}
+        access(all)
+        var opened: Bool
 
         init() {
             self.participants = {}
             self.deadUnits = []
             self.leftUnits = []
+
+            self.opened = false
         }
 
         access(all) view
@@ -3299,6 +3432,44 @@ access(all) contract FGameMishal {
             return []
         }
 
+        // Called when the board is opened
+        access(contract)
+        fun onOpening() {
+            pre {
+                !self.opened: "Board should not be opened"
+            }
+
+            let boardAddr = self.owner?.address ?? panic("Host not exists")
+            let boardUuid = self.uuid
+            // Attach the position to the units
+            for participant in self.participants.keys {
+                if let ids = self.borrowParticipantIds(participant) {
+                    for id in ids {
+                        self.attachPawn(participant, id)
+                    }
+                }
+            }
+        }
+
+        // Called when the board is closed
+        access(contract)
+        fun onClosed() {
+            pre {
+                self.opened: "Board should be opened"
+            }
+
+            // Detach the position from the units
+            let boardAddr = self.owner?.address ?? panic("Host not exists")
+            let boardUuid = self.uuid
+            for participant in self.participants.keys {
+                if let ids = self.borrowParticipantIds(participant) {
+                    for id in ids {
+                        self.detachPawn(participant, id)
+                    }
+                }
+            }
+        }
+
         // Returns a mutable reference to the pawn of the participant
         access(Host) view
         fun borrowWritableParticipantPawn(_ address: Address, _ id: UInt64): auth(Host) &Pawn? {
@@ -3318,26 +3489,19 @@ access(all) contract FGameMishal {
 
             let participants = self.borrowAndEnsureParticipants(address)
             assert(!participants.contains(uuid), message: "Pawn already exists")
-            // ensure pawn is alive
-            assert(!pawn.isStunned(), message: "Pawn should not be stunned")
 
             participants.append(uuid)
-
-            emit PawnDeployed(
-                pawn.library,
-                address,
-                uuid,
-                self.owner?.address ?? panic("Host not exists"),
-                self.uuid,
-            )
+            // attach the pawn to the board
+            self.attachPawn(address, uuid)
         }
 
         // Removes a dead pawn from the host board
         access(Host)
         fun removeDeadPawn(_ address: Address, _ id: UInt64) {
             if let pawn = PawnIdentifier(address, id).borrowFullWritablePawn() {
+                let health = pawn.borrowHealth()
                 // ensure pawn is dead
-                assert(pawn.isDead(), message: "Pawn is not dead")
+                assert(health?.isDead() ?? false, message: "Pawn is not dead")
 
                 self.removePawn(pawn)
                 return
@@ -3349,8 +3513,9 @@ access(all) contract FGameMishal {
         access(Host)
         fun removeAlivePawn(_ address: Address, _ id: UInt64) {
             if let pawn = PawnIdentifier(address, id).borrowFullWritablePawn() {
+                let health = pawn.borrowHealth()
                 // ensure pawn is alive
-                assert(!pawn.isDead(), message: "Pawn should be alive")
+                assert(!(health?.isDead() ?? false), message: "Pawn should be alive")
 
                 self.removePawn(pawn)
                 return
@@ -3376,30 +3541,61 @@ access(all) contract FGameMishal {
             if let index = participants.firstIndex(of: pawnId) {
                 let _ = participants.remove(at: index)
 
-                if pawn.isDead() {
-                    self.deadUnits.append(PawnIdentifier(pawnOwner, pawnId))
-                } else {
-                    self.leftUnits.append(PawnIdentifier(pawnOwner, pawnId))
+                if let health = pawn.borrowHealth() {
+                    if health.isDead() {
+                        self.deadUnits.append(PawnIdentifier(pawnOwner, pawnId))
+                    } else {
+                        self.leftUnits.append(PawnIdentifier(pawnOwner, pawnId))
+                    }
                 }
 
-                emit PawnRemoved(
-                    pawn.library,
-                    pawnOwner,
-                    pawn.uuid,
-                    self.owner?.address ?? panic("Host not exists"),
-                    self.uuid,
-                )
+                self.detachPawn(pawnOwner, pawnId)
             }
         }
 
         access(self)
+        fun attachPawn(_ address: Address, _ uuid: UInt64) {
+            let pocketRef = FGameMishal.borrowPlayerPocket(address)
+                ?? panic("Player pocket not found")
+            assert(pocketRef.borrowPawn(uuid) != nil, message: "Pawn not found")
+
+            if !pocketRef.isPawnOnBoard(uuid) {
+                pocketRef.attachToBoard(uuid, self.getContainerAddress(), self.uuid)
+            }
+        }
+
+        access(self)
+        fun detachPawn(_ address: Address, _ uuid: UInt64) {
+            let pocketRef = FGameMishal.borrowPlayerPocket(address)
+                ?? panic("Player pocket not found")
+            assert(pocketRef.borrowPawn(uuid) != nil, message: "Pawn not found")
+
+            if pocketRef.isPawnOnBoard(uuid) {
+                pocketRef.detachFromBoard(uuid, self.getContainerAddress(), self.uuid)
+            }
+        }
+
+        access(self) view
+        fun getContainerAddress(): Address {
+            return self.owner?.address ?? panic("Host not exists")
+        }
+
+        access(self)
         fun borrowAndEnsureParticipants(_ address: Address): auth(Mutate) &[UInt64] {
-            if let participants = &self.participants[address] as auth(Mutate) &[UInt64]? {
+            if let participants = self.borrowParticipantIds(address) {
                 return participants
             } else {
                 self.participants[address] = []
                 return &self.participants[address]!
             }
+        }
+
+        access(self) view
+        fun borrowParticipantIds(_ address: Address): auth(Mutate) &[UInt64]? {
+            if let ids = &self.participants[address] as auth(Mutate) &[UInt64]? {
+                return ids
+            }
+            return nil
         }
     }
 
@@ -3437,7 +3633,10 @@ access(all) contract FGameMishal {
         let container: Address
         let id: UInt64
 
-        init(_ container: Address, _ id: UInt64) {
+        view init(
+            _ container: Address,
+            _ id: UInt64,
+        ) {
             self.container = container
             self.id = id
         }
@@ -3457,11 +3656,11 @@ access(all) contract FGameMishal {
 
         access(all) view
         fun borrowBoard(): &HostBoard? {
-            return self.borrowWritableBoard(self.id)
+            return self.borrowWritableBoard()
         }
 
         access(contract) view
-        fun borrowWritableBoard(_ uuid: UInt64): auth(Host) &HostBoard? {
+        fun borrowWritableBoard(): auth(Host) &HostBoard? {
             if let container = self.borrowBoardContainer() {
                 if let board = container.borrowBoard(self.id) {
                     return board.borrowInternalWritableBoard()
@@ -3475,9 +3674,9 @@ access(all) contract FGameMishal {
     // This resource is stored in the host's account
     access(all) resource HostOperator {
         access(contract)
-        let boards: {UInt64: Capability<auth(Host) &HostBoard>}
+        let boards: {Address: [UInt64]}
         access(contract)
-        let activeBoards: [UInt64]
+        let activeBoards: [BoardIdentifier]
         access(contract)
         var pawnSpawner: Capability<auth(Host) &{PawnSpawner}>?
 
@@ -3493,15 +3692,11 @@ access(all) contract FGameMishal {
         }
 
         access(all) view
-        fun getActiveBoardIDs(): [UInt64] {
+        fun getActiveBoards(): [BoardIdentifier] {
             return self.activeBoards
         }
 
-        access(all) view
-        fun borrowBoard(_ uuid: UInt64): &HostBoard? {
-            return self.borrowWritableBoard(uuid)
-        }
-
+        // Updates the pawn spawner
         access(Host)
         fun updatePawnSpawner(_ pawnSpawner: Capability<auth(Host) &{PawnSpawner}>) {
             pre {
@@ -3517,6 +3712,7 @@ access(all) contract FGameMishal {
             )
         }
 
+        // Returns a mutable reference to the pawn spawner
         access(Host) view
         fun borrowPawnSpawner(): auth(Host) &{PawnSpawner}? {
             if let spwaner = self.pawnSpawner?.borrow() {
@@ -3525,47 +3721,88 @@ access(all) contract FGameMishal {
             return nil
         }
 
+        // Returns a mutable reference to the board with the given container and id
         access(Host) view
-        fun borrowWritableBoard(_ uuid: UInt64): auth(Host) &HostBoard? {
-            if let cap = self.boards[uuid] {
-                return cap.borrow()
+        fun borrowWritableBoard(_ container: Address, _ id: UInt64): auth(Host) &HostBoard? {
+            return self.borrowInternalWritableBoard(container, id)
+        }
+
+        // Opens a board
+        access(Host)
+        fun openBoard(_ container: Address, _ id: UInt64) {
+            let boardIdentifier = BoardIdentifier(container, id)
+            let board = boardIdentifier.borrowWritableBoard()
+                ?? panic("Board not found")
+
+            if self.boards[container] == nil {
+                self.boards[container] = []
+            }
+            let ids = self.borrowBoardContainerIds(container)
+                ?? panic("Board container not found")
+            assert(!ids.contains(id), message: "Board has already added")
+
+            ids.append(id)
+            self.activeBoards.append(boardIdentifier)
+
+            // open the board
+            board.onOpening()
+
+            emit HostBoardOpened(self.owner?.address ?? panic("Host not exists"), container, id)
+        }
+
+        // Closes a board
+        access(Host)
+        fun closeBoard(_ container: Address, _ id: UInt64) {
+            let boardIdentifier = BoardIdentifier(container, id)
+            let board = boardIdentifier.borrowWritableBoard()
+                ?? panic("Board not found")
+
+            assert(board.isActive() == false, message: "Board should be inactive")
+
+            let ids = self.borrowBoardContainerIds(container)
+                ?? panic("Board container not found")
+            assert(ids.contains(id), message: "Board not found")
+
+            // remove the board from the container
+            let index = ids.firstIndex(of: id)
+                ?? panic("Board not found")
+            let _ = ids.remove(at: index)
+
+            // remove the board from the active boards
+            let len = self.activeBoards.length
+            var i = 0
+            while i < len {
+                if self.activeBoards[i].container == container && self.activeBoards[i].id == id {
+                    let _ = self.activeBoards.remove(at: i)
+                    break
+                }
+                i = i + 1
+            }
+
+            // close the board
+            board.onClosed()
+
+            emit HostBoardClosed(self.owner?.address ?? panic("Host not exists"), container, id)
+        }
+
+        // Returns a mutable reference to the board with the given container and id
+        access(self) view
+        fun borrowInternalWritableBoard(_ container: Address, _ id: UInt64): auth(Host) &HostBoard? {
+            if let ids = self.borrowBoardContainerIds(container) {
+                if ids.contains(id) {
+                    return BoardIdentifier(container, id).borrowWritableBoard()
+                }
             }
             return nil
         }
 
-        access(Host)
-        fun openBoard(_ cap: Capability<auth(Host) &HostBoard>) {
-            pre {
-                cap.borrow() != nil: "Board's capability is not valid"
+        // Returns a mutable reference to the board with the given container and id
+        access(self) view
+        fun borrowBoardContainerIds(_ container: Address): auth(Mutate) &[UInt64]? {
+            if let ids = &self.boards[container] as auth(Mutate) &[UInt64]? {
+                return ids
             }
-            let board = cap.borrow()!
-            let uuid = board.uuid
-
-            assert(self.boards[uuid] == nil, message: "Board has already added")
-            assert(self.activeBoards.contains(uuid), message: "Board is not active")
-
-            self.boards[uuid] = cap
-            self.activeBoards.append(uuid)
-
-            emit HostBoardOpened(self.owner?.address ?? panic("Host not exists"), uuid)
-        }
-
-        access(Host)
-        fun closeBoard(_ uuid: UInt64) {
-            pre {
-                self.activeBoards.contains(uuid): "Board is not active"
-                self.boards[uuid] == nil: "Board has already added"
-            }
-            assert(self.boards[uuid] != nil, message: "Board not found")
-            let board = self.boards[uuid]!.borrow()
-                ?? panic("Board not found")
-
-            assert(!board.isActive(), message: "Board should be inactive")
-
-            let _cap = self.boards.remove(key: uuid)
-            let _ = self.activeBoards.remove(at: self.activeBoards.firstIndex(of: uuid)!)
-
-            emit HostBoardClosed(self.owner?.address ?? panic("Host not exists"), uuid)
+            return nil
         }
     }
 
