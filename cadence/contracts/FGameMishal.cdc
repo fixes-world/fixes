@@ -51,6 +51,10 @@ access(all) contract FGameMishal {
     access(all) event PawnHealthRecovered(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
     access(all) event PawnHealthDamaged(_ owner: Address?, _ type: UInt8, _ amount: Int64, uuid: UInt64)
 
+    access(all) event PawnPositionUpdated(_ board: Address, _ boardUuid: UInt64, unit: UInt64, x: Int32, y: Int32)
+
+    access(all) event HostBoardCreated(_ host: Address, _ uuid: UInt64)
+    access(all) event HostOperatorSpawnerUpdated(_ host: Address, _ uuid: UInt64, _ pawnSpawner: Address, _ pawnSpawnerUuid: UInt64)
     access(all) event HostBoardOpened(_ host: Address, _ uuid: UInt64)
     access(all) event HostBoardClosed(_ host: Address, _ uuid: UInt64)
 
@@ -64,6 +68,8 @@ access(all) contract FGameMishal {
 
     access(all) let pocketStoragePath: StoragePath
     access(all) let pocketPublicPath: PublicPath
+
+    access(all) let hostBoardContainerPublicPath: PublicPath
 
     access(all) let hostOperatorStoragePath: StoragePath
     access(all) let hostOperatorPublicPath: PublicPath
@@ -2833,6 +2839,48 @@ access(all) contract FGameMishal {
         }
     }
 
+    // The Positino attachment for PlayableUnit, it is used to store the position of the unit for game board
+    // Only when the unit is stored in the board, the attachment will be initialized
+    access(all)
+    attachment PositionXY for PlayableUnit {
+        // Board Information
+        // The board that the unit is stored in
+        access(all) var board: Address
+        // The uuid of the board that the unit is stored in
+        access(all) var boardUuid: UInt64
+
+        // The x coordinate of the unit
+        access(all) var x: Int32
+        // The y coordinate of the unit
+        access(all) var y: Int32
+
+        init(_ board: Address, _ boardUuid: UInt64) {
+            self.board = board
+            self.boardUuid = boardUuid
+
+            self.x = 0
+            self.y = 0
+        }
+
+        // Sets the position of the unit
+        access(Host)
+        fun setPosition(_ x: Int32, _ y: Int32) {
+            self.x = x
+            self.y = y
+
+            emit PawnPositionUpdated(
+                self.board,
+                self.boardUuid,
+                unit: base.uuid,
+                x: self.x,
+                y: self.y,
+            )
+        }
+    }
+
+    access(all) resource interface PositionableUnit {
+    }
+
     // Pawn resource represents a playable and cultivable character in the game
     access(all) resource Pawn: PlayableUnit, CultivableUnit, CollectionContainerUnit, BioPromptsUnit, MergableStatusUnit, SettingsUnit {
         // The address of the library this pawn belongs to
@@ -3048,6 +3096,10 @@ access(all) contract FGameMishal {
     // ------------ Host and Player Resources ------------
 
     access(all) resource interface PawnSpawner {
+        // Returns whether the player is spawnable
+        access(Host) view
+        fun isPlayerSpawnable(_ player: Address): Bool
+
         // Creates a new pawn
         access(Host)
         fun createPawn(
@@ -3075,6 +3127,9 @@ access(all) contract FGameMishal {
         // Stores a pawn in the player's pocket
         access(Host)
         fun storePawn(_ player: Address, _ pawn: @Pawn) {
+            pre {
+                self.isPlayerSpawnable(player): "Player is not spawnable"
+            }
             let pocketRef = FGameMishal.borrowPlayerPocket(player)
                 ?? panic("Player pocket not found")
             pocketRef.addPawn(<- pawn)
@@ -3303,6 +3358,14 @@ access(all) contract FGameMishal {
             panic("Pawn not found")
         }
 
+        // --- Internal Functions ---
+
+        // Returns a mutable reference to the board with the given UUID
+        access(contract) view
+        fun borrowInternalWritableBoard(): auth(Host) &HostBoard {
+            return &self
+        }
+
         // ---- Private Functions ----
 
         access(self)
@@ -3340,23 +3403,88 @@ access(all) contract FGameMishal {
         }
     }
 
-    // Creates a new host board
-    access(all)
-    fun createBoard(): @HostBoard {
-        return <- create HostBoard()
+    access(all) resource interface HostBoardContainer {
+        // Returns a reference to the board with the given UUID
+        access(all) view
+        fun borrowBoard(_ uuid: UInt64): &HostBoard? {
+            return self.borrowWritableBoard(uuid)
+        }
+
+        // Returns a mutable reference to the board with the given UUID
+        access(Host) view
+        fun borrowWritableBoard(_ uuid: UInt64): auth(Host) &HostBoard?
+
+        // Stores a board in the container
+        access(Host)
+        fun storeBoard(_ board: @HostBoard)
+
+        // Creates a new host board
+        access(Host)
+        fun createNewBoard(): UInt64 {
+            let newBoard <- create HostBoard()
+            let uuid = newBoard.uuid
+            self.storeBoard(<- newBoard)
+
+            emit HostBoardCreated(
+                self.owner?.address ?? panic("Host not exists"),
+                uuid,
+            )
+            return uuid
+        }
+    }
+
+    access(all) struct BoardIdentifier {
+        let container: Address
+        let id: UInt64
+
+        init(_ container: Address, _ id: UInt64) {
+            self.container = container
+            self.id = id
+        }
+
+        access(all) view
+        fun toString(): String {
+            return self.container.toString().concat("#").concat(self.id.toString())
+        }
+
+        access(all) view
+        fun borrowBoardContainer(): &{HostBoardContainer}? {
+            return getAccount(self.container)
+                .capabilities
+                .get<&{HostBoardContainer}>(FGameMishal.hostBoardContainerPublicPath)
+                .borrow()
+        }
+
+        access(all) view
+        fun borrowBoard(): &HostBoard? {
+            return self.borrowWritableBoard(self.id)
+        }
+
+        access(contract) view
+        fun borrowWritableBoard(_ uuid: UInt64): auth(Host) &HostBoard? {
+            if let container = self.borrowBoardContainer() {
+                if let board = container.borrowBoard(self.id) {
+                    return board.borrowInternalWritableBoard()
+                }
+            }
+            return nil
+        }
     }
 
     // The HostOperator resource is used to manage the active containers of the host
     // This resource is stored in the host's account
-    access(all) resource HostOperator: PawnSpawner {
+    access(all) resource HostOperator {
         access(contract)
         let boards: {UInt64: Capability<auth(Host) &HostBoard>}
         access(contract)
         let activeBoards: [UInt64]
+        access(contract)
+        var pawnSpawner: Capability<auth(Host) &{PawnSpawner}>?
 
         view init() {
             self.boards = {}
             self.activeBoards = []
+            self.pawnSpawner = nil
         }
 
         access(all) view
@@ -3372,6 +3500,29 @@ access(all) contract FGameMishal {
         access(all) view
         fun borrowBoard(_ uuid: UInt64): &HostBoard? {
             return self.borrowWritableBoard(uuid)
+        }
+
+        access(Host)
+        fun updatePawnSpawner(_ pawnSpawner: Capability<auth(Host) &{PawnSpawner}>) {
+            pre {
+                pawnSpawner.borrow() != nil: "Pawn spawner is not valid"
+            }
+            self.pawnSpawner = pawnSpawner
+
+            emit HostOperatorSpawnerUpdated(
+                self.owner?.address ?? panic("Host not exists"),
+                self.uuid,
+                pawnSpawner.address,
+                pawnSpawner.borrow()?.uuid ?? panic("Pawn spawner is not valid"),
+            )
+        }
+
+        access(Host) view
+        fun borrowPawnSpawner(): auth(Host) &{PawnSpawner}? {
+            if let spwaner = self.pawnSpawner?.borrow() {
+                return spwaner
+            }
+            return nil
         }
 
         access(Host) view
@@ -3480,5 +3631,7 @@ access(all) contract FGameMishal {
 
         self.hostOperatorStoragePath = StoragePath(identifier: identifier.concat("_HostOperator"))!
         self.hostOperatorPublicPath = PublicPath(identifier: identifier.concat("_HostOperator"))!
+
+        self.hostBoardContainerPublicPath = PublicPath(identifier: identifier.concat("_HostBoardContainer"))!
     }
 }
