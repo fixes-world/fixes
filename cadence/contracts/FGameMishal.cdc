@@ -59,6 +59,7 @@ access(all) contract FGameMishal {
 
     access(all) event HostOperatorSpawnerUpdated(_ host: Address, _ uuid: UInt64, _ pawnSpawner: Address, _ pawnSpawnerUuid: UInt64)
     access(all) event HostOperatorBoardContainerAdded(_ host: Address, _ uuid: UInt64, _ container: Address)
+    access(all) event HostOperatorBoardContainerRemoved(_ host: Address, _ uuid: UInt64, _ container: Address)
 
     // ----- Contract Level Variables -----
 
@@ -3724,6 +3725,36 @@ access(all) contract FGameMishal {
             self.boardContainers[addr] = cap
 
             emit HostOperatorBoardContainerAdded(
+                self.owner?.address ?? panic("Host not exists"),
+                self.uuid,
+                addr,
+            )
+        }
+
+        access(Host)
+        fun removeBoardContainer(_ addr: Address) {
+            pre {
+                self.boardContainers.keys.contains(addr): "Board container not found"
+            }
+
+            // check if the board container is empty
+            let ids = self.borrowBoardContainerIds(addr)
+                ?? panic("Board container not found")
+
+            // Close all boards
+            for id in ids {
+                let board = self.borrowInternalWritableBoard(addr, id)
+                    ?? panic("Board not found")
+                if board.isActive() {
+                    self.closeBoard(addr, id)
+                }
+            }
+
+            // Remove the board container
+            let _ = self.boardContainers.remove(key: addr)
+
+            // emit event
+            emit HostOperatorBoardContainerRemoved(
                 self.owner?.address ?? panic("Host not exists"),
                 self.uuid,
                 addr,
