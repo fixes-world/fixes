@@ -35,6 +35,20 @@
 				"testnet": "b7248baa24a95c3f"
 			}
 		},
+		"FGameMishal": {
+			"source": "cadence/contracts/FGameMishal.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "b7248baa24a95c3f"
+			}
+		},
+		"FGameMishalBattleField": {
+			"source": "cadence/contracts/FGameMishalBattleField.cdc",
+			"aliases": {
+				"mainnet": "d2abb5dbf5e08666",
+				"testnet": "b7248baa24a95c3f"
+			}
+		},
 		"FRC20AccountsPool": {
 			"source": "cadence/contracts/FRC20AccountsPool.cdc",
 			"aliases": {
@@ -1071,7 +1085,9 @@
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
 				"FungibleTokenManager",
-				"FixesTVL"
+				"FixesTVL",
+				"FGameMishal",
+				"FGameMishalBattleField"
 			]
 		},
 		"mainnet": {
@@ -1113,7 +1129,9 @@
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
 				"FungibleTokenManager",
-				"FixesTVL"
+				"FixesTVL",
+				"FGameMishal",
+				"FGameMishalBattleField"
 			]
 		},
 		"testnet": {
@@ -1155,7 +1173,9 @@
 				"FixesFungibleToken",
 				"FRC20FungibleToken",
 				"FungibleTokenManager",
-				"FixesTVL"
+				"FixesTVL",
+				"FGameMishal",
+				"FGameMishalBattleField"
 			]
 		}
 	}
