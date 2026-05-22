@@ -1004,6 +1004,9 @@ access(all) contract FRC20Storefront {
                         // rest amount can be paid to the deployer pool
                         if partialPayment.balance > 0.0 {
                             payToDeployer(<- partialPayment)
+                        } else {
+                            // Consume empty vault (no-op deposit); required once Cadence flags unhandled resources
+                            tokenTreasury.deposit(from: <- partialPayment)
                         }
                     } else {
                         // If the market shared store is not set, pay to the token treasury
